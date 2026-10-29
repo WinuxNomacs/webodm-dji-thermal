@@ -48,8 +48,8 @@ themselves are not kept.
 
 By default the temperatures come from dji-thermal-cli's built-in port of DJI's Thermal SDK v1.8, which gives the
 same results as DJI's own SDK on DJI's sample images. If you prefer DJI's own library, it can compute every
-photo's temperatures instead. The **DJI Thermal** entry of WebODM's menu shows every user which of the two is in
-use; administrators change it there:
+photo's temperatures instead. The **DJI Thermal** page, under **Administration** in WebODM's menu (for
+superusers only), shows which of the two is in use and changes it:
 
 - **Upload** the [DJI Thermal SDK](https://www.dji.com/downloads/softwares/dji-thermal-sdk) zip as DJI's site gives
   it (version 1.8; another version is refused). The plugin keeps only the libraries for the server (Linux x64 in
@@ -77,7 +77,7 @@ checked on a real flight; the others on DJI's Thermal SDK sample images only.
 The plugin's parts: `converter.py` (R-JPEG to TIFF), `api.py` (its API, under `/api/plugins/dji-thermal/`:
 `describe` a photo's camera, recorded values and ranges; `projects/<id>/tasks/<id>/convert` one photo into a
 partial task, with WebODM's project permission), `sdk.py` with `page.py` and `templates/sdk.html` (DJI's own SDK
-and the DJI Thermal page, `/plugins/dji-thermal/`), and `public/` (`main.js`, which adds the button, and
+and the DJI Thermal page, `/plugins/dji-thermal/`), and `public/` (`main.js`, which adds the button and the page's link under Administration, and
 `thermal/`, the button and panel, JSX built by WebODM's webpack when the plugin is installed).
 
 The tests never use images or DJI's files from this repository: none is committed or published. Those that need
