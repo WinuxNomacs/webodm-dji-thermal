@@ -9,7 +9,11 @@
 
 **Later**
 - **Folder conversion** for administrators (images already on the server), if wanted (below).
-- **Thermal tools on the map** (temperature under the cursor, spot and area measurements): evaluate (below).
+- **Thermal Analyzer, part 1** — storage on the plugin's data stores, datasets and conversions, mosaics on the map
+  (below).
+- **Thermal Analyzer, part 2** — measurements (spot, line, area), comparisons and frame views (below).
+- **Pixel Inspector** — the map control (value under the cursor, region statistics), with its point and region
+  endpoints served by the plugin (below).
 
 **Done**
 - **The DJI Thermal page under Administration** — 2026-10-29, `admin-page` (details below).
@@ -319,10 +323,42 @@ camera's own conversion kept in `raw/`, a CSV report, progress and Cancel in the
 a section of the DJI Thermal page (under Administration, superusers only). Open: wanted at all, since it needs server
 paths (admins of a Docker install only).
 
-## Later: Thermal tools on the map
+## Later: Thermal Analyzer and Pixel Inspector
 
-The earlier work also has a map control (value under the cursor, pinned points, region statistics) and a larger
-thermal workspace. The control uses only `PluginsAPI.Map` hooks, but reads raster values from point and
-region-stats endpoints that WebODM 3.3.2 does not have: the plugin would serve them itself. The workspace keeps
-its data in Django models, which a plugin may not have: it would need rewriting on data stores. To be evaluated
+**The request** (the user, 2026-10-29): add the earlier plugin's Thermal Analyzer to this plugin; recorded as phases
 after 1.0.0.
+
+What the earlier work has:
+- **Thermal Analyzer**: about 7,000 lines (2,000 Python, 5,000 JavaScript) and a 3,400-line JS test file. Datasets,
+  conversions, mosaics on a map with live palette and contrast, side-by-side and difference comparisons, spot, line
+  and area measurements, frame views, a conversion handed to a task. Its folder carries a `disabled` file there:
+  find out why before porting it.
+- **Pixel Inspector**: about 2,500 lines and tests; a map control (`PluginsAPI.Map` hooks only) showing the value
+  under the cursor, pinned points and region statistics.
+
+What ports as it is:
+- The Python parses as Python 3.9; every outside dependency it uses is in WebODM 3.3.2 (`zipstream-ng`, `Basemap`,
+  the worker's `process_task`, `run_function_async`, django-guardian permissions).
+- Measuring and mosaics come from dji-thermal-cli's API, which the plugin pins, so they use DJI's own SDK when one
+  is installed.
+- Its pages are the plugin's own (page routes and about 35 API routes), no fork-only hooks.
+
+What has to change, all within the plugin rules (no change to WebODM):
+1. **Its three Django models** (`ThermalDataset`, `ThermalConversion`, `ThermalMeasurement`: 266 lines, 45 fields,
+   about 37 query sites) move to the plugin's data stores, which are key/value JSON rows: a key per record,
+   progress from the worker under keys of its own so writes don't overwrite each other, listing and permissions
+   by hand through the project's permissions. WebODM gives plugins no "project deleted" signal (task signals
+   only): records of a deleted project are ignored and cleaned up when next seen. Dataset sizes no longer count
+   toward the owner's quota as they did there.
+2. **The Pixel Inspector** reads `point` and `region-stats` endpoints WebODM 3.3.2 lacks: the plugin serves them
+   itself, reading the task's rasters.
+3. **Merged with this plugin**: its upload-and-convert duplicates the Thermal Task, so it reuses this plugin's
+   converter, SDK choice and task creation.
+4. **Tests**: the Jest tests mostly carry over; the Python tests are rewritten against the data stores; live
+   checks on the M4T flight. Its JavaScript is mostly plain (not JSX), which fits the plugin's build.
+
+Phases, in order: **part 1** (storage on data stores, datasets and conversions, mosaics on the map), **part 2**
+(measurements, comparisons, frame views), **Pixel Inspector** (the map control and its endpoints).
+
+Open, to plan with the user before part 1: where the Analyzer's page goes (every user's menu, since it works on
+their own projects), whether the `disabled` state there hides a known problem, and what of the quota matters.
