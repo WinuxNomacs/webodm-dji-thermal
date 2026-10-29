@@ -19,7 +19,7 @@ PluginsAPI.Dashboard.addNewTaskButton(
         var item = document.createElement("li");
         item.id = "dji-thermal-admin-menu";
         var link = document.createElement("a");
-        link.href = "/plugins/dji-thermal/";
+        link.href = "/plugins/dji-thermal/sdk/";
         link.innerHTML = '<i class="fa fa-thermometer-half fa-fw"></i> ';
         link.appendChild(document.createTextNode("DJI Thermal"));
         item.appendChild(link);

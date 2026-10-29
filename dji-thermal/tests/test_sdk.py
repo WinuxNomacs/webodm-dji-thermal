@@ -24,7 +24,7 @@ from .test_converter import ConverterTestCase, jpegs_in, read_tags
 converter = importlib.import_module("coreplugins.dji-thermal.converter")
 sdk = importlib.import_module("coreplugins.dji-thermal.sdk")
 
-PAGE_URL = "/plugins/dji-thermal/"
+PAGE_URL = "/plugins/dji-thermal/sdk/"
 LIBS = "tsdk-core/lib/linux/release_x64/"
 
 
@@ -188,7 +188,8 @@ class TestPage(SdkTestCase):
         self.assertContains(res, 'name="sdk_zip"')
 
     def test_the_page_is_not_in_the_menu_every_user_sees(self):
-        self.assertEqual(get_plugin_by_name("dji-thermal", only_active=False).main_menu(), [])
+        menu = get_plugin_by_name("dji-thermal", only_active=False).main_menu()
+        self.assertEqual([m.link for m in menu], ["/plugins/dji-thermal/"])
 
     def test_a_refused_upload_is_reported_on_the_page(self):
         client = self.client_for("testsuperuser")

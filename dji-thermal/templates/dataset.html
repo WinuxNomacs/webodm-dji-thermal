@@ -1,0 +1,50 @@
+{% extends "app/plugins/templates/base.html" %}
+{% block content %}
+<link rel="stylesheet" href="{{ public }}analyzer.css">
+
+<div id="ta-dataset" class="ta-page" data-api="{{ api }}" data-public="{{ public }}" data-id="{{ dataset.id }}">
+    {% csrf_token %}
+    <div class="ta-breadcrumb"><a href="{{ public }}"><i class="fa fa-arrow-left"></i> Thermal Analyzer</a></div>
+    <div class="ta-header">
+        <div>
+            <h3 id="ta-name">{{ dataset.name }}</h3>
+            <div class="ta-subtitle" id="ta-subtitle"></div>
+        </div>
+        <div class="ta-header-actions" id="ta-actions">
+            <label class="btn btn-default btn-sm ta-pick" id="ta-add" hidden title="Add images to this dataset"><i class="fa fa-plus"></i> Add images
+                <input type="file" id="ta-add-files" multiple accept=".jpg,.jpeg,image/jpeg" hidden></label>
+            <button type="button" class="btn btn-default btn-sm" id="ta-analyze" hidden><i class="fa fa-sync"></i> Analyze again</button>
+            <button type="button" class="btn btn-default btn-sm" id="ta-cancel" hidden><i class="fa fa-stop"></i> Cancel</button>
+            <button type="button" class="btn btn-default btn-sm" id="ta-copy-link" title="Copy a link to this dataset"><i class="fa fa-link"></i> Copy link</button>
+            <button type="button" class="btn btn-default btn-sm" id="ta-rename" hidden title="Rename"><i class="fa fa-pencil-alt"></i></button>
+            <button type="button" class="btn btn-danger btn-sm" id="ta-delete" hidden title="Delete"><i class="fa fa-trash"></i></button>
+        </div>
+    </div>
+
+    <div class="ta-sharing" id="ta-sharing" hidden></div>
+    <div class="ta-status" id="ta-status"></div>
+    <div class="ta-upload-progress" id="ta-add-progress" hidden>
+        <div class="progress"><div class="progress-bar" role="progressbar" style="width: 0%;"></div></div>
+        <span id="ta-add-progress-text"></span>
+        <button type="button" class="btn btn-default btn-xs" id="ta-add-cancel">Cancel</button>
+    </div>
+    <div class="ta-status text-danger" id="ta-add-failed" hidden>
+        <span id="ta-add-failed-text"></span>
+        <button type="button" class="btn btn-default btn-xs" id="ta-add-retry">Send them again</button>
+    </div>
+
+    <div class="ta-overview" id="ta-overview"></div>
+
+    <ul class="nav nav-tabs ta-tabs" id="ta-tabs" hidden>
+        <li class="active"><a href="#files" data-tab="files">Files <span class="badge" id="ta-files-count"></span></a></li>
+        <li><a href="#problems" data-tab="problems">Problems <span class="badge" id="ta-problems-count"></span></a></li>
+        <li><a href="#webodm" data-tab="webodm">WebODM plan</a></li>
+    </ul>
+    <div class="ta-tab" id="ta-tab-files" data-tab="files"></div>
+    <div class="ta-tab" id="ta-tab-problems" data-tab="problems" hidden></div>
+    <div class="ta-tab" id="ta-tab-webodm" data-tab="webodm" hidden></div>
+</div>
+
+<script src="{{ public }}analyzer_core.js"></script>
+<script src="{{ public }}dataset.js"></script>
+{% endblock %}
