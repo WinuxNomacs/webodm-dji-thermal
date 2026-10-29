@@ -1,6 +1,6 @@
 """
-Tests of the conversion of DJI R-JPEGs into temperature TIFFs: which files are converted, the TIFF and its metadata,
-and what happens when a file or a tool fails.
+Tests of the conversion of DJI R-JPEGs into temperature TIFFs: which files are converted, the measurement settings,
+the TIFF and its metadata, and what happens when a file or a tool fails.
 
 No image is ever committed. The tests that need real R-JPEGs read them from two folders, and are skipped when they
 are empty (see the README): DJI_THERMAL_SAMPLES_DIR, DJI's Thermal SDK sample images with one folder per camera,
@@ -133,14 +133,25 @@ class TestMetadata(ConverterTestCase):
         Image.fromarray(np.full((48, 64), 21.5, dtype=np.float32)).save(path, format="TIFF")
         return path
 
-    def test_the_exiftool_command_copies_all_the_metadata_and_names_the_band_lwir(self):
-        command = converter.exiftool_command("/in/a.jpg", "/out/a.tif")
+    def test_the_exiftool_command_copies_all_the_metadata_names_the_band_lwir_and_adds_the_measurement(self):
+        command = converter.exiftool_command("/in/a.jpg", "/out/a.tif", {"Emissivity": "0.95"})
         self.assertEqual(command[1:3], ["-config", converter.EXIFTOOL_CONFIG_FILE])
         self.assertTrue(os.path.isfile(converter.EXIFTOOL_CONFIG_FILE))
         self.assertIn("-XMP-Camera:BandName=LWIR", command)
+        self.assertIn("-XMP-dtc:Emissivity=0.95", command)
         self.assertEqual(command[command.index("-TagsFromFile") + 1:command.index("-TagsFromFile") + 3],
                          ["/in/a.jpg", "-all:all>all:all"])
         self.assertEqual(command[-2:], ["-overwrite_original", "/out/a.tif"])
+
+    def test_the_measurement_is_written_in_the_tiff_s_xmp(self):
+        measurement = mock.Mock(params={"distance": 29.422, "humidity": 50.0, "emissivity": 0.8999999761581421,
+                                        "reflection": 27.75}, distance_source="rangefinder")
+        source, dest = self.jpeg("DJI_0001_T.JPG", image_source="InfraredCamera"), self.float_tiff("out.tif")
+        self.assertEqual(converter.copy_metadata(source, dest, converter.measurement_tags(measurement)), "")
+        tags = read_tags(dest, "XMP-dtc:all")
+        tags.pop("SourceFile")
+        self.assertEqual(tags, {"Software": "dji-thermal-cli 1.7.0", "Distance": 29.422, "Humidity": 50,
+                                "Emissivity": 0.9, "ReflectedTemperatureC": 27.75, "DistanceSource": "rangefinder"})
 
     def test_the_tiff_gets_the_source_s_gps_and_the_lwir_band_name(self):
         exif = Image.Exif()
@@ -178,6 +189,40 @@ class TestMetadata(ConverterTestCase):
             self.assertIn("exiftool did not run", converter.copy_metadata("a.jpg", "a.tif"))
 
 
+class TestMeasurementSettings(ConverterTestCase):
+    def test_by_default_the_rangefinder_s_distance_and_the_recorded_parameters_are_used(self):
+        for values in (None, {}, {"distance": "", "emissivity": "", "humidity": None}):
+            with self.subTest(values=values):
+                s = converter.settings(values)
+                self.assertEqual(s.distance, "lrf")
+                self.assertEqual(s.unit, "C")
+                for name in converter.MEASUREMENT_FIELDS:
+                    self.assertIsNone(getattr(s, name), name)
+
+    def test_the_values_sent_as_text_are_read_as_numbers(self):
+        s = converter.settings({"distance": "12.5", "emissivity": "0.95", "reflected_temp": "-3",
+                                "ambient_temp": "21", "humidity": "70"})
+        self.assertEqual((s.distance, s.emissivity, s.reflected_temp, s.ambient_temp, s.humidity),
+                         (12.5, 0.95, -3.0, 21.0, 70.0))
+
+    def test_the_recorded_distance_can_be_chosen_instead_of_the_rangefinder_s(self):
+        self.assertEqual(converter.settings({"distance": "embedded"}).distance, "embedded")
+
+    def test_temperatures_in_fahrenheit_are_measured_in_celsius(self):
+        s = converter.settings({"unit": "f", "reflected_temp": "50", "ambient_temp": "32"})
+        self.assertEqual(s.overrides().reflection, 10.0)
+        self.assertEqual(s.overrides().ambient_temp, 0.0)
+
+    def test_a_value_that_is_not_a_number_is_refused_naming_it(self):
+        for values, message in (({"emissivity": "high"}, "emissivity must be a number"),
+                                ({"distance": "far"}, "distance must be a number"),
+                                ({"humidity": "nan"}, "humidity must be a number"),
+                                ({"unit": "K"}, "unit must be C or F"),
+                                ({"reflected_temp": "-500"}, "reflected_temp")):
+            with self.subTest(values=values), self.assertRaisesRegex(ValueError, message):
+                converter.settings(values)
+
+
 class TestFailedConversions(ConverterTestCase):
     def convert_thermal(self, **patches):
         source = self.jpeg("DJI_0001_T.JPG")
@@ -193,7 +238,8 @@ class TestFailedConversions(ConverterTestCase):
     def test_a_tiff_whose_metadata_could_not_be_written_is_removed(self):
         # Without its GPS and band name, ODM could neither place the image nor treat it as thermal
         temps = np.zeros((48, 64), dtype=np.float32)
-        source, reason = self.convert_thermal(measure=mock.Mock(return_value=temps),
+        measurement = mock.Mock(temperature=temps, params={}, distance_source="embedded")
+        source, reason = self.convert_thermal(measure=mock.Mock(return_value=measurement),
                                               copy_metadata=mock.Mock(return_value="exiftool not found"))
         self.assertEqual(reason, "the metadata could not be written: exiftool not found")
         self.assertEqual(os.listdir(self.dir), [os.path.basename(source)])
@@ -207,14 +253,14 @@ class TestFailedConversions(ConverterTestCase):
 
 
 class ConvertedImagesTestCase(ConverterTestCase):
-    def assertConverts(self, source):
+    def assertConverts(self, source, measurement_settings=None):
         out = tempfile.mkdtemp(dir=self.dir)
         dest = os.path.join(out, os.path.splitext(os.path.basename(source))[0] + ".tif")
-        self.assertEqual(converter.convert(source, dest), "")
+        self.assertEqual(converter.convert(source, dest, measurement_settings), "")
         with Image.open(dest) as im:
             self.assertEqual(im.mode, "F")
             temps = np.asarray(im)
-        np.testing.assert_array_equal(temps, converter.measure(source))
+        np.testing.assert_array_equal(temps, converter.measure(source, measurement_settings).temperature)
         self.assertEqual(os.listdir(out), [os.path.basename(dest)])
         return dest, temps
 
@@ -229,6 +275,36 @@ class TestDjiSampleImages(ConvertedImagesTestCase):
                 self.assertTrue(np.isfinite(temps).all())
                 self.assertTrue(-60 < np.median(temps) < 200)
                 self.assertEqual(read_tags(dest, "XMP-Camera:BandName")["BandName"], "LWIR")
+
+    def test_every_camera_s_recorded_parameters_and_ranges_are_described_for_the_form(self):
+        cameras = {}
+        for source in jpegs_in("DJI_THERMAL_SAMPLES_DIR"):
+            info = converter.describe(source)
+            cameras.setdefault(info["camera"], info)
+            self.assertEqual(sorted(info["recorded"]), sorted(info["ranges"]), source)
+        self.assertEqual(cameras["M4T"]["ranges"]["distance"], [1.0, 300.0])
+        self.assertEqual(cameras["M30T"]["ranges"]["distance"], [1.0, 25.0])
+        for camera in ("ZH20T", "XT S"):
+            self.assertNotIn("ambient_temp", cameras[camera]["ranges"], camera)
+            self.assertIn("reflected_temp", cameras[camera]["ranges"], camera)
+        self.assertIn("ambient_temp", cameras["M4T"]["ranges"])
+
+    def test_changed_parameters_change_the_temperatures_and_are_recorded_in_the_tiff(self):
+        source = next(f for f in jpegs_in("DJI_THERMAL_SAMPLES_DIR") if converter.describe(f)["camera"] == "M4T")
+        changed = converter.settings({"emissivity": "0.7", "reflected_temp": "68", "unit": "F", "distance": "12"})
+        dest, temps = self.assertConverts(source, changed)
+        _, recorded = self.assertConverts(source)
+        self.assertGreater(abs(float(np.median(temps)) - float(np.median(recorded))), 0.5)
+        tags = read_tags(dest, "XMP-dtc:all")
+        self.assertEqual((tags["Emissivity"], tags["ReflectedTemperatureC"], tags["Distance"], tags["DistanceSource"]),
+                         (0.7, 20, 12, "option"))
+
+    def test_a_value_outside_the_camera_s_range_fails_the_photo_with_the_reason(self):
+        source = next(f for f in jpegs_in("DJI_THERMAL_SAMPLES_DIR") if converter.describe(f)["camera"] == "M30T")
+        dest = self.path("out.tif")
+        reason = converter.convert(source, dest, converter.settings({"distance": "100"}))
+        self.assertIn("distance=100 is outside [1, 25]", reason)
+        self.assertFalse(os.path.exists(dest))
 
 
 @skip_without("DJI_THERMAL_FLIGHT_DIR")
@@ -254,6 +330,7 @@ class TestRealFlight(ConvertedImagesTestCase):
                 dest, _ = self.assertConverts(source)
                 before, after = read_tags(source, *tags), read_tags(dest, *tags + ["XMP-Camera:BandName"])
                 self.assertEqual(after.pop("BandName"), "LWIR")
+                self.assertEqual(read_tags(dest, "XMP-dtc:DistanceSource")["DistanceSource"], "rangefinder")
                 before.pop("SourceFile"), after.pop("SourceFile")
                 self.assertIn("GimbalPitchDegree", before)
                 self.assertEqual(sorted(after), sorted(before))
