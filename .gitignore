@@ -229,3 +229,6 @@ new.md
 .claude/settings.local.json
 .env
 dev/no-images/
+
+# Built by WebODM from the plugin's JSX when it is installed
+dji-thermal/public/webpack.config.js
