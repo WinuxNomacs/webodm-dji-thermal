@@ -1,0 +1,26 @@
+// ESLint for the plugin's front end: `npm run lint` at the repo root, or the VSCode ESLint extension
+import js from "@eslint/js";
+import globals from "globals";
+
+export default [
+    {ignores: ["**/node_modules/", "**/build/", "**/dist/", "ignored/"]},
+    {
+        // The plugin's pages: plain ES5 scripts, loaded by <script> tags and by Jest (UMD), with WebODM's React
+        files: ["dji-thermal/public/*.js"],
+        ...js.configs.recommended,
+        languageOptions: {
+            ecmaVersion: 5,
+            sourceType: "script",
+            // ES5 syntax, but the ES2015 Promise the browsers have; module and require are the UMD wrapper's
+            globals: {...globals.browser, Promise: "readonly", module: "readonly", require: "readonly", PluginsAPI: "readonly",
+                      React: "readonly"},
+        },
+        // ES5 has no catch without a binding, so one left unused is no mistake
+        rules: {...js.configs.recommended.rules, "no-unused-vars": ["error", {caughtErrors: "none"}]},
+    },
+    {
+        files: ["dji-thermal/public/__tests__/**/*.js", "tools/**/*.js"],
+        ...js.configs.recommended,
+        languageOptions: {ecmaVersion: 2022, sourceType: "commonjs", globals: {...globals.browser, ...globals.node, ...globals.jest}},
+    },
+];

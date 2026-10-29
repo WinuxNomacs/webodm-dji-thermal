@@ -218,3 +218,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+ignored/
+
+# Host-only dev tooling and personal editor settings
+node_modules/
+.vscode/
+
+# New requests (see the user's CLAUDE.md)
+new.md
+.claude/settings.local.json

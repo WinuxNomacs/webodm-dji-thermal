@@ -1,0 +1,12 @@
+# WebODM runs Python 3.9: newer syntax (match, X | Y types, ...) is reported
+target-version = "py39"
+line-length = 120
+extend-exclude = ["ignored"]
+
+[lint]
+# Style rewrites, not compatibility: the code keeps its %-formatting and import order
+extend-ignore = ["UP031", "UP032", "I001"]
+
+[lint.per-file-ignores]
+# The folder is the plugin's id, which WebODM names with hyphens (coreplugins/hello-world)
+"dji-thermal/**" = ["N999"]
