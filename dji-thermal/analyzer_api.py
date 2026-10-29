@@ -1,13 +1,16 @@
 """
 The Thermal Analyzer's API: a user's thermal datasets (those of every project they can view), creating one in a
-project, uploading its images, its analysis in WebODM's worker, and a thumbnail of each file. A dataset is its holder
-task's id (see datasets).
+project, uploading its images, its analysis in WebODM's worker, a thumbnail of each file, its conversions (several,
+side by side, see conversions) with their downloads, and the user's saved conversion settings. A dataset is its
+holder task's id (see datasets).
 
-A dataset is shared as its project is: viewing the project shows its datasets, changing it allows uploading,
-renaming and analyzing, and deleting a dataset needs the project's delete permission (as a task does).
+A dataset is shared as its project is: viewing the project shows its datasets and conversions and downloads the
+outputs, changing it allows uploading, renaming, analyzing and converting (and deleting conversions), and deleting a
+dataset needs the project's delete permission (as a task does).
 """
 
 import io
+import os
 
 from django.core.exceptions import SuspiciousFileOperation
 from django.http import HttpResponse
@@ -16,13 +19,16 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from zipstream.ng import ZipStream
+
+from app.api.tasks import download_file_response, download_file_stream
 from app.models import Project, Task
 from app.security import path_traversal_check
 
-from . import datasets
+from . import conversions, datasets
 
 THUMBNAIL_SIZE = (96, 96)
-OVER_QUOTA = "The project's owner is over their storage quota: free some space before adding images"
+OVER_QUOTA = "The project's owner is over their storage quota: free some space first"
 
 
 def get_dataset(request, pk, perm='view_project'):
@@ -40,6 +46,7 @@ def summary(task, user):
     job = datasets.job(task)
     created = datasets.info(task)
     images = datasets.image_files(task)
+    jobs = [conversions.job(conversions.check_stale(task, cid), cid) for cid in conversions.ids(task)]
     return {
         'id': str(task.id),
         'name': datasets.name_of(task),
@@ -59,9 +66,14 @@ def summary(task, user):
         'cameras': sorted({c.get('model') or "" for c in a.get('cameras') or []}),
         'analyzed': bool(a),
         'analyzed_at': a.get('analyzed_at'),
+        'conversion_count': len(jobs),
+        'conversions_ready': sum(1 for j in jobs if j['status'] == 'ready'),
+        # A conversion of the dataset running
+        'busy': any(j['status'] == 'converting' for j in jobs),
         'created_at': task.created_at,
-        'last_activity': max(t for t in (task.created_at.isoformat(), a.get('analyzed_at'), job.get('finished_at'))
-                             if t),
+        # The latest of its creation, its analysis and its conversions' starts and finishes
+        'last_activity': max(t for t in [task.created_at.isoformat(), a.get('analyzed_at'), job.get('finished_at')]
+                             + [t for j in jobs for t in (j.get('started_at'), j.get('finished_at'))] if t),
         'created_by': created.get('created_by'),
         'can_change': user.has_perm('change_project', task.project),
         'can_delete': user.has_perm('delete_project', task.project),
@@ -71,9 +83,63 @@ def summary(task, user):
 def detail(task, user):
     out = summary(task, user)
     out['analysis'] = datasets.analysis(task)
+    # Newest first
+    out['conversions'] = [conversion_summary(task, cid) for cid in reversed(conversions.ids(task))]
+    # What the conversions' settings are compared against, to list what each one changed
+    out['defaults'] = conversions.DEFAULTS
     if out['can_change']:
         out['sharing'] = datasets.sharing(task.project)
     return out
+
+
+def conversion_summary(task, cid):
+    """A conversion as the dataset's Convert tab lists it"""
+    record, job, r = conversions.record(task, cid), conversions.job(task, cid), conversions.results(task, cid)
+    settings = record.get('settings') or {}
+    count, size = conversions.files_size(task, cid)
+    return {
+        'id': cid,
+        'dataset': str(task.id),
+        'name': record.get('name') or cid,
+        'settings': settings,
+        'description': conversions.summary_text(settings),
+        'status': job['status'],
+        'progress': job.get('progress') or 0,
+        'stage': job.get('stage') or {},
+        'error': job.get('error') or '',
+        'converted': r.get('converted', 0),
+        'skipped': r.get('skipped', 0),
+        'file_count': count,
+        'size': size,
+        'created_at': record.get('created_at'),
+        'finished_at': job.get('finished_at'),
+        'created_by': record.get('created_by'),
+    }
+
+
+def conversion_detail(task, cid):
+    out = conversion_summary(task, cid)
+    out['results'] = conversions.results(task, cid)
+    return out
+
+
+def get_conversion(request, pk, cid, perm='view_project'):
+    task = get_dataset(request, pk, perm)
+    if not conversions.record(task, cid):
+        raise NotFound()
+    return task
+
+
+def conversion_name(request, task):
+    name = str(request.data.get('name', '') or '').strip()
+    return (name or "Conversion {}".format(len(conversions.ids(task)) + 1))[:255]
+
+
+def download_name(text):
+    """A file name from a dataset or conversion name: letters, digits, dots, dashes and underscores (the header that
+    carries it is not quoted, and some browsers cut an unquoted name at its first space)"""
+    name = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in text).strip("._")
+    return name or "conversion"
 
 
 def dataset_name(request):
@@ -205,3 +271,98 @@ class DatasetThumbnail(DatasetView):
         response = HttpResponse(out.getvalue(), content_type="image/jpeg")
         response['Cache-Control'] = 'private, max-age=86400'
         return response
+
+
+class ConversionListCreate(DatasetView):
+    def get(self, request, pk):
+        task = get_dataset(request, pk)
+        return Response([conversion_summary(conversions.check_stale(task, cid), cid)
+                         for cid in reversed(conversions.ids(task))])
+
+    def post(self, request, pk):
+        """Converts the dataset's images with the settings given, as a new conversion kept beside the others"""
+        task = get_dataset(request, pk, 'change_project')
+        if not datasets.image_files(task):
+            raise ValidationError({'error': "Add images to the dataset first"})
+        if datasets.over_quota(task):
+            raise ValidationError({'error': OVER_QUOTA})
+        settings, errors = conversions.parse_settings(request.data.get('settings'))
+        if errors:
+            raise ValidationError(errors)
+        cid = conversions.create(task, conversion_name(request, task), settings, request.user)
+        return Response(conversion_detail(task, cid), status=status.HTTP_201_CREATED)
+
+
+class ConversionDetail(DatasetView):
+    def get(self, request, pk, cid):
+        task = get_conversion(request, pk, cid)
+        return Response(conversion_detail(conversions.check_stale(task, cid), cid))
+
+    def patch(self, request, pk, cid):
+        task = get_conversion(request, pk, cid, 'change_project')
+        name = str(request.data.get('name', '')).strip()
+        if not name:
+            raise ValidationError({'name': "A name is required"})
+        conversions.rename(task, cid, name[:255])
+        return Response(conversion_detail(task, cid))
+
+    def delete(self, request, pk, cid):
+        task = get_conversion(request, pk, cid, 'change_project')
+        conversions.delete(task, cid)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ConversionCancel(DatasetView):
+    def post(self, request, pk, cid):
+        task = get_conversion(request, pk, cid, 'change_project')
+        conversions.cancel(task, cid)
+        return Response(conversion_detail(task, cid))
+
+
+class ConversionDownload(DatasetView):
+    def get(self, request, pk, cid):
+        """The conversion's outputs as a zip (streamed as it is made), or one of them (?file=<path in the outputs>)"""
+        task = get_conversion(request, pk, cid)
+        out_dir = conversions.output_path(task, cid)
+        rel = request.query_params.get('file')
+        if rel:
+            try:
+                path = path_traversal_check(os.path.join(out_dir, rel), out_dir + os.sep)
+            except SuspiciousFileOperation:
+                raise NotFound() from None
+            if not os.path.isfile(path):
+                raise NotFound()
+            return download_file_response(request, path, 'attachment')
+
+        zs = ZipStream(sized=True)
+        for f in conversions.output_files(task, cid):
+            zs.add_path(os.path.join(out_dir, f), f)
+        name = download_name("{}-{}".format(datasets.name_of(task), conversions.record(task, cid).get('name', '')))
+        return download_file_stream(request, zs, 'attachment', download_filename=name + ".zip")
+
+
+class Preferences(DatasetView):
+    def get(self, request):
+        """The user's saved conversion settings (or the defaults), and what can be chosen"""
+        saved = conversions.preferences(request.user)
+        return Response({
+            'settings': saved if saved is not None else conversions.DEFAULTS,
+            'saved': saved is not None,
+            'defaults': conversions.DEFAULTS,
+            'products': conversions.products(),
+            'palettes': conversions.palettes(),
+            'limits': conversions.LIMITS,
+        })
+
+    def put(self, request):
+        """Saves settings as the user's defaults for new conversions"""
+        settings, errors = conversions.parse_settings(request.data.get('settings'))
+        if errors:
+            raise ValidationError(errors)
+        conversions.save_preferences(request.user, settings)
+        return Response({'settings': settings, 'saved': True})
+
+    def delete(self, request):
+        """Back to dji-thermal-cli's defaults"""
+        conversions.forget_preferences(request.user)
+        return Response({'settings': conversions.DEFAULTS, 'saved': False})

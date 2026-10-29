@@ -9,6 +9,7 @@ from .api import Describe, TaskConvert
 from .page import sdk_page
 
 DATASET = r'datasets/(?P<pk>[0-9a-f-]{36})'
+CONVERSION = DATASET + r'/conversions/(?P<cid>[0-9a-f]{12})'
 
 
 class Plugin(PluginBase):
@@ -48,6 +49,11 @@ class Plugin(PluginBase):
             MountPoint(DATASET + '/analyze$', analyzer_api.DatasetAnalyze.as_view()),
             MountPoint(DATASET + '/cancel$', analyzer_api.DatasetCancel.as_view()),
             MountPoint(DATASET + '/thumbnail$', analyzer_api.DatasetThumbnail.as_view()),
+            MountPoint(DATASET + '/conversions$', analyzer_api.ConversionListCreate.as_view()),
+            MountPoint(CONVERSION + '$', analyzer_api.ConversionDetail.as_view()),
+            MountPoint(CONVERSION + '/cancel$', analyzer_api.ConversionCancel.as_view()),
+            MountPoint(CONVERSION + '/download$', analyzer_api.ConversionDownload.as_view()),
+            MountPoint('preferences$', analyzer_api.Preferences.as_view()),
         ]
 
 

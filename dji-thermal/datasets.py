@@ -178,10 +178,12 @@ def info(task):
     return read_json(data_path(task, DATASET_FILE))
 
 
-def job(task):
-    """The analysis's state: {'status', 'progress', 'error', 'run_id', 'celery_task_id', 'started_at',
-    'finished_at'}"""
-    state = read_json(data_path(task, JOB_FILE))
+def job(task, rel=JOB_FILE):
+    """
+    A job's state: {'status', 'progress', 'error', 'run_id', 'celery_task_id', 'started_at', 'finished_at'}
+    :param rel: its job file in the dataset's folder: the analysis's, or a conversion's (see conversions)
+    """
+    state = read_json(data_path(task, rel))
     state.setdefault('status', 'new')
     return state
 
@@ -191,33 +193,39 @@ def analysis(task):
     return read_json(data_path(task, ANALYSIS_FILE))
 
 
-def update_job(task, if_run=None, **fields):
+def update_job(task, if_run=None, rel=JOB_FILE, **fields):
     """
-    Changes the analysis's state.
+    Changes a job's state (see job), if its file is still there (a deleted conversion's is not).
     :param if_run: only while it is the job's run id (a job's own writes)
     :return: whether it was changed
     """
     try:
         with locked(task):
-            state = job(task)
+            path = data_path(task, rel)
+            if not os.path.exists(path) and rel != JOB_FILE:
+                return False
+            state = job(task, rel)
             if if_run is not None and state.get('run_id') != if_run:
                 return False
             state.update(fields)
-            write_json(data_path(task, JOB_FILE), state)
+            write_json(path, state)
     except Gone:
         return False
     return True
 
 
-def finish_job(task, run_id, result):
-    """A job's analysis kept, if it is still the dataset's run: :return: whether it was"""
+def finish_job(task, run_id, result, rel=JOB_FILE, result_rel=ANALYSIS_FILE, **fields):
+    """
+    A job's result kept (in result_rel), and its state ready with fields, if it is still the job's run.
+    :return: whether it was
+    """
     try:
         with locked(task):
-            if job(task).get('run_id') != run_id:
+            if job(task, rel).get('run_id') != run_id or not os.path.exists(data_path(task, rel)):
                 return False
-            write_json(data_path(task, ANALYSIS_FILE), result)
-            write_json(data_path(task, JOB_FILE), {'status': 'ready', 'progress': 1.0, 'error': '',
-                                                   'finished_at': now()})
+            write_json(data_path(task, result_rel), result)
+            write_json(data_path(task, rel), dict({'status': 'ready', 'progress': 1.0, 'error': '',
+                                                   'finished_at': now()}, **fields))
     except Gone:
         return False
     return True
@@ -233,12 +241,12 @@ def job_gone(celery_task_id):
         return False
 
 
-def check_stale(task):
-    """An analysis whose job is gone (the worker stopped, or the job failed) is not left running forever"""
-    state = job(task)
-    if state['status'] == 'analyzing' and job_gone(state.get('celery_task_id')):
-        update_job(task, if_run=state.get('run_id'), status='failed', progress=0, run_id='',
-                   error="The analysis job stopped before it finished")
+def check_stale(task, rel=JOB_FILE, running='analyzing', what='analysis'):
+    """A job that is gone (the worker stopped, or the job failed) is not left running forever"""
+    state = job(task, rel)
+    if state['status'] == running and job_gone(state.get('celery_task_id')):
+        update_job(task, if_run=state.get('run_id'), rel=rel, status='failed', progress=0, run_id='',
+                   error="The {} job stopped before it finished".format(what))
     return task
 
 
@@ -291,22 +299,31 @@ def images_changed(task):
         pass
 
 
-def run_analysis(module, task_id, run_id):
+def run_job(module, function, *args):
     """
     Runs in WebODM's worker: run_function_async ships this function's source, so it imports what it needs.
     :return: {'output': what the run did}
     """
     import importlib
-    return {'output': importlib.import_module(module).analyze(task_id, run_id)}
+    return {'output': getattr(importlib.import_module(module), function)(*args)}
+
+
+def start_job(task, module, function, *args, rel=JOB_FILE, running='analyzing', **fields):
+    """
+    Starts module.function(task id, run id, *args) (a module of this plugin) in WebODM's worker, with a new run id
+    in its job file.
+    """
+    from app.plugins.worker import run_function_async
+    run_id = uuid.uuid4().hex
+    update_job(task, rel=rel, status=running, progress=0, error='', run_id=run_id, started_at=now(),
+               celery_task_id='', **fields)
+    module = __name__.rsplit('.', 1)[0] + '.' + module
+    celery_task_id = run_function_async(run_job, module, function, str(task.pk), run_id, *args).task_id
+    update_job(task, if_run=run_id, rel=rel, celery_task_id=celery_task_id or '')
 
 
 def start_analysis(task):
-    from app.plugins.worker import run_function_async
-    run_id = uuid.uuid4().hex
-    update_job(task, status='analyzing', progress=0, error='', run_id=run_id, started_at=now(), celery_task_id='')
-    module = __name__.rsplit('.', 1)[0] + '.analysis'
-    celery_task_id = run_function_async(run_analysis, module, str(task.pk), run_id).task_id
-    update_job(task, if_run=run_id, celery_task_id=celery_task_id or '')
+    start_job(task, 'analysis', 'analyze')
 
 
 def cancel_analysis(task):
@@ -329,11 +346,14 @@ def revoke(celery_task_id):
         from worker.celery import app
         app.control.revoke(celery_task_id)
     except Exception as e:  # noqa: BLE001 - it then stops at its first progress write
-        logger.info("Cannot revoke the analysis job {}: {}".format(celery_task_id, e))
+        logger.info("Cannot revoke the job {}: {}".format(celery_task_id, e))
 
 
 def task_removing(task_id):
-    """The task being deleted: its analysis canceled (it would stop anyway, its folder gone)"""
+    """The task being deleted: its jobs canceled (they would stop anyway, its folder gone)"""
+    from . import conversions
     task = Task.objects.filter(pk=task_id).first()
     if task is not None and is_dataset(task):
         cancel_analysis(task)
+        for c in conversions.ids(task):
+            conversions.cancel(task, c)

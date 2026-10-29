@@ -2,13 +2,14 @@
 Tests of the Thermal Analyzer's datasets: their holder tasks, uploads, the analysis (run by WebODM's worker, which the
 tests run in place), and who sees and changes what.
 
-The test with real R-JPEGs reads them from DJI_THERMAL_FLIGHT_DIR and is skipped without it.
+The tests with real R-JPEGs read them from DJI_THERMAL_FLIGHT_DIR and are skipped without it.
 """
 import contextlib
 import importlib
 import io
 import os
 import shutil
+import zipfile
 from unittest import mock
 
 from django.contrib.auth.models import User
@@ -25,6 +26,7 @@ from .test_converter import jpegs_in, skip_without
 
 datasets = importlib.import_module("coreplugins.dji-thermal.datasets")
 analysis = importlib.import_module("coreplugins.dji-thermal.analysis")
+conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
 
 API = "/api/plugins/dji-thermal/datasets"
 
@@ -239,3 +241,165 @@ class TestAnalysis(AnalyzerTestCase):
         self.assertEqual(thumb["Content-Type"], "image/jpeg")
         self.assertEqual(self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": "../x.jpg"}).status_code,
                          status.HTTP_404_NOT_FOUND)
+
+
+def flight_frames(count):
+    return [f for f in jpegs_in("DJI_THERMAL_FLIGHT_DIR") if f.upper().endswith("_T.JPG")][:count]
+
+
+class TestConversionSettings(AnalyzerTestCase):
+    def test_settings_left_out_are_dji_thermal_clis_defaults(self):
+        self.assertEqual(conversions.parse_settings({}), (conversions.DEFAULTS, {}))
+        self.assertEqual(conversions.parse_settings(None), (conversions.DEFAULTS, {}))
+
+    def test_settings_are_checked_field_by_field(self):
+        settings, errors = conversions.parse_settings({
+            "distance": "far", "emissivity": 2, "humidity": "wet", "unit": "R", "palette": "pink",
+            "outputs": ["temp_c:tif", "pseudo", "temp_c:tiff"], "replace_above_value": "nothing"})
+        self.assertEqual(set(errors), {"distance", "emissivity", "humidity", "unit", "palette", "replace_above_value"})
+        self.assertEqual(settings["outputs"], ["temp_c:tiff", "pseudo:png"])
+        _, errors = conversions.parse_settings({"outputs": ["pseudo:exr"]})
+        self.assertIn("outputs", errors)
+        _, errors = conversions.parse_settings({"outputs": []})
+        self.assertIn("outputs", errors)
+
+    def test_what_dji_thermal_cli_refuses_is_reported(self):
+        _, errors = conversions.parse_settings({"range_min": 10})
+        self.assertIn("range_max", errors["settings"])
+        settings, errors = conversions.parse_settings({"replace_above": 80, "replace_above_value": "nodata",
+                                                       "distance": "12.5", "normalize": 1})
+        self.assertEqual(errors, {})
+        self.assertEqual((settings["distance"], settings["normalize"]), (12.5, True))
+
+    def test_a_user_saves_and_forgets_their_defaults(self):
+        url = "/api/plugins/dji-thermal/preferences"
+        res = self.client.get(url)
+        self.assertEqual((res.data["saved"], res.data["settings"]), (False, conversions.DEFAULTS))
+        self.assertIn("temp_c", [p["product"] for p in res.data["products"]])
+        self.assertIn("ironred", res.data["palettes"])
+        self.assertEqual(self.client.put(url, {"settings": {"emissivity": 5}}, format="json").status_code,
+                         status.HTTP_400_BAD_REQUEST)
+        self.client.put(url, {"settings": {"emissivity": 0.95}}, format="json")
+        res = self.client.get(url)
+        self.assertEqual((res.data["saved"], res.data["settings"]["emissivity"]), (True, 0.95))
+        self.assertFalse(self.client_for("testuser2").get(url).data["saved"])
+        self.client.delete(url)
+        self.assertFalse(self.client.get(url).data["saved"])
+
+
+class TestConversions(AnalyzerTestCase):
+    def convert(self, task, settings=None, name="", client=None):
+        return (client or self.client).post("{}/{}/conversions".format(API, task.id),
+                                            {"name": name, "settings": settings or {}}, format="json")
+
+    def test_a_dataset_without_images_cannot_be_converted(self):
+        task = self.create()
+        self.assertEqual(self.convert(task).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_settings_refused_start_no_conversion(self):
+        task = self.create()
+        self.upload(task, [jpeg("a.jpg")])
+        res = self.convert(task, {"emissivity": 5})
+        self.assertIn("emissivity", res.data)
+        self.assertEqual(conversions.ids(task), [])
+
+    def test_a_conversion_of_no_thermal_image_fails_with_each_images_reason(self):
+        task = self.create()
+        self.upload(task, [jpeg("DJI_0001_V.JPG")])
+        res = self.convert(task)
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual((res.data["name"], res.data["status"]), ("Conversion 1", "failed"))
+        self.assertIn("No image could be converted", res.data["error"])
+        self.assertEqual([(f["path"], f["ok"]) for f in res.data["results"]["files"]], [("DJI_0001_V.JPG", False)])
+        d = self.client.get("{}/{}".format(API, task.id)).data
+        self.assertEqual((d["conversion_count"], d["conversions_ready"], d["busy"]), (1, 0, False))
+        self.assertEqual(d["conversions"][0]["id"], res.data["id"])
+
+    def test_a_conversion_is_renamed_and_deleted_with_its_files(self):
+        task = self.create()
+        self.upload(task, [jpeg("a.jpg")])
+        cid = self.convert(task, name="First").data["id"]
+        url = "{}/{}/conversions/{}".format(API, task.id, cid)
+        self.assertEqual(self.client.patch(url, {"name": "Renamed"}, format="json").data["name"], "Renamed")
+        self.assertEqual(self.client.delete(url).status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(os.path.exists(conversions.path(task, cid)))
+        self.assertEqual(self.client.get(url).status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_viewers_download_conversions_but_do_not_make_or_delete_them(self):
+        task = self.create()
+        self.upload(task, [jpeg("a.jpg")])
+        cid = self.convert(task).data["id"]
+        assign_perm("view_project", User.objects.get(username="testuser2"), self.project)
+        other = self.client_for("testuser2")
+        url = "{}/{}/conversions/{}".format(API, task.id, cid)
+        self.assertEqual(other.get(url).status_code, status.HTTP_200_OK)
+        self.assertEqual(other.get(url + "/download").status_code, status.HTTP_200_OK)
+        self.assertEqual(self.convert(task, client=other).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(other.delete(url).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(other.post(url + "/cancel").status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_a_canceled_conversion_stops_and_keeps_what_it_wrote(self):
+        task = self.create()
+        self.upload(task, [jpeg("a.jpg")])
+        with mock.patch.object(datasets, "start_job"):
+            cid = conversions.create(task, "Running", conversions.DEFAULTS, self.user)
+        datasets.update_job(task, rel=conversions.rel(cid, "job.json"), run_id="run")
+        res = self.client.post("{}/{}/conversions/{}/cancel".format(API, task.id, cid))
+        self.assertEqual(res.data["status"], "canceled")
+        self.assertEqual(conversions.convert(str(task.id), "run", cid), {"canceled": True})
+        self.assertTrue(os.path.exists(conversions.path(task, cid, "conversion.json")))
+
+    def test_a_run_of_a_deleted_conversion_leaves_no_files(self):
+        task = self.create()
+        self.upload(task, [jpeg("a.jpg")])
+        with mock.patch.object(datasets, "start_job"):
+            cid = conversions.create(task, "Running", conversions.DEFAULTS, self.user)
+        conversions.delete(task, cid)
+        os.makedirs(conversions.output_path(task, cid))     # as the run's writes would make it again
+        conversions.left_behind(task, cid)
+        self.assertFalse(os.path.exists(conversions.path(task, cid)))
+
+    def test_a_conversion_whose_job_is_gone_is_marked_failed(self):
+        task = self.create()
+        self.upload(task, [jpeg("a.jpg")])
+        with mock.patch.object(datasets, "start_job"):
+            conversions.create(task, "Running", conversions.DEFAULTS, self.user)
+        with mock.patch.object(datasets, "job_gone", return_value=True):
+            d = self.client.get("{}/{}".format(API, task.id)).data
+        self.assertEqual(d["conversions"][0]["status"], "failed")
+        self.assertIn("conversion job stopped", d["conversions"][0]["error"])
+
+    def test_deleting_a_dataset_cancels_its_conversions(self):
+        task = self.create()
+        self.upload(task, [jpeg("a.jpg")])
+        with mock.patch.object(datasets, "start_job"):
+            cid = conversions.create(task, "Running", conversions.DEFAULTS, self.user)
+        with mock.patch.object(conversions, "cancel") as cancel:
+            self.client.delete("{}/{}".format(API, task.id))
+        cancel.assert_called_once_with(mock.ANY, cid)
+
+    @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def test_a_flights_frames_are_converted_downloaded_and_counted_in_the_quota(self):
+        frames = flight_frames(3)
+        task = self.create()
+        with contextlib.ExitStack() as stack:
+            self.upload(task, [stack.enter_context(open(f, "rb")) for f in frames])
+        size = Task.objects.get(pk=task.id).size
+        res = self.convert(task, {"outputs": ["temp_c:tiff", "pseudo:png"], "emissivity": 0.95}, name="Nadir")
+        self.assertEqual((res.data["status"], res.data["converted"], res.data["skipped"]), ("ready", 3, 0),
+                         res.data["error"])
+        self.assertEqual(res.data["file_count"], 6)
+        self.assertGreater(Task.objects.get(pk=task.id).size, size)
+        self.assertEqual(task.scan_images(), [])
+
+        url = "{}/{}/conversions/{}/download".format(API, task.id, res.data["id"])
+        tiff = next(o for o in res.data["results"]["files"][0]["outputs"] if o.endswith(".tiff"))
+        one = self.client.get(url, {"file": tiff})
+        self.assertEqual(one.status_code, status.HTTP_200_OK)
+        self.assertIn("attachment", one["Content-Disposition"])
+        self.assertEqual(self.client.get(url, {"file": "../conversion.json"}).status_code, status.HTTP_404_NOT_FOUND)
+        everything = self.client.get(url)
+        self.assertIn("filename=Roof-Nadir.zip", everything["Content-Disposition"])
+        with zipfile.ZipFile(io.BytesIO(b"".join(everything.streaming_content))) as z:
+            self.assertEqual(sorted(z.namelist()), sorted(conversions.output_files(task, res.data["id"])))
+            self.assertEqual(len(z.namelist()), 6)
