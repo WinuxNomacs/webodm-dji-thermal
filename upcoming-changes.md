@@ -121,31 +121,49 @@ run; when those alerts appear they are dismissed with that reason, and the pins 
 
 ## 1. Thermal task flow
 
-- **A "Thermal task" button** beside "Select Images and GCP" (`Dashboard.addNewTaskButton`): the user picks the
-  flight's R-JPEGs (and a GCP file), the name and options as for any task.
-- **Upload to the plugin**: the plugin creates a partial WebODM task in the project, receives the files on its own
-  API mount point (one request per file, like WebODM's upload), converts each R-JPEG as it arrives and saves the
-  TIFF in the task's folder, then commits the task, which then processes like any other.
-- **Options**: on the Task Options hook, the plugin can set or suggest the options a temperature dataset needs (no
-  `radiometric-calibration` for converted DJI images, per WebODM's docs).
-- **Why not the Task Options hook alone** (the user asked, 2026-10-29): its controls run in the browser and only
-  set option values, which go to the node. WebODM then uploads the original files itself and its worker sends them
-  to the node within seconds of the commit, with no plugin code in between (no signal there but
-  `task_resizing_images`, which fires only when resizing). But for a new task, `getExifData()` also gives each
-  photo's `File` (`image`, set in `MapPreview.jsx`; not in WebODM's docs, so it may change): a control can read
-  the R-JPEGs' XMP in the browser and show that the photos are DJI thermal ones, with a way into the plugin's
-  upload for the same files. A spike at the start of this phase checks how far that goes.
-- Progress, errors per file (a file that fails stays out, with the reason), permissions as WebODM's own upload.
+**Design** (agreed with the user, 2026-10-29):
+- **A "Thermal task" button** beside "Select Images and GCP" (`Dashboard.addNewTaskButton`, which gives
+  `{projectId, onNewTaskAdded}`): the user picks the flight's photos (and a GCP file). The plugin counts the
+  thermal R-JPEGs among them in the browser; the others are ignored.
+- **WebODM's own task panel** (`webodm/components/NewTaskPanel`: name, processing node, options, the photos on the
+  map; `showResize` off), as WebODM's core plugins reuse its components, with a **Measurement** section below it.
+  This makes the plugin's scripts JSX built by WebODM's webpack at install (`build_jsx_components`), no longer
+  ES5: ESLint and Jest are set up for that.
+- **Upload**: the browser creates a partial task with WebODM's API (`POST /api/projects/<id>/tasks/`,
+  `partial`), sends each thermal photo to the plugin's mount point (the same project permission as WebODM's
+  upload, `change_project`), which converts it and saves the TIFF in the task's folder (`task.get_image_path`);
+  the GCP file goes in unchanged. The browser then commits with WebODM's API (`.../commit/`). Progress per photo;
+  a photo that fails stays out, with its reason; a task left with no image is removed.
+- **Measurement settings**: emissivity, reflected (background) temperature, ambient temperature, humidity,
+  distance; each shows and keeps the camera's recorded value unless changed. Limits per camera, from the photos
+  picked (the library's `measurement_params_range`; distance to 25 m on the H20N, M2EA, M30T and M3T, 300 m on
+  the H30T and M4T), checked before the upload starts. The H20T and XT S record no ambient temperature: the form
+  says their photos do not use it. The values used are written in each TIFF's XMP.
+- **Why not Task Options alone** (the user asked, 2026-10-29): `presetDialogOptionsReady` (added to WebODM on
+  2026-10-28, in 3.3.2, not yet in its docs) can put controls in Task Options, and its `getExifData()` entries
+  carry each photo's browser `File` (`image`, an internal field of the map preview since 2024), so a control can
+  see the photos are DJI thermal ones. But the conversion has no place there: WebODM uploads the originals and
+  its worker sends them to the node with no plugin code in between, except `task_resizing_images`. Converting
+  in that signal would need the user to pick "Resize images" with a size larger than the frames (WebODM never
+  enlarges), the settings carried to the worker without a task (the dialog has none for a new task), and the RGB
+  photos deleted there: rejected for the button.
 
 **Decided (the user, 2026-10-29):**
 - **Only the thermal photos are processed**: RGB photos (`_V`, `_W`, `_Z`) and unsupported ones (another camera's
   R-JPEG, a corrupt file) picked with them are simply ignored, neither refused nor sent to a second task.
 - **No resizing** offered: the task's thermal frames keep their size.
-- **The measurement settings can be changed at upload**: emissivity, reflected (background) temperature, ambient
-  temperature, humidity and distance, each left at the camera's recorded value unless set (dji-thermal-cli's
-  `Settings`: `emissivity`, `reflected_temp`, `ambient_temp`, `humidity`, `distance`). To settle when planning
-  the phase: the limits each camera accepts (the library's per-camera ranges), cameras without an ambient
-  temperature, the unit the temperatures are entered in, and recording the values used (task or TIFF metadata).
+- **The measurement settings can be changed at upload** (above).
+- **Distance by default: the rangefinder's, else the recorded one**: each photo's laser rangefinder distance
+  where it has a valid one (dji-thermal-cli's `distance="lrf"`, its default), else the distance the camera
+  recorded (usually 5 m, whatever the flight height). The temperatures then differ slightly from DJI's own apps.
+  This changes the conversion core's `distance="embedded"`.
+- **Temperature unit selectable in the form**, defaulting to WebODM's unit system (degrees C when metric, F when
+  imperial: `Units.js`). The TIFFs are always in degrees Celsius.
+- **The Thermal task button is the only entry point**: no hint in the regular upload's Task Options.
+
+**Build order**: the conversion's settings (`converter.measure` with overrides and `distance="lrf"`, the values in
+the XMP) and the upload API with Django tests first; then the button, panel and Measurement section, with Jest
+tests and a live check on the M4T flight (a real task processed to a thermal orthophoto on the dev node).
 
 ## 2. Release 1.0.0
 
