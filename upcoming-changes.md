@@ -4,13 +4,15 @@
 
 **Up next**
 1. **Release 1.0.0** — README, changelog, zip, release check; in the directory and as a GitHub release (below).
-   Prepared once on `release/1.0.0` (unmerged), to be redone on `main` once dji-thermal-cli 1.9.0 is on PyPI.
+   Prepared once on `release/1.0.0` (unmerged), to be redone on `main` (dji-thermal-cli 1.9.0 is on PyPI since
+   2026-10-29).
 
 **Later**
 - **Folder conversion** for administrators (images already on the server), if wanted (below).
 - **Thermal tools on the map** (temperature under the cursor, spot and area measurements): evaluate (below).
 
 **Done**
+- **The DJI Thermal page under Administration** — 2026-10-29, `admin-page` (details below).
 - **DJI's own Thermal SDK** — 2026-10-29, `native-sdk` here and in dji-thermal-cli (details below).
 - **Thermal task flow** — 2026-10-29, `thermal-task-flow` (details below).
 - **Conversion core** — 2026-10-29, `conversion-core`. `dji-thermal/converter.py`: `is_thermal_rjpeg` (by content,
@@ -63,7 +65,7 @@ they are uploaded, and it has a page for converting a folder already on the serv
 | A float32 TIFF with the source's EXIF/XMP and `Camera:BandName` = `LWIR` (so ODM treats it as thermal) | exiftool, a config file | exiftool is in WebODM's image; ports as is |
 | Converting each file on upload | a per-upload plugin hook | **missing**: WebODM has no hook between upload and processing (its one signal there, `task_resizing_images`, fires only when the user resizes images) |
 | Choosing per task whether to convert | a task option of its own, removed before the options reach the node | **missing**: the Task Options hook (`presetDialogOptionsReady`) adds controls beside the node's own options and sets their values, but cannot add an option |
-| The admin page | an Administration menu for plugins | **missing**: `main_menu` with a superuser check instead |
+| The admin page | an Administration menu for plugins | **missing**: `main.js` adds the link to WebODM's Administration menu, the page checks for a superuser |
 | Folder conversion in the background | `run_function_async` | ports as is |
 
 Conversion time on Python 3.9: 0.02 to 1 s per image (DJI's sample images, H20N, H20T, H30T), so converting each
@@ -261,7 +263,8 @@ since libdirp can crash, with the SDK found by `DJI_THERMAL_SDK_DIR` (an unpacke
   the reason). Chosen explicitly: `Settings(sdk=dir)`, `describe(..., sdk=dir)`, `--sdk DIR`; the library reads
   no environment variable itself (its tests' `DJI_THERMAL_SDK_DIR` keeps meaning the oracle). The plugin reads
   `DJI_THERMAL_SDK_DIR` from WebODM's environment and passes it.
-- The plugin: a **DJI Thermal** page (`main_menu` and `app_mount_points`). WebODM shows a plugin's menu entry
+- The plugin: a **DJI Thermal** page (`main_menu` and `app_mount_points`; since moved under Administration, for
+  superusers only: see "Done: The DJI Thermal page under Administration"). WebODM shows a plugin's menu entry
   to every user and has no per-plugin link in Administration > Plugins, so the page shows everyone which SDK
   computes the temperatures (built-in, or DJI's v1.8, uploaded or set at deployment), and only superusers get
   Upload / Update, Check (the SDK measuring its own samples) and Remove (an uploaded SDK only).
@@ -292,11 +295,28 @@ Open decision: **where to publish**. WebODM's docs point DJI users to Thermal To
 maintainers, which this plugin would replace for those cameras. Submit it to WebODM-Plugins' directory as well,
 or distribute it from this repo's releases only.
 
+## Done: The DJI Thermal page under Administration
+
+**The request** (the user, 2026-10-29): only administrators can see and use the DJI Thermal page and the SDK
+setting, under Administration.
+
+- WebODM has no plugin hook for the Administration menu, and a `main_menu` entry shows to every user (it gets no
+  request), so the plugin has no `main_menu`. `public/main.js` adds a **DJI Thermal** link after **Plugins** in
+  the Administration menu once the page is loaded. It depends on that menu's markup
+  (`#side-menu a[href="/admin/app/plugin/"]`); if WebODM changes it, the link is missing and the page is still at
+  `/plugins/dji-thermal/`. WebODM shows that menu to staff; the page answers superusers only (403 otherwise,
+  viewing as well as changing), so a staff user who is not a superuser sees the link and is refused.
+- Tests: `public/__tests__/main.test.js` (the link after Plugins; none without the Administration menu; the
+  Thermal Task button), `tests/test_sdk.py` (a user gets 403 on GET and POST, a superuser the page; no
+  `main_menu`). Jest 31, Django 65 with `app.tests.test_plugins`, ESLint, Ruff.
+- Live check on :8002: admin sees DJI Thermal under Administration after Plugins and opens the page; a temporary
+  user made for it has no link and gets 403 at `/plugins/dji-thermal/`; the user was removed afterwards.
+
 ## Later: Folder conversion
 
 The earlier plugin's page converts a folder on the server (overrides for the measurement parameters, the
 camera's own conversion kept in `raw/`, a CSV report, progress and Cancel in the worker). It ports with
-`main_menu` and a superuser check in place of the Administration menu. Open: wanted at all, since it needs server
+a section of the DJI Thermal page (under Administration, superusers only). Open: wanted at all, since it needs server
 paths (admins of a Docker install only).
 
 ## Later: Thermal tools on the map

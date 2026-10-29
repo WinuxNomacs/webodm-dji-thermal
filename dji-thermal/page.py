@@ -1,6 +1,6 @@
 """
-The plugin's DJI Thermal page: which SDK computes the temperatures, for every user; for superusers, uploading
-or updating DJI's own SDK, checking it and removing it (see sdk).
+The plugin's DJI Thermal page, under Administration, for superusers only: which SDK computes the temperatures,
+uploading or updating DJI's own SDK, checking it and removing it (see sdk).
 """
 
 from django.contrib import messages
@@ -39,9 +39,9 @@ def _remove(request):
 
 @login_required
 def sdk_page(request, template):
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
     if request.method == 'POST':
-        if not request.user.is_superuser:
-            return HttpResponseForbidden()
         action = request.POST.get('action')
         if action in ACTIONS:
             try:
@@ -50,5 +50,4 @@ def sdk_page(request, template):
                 messages.error(request, str(e))
         return redirect(request.path)
 
-    return render(request, template, {'title': _("DJI Thermal"), 'status': sdk.status(), 'env': sdk.ENV,
-                                      'is_admin': request.user.is_superuser})
+    return render(request, template, {'title': _("DJI Thermal"), 'status': sdk.status(), 'env': sdk.ENV})

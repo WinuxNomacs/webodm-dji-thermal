@@ -27,7 +27,6 @@
     </div>
 </div>
 
-{% if is_admin %}
 <div class="panel panel-default">
     <div class="panel-heading"><strong>{% if status.folder %}{% trans "Update DJI's Thermal SDK" %}{% else %}{% trans "Use DJI's own Thermal SDK" %}{% endif %}</strong></div>
     <div class="panel-body">
@@ -66,7 +65,4 @@
         {% endif %}
     </div>
 </div>
-{% else %}
-<p class="help-block">{% trans 'An administrator can change it on this page.' %}</p>
-{% endif %}
 {% endblock %}

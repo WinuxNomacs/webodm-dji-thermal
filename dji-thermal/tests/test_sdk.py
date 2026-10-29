@@ -16,6 +16,7 @@ from unittest import mock
 
 import numpy as np
 from django.test import Client
+from app.plugins.functions import get_plugin_by_name
 from PIL import Image
 
 from .test_converter import ConverterTestCase, jpegs_in, read_tags
@@ -178,17 +179,16 @@ class TestPage(SdkTestCase):
         self.assertTrue(client.login(username=username, password="test1234"))
         return client
 
-    def test_every_user_sees_which_sdk_computes_the_temperatures(self):
-        res = self.client_for("testuser").get(PAGE_URL)
-        self.assertEqual(res.status_code, 200)
-        self.assertContains(res, "The built-in port of DJI")
-        self.assertNotContains(res, 'name="sdk_zip"')
-
-    def test_only_superusers_can_change_the_sdk(self):
-        res = self.client_for("testuser").post(PAGE_URL, {"action": "remove"})
-        self.assertEqual(res.status_code, 403)
+    def test_only_superusers_can_see_or_change_the_sdk(self):
+        client = self.client_for("testuser")
+        self.assertEqual(client.get(PAGE_URL).status_code, 403)
+        self.assertEqual(client.post(PAGE_URL, {"action": "remove"}).status_code, 403)
         res = self.client_for("testsuperuser").get(PAGE_URL)
+        self.assertContains(res, "The built-in port of DJI")
         self.assertContains(res, 'name="sdk_zip"')
+
+    def test_the_page_is_not_in_the_menu_every_user_sees(self):
+        self.assertEqual(get_plugin_by_name("dji-thermal", only_active=False).main_menu(), [])
 
     def test_a_refused_upload_is_reported_on_the_page(self):
         client = self.client_for("testsuperuser")
