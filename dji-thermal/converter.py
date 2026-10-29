@@ -1,14 +1,16 @@
 """
 Converts DJI radiometric R-JPEGs into temperature images ODM processes as thermal: a single-band float32 TIFF
-in degrees Celsius, with the R-JPEG's EXIF and XMP metadata (GPS, capture time, camera and gimbal orientation)
-and the XMP band name ODM reads. The temperatures come from dji-thermal-cli, a pure-Python port of DJI's
-Thermal SDK, with each camera's own recorded measurement parameters.
+in degrees Celsius, with the R-JPEG's EXIF and XMP metadata (GPS, capture time, camera and gimbal orientation),
+the XMP band name ODM reads and the measurement parameters used. The temperatures come from dji-thermal-cli, a
+pure-Python port of DJI's Thermal SDK, with each camera's recorded measurement parameters unless the upload
+changes them.
 
 Nothing here raises on a bad file: a file that is not a thermal R-JPEG, or does not convert, is reported and
 left as it is, so one problem image never stops the rest of an upload.
 """
 
 import logging
+import math
 import os
 import shutil
 import subprocess
@@ -30,6 +32,21 @@ EXIFTOOL_CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 EXIFTOOL_TIMEOUT = 60
 
 JPEG_EXTENSIONS = ('.jpg', '.jpeg')
+
+# The measurement parameters an upload can change, as dji-thermal-cli's Settings fields. Temperatures are in the
+# upload's unit; humidity is a percent.
+MEASUREMENT_FIELDS = ('emissivity', 'reflected_temp', 'ambient_temp', 'humidity')
+DISTANCES = ('lrf', 'embedded')
+UNITS = ('C', 'F')
+
+# The library's measurement parameter names (in a Measurement's .params, and describe()) to the Settings fields
+PARAM_FIELDS = {'distance': 'distance', 'humidity': 'humidity', 'emissivity': 'emissivity',
+                'reflection': 'reflected_temp', 'ambient_temp': 'ambient_temp'}
+
+# The XMP tags (namespace dtc, see exiftool_camera.config) for the parameters a temperature image was measured
+# with, as dji-thermal-cli's own outputs name them
+MEASUREMENT_TAGS = {'distance': 'Distance', 'humidity': 'Humidity', 'emissivity': 'Emissivity',
+                    'reflection': 'ReflectedTemperatureC', 'ambient_temp': 'AmbientTemperatureC'}
 
 
 def site_packages_path():
@@ -87,32 +104,91 @@ def is_thermal_rjpeg(path):
     return status.kind == 'thermal'
 
 
-def measure(path):
+def settings(values=None):
     """
-    The temperatures of an R-JPEG in degrees Celsius, as a float32 array of shape (height, width), decoded with
-    the measurement parameters the camera recorded. That includes the distance: dji-thermal-cli would otherwise
-    take the laser rangefinder's reading where there is one, which changes the temperatures from what the
-    camera's own settings give.
+    dji-thermal-cli's Settings from an upload's measurement values (a dict): 'distance' ('lrf', the laser
+    rangefinder's distance where valid, else the recorded one; 'embedded', the recorded one; or metres), 'unit'
+    ('C' or 'F', of the temperatures) and the MEASUREMENT_FIELDS. A field left out, None or '' keeps each photo's
+    recorded value.
+    :raises ValueError: a value that is not a number, or that the library refuses, naming the field
     """
-    dtc = library()
-    return dtc.measure(path, dtc.Settings(unit='C', distance='embedded'), unit='C').temperature
+    values = values or {}
+
+    def number(name):
+        value = values.get(name)
+        if value is None or value == '':
+            return None
+        try:
+            n = float(value)
+        except (TypeError, ValueError):
+            n = float('nan')
+        if not math.isfinite(n):
+            raise ValueError("{} must be a number, not {!r}".format(name, value))
+        return n
+
+    unit = str(values.get('unit') or 'C').upper()
+    if unit not in UNITS:
+        raise ValueError("unit must be C or F, not {!r}".format(values.get('unit')))
+    distance = values.get('distance')
+    distance = 'lrf' if distance is None or distance == '' else distance
+    if distance not in DISTANCES:
+        distance = number('distance')
+    return library().Settings(distance=distance, unit=unit, **{name: number(name) for name in MEASUREMENT_FIELDS})
 
 
-def exiftool_command(source_path, dest_path):
+def measure(path, measurement_settings=None):
     """
-    The exiftool command that gives the converted file (dest_path) the metadata of its R-JPEG (source_path) and
-    marks it as thermal. Of DJI's XMP tags, exiftool copies those it can write, which include all ODM and OpenSfM
-    read (position, altitudes, camera and gimbal angles, RTK accuracy); the rest (ImageSource, the rangefinder's)
-    are left out.
+    An R-JPEG measured with dji-thermal-cli: its .temperature in degrees Celsius (a float32 array of shape
+    (height, width)), the .params used (Celsius) and the .distance_source ('rangefinder', 'embedded' or 'option').
+    :param measurement_settings: from settings(); by default each photo's rangefinder distance where valid and
+        the other parameters the camera recorded
+    :raises: the library's errors, for a file it cannot measure or a value outside the camera's range
     """
-    return [shutil.which('exiftool') or 'exiftool',
-            '-config', EXIFTOOL_CONFIG_FILE,
-            '-TagsFromFile', source_path, '-all:all>all:all',
-            '-XMP-Camera:BandName={}'.format(THERMAL_BAND_NAME),
-            '-overwrite_original', dest_path]
+    return library().measure(path, measurement_settings or settings(), unit='C')
 
 
-def copy_metadata(source_path, dest_path):
+def describe(path):
+    """
+    What the upload form needs to know of an R-JPEG's camera: {'camera': its model, 'recorded': the measurement
+    parameters it recorded, 'ranges': [lowest, highest] each parameter can be set to}, with the Settings names and
+    in degrees Celsius. A parameter the camera does not use (the ambient temperature on the H20T and XT S) is in
+    neither.
+    :raises: the library's errors, for a file that is not a thermal R-JPEG it can measure
+    """
+    info = library().describe(path, stats=False)
+    recorded, ranges = info['thermal']['measurement_params'], info['thermal']['measurement_params_range']
+    used = [key for key, limits in ranges.items() if limits and tuple(limits) != (0, 0)]
+    return {'camera': info['camera']['model'],
+            'recorded': {PARAM_FIELDS[key]: recorded[key] for key in used if recorded.get(key) is not None},
+            'ranges': {PARAM_FIELDS[key]: list(ranges[key]) for key in used}}
+
+
+def measurement_tags(measurement):
+    """The XMP tags (name: value) recording how measurement was made, as dji-thermal-cli's own outputs do"""
+    tags = {'Software': 'dji-thermal-cli {}'.format(library().__version__)}
+    for key, name in MEASUREMENT_TAGS.items():
+        if measurement.params.get(key) is not None:
+            tags[name] = '{:.4f}'.format(float(measurement.params[key])).rstrip('0').rstrip('.')
+    tags['DistanceSource'] = measurement.distance_source
+    return tags
+
+
+def exiftool_command(source_path, dest_path, dtc_tags=None):
+    """
+    The exiftool command that gives the converted file (dest_path) the metadata of its R-JPEG (source_path),
+    marks it as thermal and adds dtc_tags (name: value, see measurement_tags). Of DJI's XMP tags, exiftool copies
+    those it can write, which include all ODM and OpenSfM read (position, altitudes, camera and gimbal angles, RTK
+    accuracy); the rest (ImageSource, the rangefinder's) are left out.
+    """
+    return ([shutil.which('exiftool') or 'exiftool',
+             '-config', EXIFTOOL_CONFIG_FILE,
+             '-TagsFromFile', source_path, '-all:all>all:all',
+             '-XMP-Camera:BandName={}'.format(THERMAL_BAND_NAME)]
+            + ['-XMP-dtc:{}={}'.format(name, value) for name, value in (dtc_tags or {}).items()]
+            + ['-overwrite_original', dest_path])
+
+
+def copy_metadata(source_path, dest_path, dtc_tags=None):
     """
     Copies the metadata of source_path onto dest_path and marks it as thermal (see exiftool_command).
     :return: '' if it was all written, or why not
@@ -121,7 +197,7 @@ def copy_metadata(source_path, dest_path):
         return "exiftool not found"
 
     try:
-        result = subprocess.run(exiftool_command(source_path, dest_path), check=False, capture_output=True,
+        result = subprocess.run(exiftool_command(source_path, dest_path, dtc_tags), check=False, capture_output=True,
                                 text=True, timeout=EXIFTOOL_TIMEOUT)
     except Exception as e:  # noqa: BLE001 - reported as the metadata not written
         return "exiftool did not run: {}".format(str(e))
@@ -136,10 +212,10 @@ def copy_metadata(source_path, dest_path):
     return ''
 
 
-def convert(source_path, dest_path):
+def convert(source_path, dest_path, measurement_settings=None):
     """
-    Writes the temperature TIFF of the R-JPEG source_path to dest_path; source_path is left as it is. dest_path
-    appears only once it is complete, with its metadata.
+    Writes the temperature TIFF of the R-JPEG source_path to dest_path, measured with measurement_settings (see
+    measure); source_path is left as it is. dest_path appears only once it is complete, with its metadata.
     :return: '' if converted, or why not (the file is not a DJI thermal image, or failed to convert)
     """
     if not is_thermal_rjpeg(source_path):
@@ -148,8 +224,9 @@ def convert(source_path, dest_path):
     part_path = dest_path + '.part'
     try:
         # A float32 array is one band of mode F (32-bit floating point) pixels
-        Image.fromarray(measure(source_path)).save(part_path, format='TIFF')
-        problem = copy_metadata(source_path, part_path)
+        measurement = measure(source_path, measurement_settings)
+        Image.fromarray(measurement.temperature).save(part_path, format='TIFF')
+        problem = copy_metadata(source_path, part_path, measurement_tags(measurement))
         if problem:
             raise RuntimeError("the metadata could not be written: {}".format(problem))
         os.replace(part_path, dest_path)

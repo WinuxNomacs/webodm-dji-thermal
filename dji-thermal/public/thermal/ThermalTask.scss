@@ -1,0 +1,23 @@
+.dji-thermal-container{
+    .dji-thermal-input{
+        max-width: 280px;
+    }
+
+    select.dji-thermal-input{
+        max-width: 360px;
+    }
+
+    .dji-thermal-distance{
+        margin-top: 6px;
+    }
+
+    .dji-thermal-measurement-panel{
+        margin-bottom: 0;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+
+    .dji-thermal-progress{
+        margin: 12px 0;
+    }
+}

@@ -3,7 +3,7 @@ import js from "@eslint/js";
 import globals from "globals";
 
 export default [
-    {ignores: ["**/node_modules/", "**/build/", "**/dist/", "ignored/"]},
+    {ignores: ["**/node_modules/", "**/build/", "**/dist/", "ignored/", "dji-thermal/public/webpack.config.js"]},
     {
         // The plugin's pages: plain ES5 scripts, loaded by <script> tags and by Jest (UMD), with WebODM's React
         files: ["dji-thermal/public/*.js"],
@@ -19,7 +19,25 @@ export default [
         rules: {...js.configs.recommended.rules, "no-unused-vars": ["error", {caughtErrors: "none"}]},
     },
     {
-        files: ["dji-thermal/public/__tests__/**/*.js", "tools/**/*.js"],
+        // The thermal task's modules and components: built by WebODM's webpack and Babel (ES modules, JSX, class
+        // fields), with React, ReactDOM and jQuery from WebODM's page
+        files: ["dji-thermal/public/thermal/**/*.{js,jsx}"],
+        ...js.configs.recommended,
+        languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: "module",
+            parserOptions: {ecmaFeatures: {jsx: true}},
+            globals: {...globals.browser},
+        },
+    },
+    {
+        // Jest's tests, ES modules through babel-jest (Babel's settings are in package.json)
+        files: ["dji-thermal/public/__tests__/**/*.js"],
+        ...js.configs.recommended,
+        languageOptions: {ecmaVersion: 2022, sourceType: "module", globals: {...globals.browser, ...globals.node, ...globals.jest}},
+    },
+    {
+        files: ["tools/**/*.js"],
         ...js.configs.recommended,
         languageOptions: {ecmaVersion: 2022, sourceType: "commonjs", globals: {...globals.browser, ...globals.node, ...globals.jest}},
     },
