@@ -5,9 +5,7 @@
 **Up next**
 1. **Conversion core** — R-JPEG to temperature TIFF in the plugin, server side, with tests (below).
 
-(waiting, as of 2026-10-29, on the user publishing dji-thermal-cli 1.7.0: push its `main`, CI on the three
-systems, tag `v1.7.0`, which publishes to TestPyPI and PyPI. Phase 1 can be built before that, with the local
-wheel installed in the plugin's site-packages in the dev container; its `requirements.txt` needs 1.7.0 on PyPI.)
+(dji-thermal-cli 1.7.0 is on PyPI: the plugin's `requirements.txt` can pin it.)
 
 **Then**
 2. **Thermal task flow** — the plugin's own upload: R-JPEGs in, a WebODM task of temperature images out (below).
@@ -27,7 +25,11 @@ wheel installed in the plugin's site-packages in the dev container; its `require
   The lock only adds versions for Pythons below 3.12. Checks: Ruff, pytest on 3.14 (197) and on 3.9 lowest-direct
   (195), build, `check_dist.py`, twine, the wheel on 3.9 and 3.14. In the dev container: `pip install -U --target`
   of the wheel with `numpy==1.26.2` and `pillow==11.3.0` gave those versions, and M4T and H20T samples converted.
-  Not done (the user's, RELEASING.md): the macOS run from a fresh clone, CI, the tag and publishing.
+  Published 2026-10-29 by Claude, on the user's word ("go ahead and push and publish to pypi"): `main` pushed,
+  CI passed (Linux, Windows, macOS on 3.14; Linux 3.9 lowest-direct; the wheel on the three), tag `v1.7.0` (SSH
+  signed, on fd5e0ea), the Release workflow published to TestPyPI and PyPI; PyPI's files have the local build's
+  sha256 (wheel 3659e9c0..., sdist e573d183...), `uvx dji-thermal-cli@1.7.0` runs on 3.9 and 3.14. Not done: the
+  macOS run from a fresh clone (RELEASING.md step 3), and the GitHub release (refused by the permission check).
 - **Project setup** — 2026-10-29, `project-setup`. The repo from the GeoJSON plugin's: `CLAUDE.md`, this plan,
   `new.md` (untracked), AGPLv3 `LICENSE`, `dev/` (`webodm.sh`, `compose.yml` with the WebODM 3.3.2 images pinned
   by digest, `package.sh`), `ruff.toml` (py39), `eslint.config.mjs`, `package.json` (Jest, ESLint, Playwright),
@@ -83,8 +85,7 @@ publishes).
   `Camera:BandName` = `LWIR` (`exiftool_camera.config`), never raising (a failed file is left as it is and
   logged).
 - `Plugin.enable()` logs whether dji-thermal-cli loads; imports through `python_imports()` (the plugin's
-  site-packages). `requirements.txt`: `dji-thermal-cli==1.7.0`, `numpy==1.26.2`, `pillow==11.3.0`; until 1.7.0 is
-  on PyPI, the local wheel installed in the dev container's plugin site-packages.
+  site-packages). `requirements.txt`: `dji-thermal-cli==1.7.0`, `numpy==1.26.2`, `pillow==11.3.0`.
 - **Tests without images** (always run): detection on JPEGs the tests make (with and without DJI's XMP, an RGB
   photo's `ImageSource`), a corrupt file, a non-JPEG, the exiftool command and its failure handling.
 - **Tests with images** (skipped, naming the variable, when it is not set), as dji-thermal-cli's own:
