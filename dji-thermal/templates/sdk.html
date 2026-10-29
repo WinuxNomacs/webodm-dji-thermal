@@ -1,0 +1,72 @@
+{% extends "app/plugins/templates/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<h3><i class="fa fa-thermometer-half"></i> {% trans 'DJI Thermal' %}</h3>
+
+<div class="panel panel-default">
+    <div class="panel-heading"><strong>{% trans 'What computes the temperatures' %}</strong></div>
+    <div class="panel-body">
+        {% if status.problem %}
+        <div class="alert alert-danger">{{ status.problem }}</div>
+        {% endif %}
+
+        {% if status.source == 'builtin' %}
+        <p id="dji-thermal-sdk-source">{% blocktrans with version=status.library_version sdk=status.port_sdk_version %}The built-in port of DJI's Thermal SDK v{{ sdk }}, in dji-thermal-cli {{ version }}: pure Python, with the same results as DJI's own SDK on DJI's sample images.{% endblocktrans %}</p>
+        {% else %}
+        <p id="dji-thermal-sdk-source">{% blocktrans with version=status.info.sdk_version|default:"?" %}DJI's own Thermal SDK v{{ version }}.{% endblocktrans %}
+            {% if status.source == 'deployment' %}
+            {% blocktrans with folder=status.folder %}Set at deployment ({{ env }}={{ folder }}).{% endblocktrans %}
+            {% endif %}
+            {% if status.info.installed_at %}
+            {% blocktrans with when=status.info.installed_at who=status.info.installed_by|default:"?" zip=status.info.zip %}Installed {{ when }} by {{ who }}, from {{ zip }}.{% endblocktrans %}
+            {% endif %}
+        </p>
+        <p class="help-block">{% trans "DJI's library runs in a process of its own: if it crashes on a photo, only that photo fails, with the reason." %}</p>
+        {% endif %}
+    </div>
+</div>
+
+{% if is_admin %}
+<div class="panel panel-default">
+    <div class="panel-heading"><strong>{% if status.folder %}{% trans "Update DJI's Thermal SDK" %}{% else %}{% trans "Use DJI's own Thermal SDK" %}{% endif %}</strong></div>
+    <div class="panel-body">
+        <p>{% blocktrans %}Upload the zip of the <a href="https://www.dji.com/downloads/softwares/dji-thermal-sdk" target="_blank" rel="noopener">DJI Thermal SDK</a> as DJI's site gives it (version 1.8). It then computes every photo's temperatures, in place of the built-in port. The plugin keeps the SDK's libraries for this server, DJI's License.txt and one sample image per camera, which it checks the SDK with before using it. DJI's license terms apply to the SDK.{% endblocktrans %}</p>
+        {% if status.deploy_dir %}
+        <p>{% blocktrans with folder=status.deploy_dir %}The deployment sets {{ env }}={{ folder }}: the SDK is installed there, replacing the one in it.{% endblocktrans %}</p>
+        {% endif %}
+        {% if not status.writable %}
+        <div class="alert alert-warning">{% trans 'The SDK folder cannot be written to by WebODM: an upload will fail.' %}</div>
+        {% endif %}
+        <form method="post" enctype="multipart/form-data" class="form-inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="upload">
+            <div class="form-group">
+                <input type="file" name="sdk_zip" accept=".zip" required class="form-control" id="dji-thermal-sdk-zip">
+            </div>
+            <button type="submit" class="btn btn-primary" id="dji-thermal-sdk-upload"><i class="fa fa-upload"></i>
+                {% if status.folder %}{% trans 'Update' %}{% else %}{% trans 'Upload' %}{% endif %}</button>
+        </form>
+
+        {% if status.folder %}
+        <hr>
+        <form method="post" style="display: inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="check">
+            <button type="submit" class="btn btn-default" id="dji-thermal-sdk-check"><i class="fa fa-check"></i> {% trans 'Check' %}</button>
+        </form>
+        {% if status.source == 'upload' %}
+        <form method="post" style="display: inline" onsubmit="return confirm('{% trans 'Remove the uploaded SDK? Temperatures will come from the built-in port.' %}');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="remove">
+            <button type="submit" class="btn btn-danger" id="dji-thermal-sdk-remove"><i class="fa fa-trash"></i> {% trans 'Remove' %}</button>
+        </form>
+        {% endif %}
+        <p class="help-block">{% trans 'Check measures the sample images with the SDK.' %}</p>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<p class="help-block">{% trans 'An administrator can change this here.' %}</p>
+{% endif %}
+{% endblock %}

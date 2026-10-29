@@ -25,6 +25,15 @@ from app.tests.classes import BootTestCase
 
 converter = importlib.import_module("coreplugins.dji-thermal.converter")
 
+
+def pinned_version():
+    """The dji-thermal-cli version requirements.txt pins"""
+    with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "requirements.txt")) as f:
+        return next(line.split("==")[1].strip() for line in f if line.startswith("dji-thermal-cli=="))
+
+
+LIBRARY = "dji-thermal-cli " + pinned_version()
+
 XMP_IMAGE_SOURCE = (
     '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
     '<rdf:Description xmlns:drone-dji="http://www.dji.com/drone-dji/1.0/" drone-dji:ImageSource="{}"/>'
@@ -85,14 +94,14 @@ class TestWhatIsConverted(ConverterTestCase):
     def test_the_library_loads_from_the_plugins_site_packages(self):
         ok, message = converter.decoder_status()
         self.assertTrue(ok, message)
-        self.assertIn("dji-thermal-cli 1.7.0", message)
+        self.assertIn(LIBRARY, message)
         self.assertTrue(converter.library().__file__.startswith(converter.site_packages_path()))
 
     def test_enabling_the_plugin_logs_the_library_it_measures_with(self):
         plugin = get_plugin_by_name("dji-thermal", only_active=False)
         with self.assertLogs("app.logger", level="INFO") as logs:
             plugin.enable()
-        self.assertIn("Temperatures are computed with dji-thermal-cli 1.7.0", "\n".join(logs.output))
+        self.assertIn("Temperatures are computed with " + LIBRARY, "\n".join(logs.output))
 
     def test_an_ordinary_jpeg_is_not_a_thermal_image(self):
         self.assertFalse(converter.is_thermal_rjpeg(self.jpeg("photo.jpg")))
@@ -150,7 +159,7 @@ class TestMetadata(ConverterTestCase):
         self.assertEqual(converter.copy_metadata(source, dest, converter.measurement_tags(measurement)), "")
         tags = read_tags(dest, "XMP-dtc:all")
         tags.pop("SourceFile")
-        self.assertEqual(tags, {"Software": "dji-thermal-cli 1.7.0", "Distance": 29.422, "Humidity": 50,
+        self.assertEqual(tags, {"Software": LIBRARY, "Distance": 29.422, "Humidity": 50,
                                 "Emissivity": 0.9, "ReflectedTemperatureC": 27.75, "DistanceSource": "rangefinder"})
 
     def test_the_tiff_gets_the_source_s_gps_and_the_lwir_band_name(self):

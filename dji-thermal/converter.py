@@ -2,8 +2,8 @@
 Converts DJI radiometric R-JPEGs into temperature images ODM processes as thermal: a single-band float32 TIFF
 in degrees Celsius, with the R-JPEG's EXIF and XMP metadata (GPS, capture time, camera and gimbal orientation),
 the XMP band name ODM reads and the measurement parameters used. The temperatures come from dji-thermal-cli, a
-pure-Python port of DJI's Thermal SDK, with each camera's recorded measurement parameters unless the upload
-changes them.
+pure-Python port of DJI's Thermal SDK, or from DJI's own SDK where an administrator gave one (see sdk), with each
+camera's recorded measurement parameters unless the upload changes them.
 
 Nothing here raises on a bad file: a file that is not a thermal R-JPEG, or does not convert, is reported and
 left as it is, so one problem image never stops the rest of an upload.
@@ -109,9 +109,11 @@ def settings(values=None):
     dji-thermal-cli's Settings from an upload's measurement values (a dict): 'distance' ('lrf', the laser
     rangefinder's distance where valid, else the recorded one; 'embedded', the recorded one; or metres), 'unit'
     ('C' or 'F', of the temperatures) and the MEASUREMENT_FIELDS. A field left out, None or '' keeps each photo's
-    recorded value.
-    :raises ValueError: a value that is not a number, or that the library refuses, naming the field
+    recorded value. Measured with the SDK in use (sdk.current()).
+    :raises ValueError: a value that is not a number, or that the library refuses, naming the field; the SDK
+        set at deployment is missing (sdk.SdkError)
     """
+    from . import sdk
     values = values or {}
 
     def number(name):
@@ -133,7 +135,8 @@ def settings(values=None):
     distance = 'lrf' if distance is None or distance == '' else distance
     if distance not in DISTANCES:
         distance = number('distance')
-    return library().Settings(distance=distance, unit=unit, **{name: number(name) for name in MEASUREMENT_FIELDS})
+    return library().Settings(distance=distance, unit=unit, sdk=sdk.current(),
+                              **{name: number(name) for name in MEASUREMENT_FIELDS})
 
 
 def measure(path, measurement_settings=None):
@@ -153,9 +156,10 @@ def describe(path):
     parameters it recorded, 'ranges': [lowest, highest] each parameter can be set to}, with the Settings names and
     in degrees Celsius. A parameter the camera does not use (the ambient temperature on the H20T and XT S) is in
     neither.
-    :raises: the library's errors, for a file that is not a thermal R-JPEG it can measure
+    :raises: the library's errors, for a file that is not a thermal R-JPEG it can measure; sdk.SdkError
     """
-    info = library().describe(path, stats=False)
+    from . import sdk
+    info = library().describe(path, stats=False, sdk=sdk.current())
     recorded, ranges = info['thermal']['measurement_params'], info['thermal']['measurement_params_range']
     used = [key for key, limits in ranges.items() if limits and tuple(limits) != (0, 0)]
     return {'camera': info['camera']['model'],
@@ -163,9 +167,16 @@ def describe(path):
             'ranges': {PARAM_FIELDS[key]: list(ranges[key]) for key in used}}
 
 
-def measurement_tags(measurement):
-    """The XMP tags (name: value) recording how measurement was made, as dji-thermal-cli's own outputs do"""
-    tags = {'Software': 'dji-thermal-cli {}'.format(library().__version__)}
+def measurement_tags(measurement, native=False):
+    """
+    The XMP tags (name: value) recording how measurement was made, as dji-thermal-cli's own outputs do.
+    :param native: measured with DJI's own SDK, not the built-in port
+    """
+    dtc = library()
+    software = 'dji-thermal-cli {}'.format(dtc.__version__)
+    if native:
+        software += " with DJI's Thermal SDK {}".format(dtc.native.SDK_VERSION)
+    tags = {'Software': software}
     for key, name in MEASUREMENT_TAGS.items():
         if measurement.params.get(key) is not None:
             tags[name] = '{:.4f}'.format(float(measurement.params[key])).rstrip('0').rstrip('.')
@@ -224,9 +235,11 @@ def convert(source_path, dest_path, measurement_settings=None):
     part_path = dest_path + '.part'
     try:
         # A float32 array is one band of mode F (32-bit floating point) pixels
+        measurement_settings = measurement_settings or settings()
         measurement = measure(source_path, measurement_settings)
         Image.fromarray(measurement.temperature).save(part_path, format='TIFF')
-        problem = copy_metadata(source_path, part_path, measurement_tags(measurement))
+        problem = copy_metadata(source_path, part_path,
+                                measurement_tags(measurement, native=measurement_settings.sdk is not None))
         if problem:
             raise RuntimeError("the metadata could not be written: {}".format(problem))
         os.replace(part_path, dest_path)

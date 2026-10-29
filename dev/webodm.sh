@@ -16,6 +16,9 @@ export DT_PLUGIN_DIR="${DT_PLUGIN_DIR:-$repo/dji-thermal}"
 if [ -f "$repo/.env" ]; then set -a; . "$repo/.env"; set +a; fi
 mkdir -p "$repo/dev/no-images"
 export DT_SAMPLES_DIR="${DT_SAMPLES_DIR:-$repo/dev/no-images}" DT_FLIGHT_DIR="${DT_FLIGHT_DIR:-$repo/dev/no-images}"
+# DJI's Thermal SDK zip as DJI's site gives it (DT_SDK_ZIP), for the tests that install it; unset, an empty file
+touch "$repo/dev/no-images/no-sdk.zip"
+export DT_SDK_ZIP="${DT_SDK_ZIP:-$repo/dev/no-images/no-sdk.zip}"
 
 compose=(docker compose -p webodm-dji-thermal --project-directory "$webodm"
          -f "$webodm/docker-compose.yml" -f "$webodm/docker-compose.nodeodm.yml"
