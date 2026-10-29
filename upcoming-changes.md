@@ -465,3 +465,17 @@ conversions; (c) mosaics and the viewer; (d) Create task and the README.
   link, deleted from its page (task and folder gone).
   Found while building it: the holder task is listed by WebODM's task API and counts in the project's task count
   ("2 Tasks"); removing it in WebODM deletes the dataset (`Task.delete` removes the task's folder).
+- **(b) Conversions** — 2026-10-29, `analyzer-conversions`. `conversions.py` (the earlier `thermal_conversion.py`
+  on dji-thermal-cli 1.9.0: every `Settings` field, the outputs from `outputs.PRODUCTS` (now with `rjpeg`), the
+  user's defaults in the plugin's user data store; records `thermal/conversions/<id>/conversion.json`, `job.json`,
+  `results.json`, files in `output/`; the job with DJI's SDK when installed; a conversion or dataset deleted while
+  running stops at its next image and leaves no files), `datasets.py`'s job functions made per job file
+  (`start_job`, `update_job(rel=...)`, `finish_job`, `check_stale`); the API's conversions under
+  `datasets/<id>/conversions` (list and create, detail, rename, delete, cancel, download as a streamed zip or one
+  file) and `preferences`; the datasets list's Conversions column. Front end: the earlier `conversions.js` without
+  its mosaic, task and frame-page parts (steps c, d and part 2), conversion ids as text. Fixed on the way: the form
+  drawn while an analysis ran never showed the recorded values once it finished (it is drawn again, keeping what was
+  typed); the delete dialog spoke of tasks made from conversions, which come in (d) (now only with `task_count`).
+  Tests: `test_analyzer.py` 33 (one converting 3 M4T frames and downloading them), Jest 94. Live check: 12 M4T
+  frames converted with emissivity 0.95 (24 files, 8.5 MB), the zip and one file downloaded, defaults saved then put
+  back, the plan's settings, the list's 1/1, the dataset deleted.

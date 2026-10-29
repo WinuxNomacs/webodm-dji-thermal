@@ -1,7 +1,8 @@
-// A thermal dataset's page: what dji-thermal-cli found in it (an overview, then tabs: the files, the problems and
-// the WebODM plan), with adding images, analyzing again and sharing its link.
+// A thermal dataset's page: what dji-thermal-cli found in it (an overview, then tabs: the files, the problems,
+// the WebODM plan and its conversions, see conversions.js), with adding images, analyzing again and sharing its link.
 (function (root) {
     var core = root.ThermalAnalyzerCore || (typeof require !== "undefined" ? require("./analyzer_core") : null);
+    var conversionsModule = root.ThermalAnalyzerConversions || (typeof require !== "undefined" ? require("./conversions") : null);
     var esc = function (t) { return core.escapeHtml(t); };
     var POLL_MS = 2000;
     var FILES_SHOWN = 12;     // files listed under a problem before "and N more"
@@ -243,6 +244,8 @@
         // A link to a tab (#convert, as the mosaic viewer's way back) opens it
         var linked = ((root.location && root.location.hash) || "").replace(/[^a-z]/g, "");
         if (linked && page.querySelector('#ta-tabs a[data-tab="' + linked + '"]')) { tab = linked; tabChosen = true; }
+        var conversions = conversionsModule.init({doc: doc, fetchFn: fetchFn, api: API, csrf: csrf, datasetId: id,
+                                                  onChange: function () { return load(); }});
 
         function send(u, method, data) {
             var opts = {method: method, credentials: "same-origin", headers: {"X-CSRFToken": csrf}};
@@ -301,9 +304,15 @@
 
             var a = d.analysis || {};
             $("ta-overview").innerHTML = overviewHtml(d);
-            // The tabs show what the analysis found
-            $("ta-tabs").hidden = !a.files;
-            if (!tabChosen) tab = "files";
+            // Converting needs no analysis: the tabs show as soon as there are images (or conversions)
+            $("ta-tabs").hidden = !a.files && !d.file_count && !(d.conversions || []).length;
+            // Before the analysis only the Convert tab has something to show; after it, the files unless a tab was chosen
+            [].forEach.call(page.querySelectorAll("#ta-tabs a[data-tab]"), function (link) {
+                if (link.getAttribute("data-tab") !== "convert") link.parentNode.hidden = !a.files;
+            });
+            if (!a.files) tab = "convert";
+            else if (!tabChosen) tab = "files";
+            conversions.update(d);
             if (a.files) {
                 $("ta-files-count").textContent = a.files.length;
                 var serious = (a.findings || []).filter(function (f) { return f.severity !== "info"; }).length;
@@ -313,7 +322,7 @@
                 if (key !== filesKey) renderFiles();
                 filesKey = key;
                 $("ta-tab-problems").innerHTML = problemsHtml(a);
-                $("ta-tab-webodm").innerHTML = planHtml(a, false);
+                $("ta-tab-webodm").innerHTML = planHtml(a, d.can_change);
             } else {
                 ["files", "problems", "webodm"].forEach(function (t) { $("ta-tab-" + t).innerHTML = ""; });
                 filesKey = null;
@@ -321,7 +330,8 @@
             renderTabs();
 
             if (timer && root.clearTimeout) root.clearTimeout(timer);
-            timer = analyzing && root.setTimeout ? root.setTimeout(load, POLL_MS) : null;
+            var converting = (d.conversions || []).some(function (c) { return c.status === "converting"; });
+            timer = (analyzing || converting) && root.setTimeout ? root.setTimeout(load, POLL_MS) : null;
         }
 
         function renderFiles() { $("ta-tab-files").innerHTML = filesHtml(dataset.analysis, view); }
@@ -410,6 +420,10 @@
             if (!e.target.closest) return;
             var button = e.target.closest("button[data-copy]");
             if (button) return copyText(button.getAttribute("data-copy"), button, "Copy");
+            if (e.target.closest("#ta-plan-convert") && conversions.usePlan()) {
+                showTab("convert");
+                if ($("ta-convert-settings").scrollIntoView) $("ta-convert-settings").scrollIntoView();
+            }
         });
 
         // To the clipboard, the button saying so; without one (or refused), a dialog to copy it from

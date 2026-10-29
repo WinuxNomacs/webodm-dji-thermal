@@ -232,7 +232,7 @@
         if (with_.length) {
             out.push("With it: " + with_.slice(0, -1).join(", ") + (with_.length > 1 ? " and " : "") + with_[with_.length - 1] + ".");
         }
-        if (d.conversion_count) out.push("The WebODM tasks made from its conversions are kept.");
+        if (d.task_count) out.push("The WebODM tasks made from its conversions are kept.");
         out.push("This cannot be undone.");
         return out;
     }

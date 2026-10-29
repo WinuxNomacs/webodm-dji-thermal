@@ -33,6 +33,14 @@
         return '<span class="' + cls + '"' + (d.error ? ' title="' + core.escapeHtml(d.error) + '"' : "") + ">" + label + "</span>";
     }
 
+    // Ready of all its conversions, as 2/3
+    function conversionsCell(d) {
+        if (!d.conversion_count) return "";
+        var ready = d.conversions_ready || 0;
+        return '<span class="' + (ready === d.conversion_count ? "text-success" : "") + '" title="' + core.count(ready, "conversion", "conversions") +
+            " ready of " + d.conversion_count + '">' + ready + "/" + d.conversion_count + "</span>";
+    }
+
     // What each column sorts by; null (nothing to sort by, as before an analysis) goes last either way
     var SORT_KEYS = {
         name: function (d) { return (d.name || "").toLowerCase(); },
@@ -40,6 +48,7 @@
         status: function (d) { return core.statusLabel(d); },
         files: function (d) { return d.file_count; },
         problems: function (d) { return d.analyzed ? d.errors * 1e6 + d.warnings : null; },
+        conversions: function (d) { return d.conversion_count ? (d.conversions_ready || 0) * 1e6 + d.conversion_count : null; },
         size: function (d) { return d.size; },
         activity: function (d) { return d.last_activity || null; },
         created: function (d) { return d.created_at || null; }
@@ -109,6 +118,7 @@
             "<td>" + statusCell(d) + "</td>" +
             "<td>" + core.escapeHtml(filesCell(d)) + "</td>" +
             "<td>" + problemsCell(d) + "</td>" +
+            "<td>" + conversionsCell(d) + "</td>" +
             "<td>" + core.escapeHtml(core.formatBytes(d.size)) + "</td>" +
             "<td>" + core.escapeHtml(core.formatDate(d.last_activity)) + "</td>" +
             "<td>" + core.escapeHtml(core.formatDate(d.created_at)) + "</td>" +

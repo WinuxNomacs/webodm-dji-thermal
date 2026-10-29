@@ -1,7 +1,7 @@
 """
 A dataset's analysis: dji-thermal-cli's check (with the WebODM plan) over its images, kept with the dataset as a
 compact record: a row per file, the cameras, the problems found and the plan. Runs in WebODM's worker (see
-datasets.run_analysis).
+datasets.start_job).
 """
 
 import dataclasses

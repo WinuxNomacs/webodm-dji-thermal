@@ -4,6 +4,8 @@ const path = require('path');
 const core = require('../analyzer_core');
 window.ThermalAnalyzerCore = core;
 const datasets = require('../datasets');
+const conversions = require('../conversions');
+window.ThermalAnalyzerConversions = conversions;
 const dataset = require('../dataset');
 
 // A page's markup from its Django template, with the template tags filled in as the plugin does
@@ -26,7 +28,6 @@ const ticks = async (n = 20) => { for (let i = 0; i < n; i++) await Promise.reso
 afterEach(() => jest.useRealTimers());
 const click = el => el.dispatchEvent(new MouseEvent("click", {bubbles: true}));
 const change = el => el.dispatchEvent(new Event("change", {bubbles: true}));
-const input = el => el.dispatchEvent(new Event("input", {bubbles: true}));
 // The pages' dialog, and pressing one of its buttons
 const askDialog = () => document.querySelector(".ta-ask");
 const press = label => click([].filter.call(askDialog().querySelectorAll("button"), b => b.textContent === label)[0]);
@@ -34,7 +35,7 @@ const press = label => click([].filter.call(askDialog().querySelectorAll("button
 // A fake server: "METHOD url" (or just the url, for GET) to a list of responses, each answered once in turn and the
 // last one again after that. Its calls are fetchFn.mock.calls.
 function server(routes) {
-    const left = {};
+    const left = {"GET /api/plugins/dji-thermal/preferences": [PREFERENCES]};
     Object.keys(routes).forEach(k => { left[k.indexOf(" ") > 0 ? k : "GET " + k] = [].concat(routes[k]); });
     return jest.fn((url, opts) => {
         const key = ((opts && opts.method) || "GET") + " " + url;
@@ -75,6 +76,26 @@ const ANALYSIS = {
         coverage: {frames: 2, gsd_m: 0.0212, area_m2: 363.9, images_per_point_median: 3, area_seen_by_3_or_more_pct: 62.9, equivalent_overlap_pct: 42.3},
         odm_arguments: ["--radiometric-calibration", "none"]
     }
+};
+
+const DEFAULTS = {
+    distance: "lrf", humidity: null, emissivity: null, reflected_temp: null, ambient_temp: null, unit: "C", range_min: null,
+    range_max: null, palette: null, gimbal_yaw: null, gimbal_pitch: null, gimbal_roll: null, replace_above: null,
+    replace_above_value: null, replace_below: null, replace_below_value: null, strip_location: false, normalize: false,
+    max_pitch: null, outputs: ["temp_c:tiff", "pseudo:png"], compression: "deflate"
+};
+const PREFERENCES = {
+    settings: DEFAULTS, saved: false, defaults: DEFAULTS, palettes: ["whitehot", "ironred"],
+    products: [
+        {product: "temp_c", description: "float32 temperature in degrees C", formats: ["tiff", "exr"]},
+        {product: "pseudo", description: "8-bit RGB pseudo-colour image", formats: ["png", "tiff"]},
+        {product: "gray16", description: "uint16 grayscale view", formats: ["png", "tiff"]}
+    ]
+};
+const CONVERSION = {
+    id: 9, dataset: 5, name: "Nadir", settings: Object.assign({}, DEFAULTS, {emissivity: 0.95, normalize: true}),
+    description: "temp_c tiff · normalized", status: "ready", progress: 1, error: "", converted: 2, skipped: 1,
+    file_count: 2, size: 2097152, created_at: "2026-10-18T11:00:00Z", finished_at: "2026-10-18T11:01:00Z", created_by: "ana"
 };
 
 describe("analyzer core", () => {
@@ -507,7 +528,7 @@ describe("datasets list actions and an upload that does not all arrive", () => {
     });
 
     it("says what deleting a dataset takes with it before deleting it", async () => {
-        const d = Object.assign({}, DATASET, {conversion_count: 2, mosaic_count: 1, measurement_count: 14});
+        const d = Object.assign({}, DATASET, {conversion_count: 2, mosaic_count: 1, measurement_count: 14, task_count: 1});
         const fetchFn = server({[API + "datasets"]: {datasets: [d], projects: []}, ["DELETE " + API + "datasets/5"]: {}});
         datasets.init(document, fetchFn);
         await flush();
@@ -516,6 +537,7 @@ describe("datasets list actions and an upload that does not all arrive", () => {
         expect(text).toContain("“Roof” and its 3 images are deleted, with the task that holds them in the project.");
         expect(text).toContain("With it: 2 conversions, 1 mosaic and 14 measurements.");
         expect(text).toContain("WebODM tasks made from its conversions are kept");
+        expect(core.deleteText(Object.assign({}, DATASET, {conversion_count: 2})).join(" ")).not.toContain("tasks");
         expect(text).toContain("cannot be undone");
         press("Cancel");
         await flush();
@@ -621,6 +643,7 @@ describe("datasets list actions and an upload that does not all arrive", () => {
 describe("a dataset's page", () => {
     beforeEach(() => {
         document.body.innerHTML = page('dataset.html');
+        window.history.replaceState(null, "", "/");    // no tab linked by an earlier test's hash
     });
 
     it("sums up the frames, cameras, temperatures and capture times", () => {
@@ -735,7 +758,7 @@ describe("a dataset's page", () => {
         expect([...tab.querySelectorAll("tbody tr")].map(r => r.className)).toEqual(["ta-kind-thermal"]);
     });
 
-    it("copies the plan's options and command", async () => {
+    it("copies the plan's options and command, and offers to convert with it only to who can", async () => {
         navigator.clipboard = {writeText: jest.fn(() => Promise.resolve())};
         const fetchFn = server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS})});
         dataset.init(document, fetchFn);
@@ -748,7 +771,8 @@ describe("a dataset's page", () => {
         expect(navigator.clipboard.writeText.mock.calls).toEqual([["--radiometric-calibration none"],
                                                                   ["dji-thermal-cli process -o temp_c:tiff --normalize"]]);
         expect(buttons[1].textContent).toMatch(/Copied/);
-        expect(document.getElementById("ta-plan-convert")).toBe(null);
+        expect(document.getElementById("ta-plan-convert")).not.toBe(null);
+        expect(dataset.planHtml(ANALYSIS, false)).not.toContain("ta-plan-convert");
     });
 
     it("loads the dataset, switches tabs and polls while it is analyzed", async () => {
@@ -763,8 +787,10 @@ describe("a dataset's page", () => {
 
         expect(fetchFn.mock.calls[0][0]).toBe("/api/plugins/dji-thermal/datasets/5");
         expect(document.getElementById("ta-status").innerHTML).toContain("40%");
-        // Before the analysis, no tabs: they show what it found
-        expect(document.getElementById("ta-tabs").hidden).toBe(true);
+        // Before the analysis, only the Convert tab: converting needs none
+        expect(document.getElementById("ta-tabs").hidden).toBe(false);
+        expect(document.querySelector('#ta-tabs a[data-tab="files"]').parentNode.hidden).toBe(true);
+        expect(document.getElementById("ta-tab-convert").hidden).toBe(false);
         expect(document.getElementById("ta-cancel").hidden).toBe(false);
         expect(document.getElementById("ta-add").hidden).toBe(true);
 
@@ -898,3 +924,411 @@ describe("a dataset's page", () => {
     });
 });
 
+describe("a dataset's conversions", () => {
+    const URL5 = "/api/plugins/dji-thermal/datasets/5";
+    beforeEach(() => {
+        document.body.innerHTML = page('dataset.html');
+    });
+    const form = () => document.getElementById("ta-convert-form");
+    const input = name => form().querySelector('[name="' + name + '"]');
+
+    afterEach(() => { window.localStorage.clear(); window.history.replaceState(null, "", "/"); });
+
+    it("shows what the flight recorded beside each measurement parameter, in the user's unit", () => {
+        const rec = conversions.recorded(Object.assign({}, ANALYSIS, {files: ANALYSIS.files.concat(
+            [{path: "c_T.JPG", kind: "thermal", distance: 7, lrf: 20, humidity: 50, emissivity: 0.95, reflection: 20, ambient: 25}])}));
+        expect(rec).toMatchObject({distance: 5, lrf: 20.7, emissivity: 0.91, reflection: 20});
+        window.localStorage.setItem("unit_system", "imperial");
+        // The files in kelvin: the form is still in the user's unit
+        document.body.innerHTML = '<div id="f">' + conversions.formHtml(Object.assign({}, DEFAULTS, {unit: "K"}), PREFERENCES, rec) + "</div>";
+        const html = document.getElementById("f").innerHTML;
+        expect(html).toContain("Embedded 5.0 m, rangefinder 20.7 m");
+        expect(html).toContain("Reflected temperature (°F)");
+        expect(html).toContain("recorded 68.0 °F");      // 20 °C
+        expect(html).toContain("recorded 0.91");
+        expect(html).toContain("Relative humidity (%)");
+        expect(html).toContain("Colour range (°F)");
+        expect(document.querySelector('[name="unit"]').value).toBe("K");
+    });
+
+    it("puts the colours first, above the outputs, the default naming the images' own palette", () => {
+        const files = palettes => palettes.map((p, i) => ({path: i + "_T.JPG", kind: "thermal", palette: p}));
+        const own = analysis => {
+            document.body.innerHTML = '<div id="f">' + conversions.formHtml(DEFAULTS, PREFERENCES, conversions.recorded(analysis)) + "</div>";
+            return document.querySelector('[name="palette"] option[value=""]').textContent;
+        };
+        expect(own({files: files(["ironred", "ironred"])})).toBe("Each image's own (ironred)");
+        expect(own({files: files(["whitehot", "ironred", "ironred", ""])})).toBe("Each image's own (ironred on 2, whitehot on 1)");
+        expect(own(ANALYSIS)).toBe("Each image's own");
+        const sections = [].map.call(document.querySelectorAll("#f > .ta-section"), el => el.querySelector("h4").textContent);
+        expect(sections).toEqual(["Colours", "Outputs", "Measurement", "Frames", "Adjustments"]);
+        const colours = document.querySelector("#f > .ta-section");
+        expect(colours.tagName).toBe("DIV");
+        expect(colours.querySelector('[name="palette"]')).not.toBe(null);
+        expect(colours.querySelector('[name="range_min"]')).not.toBe(null);
+        expect([].map.call(document.querySelectorAll('[name="palette"] option'), o => o.value)).toEqual(["", "whitehot", "ironred"]);
+    });
+
+    it("shows the temperatures in the user's unit and reads them back in the files'", () => {
+        window.localStorage.setItem("unit_system", "imperial");
+        const s = Object.assign({}, DEFAULTS, {unit: "C", reflected_temp: 20, range_min: 10, range_max: 60,
+            replace_above: 150, replace_above_value: "nodata", replace_below: -10, replace_below_value: 0});
+        document.body.innerHTML = '<div id="ta-convert-form">' + conversions.formHtml(s, PREFERENCES, {}) + "</div>";
+        expect(input("reflected_temp").value).toBe("68");
+        expect(input("range_min").value).toBe("50");
+        expect(input("range_max").value).toBe("140");
+        expect(input("replace_above").value).toBe("302");
+        expect(input("replace_below").value).toBe("14");
+        expect(input("replace_below_value").value).toBe("32");
+        expect(conversions.readForm(form())).toEqual(s);
+
+        // What is typed is given in the files' unit, here kelvin
+        input("unit").value = "K";
+        input("ambient_temp").value = "77";
+        const read = conversions.readForm(form());
+        expect(read).toMatchObject({unit: "K", reflected_temp: 293.15, ambient_temp: 298.15, range_min: 283.15, replace_above_value: "nodata"});
+    });
+
+    it("chooses the user's unit for the files when the settings name none", () => {
+        window.localStorage.setItem("unit_system", "imperial");
+        document.body.innerHTML = '<div id="ta-convert-form">' + conversions.formHtml(Object.assign({}, DEFAULTS, {unit: undefined}), PREFERENCES, {}) + "</div>";
+        expect(input("unit").value).toBe("F");
+        expect(form().innerHTML).toContain("Reflected temperature (°F)");
+    });
+
+    it("reads the form back as the settings it shows", () => {
+        const s = Object.assign({}, DEFAULTS, {distance: 12.5, emissivity: 0.95, palette: "ironred", range_min: 10, range_max: 60,
+            replace_above: 150, replace_above_value: "nodata", normalize: true, max_pitch: -80, outputs: ["temp_c:exr", "gray16:png"]});
+        document.body.innerHTML = '<div id="f">' + conversions.formHtml(s, PREFERENCES, {}) + "</div>";
+        const read = conversions.readForm(document.getElementById("f"));
+        expect(read).toEqual(Object.assign({}, s));
+        expect(conversions.formProblem(read)).toBe(null);
+        expect(conversions.formProblem(Object.assign({}, read, {outputs: []}))).toMatch(/at least one output/);
+        expect(conversions.formProblem(Object.assign({}, read, {distance: ""}))).toMatch(/distance/);
+        expect(conversions.formProblem(Object.assign({}, read, {range_max: null}))).toMatch(/colour range/);
+    });
+
+    it("fills the settings from the WebODM plan's process command", () => {
+        const s = conversions.planSettings(["-o", "temp_c:tif,pseudo", "--max-pitch", "-80", "--normalize", "--emissivity", "0.9"], DEFAULTS);
+        expect(s).toEqual(Object.assign({}, DEFAULTS, {outputs: ["temp_c:tiff", "pseudo"], max_pitch: -80, normalize: true, emissivity: 0.9}));
+        expect(DEFAULTS.normalize).toBe(false);
+    });
+
+    it("gives the plan's temperatures in the settings' unit, °C when the plan names no unit", () => {
+        const f = Object.assign({}, DEFAULTS, {unit: "F"});
+        expect(conversions.planSettings(["--reflected-temp", "20"], f).reflected_temp).toBe(68);
+        expect(conversions.planSettings(["--unit", "k", "--ambient-temp", "293.15"], f).ambient_temp).toBe(68);
+        expect(conversions.planSettings(["--unit", "F", "--ambient-temp", "68"], DEFAULTS).ambient_temp).toBe(20);
+    });
+
+    it("lists what settings change dji-thermal-cli's defaults, in the user's unit, and which leave the WebODM plan", () => {
+        window.localStorage.setItem("unit_system", "imperial");
+        const plan = conversions.planSettings(["-o", "temp_c:tiff", "-o", "pseudo", "--normalize"], DEFAULTS);
+        const s = Object.assign({}, DEFAULTS, {emissivity: 0.95, reflected_temp: 20, range_min: 10, range_max: 60,
+            outputs: ["temp_c:tiff", "pseudo:tiff"]});
+        const diffs = conversions.differences(s, DEFAULTS, plan, "F");
+        expect(diffs.map(d => [d.key, d.text, d.changed, d.offPlan])).toEqual([
+            ["outputs", "temp_c:tiff, pseudo:tiff", true, false],   // the plan's pseudo names no format, so any one is on it
+            ["emissivity", "emissivity 0.95", true, false],
+            ["reflected_temp", "reflected 68 °F", true, false],
+            ["normalize", "not normalized", false, true],
+            ["range", "range 50 to 140 °F", true, false]
+        ]);
+        expect(conversions.differences(DEFAULTS, DEFAULTS, null, "C")).toEqual([]);
+        // The same temperature in another unit is no change, but the unit is
+        expect(conversions.differences(Object.assign({}, DEFAULTS, {unit: "K"}), DEFAULTS, null, "C").map(d => d.key)).toEqual(["unit"]);
+
+        const chips = document.createElement("div");
+        chips.innerHTML = conversions.chipsHtml(diffs, "the defaults");
+        expect(chips.querySelectorAll(".ta-chip-changed").length).toBe(4);
+        expect(chips.querySelector(".ta-chip-off-plan").getAttribute("title")).toBe("The WebODM plan: normalized");
+        expect(conversions.chipsHtml([], "the defaults")).toContain("the defaults");
+    });
+
+    it("puts a changed setting back to its default, in the files' unit", () => {
+        const s = Object.assign({}, DEFAULTS, {unit: "K", range_min: 283.15, range_max: 333.15, emissivity: 0.95, gimbal_yaw: 10});
+        expect(conversions.resetSetting(s, DEFAULTS, "range")).toEqual(Object.assign({}, s, {range_min: null, range_max: null}));
+        expect(conversions.resetSetting(s, DEFAULTS, "gimbal").gimbal_yaw).toBe(null);
+        const back = conversions.resetSetting(Object.assign({}, s, {reflected_temp: 293.15}), DEFAULTS, "unit");
+        expect(back.unit).toBe("C");
+        expect(back.reflected_temp).toBeCloseTo(20);
+        expect(back.range_min).toBeCloseTo(10);
+    });
+
+    it("folds the form into a summary once the dataset has conversions, and marks and resets what changed", async () => {
+        window.localStorage.setItem("unit_system", "imperial");
+        const fetchFn = server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [CONVERSION], defaults: DEFAULTS}),
+                                "/api/plugins/dji-thermal/preferences": PREFERENCES});
+        dataset.init(document, fetchFn);
+        await ticks();
+        const summary = document.getElementById("ta-convert-summary");
+        expect(form().hidden).toBe(true);
+        // The form starts from the defaults: what it shows are the plan's settings it leaves
+        expect([...summary.querySelectorAll(".ta-chip-off-plan")].map(c => c.getAttribute("data-key"))).toEqual(["outputs", "normalize"]);
+        expect(summary.querySelector(".ta-chip-changed")).toBe(null);
+        // Each card says what its conversion changed
+        const card = document.querySelector('.ta-conversion[data-id="9"] .ta-conversion-chips');
+        expect([...card.querySelectorAll(".ta-chip")].map(c => c.textContent)).toEqual(["emissivity 0.95", "normalized"]);
+
+        click(summary.querySelector('[data-act="edit"]'));
+        expect(form().hidden).toBe(false);
+        expect(summary.querySelector('[data-act="edit"]')).toBe(null);
+        input("reflected_temp").value = "68";
+        input("reflected_temp").dispatchEvent(new Event("input", {bubbles: true}));
+        expect(summary.querySelector('[data-key="reflected_temp"]').textContent).toBe("reflected 68 °F");
+        const field = input("reflected_temp").closest(".ta-field");
+        expect(field.classList.contains("ta-changed")).toBe(true);
+        // The plan normalizes, the form does not
+        expect(input("normalize").closest(".checkbox").classList.contains("ta-off-plan")).toBe(true);
+
+        click(field.querySelector('[data-reset="reflected_temp"]'));
+        expect(input("reflected_temp").value).toBe("");
+        expect(input("reflected_temp").closest(".ta-field").classList.contains("ta-changed")).toBe(false);
+        expect(summary.querySelector('[data-key="reflected_temp"]')).toBe(null);
+        expect(form().hidden).toBe(false);
+    });
+
+    it("opens the Convert tab with the WebODM plan's settings, marked as changed, without converting", async () => {
+        const fetchFn = server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [CONVERSION], defaults: DEFAULTS}),
+                                "/api/plugins/dji-thermal/preferences": PREFERENCES});
+        dataset.init(document, fetchFn);
+        await ticks();
+        expect(form().hidden).toBe(true);
+        click(document.getElementById("ta-plan-convert"));
+        expect(document.getElementById("ta-tab-convert").hidden).toBe(false);
+        expect(document.getElementById("ta-tab-webodm").hidden).toBe(true);
+        expect(input("normalize").checked).toBe(true);
+        expect(document.querySelector('#ta-convert-summary [data-key="normalize"]').classList.contains("ta-chip-changed")).toBe(true);
+        expect(document.querySelector("#ta-convert-summary .ta-chip-off-plan")).toBe(null);
+        expect(calls(fetchFn).filter(c => c.indexOf("POST") === 0)).toEqual([]);
+    });
+
+    it("shows the recorded values once an analysis running when the page opened is done, keeping what was typed", async () => {
+        jest.useFakeTimers();
+        const analyzing = Object.assign({}, DATASET, {status: "analyzing", analysis: {}, analyzed: false, analyzed_at: null, conversions: []});
+        const fetchFn = server({[URL5]: [analyzing, Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: []})]});
+        dataset.init(document, fetchFn);
+        await ticks();
+        expect(form().innerHTML).toContain("Embedded not recorded");
+        input("humidity").value = "55";
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect(form().innerHTML).toContain("Embedded 5.0 m");
+        expect(input("humidity").value).toBe("55");
+    });
+
+    it("opens the form at once for a dataset without conversions", async () => {
+        const fetchFn = server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [], defaults: DEFAULTS}),
+                                "/api/plugins/dji-thermal/preferences": PREFERENCES});
+        dataset.init(document, fetchFn);
+        await ticks();
+        expect(form().hidden).toBe(false);
+        expect(document.querySelector('#ta-convert-summary [data-act="edit"]')).toBe(null);
+    });
+
+    it("opens a conversion's menu, and closes it on another click or Esc", async () => {
+        const fetchFn = server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [CONVERSION], defaults: DEFAULTS}),
+                                "/api/plugins/dji-thermal/preferences": PREFERENCES});
+        dataset.init(document, fetchFn);
+        await ticks();
+        const toggle = () => document.querySelector('.ta-conversion[data-id="9"] [data-act="menu"]');
+        const isOpen = () => toggle().parentNode.classList.contains("open");
+        click(toggle());
+        expect(isOpen()).toBe(true);
+        expect(toggle().getAttribute("aria-expanded")).toBe("true");
+        click(toggle());
+        expect(isOpen()).toBe(false);
+        click(toggle());
+        click(document.body);
+        expect(isOpen()).toBe(false);
+        click(toggle());
+        document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true}));
+        expect(isOpen()).toBe(false);
+        expect(toggle().getAttribute("aria-expanded")).toBe("false");
+    });
+
+    it("lists the conversions with their downloads, and each one's files", () => {
+        const base = "/api/plugins/dji-thermal/datasets/5/conversions/";
+        const running = Object.assign({}, CONVERSION, {id: 10, name: "Run", status: "converting", progress: 0.3});
+        let html = conversions.listHtml([running, CONVERSION], true, base, null);
+        expect(html).toContain("Converting 30%");
+        const starting = Object.assign({}, running, {progress: 0, settings: Object.assign({}, DEFAULTS, {normalize: true})});
+        expect(conversions.listHtml([starting], true, base, null)).toContain("Normalizing: comparing the frames' overlaps");
+        const normalizing = Object.assign({}, starting, {stage: {stage: "frames", step: 2, steps: 5, done: 40, total: 217, unit: "files"}});
+        expect(conversions.listHtml([normalizing], true, base, null)).toContain("Normalizing: step 2 of 5, reading frames, 40/217 files…");
+        expect(html).toContain('href="' + base + '9/download"');
+        expect(html).not.toContain(base + '10/download');
+        expect(html).toContain("2 converted, 1 skipped");
+        expect(html).toContain('data-act="cancel"');
+        html = conversions.listHtml([CONVERSION], false, base, null);
+        expect(html).not.toContain('data-act="delete"');
+        expect(html).toContain('data-act="use"');
+        expect(conversions.listHtml([], true, base)).toMatch(/No conversions yet/);
+
+        const files = conversions.resultsHtml(Object.assign({}, CONVERSION, {results: {
+            files: [{path: "a_T.JPG", ok: true, outputs: ["sub/a_T_temp_c.tiff"], notes: [], distance: 21.4, distance_source: "lrf"},
+                    {path: "b_T.JPG", ok: false, reason: "oblique (gimbal pitch -45 above -80)", outputs: [], notes: []}],
+            normalization: {ambient_c: 20, reflected_c: 20, frames: 2, without_offset: 0, offset_min: -0.2, offset_max: 0.3}}}), base);
+        expect(files).toContain('href="' + base + '9/download?file=sub%2Fa_T_temp_c.tiff">a_T_temp_c.tiff</a>');
+        expect(files).toContain("oblique (gimbal pitch -45 above -80)");
+        expect(files).toContain("Skipped: oblique (1).");
+        expect(conversions.skipReasons([{ok: false, reason: "oblique (gimbal pitch -45 above -80)"}, {ok: false, reason: "no DJI thermal data found (not an R-JPEG)"},
+            {ok: false, reason: "oblique (gimbal pitch -30 above -80)"}, {ok: true}])).toEqual([["oblique", 2], ["no DJI thermal data found", 1]]);
+        expect(files).toContain("distance 21.4 m (lrf)");
+        expect(files).toContain("offsets -0.20 to 0.30 °C");
+    });
+
+    it("converts with the form's settings, polls while it runs, and saves or resets the user's defaults", async () => {
+        jest.useFakeTimers();
+        const converting = Object.assign({}, CONVERSION, {id: 10, name: "Conversion 2", status: "converting", progress: 0.5});
+        const fetchFn = server({
+            [URL5]: [Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [CONVERSION]}),
+                Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [converting, CONVERSION]}),
+                Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [Object.assign({}, converting, {status: "ready"}), CONVERSION]})],
+            "/api/plugins/dji-thermal/preferences": Object.assign({}, PREFERENCES, {settings: Object.assign({}, DEFAULTS, {emissivity: 0.9}), saved: true}),
+            ["POST " + URL5 + "/conversions"]: converting,
+            "PUT /api/plugins/dji-thermal/preferences": (u, o) => jsonResponse({settings: JSON.parse(o.body).settings, saved: true}),
+            "DELETE /api/plugins/dji-thermal/preferences": {settings: DEFAULTS, saved: false}
+        });
+        dataset.init(document, fetchFn);
+        await ticks();
+
+        // The form starts from the user's saved defaults
+        expect(document.getElementById("ta-convert-count").textContent).toBe("1");
+        expect(document.getElementById("ta-convert-origin").textContent).toMatch(/your saved defaults/);
+        expect(input("emissivity").value).toBe("0.9");
+        expect(document.getElementById("ta-convert-plan").hidden).toBe(false);
+
+        input("normalize").checked = true;
+        document.getElementById("ta-convert-name").value = "Normalized";
+        click(document.getElementById("ta-convert-start"));
+        await ticks();
+        const post = fetchFn.mock.calls.find(c => c[1] && c[1].method === "POST");
+        expect(JSON.parse(post[1].body)).toMatchObject({name: "Normalized", settings: {emissivity: 0.9, normalize: true}});
+        expect(document.getElementById("ta-conversions").innerHTML).toContain("Converting 50%");
+        expect(document.querySelector('.ta-conversion[data-id="10"]').classList).toContain("ta-conversion-new");
+
+        // Polled while it converts, and no longer once it is done
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect(document.getElementById("ta-conversions").innerHTML).not.toContain("Converting");
+        const loads = calls(fetchFn).filter(c => c === "GET " + URL5).length;
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect(calls(fetchFn).filter(c => c === "GET " + URL5).length).toBe(loads);
+
+        input("humidity").value = "60";
+        click(document.getElementById("ta-convert-save"));
+        await ticks();
+        const put = fetchFn.mock.calls.find(c => c[1] && c[1].method === "PUT");
+        expect(JSON.parse(put[1].body).settings.humidity).toBe(60);
+        expect(document.getElementById("ta-convert-message").textContent).toMatch(/Saved/);
+
+        click(document.getElementById("ta-convert-reset"));
+        expect(askDialog().textContent).toContain("Your saved defaults are forgotten.");
+        press("Reset");
+        await ticks();
+        expect(input("emissivity").value).toBe("");
+        expect(input("humidity").value).toBe("");
+        expect(document.getElementById("ta-convert-origin").textContent).toMatch(/dji-thermal-cli's defaults/);
+
+        // A conversion's settings, and the WebODM plan's, fill the form
+        click(document.querySelector('.ta-conversion[data-id="9"] button[data-act="use"]'));
+        expect(input("emissivity").value).toBe("0.95");
+        expect(input("normalize").checked).toBe(true);
+        click(document.getElementById("ta-convert-plan"));
+        expect(input("emissivity").value).toBe("");
+        expect(form().querySelector('input[name="output"][value="pseudo"]').checked).toBe(false);
+    });
+
+    it("shows a started conversion at once, before the dataset reloads", async () => {
+        const started = Object.assign({}, CONVERSION, {id: 10, name: "Conversion 2", status: "converting", progress: 0});
+        let reload;
+        const fetchFn = server({
+            [URL5]: [Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [CONVERSION]}),
+                     () => new Promise(r => { reload = r; })],
+            "/api/plugins/dji-thermal/preferences": PREFERENCES,
+            ["POST " + URL5 + "/conversions"]: started
+        });
+        dataset.init(document, fetchFn);
+        await ticks();
+        click(document.getElementById("ta-convert-start"));
+        await ticks();
+        expect(reload).toBeDefined();   // the reload has not answered yet
+        const card = document.querySelector('.ta-conversion[data-id="10"]');
+        expect(card.classList).toContain("ta-conversion-new");
+        expect(card.textContent).toContain("Conversion 2");
+        expect(document.getElementById("ta-convert-count").textContent).toBe("2");
+    });
+
+    it("renames, cancels and deletes a conversion in the page's dialog, and says when the server refuses", async () => {
+        const converting = Object.assign({}, CONVERSION, {status: "converting", progress: 0.2});
+        const C9 = "/api/plugins/dji-thermal/datasets/5/conversions/9";
+        const fetchFn = server({
+            [URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [converting]}),
+            "/api/plugins/dji-thermal/preferences": PREFERENCES,
+            ["PATCH " + C9]: () => jsonResponse({name: ["Too long"]}, false),
+            ["POST " + C9 + "/cancel"]: () => jsonResponse({error: "Already finished"}, false),
+            ["DELETE " + C9]: () => jsonResponse({error: "Not allowed"}, false)
+        });
+        dataset.init(document, fetchFn);
+        await ticks();
+        const act = a => click(document.querySelector('.ta-conversion[data-id="9"] button[data-act="' + a + '"]'));
+        const message = () => document.getElementById("ta-convert-message").textContent;
+        expect(document.querySelector('button[data-act="delete"]').getAttribute("aria-label")).toBe("Delete " + CONVERSION.name);
+
+        act("rename");
+        document.getElementById("ta-ask-field").value = "New name";
+        press("Rename");
+        await ticks();
+        expect(JSON.parse(fetchFn.mock.calls.find(c => c[1] && c[1].method === "PATCH")[1].body)).toEqual({name: "New name"});
+        expect(message()).toContain("Too long");
+
+        act("cancel");
+        await ticks();
+        expect(message()).toContain("Already finished");
+
+        act("delete");
+        expect(askDialog().textContent).toContain("Delete " + CONVERSION.name + " and its files?");
+        press("Cancel");
+        await ticks();
+        expect(calls(fetchFn)).not.toContain("DELETE " + C9);
+        act("delete");
+        press("Delete");
+        await ticks();
+        expect(calls(fetchFn)).toContain("DELETE " + C9);
+        expect(message()).toContain("Not allowed");
+    });
+
+    it("refuses incomplete settings before sending them", async () => {
+        const fetchFn = server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: []}),
+                                "/api/plugins/dji-thermal/preferences": PREFERENCES});
+        dataset.init(document, fetchFn);
+        await flush();
+        [].forEach.call(form().querySelectorAll('input[name="output"]'), c => { c.checked = false; });
+        click(document.getElementById("ta-convert-start"));
+        expect(document.getElementById("ta-convert-message").textContent).toMatch(/at least one output/);
+        input("distance_mode").value = "fixed";
+        change(input("distance_mode"));
+        expect(input("distance").hidden).toBe(false);
+        expect(calls(fetchFn).some(c => c.indexOf("POST") === 0)).toBe(false);
+    });
+
+    it("lets a viewer download the conversions but not convert or delete them", async () => {
+        const fetchFn = server({
+            [URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS, can_change: false, can_delete: false, conversions: [CONVERSION]}),
+            "/api/plugins/dji-thermal/datasets/5/conversions/9": Object.assign({}, CONVERSION, {results: {files: [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []}]}})
+        });
+        dataset.init(document, fetchFn);
+        await flush();
+        expect(document.getElementById("ta-convert-settings").hidden).toBe(true);
+        expect(calls(fetchFn)).not.toContain("GET /api/plugins/dji-thermal/preferences");
+        const list = document.getElementById("ta-conversions");
+        expect(list.innerHTML).toContain("/conversions/9/download");
+        expect(list.innerHTML).not.toContain('data-act="delete"');
+
+        click(list.querySelector('button[data-act="files"]'));
+        await flush();
+        expect(list.querySelector('[data-files="9"]').innerHTML).toContain("a.tiff");
+    });
+});
