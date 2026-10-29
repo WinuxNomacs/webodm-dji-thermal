@@ -231,6 +231,9 @@ since libdirp can crash, with the SDK found by `DJI_THERMAL_SDK_DIR` (an unpacke
   that SDK is used; the admin page's **Update** replaces the SDK there with a newly uploaded zip (the page says
   so when the folder cannot be written). Without the variable, the upload goes to the plugin's persistent folder,
   and Update replaces it there.
+- **DJI's libraries can never crash dji-thermal-cli's process** (the user, 2026-10-29): they are loaded only in a
+  child process, never in the caller's; a crash or hang there (a signal, a timeout) is that photo's error, with
+  the reason, and the caller carries on.
 - **The CLI work** (the user, 2026-10-29): branch `native-sdk` in dji-thermal-cli from its `main` (1.8.0,
   published), then `release/1.9.0`, merged there, not pushed; the plugin then pins 1.9.0.
 
