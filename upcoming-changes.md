@@ -3,7 +3,10 @@
 ## Phases (current and upcoming)
 
 **Up next**
-1. **Release 1.0.0** — README, changelog, zip, release check; where to publish it (below).
+1. **DJI's own Thermal SDK** — an admin page to upload DJI's SDK, used in place of the built-in port for every
+   conversion; the native calls added to dji-thermal-cli first (below).
+2. **Release 1.0.0** — README, changelog, zip, release check; where to publish it (below). Prepared once on
+   `release/1.0.0` (unmerged), to be redone after phase 1.
 
 **Later**
 - **Folder conversion** for administrators (images already on the server), if wanted (below).
@@ -194,7 +197,40 @@ run; when those alerts appear they are dismissed with that reason, and the pins 
 the XMP) and the upload API with Django tests first; then the button, panel and Measurement section, with Jest
 tests and a live check on the M4T flight (a real task processed to a thermal orthophoto on the dev node).
 
-## 1. Release 1.0.0
+## 1. DJI's own Thermal SDK
+
+**The request** (the user, 2026-10-29): before the release, a plugin admin page where an administrator can upload
+the current DJI Thermal SDK, to be used in place of the built-in one if desired.
+
+**Builds on**: dji-thermal-cli, a pure-Python port of SDK v1.8, bit-identical to it. It calls DJI's libraries only
+in its tests (`tests/native_sdk.py`, ctypes bindings of `dirp_api.h`, the port's oracle), always in a subprocess
+since libdirp can crash, with the SDK found by `DJI_THERMAL_SDK_DIR` (an unpacked SDK) or
+`DJI_THERMAL_SDK_LIB_DIR`, in DJI's `<os>/release_x64` layout.
+
+**Decided (the user, 2026-10-29):**
+- **The native calls go in dji-thermal-cli**, released there first (a minor version), the plugin pinning it. The
+  SDK's location by an environment variable, as its tests have, which an admin can also set at deploy time.
+- **Server-wide**: once DJI's SDK is in place, it converts every photo on the server; without it, the built-in
+  port.
+- **The upload is DJI's SDK zip as downloaded**: the plugin keeps the libraries for the server's platform (Linux
+  x64 in WebODM's Docker image) in its persistent folder (`get_persistent_path`, kept across plugin updates) and
+  checks they load. The plugin never ships DJI's files.
+- **A photo DJI's SDK fails on** (refused, or the library crashed) **fails**, left out with DJI's reason, as other
+  failures are; no fallback to the built-in port.
+
+**Proposed design:**
+- dji-thermal-cli: the bindings moved from its tests into the package, with a subprocess runner; `measure` and
+  `describe` (and the CLI) given the SDK's location, by argument or the environment variable; a refusal or crash
+  raised as the library's errors with DJI's reason.
+- The plugin: an admin page (`main_menu` and `app_mount_points`, superusers only: plugins cannot add to the
+  Administration menu) showing which is in use (built-in, or DJI's with its API version), the upload, a test
+  conversion of a sample, and removing the SDK. `converter.py` passes the SDK's location to the library; the
+  Measurement section's ranges come from the same backend.
+
+**Open**: which wins when both the deploy-time variable and an upload are present; the CLI work's branch and
+version, to be agreed with the session working in that repo.
+
+## 2. Release 1.0.0
 
 README (what it does, cameras, installing, using it, that it calls no outside service), `CHANGELOG.md`, the zip
 (`dev/package.sh`), the `release-check` skill.
