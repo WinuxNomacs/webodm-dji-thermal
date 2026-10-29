@@ -1,14 +1,19 @@
-from app.plugins import PluginBase, logger
+from app.plugins import MountPoint, PluginBase, logger
 
 from . import converter
+from .api import Describe, TaskConvert
 
 
 class Plugin(PluginBase):
-    # The upload flow that converts a task's R-JPEGs comes in the next phase (upcoming-changes.md)
-
     def enable(self):
         ok, message = converter.decoder_status()
         if ok:
             logger.info("DJI Thermal: {}".format(message))
         else:
             logger.warning("DJI Thermal plugin enabled, but {}".format(message))
+
+    def api_mount_points(self):
+        return [
+            MountPoint('describe$', Describe.as_view()),
+            MountPoint(r'projects/(?P<project_pk>\d+)/tasks/(?P<pk>[^/.]+)/convert$', TaskConvert.as_view()),
+        ]

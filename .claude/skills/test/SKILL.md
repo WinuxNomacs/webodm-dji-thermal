@@ -10,7 +10,7 @@ From the repo root, with the dev stack up (`dev/webodm.sh ps`; start it with `de
 1. **Ruff** (Python 3.9 syntax and lint): `.venv/bin/ruff check .`
 2. **ESLint** (the ES5 scripts in `dji-thermal/public`): `npm run lint -- dji-thermal`
 3. **Jest**: `npm test` (add a path or `-t "<name>"` to run fewer).
-4. **Django**: `docker exec -w /webodm dt-webapp python manage.py test --noinput coreplugins.dji-thermal.tests.test_converter`.
+4. **Django**: `docker exec -w /webodm dt-webapp python manage.py test --noinput coreplugins.dji-thermal.tests.test_converter coreplugins.dji-thermal.tests.test_api`.
    The tests that need real R-JPEGs read the folders `DT_SAMPLES_DIR` and `DT_FLIGHT_DIR` set in `.env` (see the
    README), mounted by `dev/webodm.sh up`; they are skipped, naming the variable, when those are not set. Check
    that the run's summary has no `skipped=` before a merge (on a machine with the images).
