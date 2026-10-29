@@ -447,3 +447,21 @@ emissivity / reflected-temperature correction, the frame page, comparisons and d
 
 **Possible steps** (each merged when tested): (a) holder tasks, datasets, uploads and the analysis; (b)
 conversions; (c) mosaics and the viewer; (d) Create task and the README.
+
+**Built so far**:
+- **(a) Datasets, uploads and the analysis** — 2026-10-29, `analyzer-datasets`. `datasets.py` (the holder task:
+  tag, name prefix, records `thermal/dataset.json`, `job.json`, `analysis.json`, images in `thermal/images/`, all
+  changed under an `fcntl` lock on `thermal/.lock` that the web app and the worker share; listing, permissions,
+  quota, run ids, Cancel with Celery's revoke, a job whose Celery state is FAILURE or REVOKED marked failed;
+  `task_removing` cancels), `analysis.py` (the earlier `thermal_analysis.py` on dji-thermal-cli 1.9.0's `check`),
+  `analyzer_api.py` (list and create, detail, rename, delete, upload, analyze, cancel, thumbnail), `analyzer_pages.py`
+  and the two templates; the menu item (`main_menu`), the SDK page moved to `/plugins/dji-thermal/sdk/`.
+  Front end: the earlier `analyzer_core.js`, `datasets.js`, `dataset.js` and `analyzer.css` as plain ES5 scripts in
+  `public/` (no build), without the server-folder source and the Convert tab; temperatures in Fahrenheit with
+  WebODM's imperial units (its `unit_system` in the browser's storage) in place of the earlier profile setting.
+  Tests: `tests/test_analyzer.py` (19, one on 6 frames of the M4T flight), `public/__tests__/analyzer.test.js` (43,
+  the earlier ones that apply). Live check on :8002: a dataset of 12 thermal and 2 RGB frames of the M4T flight,
+  analyzed, its tabs and thumbnails, the holder task in the project's list with "Set a processing node", the SDK
+  link, deleted from its page (task and folder gone).
+  Found while building it: the holder task is listed by WebODM's task API and counts in the project's task count
+  ("2 Tasks"); removing it in WebODM deletes the dataset (`Task.delete` removes the task's folder).

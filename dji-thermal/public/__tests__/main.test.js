@@ -20,7 +20,7 @@ test("the DJI Thermal page is linked under Administration, after Plugins", () =>
     sideMenu(true);
     loadMain();
     expect(menuLabels()).toEqual(["Dashboard", "Administration", "Plugins", "DJI Thermal", "Basemaps"]);
-    expect(document.querySelector("#dji-thermal-admin-menu a").getAttribute("href")).toBe("/plugins/dji-thermal/");
+    expect(document.querySelector("#dji-thermal-admin-menu a").getAttribute("href")).toBe("/plugins/dji-thermal/sdk/");
 });
 
 test("users without the Administration menu get no link to the page", () => {

@@ -48,7 +48,7 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
 
 The `test`, `live-check` and `release-check` skills in `.claude/skills` have the steps.
 
-- Django: `docker exec -w /webodm dt-webapp python manage.py test --noinput coreplugins.dji-thermal.tests.test_converter coreplugins.dji-thermal.tests.test_api coreplugins.dji-thermal.tests.test_sdk`. The tests'
+- Django: `docker exec -w /webodm dt-webapp python manage.py test --noinput coreplugins.dji-thermal.tests.test_converter coreplugins.dji-thermal.tests.test_api coreplugins.dji-thermal.tests.test_sdk coreplugins.dji-thermal.tests.test_analyzer`. The tests'
   images come from `DT_SAMPLES_DIR` and `DT_FLIGHT_DIR`, DJI's SDK zip from `DT_SDK_ZIP` (`.env`, untracked);
   never commit an image or DJI's files. Each run installs `requirements.txt` afresh in WebODM's test media
   folder, so the tests use the pinned dji-thermal-cli. One run
