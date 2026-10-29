@@ -218,10 +218,18 @@ since libdirp can crash, with the SDK found by `DJI_THERMAL_SDK_DIR` (an unpacke
 - **A photo DJI's SDK fails on** (refused, or the library crashed) **fails**, left out with DJI's reason, as other
   failures are; no fallback to the built-in port.
 
-**Proposed design:**
-- dji-thermal-cli: the bindings moved from its tests into the package, with a subprocess runner; `measure` and
-  `describe` (and the CLI) given the SDK's location, by argument or the environment variable; a refusal or crash
-  raised as the library's errors with DJI's reason.
+- **Only the SDK versions the bindings were checked against** (the user, 2026-10-29): today v1.8 (API revisions
+  19 and 20). Another version is refused at upload, naming the one found and those supported; a new DJI release
+  is followed by a dji-thermal-cli release.
+
+**Design:**
+- dji-thermal-cli 1.9.0: a `native` module with the bindings moved from its tests, run in a **child process**
+  that loads the library once and serves requests over a pipe; a crash (signal) or a timeout fails that request
+  with a `TsdkError` subclass saying so, and the next request starts a new child. A proxy answers the same calls
+  as the port's `RJpeg`, so `measure`, `describe` and `process` work unchanged (a call DJI's API lacks fails with
+  the reason). Chosen explicitly: `Settings(sdk=dir)`, `describe(..., sdk=dir)`, `--sdk DIR`; the library reads
+  no environment variable itself (its tests' `DJI_THERMAL_SDK_DIR` keeps meaning the oracle). The plugin reads
+  `DJI_THERMAL_SDK_DIR` from WebODM's environment and passes it.
 - The plugin: an admin page (`main_menu` and `app_mount_points`, superusers only: plugins cannot add to the
   Administration menu) showing which is in use (built-in, or DJI's with its API version), the upload, a test
   conversion of a sample, and removing the SDK. `converter.py` passes the SDK's location to the library; the
