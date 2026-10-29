@@ -87,6 +87,13 @@ Open decisions:
   TIFF in the task's folder, then commits the task, which then processes like any other.
 - **Options**: on the Task Options hook, the plugin can set or suggest the options a temperature dataset needs (no
   `radiometric-calibration` for converted DJI images, per WebODM's docs).
+- **Why not the Task Options hook alone** (the user asked, 2026-10-29): its controls run in the browser and only
+  set option values, which go to the node. WebODM then uploads the original files itself and its worker sends them
+  to the node within seconds of the commit, with no plugin code in between (no signal there but
+  `task_resizing_images`, which fires only when resizing). But for a new task, `getExifData()` also gives each
+  photo's `File` (`image`, set in `MapPreview.jsx`; not in WebODM's docs, so it may change): a control can read
+  the R-JPEGs' XMP in the browser and show that the photos are DJI thermal ones, with a way into the plugin's
+  upload for the same files. A spike at the start of this phase checks how far that goes.
 - Progress, errors per file (a file that fails stays out, with the reason), permissions as WebODM's own upload.
 
 Open decisions:
