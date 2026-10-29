@@ -3,18 +3,31 @@
 ## Phases (current and upcoming)
 
 **Up next**
-1. **dji-thermal-cli for Python 3.9** — a release of the library that installs in WebODM's Python (below).
+1. **Conversion core** — R-JPEG to temperature TIFF in the plugin, server side, with tests (below).
+
+(waiting, as of 2026-10-29, on the user publishing dji-thermal-cli 1.7.0: push its `main`, CI on the three
+systems, tag `v1.7.0`, which publishes to TestPyPI and PyPI. Phase 1 can be built before that, with the local
+wheel installed in the plugin's site-packages in the dev container; its `requirements.txt` needs 1.7.0 on PyPI.)
 
 **Then**
-2. **Conversion core** — R-JPEG to temperature TIFF in the plugin, server side, with tests (below).
-3. **Thermal task flow** — the plugin's own upload: R-JPEGs in, a WebODM task of temperature images out (below).
-4. **Release 1.0.0** — README, changelog, zip, release check; where to publish it (below).
+2. **Thermal task flow** — the plugin's own upload: R-JPEGs in, a WebODM task of temperature images out (below).
+3. **Release 1.0.0** — README, changelog, zip, release check; where to publish it (below).
 
 **Later**
 - **Folder conversion** for administrators (images already on the server), if wanted (below).
 - **Thermal tools on the map** (temperature under the cursor, spot and area measurements): evaluate (below).
 
 **Done**
+- **dji-thermal-cli 1.7.0 for Python 3.9** — 2026-10-29, in `~/gitrepos/python/dji-thermal-cli`: branch
+  `python-3.9` (b8eeb28) and `release/1.7.0` (5223ac1), merged to its `main` (fd5e0ea), not pushed. No code
+  change: on Python 3.9 with numpy 1.26.2 and Pillow 11.3.0 its full suite passes with the SDK and flight data
+  (903 passed; 3 skipped: `math.fma`, 3.13+, has an exact fallback; one native SDK crash). `requires-python >=3.9`,
+  Ruff py39, classifiers 3.9 to 3.14; dev group: pytest 8.4 and tifffile 2024.8.30 on 3.9, tomli before 3.11
+  (`test_packaging.py`); CI's lowest-direct job (numpy 1.26.2, Pillow 11.3.0) and the wheel smoke test on 3.9.
+  The lock only adds versions for Pythons below 3.12. Checks: Ruff, pytest on 3.14 (197) and on 3.9 lowest-direct
+  (195), build, `check_dist.py`, twine, the wheel on 3.9 and 3.14. In the dev container: `pip install -U --target`
+  of the wheel with `numpy==1.26.2` and `pillow==11.3.0` gave those versions, and M4T and H20T samples converted.
+  Not done (the user's, RELEASING.md): the macOS run from a fresh clone, CI, the tag and publishing.
 - **Project setup** — 2026-10-29, `project-setup`. The repo from the GeoJSON plugin's: `CLAUDE.md`, this plan,
   `new.md` (untracked), AGPLv3 `LICENSE`, `dev/` (`webodm.sh`, `compose.yml` with the WebODM 3.3.2 images pinned
   by digest, `package.sh`), `ruff.toml` (py39), `eslint.config.mjs`, `package.json` (Jest, ESLint, Playwright),
@@ -48,23 +61,21 @@ only).
 - Plugin id `dji-thermal`.
 - The plugin keeps its own tests (Django, Jest), outside the zip, as the GeoJSON plugin does. Tests for anything
   that would go into WebODM itself only when the user says so.
-- The conversion runs in **the plugin's own upload flow**, with no change to WebODM (phase 3).
-- **dji-thermal-cli gets a release for Python 3.9**, rather than being copied into the plugin (phase 1).
+- The conversion runs in **the plugin's own upload flow**, with no change to WebODM (phase 2).
+- **dji-thermal-cli gets a release for Python 3.9**, rather than being copied into the plugin (1.7.0, done).
 
-## 1. dji-thermal-cli for Python 3.9
+## Done: dji-thermal-cli for Python 3.9
 
 In the library's own repository (the user's package: Claude prepares the `release/X.Y.Z` branch there, the user
 publishes).
 - `requires-python = ">=3.9"`; CI and the lowest-direct resolution also on 3.9 with numpy 1.26.2 and
   Pillow 11.3.0; `test_packaging.py` without `tomllib` on 3.9 (`tomli`, or skip there); Ruff's target py39.
 - A minor version (1.7.0): it widens what installs it, with no API change.
-- Then the plugin's `requirements.txt`: `dji-thermal-cli==1.7.0`, `numpy==1.26.2`, `pillow==11.3.0` (WebODM runs
+- The plugin's `requirements.txt`: `dji-thermal-cli==1.7.0`, `numpy==1.26.2`, `pillow==11.3.0` (WebODM runs
   `pip install -U --target` with dependencies, and an unpinned numpy would land in the plugin's site-packages,
   ahead of WebODM's own).
 
-Open: none, unless the library's own plan says otherwise.
-
-## 2. Conversion core
+## 1. Conversion core
 
 - `dji-thermal/converter.py`: detection, decoding with the camera's recorded parameters, the TIFF with the
   source's metadata and `Camera:BandName` = `LWIR` (`exiftool_camera.config`), never raising (a failed file is
@@ -78,7 +89,7 @@ Open decisions:
 - **Test images**: DJI's SDK sample images may not be redistributable in a public repo; use the user's own, or
   keep them out of git (a download step for the tests).
 
-## 3. Thermal task flow
+## 2. Thermal task flow
 
 - **A "Thermal task" button** beside "Select Images and GCP" (`Dashboard.addNewTaskButton`): the user picks the
   flight's R-JPEGs (and a GCP file), the name and options as for any task.
@@ -103,7 +114,7 @@ Open decisions:
   values only.
 - **Resize**: thermal frames are small (640x512, 1280x1024); offer it or not.
 
-## 4. Release 1.0.0
+## 3. Release 1.0.0
 
 README (what it does, cameras, installing, using it, that it calls no outside service), `CHANGELOG.md`, the zip
 (`dev/package.sh`), the `release-check` skill.
