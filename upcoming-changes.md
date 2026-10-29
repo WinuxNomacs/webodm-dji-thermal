@@ -3,17 +3,18 @@
 ## Phases (current and upcoming)
 
 **Up next**
-1. **Release 1.0.0** — README, changelog, zip, release check; in the directory and as a GitHub release (below).
-   Prepared once on `release/1.0.0` (unmerged), to be redone on `main` (dji-thermal-cli 1.9.0 is on PyPI since
-   2026-10-29).
+1. **Thermal Analyzer, part 1** — datasets kept in a holder task, their analysis, conversions, mosaics on the map,
+   a conversion made into a task; the Analyzer at the root of the menu (below).
+2. **Release 1.0.0** — README, changelog, zip, release check; in the directory and as a GitHub release (below).
+   Prepared once on `release/1.0.0` (unmerged), to be redone on `main` after part 1 (dji-thermal-cli 1.9.0 is on
+   PyPI since 2026-10-29).
 
 **Later**
-- **Folder conversion** for administrators (images already on the server), if wanted (below).
-- **Thermal Analyzer, part 1** — storage on the plugin's data stores, datasets and conversions, mosaics on the map
-  (below).
 - **Thermal Analyzer, part 2** — measurements (spot, line, area), comparisons and frame views (below).
 - **Pixel Inspector** — the map control (value under the cursor, region statistics), with its point and region
   endpoints served by the plugin (below).
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
 
 **Done**
 - **The DJI Thermal page under Administration** — 2026-10-29, `admin-page` (details below).
@@ -290,7 +291,7 @@ since libdirp can crash, with the SDK found by `DJI_THERMAL_SDK_DIR` (an unpacke
 - **The CLI work** (the user, 2026-10-29): branch `native-sdk` in dji-thermal-cli from its `main` (1.8.0,
   published), then `release/1.9.0`, merged there, not pushed; the plugin then pins 1.9.0.
 
-## 1. Release 1.0.0
+## 2. Release 1.0.0
 
 README (what it does, cameras, installing, using it, that it calls no outside service), `CHANGELOG.md`, the zip
 (`dev/package.sh`), the `release-check` skill.
@@ -316,12 +317,13 @@ setting, under Administration.
 - Live check on :8002: admin sees DJI Thermal under Administration after Plugins and opens the page; a temporary
   user made for it has no link and gets 403 at `/plugins/dji-thermal/`; the user was removed afterwards.
 
-## Later: Folder conversion
+## Later: Server-folder datasets
 
-The earlier plugin's page converts a folder on the server (overrides for the measurement parameters, the
-camera's own conversion kept in `raw/`, a CSV report, progress and Cancel in the worker). It ports with
-a section of the DJI Thermal page (under Administration, superusers only). Open: wanted at all, since it needs server
-paths (admins of a Docker install only).
+The earlier plugin converts a folder on the server (overrides for the measurement parameters, the camera's own
+conversion kept in `raw/`, a CSV report, progress and Cancel in the worker), and the earlier Analyzer has datasets
+read in place from a server folder (administrators only). Decided (the user, 2026-10-29): this comes after
+Analyzer part 1, as an Analyzer dataset whose photos are read in place (so they don't count toward a quota; its
+conversions and mosaics do, in its holder task).
 
 ## Later: Thermal Analyzer and Pixel Inspector
 
@@ -345,7 +347,8 @@ What ports as it is:
 
 What has to change, all within the plugin rules (no change to WebODM):
 1. **Its three Django models** (`ThermalDataset`, `ThermalConversion`, `ThermalMeasurement`: 266 lines, 45 fields,
-   about 37 query sites) move to the plugin's data stores, which are key/value JSON rows: a key per record,
+   about 37 query sites) were first to move to the data stores (key/value JSON rows; superseded by JSON files in
+   the holder task, see part 1): a key per record,
    progress from the worker under keys of its own so writes don't overwrite each other, listing and permissions
    by hand through the project's permissions. WebODM gives plugins no "project deleted" signal (task signals
    only): records of a deleted project are ignored and cleaned up when next seen. Quota: see Decided, below.
@@ -356,7 +359,7 @@ What has to change, all within the plugin rules (no change to WebODM):
 4. **Tests**: the Jest tests mostly carry over; the Python tests are rewritten against the data stores; live
    checks on the M4T flight. Its JavaScript is mostly plain (not JSX), which fits the plugin's build.
 
-Phases, in order: **part 1** (storage on data stores, datasets and conversions, mosaics on the map), **part 2**
+Phases, in order: **part 1** (datasets in holder tasks, conversions, mosaics on the map; see "1. Thermal Analyzer, part 1"), **part 2**
 (measurements, comparisons, frame views), **Pixel Inspector** (the map control and its endpoints).
 
 Decided (the user, 2026-10-29):
@@ -370,9 +373,77 @@ Decided (the user, 2026-10-29):
   `Task.update_size()` counts every file in the task's folder, so the plugin keeps a dataset's files in that
   task's folder and calls `update_size(commit=True)` after each change; uploads are refused once
   `profile.has_exceeded_quota()`.
-- **A dataset lives in the thermal task it leads to** (not a placeholder task of its own, which WebODM would list
-  as "Waiting to start processing..." with nothing real behind it, and a plugin can't hide). Creating a dataset
-  creates the same partial task the Thermal Task button makes; its photos, conversions, mosaics and measurements
-  are kept in that task's folder, and processing it later is WebODM's own Start Processing. The dataset and the
-  task share a lifetime: deleting the task deletes the analysis (the plugin cleans its records up when next seen,
-  as for a deleted project).
+- ~~A dataset lives in the thermal task it leads to~~: replaced the same day, see Part 1 below (WebODM deletes
+  a partial task after 72 hours, `CLEANUP_PARTIAL_TASKS`, and a dataset has several conversions).
+
+## 1. Thermal Analyzer, part 1
+
+**The request** (the user, 2026-10-29): plan the Analyzer's first part; it ships before 1.0.0.
+
+**Decided** (the user, 2026-10-29):
+- **Before 1.0.0**: 1.0.0 is released once part 1 is in; part 2 and the Pixel Inspector follow as 1.x.
+- **A dataset is kept in a holder task** of its project: a task WebODM never processes and never cleans up
+  (`partial=False`, no processing node, `auto_processing_node=False`, so `processing_tasks()` skips it and
+  `cleanup_tasks()`, which deletes partial tasks after 72 hours, leaves it), marked with the hidden tag
+  `.dji-thermal-dataset` (WebODM hides tags starting with "."). Everything the dataset has lives in that task's
+  folder, so it counts toward the owner's quota (`update_size`), follows the project's sharing, and goes when the
+  task or project is deleted. It shows in the project's task list as "Thermal dataset: <name>" with "Set a
+  processing node" (a plugin can't hide a task); its folder's root holds no image, so a node set on it by hand
+  only fails the task with no photos.
+- **Uploads only** in part 1; server-folder datasets later (above).
+- **The Thermal Task button stays** as the quick path; it and the Analyzer share the converter, the SDK choice and
+  the task creation.
+
+**What part 1 ports from the earlier Analyzer** (its phases 1, 2, 3 and 5, with their later UI fixes: no silent
+failures, the colour scale and exports, the Convert tab, the datasets list and tabs, moving around the viewers,
+the palette first, image optimization, the dark theme):
+- **The Analyzer's page**, `/plugins/dji-thermal/` at the root of the menu (`main_menu`, every user; the DJI
+  Thermal SDK page moves to `/plugins/dji-thermal/sdk/`, still linked under Administration): the datasets of the
+  projects the user can view, and New dataset (name, project; for those who can change the project).
+- **A dataset's page**: upload photos (subfolders kept, JPEGs only, refused once the owner is over quota), the
+  analysis (dji-thermal-cli's check with the WebODM plan, in the worker, with progress and Cancel), an overview and
+  the Files, Problems and WebODM plan tabs.
+- **Conversions**: the Convert tab with every dji-thermal-cli `Settings` field (each measurement parameter beside
+  the flight's recorded median, the palette, the outputs, normalization, a nadir-only pitch limit), "Use the WebODM
+  plan's settings", several conversions side by side, progress and Cancel, a streamed zip or file by file, the
+  user's defaults ("Save as my defaults", in the plugin's user data store). DJI's own SDK is used when installed.
+- **Mosaics on the map**: "Build the mosaics" (dji-thermal-cli's `make_mosaic`), the viewer with its tabs (as
+  converted, harmonized, source frame, view angle) over WebODM's base layers, palette and range changed live, the
+  colour scale, a hover readout (temperature, frame, view angle), the report.
+- **Create task** from a conversion: what stops a task, the plan's warnings and options, name and node; a normal
+  task in the project with the conversion's TIFFs, saved through WebODM's own task API (its permission and option
+  checks), listed on the conversion with its status.
+
+**Left for part 2**: spot, line and area measurements, saved measurements and their exports, isotherms, the
+emissivity / reflected-temperature correction, the frame page, comparisons and differences.
+
+**Design** (Claude's, to check while building):
+- **Records as JSON files in the holder task's folder** (`thermal/dataset.json`, `thermal/analysis.json`,
+  `thermal/conversions/<id>/conversion.json`), not in the data stores: they count toward the quota, take the
+  project's permissions and are deleted with the task, with no "project deleted" signal needed. A worker job
+  writes its progress to a file of its own, replaced atomically, so it never overwrites a user's change; a run id
+  file lets Cancel, delete or a new run stop a job. The datasets list is
+  `Task.objects.filter(project__in=<visible>, tags__contains='.dji-thermal-dataset')`. `task_removing` cancels a
+  running job. The data stores keep only each user's defaults. This replaces the earlier draft's "a key per record
+  in the data stores".
+- **Files**: `thermal/images/` (the uploads), `thermal/conversions/<id>/` (outputs, `mosaics/`); the folder's root
+  stays empty. A task made from a conversion gets copies (or hard links, which WebODM's size count still counts
+  twice: the quota then shows what each task holds).
+- **Jobs** with `run_function_async` (WebODM's worker), one process each (a Celery worker can't start a
+  multiprocessing pool; DJI's SDK runs in its own `subprocess` child, which is allowed).
+- **Tiles**: the plugin's own tile and point endpoints with rio-tiler 2.1.2 (in WebODM's image). The earlier copy
+  used five tiler helpers its fork added (`raster_etag`, `not_modified`, `tile_format`, `render_tile`,
+  `tile_response`, about 85 lines): they become the plugin's own. WebODM 3.3.2 has `get_zoom_safe`,
+  `download_file_response`, `download_file_stream` and `check_processing_node_perms`.
+- **Leaflet** from WebODM's own (1.3.1, bundled by WebODM's webpack into the plugin's build), not a
+  `package.json` of the plugin: WebODM runs `npm install` for one only when npm is on the server, and skips the
+  plugin without it.
+- **Its code** is about 2,000 lines of Python and 5,000 of JavaScript in all; part 1 is roughly the datasets,
+  conversions, mosaics and task parts of it (`thermal_analysis.py`, `thermal_conversion.py`,
+  `thermal_mosaics.py`, `thermal_task.py`, most of `api.py`; `datasets.js`, `dataset.js`, `conversions.js`,
+  `viewer.js`, `analyzer_core.js`, `analyzer.css`), checked against dji-thermal-cli 1.9.0's API (it was written
+  for 1.2 to 1.4). Tests: the earlier Jest tests that apply, Django tests rewritten for the holder task, live
+  checks on the M4T flight.
+
+**Possible steps** (each merged when tested): (a) holder tasks, datasets, uploads and the analysis; (b)
+conversions; (c) mosaics and the viewer; (d) Create task and the README.
