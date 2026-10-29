@@ -7,7 +7,8 @@ settings you can change, then WebODM processes them like any other task.
 **In development**: nothing is released yet. See [upcoming-changes.md](upcoming-changes.md) for the plan.
 
 Temperatures are computed with [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/), a pure-Python
-implementation of DJI's Thermal SDK: no native library and no outside service.
+implementation of DJI's Thermal SDK: no native library and no outside service. An administrator can have DJI's own
+SDK compute them instead (see [DJI's own Thermal SDK](#djis-own-thermal-sdk)).
 
 ## Using it
 
@@ -43,6 +44,27 @@ outputs do (namespace `urn:dji-thermal-cli:xmp:1.0`): `Distance`, `DistanceSourc
 `option`), `Emissivity`, `Humidity`, `ReflectedTemperatureC`, `AmbientTemperatureC` and `Software`. The photos
 themselves are not kept.
 
+## DJI's own Thermal SDK
+
+By default the temperatures come from dji-thermal-cli's built-in port of DJI's Thermal SDK v1.8, which gives the
+same results as DJI's own SDK on DJI's sample images. If you prefer DJI's own library, it can compute every
+photo's temperatures instead. The **DJI Thermal** entry of WebODM's menu shows every user which of the two is in
+use; administrators change it there:
+
+- **Upload** the [DJI Thermal SDK](https://www.dji.com/downloads/softwares/dji-thermal-sdk) zip as DJI's site gives
+  it (version 1.8; another version is refused). The plugin keeps only the libraries for the server (Linux x64 in
+  WebODM's Docker install), DJI's `License.txt` and one sample image per camera, and checks the SDK measures those
+  samples before using it. DJI's license terms apply to the SDK; the plugin does not include it.
+- **Update** replaces it with a newer zip, **Check** measures the samples again, **Remove** goes back to the
+  built-in port.
+- **At deployment**, `DJI_THERMAL_SDK_DIR` on WebODM's webapp container can name a folder for the SDK (an
+  unpacked SDK, or an empty folder the page's upload then fills; WebODM must be able to write to it for Update). It
+  wins over an upload. If it names a folder without the SDK, photos fail with that reason rather than being
+  measured by another SDK.
+
+DJI's library runs in a process of its own, never in WebODM's: if it crashes on a photo, that photo fails with
+the reason and the others go on. A converted image records which SDK measured it in its XMP `Software` tag.
+
 ## Cameras
 
 Every camera dji-thermal-cli decodes: H20N, H20T, H30T, M2EA, M30T, M3T, M3TD, M4T and XT S. The M4T has been
@@ -54,16 +76,18 @@ checked on a real flight; the others on DJI's Thermal SDK sample images only.
 
 The plugin's parts: `converter.py` (R-JPEG to TIFF), `api.py` (its API, under `/api/plugins/dji-thermal/`:
 `describe` a photo's camera, recorded values and ranges; `projects/<id>/tasks/<id>/convert` one photo into a
-partial task, with WebODM's project permission), and `public/` (`main.js`, which adds the button, and
+partial task, with WebODM's project permission), `sdk.py` with `page.py` and `templates/sdk.html` (DJI's own SDK
+and the DJI Thermal page, `/plugins/dji-thermal/`), and `public/` (`main.js`, which adds the button, and
 `thermal/`, the button and panel, JSX built by WebODM's webpack when the plugin is installed).
 
-The tests never use images from this repository: none is committed or published. Those that need real R-JPEGs
-read them from two folders on your machine, set in an untracked `.env` file at the repo root, and are skipped when
-these are not set:
+The tests never use images or DJI's files from this repository: none is committed or published. Those that need
+real R-JPEGs or DJI's SDK read them from your machine, set in an untracked `.env` file at the repo root, and are
+skipped when these are not set:
 
 ```
 DT_SAMPLES_DIR=/path/to/dji_thermal_sdk/dataset   # DJI's Thermal SDK sample images, one folder per camera
 DT_FLIGHT_DIR=/path/to/a/flight                   # a real flight's photos, thermal and RGB, in any subfolders
+DT_SDK_ZIP=/path/to/dji_thermal_sdk_v1.8.zip      # DJI's Thermal SDK zip as DJI's site gives it
 ```
 
 `dev/webodm.sh up` mounts them read-only in the dev containers.
