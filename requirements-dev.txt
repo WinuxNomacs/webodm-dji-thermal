@@ -1,0 +1,8 @@
+# Host-only tools for the IDE and lint, pinned. The plugin itself runs in WebODM's own Python (3.9, see
+# ignored/WebODM/Dockerfile); the first four match WebODM's requirements.txt so Pylance sees the same APIs.
+# Install: uv venv --python 3.9 .venv && uv pip install -r requirements-dev.txt
+Django==2.2.27
+djangorestframework==3.13.1
+numpy==1.26.2
+pillow==11.3.0
+ruff==0.17.3
