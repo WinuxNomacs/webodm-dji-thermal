@@ -3,19 +3,29 @@
 ## Phases (current and upcoming)
 
 **Up next**
-1. **Conversion core** — R-JPEG to temperature TIFF in the plugin, server side, with tests (below).
-
-(dji-thermal-cli 1.7.0 is on PyPI: the plugin's `requirements.txt` can pin it.)
+1. **Thermal task flow** — the plugin's own upload: R-JPEGs in, a WebODM task of temperature images out (below).
 
 **Then**
-2. **Thermal task flow** — the plugin's own upload: R-JPEGs in, a WebODM task of temperature images out (below).
-3. **Release 1.0.0** — README, changelog, zip, release check; where to publish it (below).
+2. **Release 1.0.0** — README, changelog, zip, release check; where to publish it (below).
 
 **Later**
 - **Folder conversion** for administrators (images already on the server), if wanted (below).
 - **Thermal tools on the map** (temperature under the cursor, spot and area measurements): evaluate (below).
 
 **Done**
+- **Conversion core** — 2026-10-29, `conversion-core`. `dji-thermal/converter.py`: `is_thermal_rjpeg` (by content,
+  dji-thermal-cli's `classify`), `measure` (the camera's recorded parameters, `distance="embedded"`),
+  `convert(source, dest)` (float32 TIFF written as `.part`, metadata by exiftool with `exiftool_camera.config`,
+  then renamed; never raises, returns '' or the reason; the source is left as it is), `decoder_status`; the
+  library imported from the plugin's site-packages (`library()`, also in the worker). `requirements.txt` pins
+  dji-thermal-cli 1.7.0, numpy 1.26.2, Pillow 11.3.0, installed by WebODM's own `pip install -U --target`.
+  `Plugin.enable()` logs the library's version. Tests: `dji-thermal/tests/test_converter.py`, 20 (17 without
+  images; 3 with the SDK samples, all 9 cameras' 49 images, and 5 frames plus the detection of all 434 photos of
+  the M4T flight), via `DT_SAMPLES_DIR` / `DT_FLIGHT_DIR` in `.env` (untracked), mounted read-only by
+  `dev/webodm.sh`; WebODM's `app.tests.test_plugins` passes. Found while building it: `classify` costs 6 ms per
+  thermal frame and 17 ms (37 at worst) per 2.8 MB RGB photo, so no header-only check in front; exiftool 12.40
+  (WebODM's) copies only the DJI XMP tags it can write, which include all ODM and OpenSfM read (the test checks
+  them), not `ImageSource` or the rangefinder's tags.
 - **dji-thermal-cli 1.7.0 for Python 3.9** — 2026-10-29, in `~/gitrepos/python/dji-thermal-cli`: branch
   `python-3.9` (b8eeb28) and `release/1.7.0` (5223ac1), merged to its `main` (fd5e0ea), not pushed. No code
   change: on Python 3.9 with numpy 1.26.2 and Pillow 11.3.0 its full suite passes with the SDK and flight data
@@ -78,7 +88,7 @@ publishes).
   `pip install -U --target` with dependencies, and an unpinned numpy would land in the plugin's site-packages,
   ahead of WebODM's own).
 
-## 1. Conversion core
+## Done: Conversion core
 
 - `dji-thermal/converter.py`: which files are thermal R-JPEGs (dji-thermal-cli's `classify`, which reads the file's
   content; to check: its cost on every uploaded JPEG, against the earlier header-only check), decoding with the
@@ -102,7 +112,14 @@ publishes).
 - **Every camera dji-thermal-cli decodes** is converted (H20N, H20T, H30T, M2EA, M30T, M3T/M3TD, M4T, XT S). The
   README says which were checked on a real flight (the M4T) and which on DJI's sample images only.
 
-## 2. Thermal task flow
+**Dependabot and the pins** (2026-10-29): the user's rule is that only the plugin's own code is ours to fix. The
+dev-only alerts (`requirements-dev.txt`, `package-lock.json`) are dismissed. `requirements.txt`'s `pillow==11.3.0`
+and `numpy==1.26.2` will raise alerts too and stay pinned: they are WebODM 3.3.2's own versions, which its Python
+3.9 cannot move past (Pillow 11.3.0 is the last for 3.9), and unpinned, `pip install -U --target` would put
+numpy 2.x in the plugin's site-packages, ahead of WebODM's own. The pins install nothing WebODM does not already
+run; when those alerts appear they are dismissed with that reason, and the pins move when WebODM's do.
+
+## 1. Thermal task flow
 
 - **A "Thermal task" button** beside "Select Images and GCP" (`Dashboard.addNewTaskButton`): the user picks the
   flight's R-JPEGs (and a GCP file), the name and options as for any task.
@@ -127,7 +144,7 @@ Open decisions:
   values only.
 - **Resize**: thermal frames are small (640x512, 1280x1024); offer it or not.
 
-## 3. Release 1.0.0
+## 2. Release 1.0.0
 
 README (what it does, cameras, installing, using it, that it calls no outside service), `CHANGELOG.md`, the zip
 (`dev/package.sh`), the `release-check` skill.

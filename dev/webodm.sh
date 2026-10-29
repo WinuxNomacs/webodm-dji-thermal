@@ -11,6 +11,11 @@ export WO_HOST=localhost WO_DEBUG=YES WO_DEV=YES WO_BROKER=redis://broker WO_DEF
 export WO_MEDIA_DIR=appmedia WO_DB_DIR=dbdata WO_SECRET_KEY="${WO_SECRET_KEY:-}"
 # DT_PLUGIN_DIR=<empty dir> runs WebODM without the mounted plugin (the release check installs the zip instead)
 export DT_PLUGIN_DIR="${DT_PLUGIN_DIR:-$repo/dji-thermal}"
+# The tests' images, never in git: DJI's SDK sample images (one folder per camera) and a real flight's images.
+# Set in the environment or in .env (untracked); unset, an empty folder is mounted and those tests are skipped.
+if [ -f "$repo/.env" ]; then set -a; . "$repo/.env"; set +a; fi
+mkdir -p "$repo/dev/no-images"
+export DT_SAMPLES_DIR="${DT_SAMPLES_DIR:-$repo/dev/no-images}" DT_FLIGHT_DIR="${DT_FLIGHT_DIR:-$repo/dev/no-images}"
 
 compose=(docker compose -p webodm-dji-thermal --project-directory "$webodm"
          -f "$webodm/docker-compose.yml" -f "$webodm/docker-compose.nodeodm.yml"

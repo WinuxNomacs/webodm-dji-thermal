@@ -1,6 +1,14 @@
-from app.plugins import PluginBase
+from app.plugins import PluginBase, logger
+
+from . import converter
 
 
 class Plugin(PluginBase):
-    # The conversion and its upload flow come in the next phases (upcoming-changes.md)
-    pass
+    # The upload flow that converts a task's R-JPEGs comes in the next phase (upcoming-changes.md)
+
+    def enable(self):
+        ok, message = converter.decoder_status()
+        if ok:
+            logger.info("DJI Thermal: {}".format(message))
+        else:
+            logger.warning("DJI Thermal plugin enabled, but {}".format(message))

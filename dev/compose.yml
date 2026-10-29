@@ -4,6 +4,7 @@
 # The images are pinned by digest: `latest` is rebuilt from WebODM's master, and a local `latest` tag can be another
 # build (a fork's). Upgrading: pull the new images, update ignored/WebODM to the commit they were built from, move
 # the digests, `dev/webodm.sh up`, run the tests.
+# The tests' images (never in git) are mounted read-only from DT_SAMPLES_DIR and DT_FLIGHT_DIR (see dev/webodm.sh).
 x-webapp-image: &webapp-image webodm/webodm_webapp@sha256:55a1d7d1eee7c1220edfb75da2b67044ebcda1b6b61b25a369cc5c087bb47d71
 services:
   db:
@@ -20,10 +21,15 @@ services:
     ports: !override
       - "${WO_PORT}:8000/tcp"
       - "${DT_LIVERELOAD_PORT}:35729"
-    volumes:
+    volumes: &volumes
       - ${DT_PLUGIN_DIR}:/webodm/coreplugins/dji-thermal
+      - ${DT_SAMPLES_DIR}:/test-images/samples:ro
+      - ${DT_FLIGHT_DIR}:/test-images/flight:ro
+    environment: &environment
+      DJI_THERMAL_SAMPLES_DIR: /test-images/samples
+      DJI_THERMAL_FLIGHT_DIR: /test-images/flight
   worker:
     image: *webapp-image
     container_name: dt-worker
-    volumes:
-      - ${DT_PLUGIN_DIR}:/webodm/coreplugins/dji-thermal
+    volumes: *volumes
+    environment: *environment
