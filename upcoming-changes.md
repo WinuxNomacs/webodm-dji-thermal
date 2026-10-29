@@ -77,17 +77,28 @@ publishes).
 
 ## 1. Conversion core
 
-- `dji-thermal/converter.py`: detection, decoding with the camera's recorded parameters, the TIFF with the
-  source's metadata and `Camera:BandName` = `LWIR` (`exiftool_camera.config`), never raising (a failed file is
-  left as it is and logged).
+- `dji-thermal/converter.py`: which files are thermal R-JPEGs (dji-thermal-cli's `classify`, which reads the file's
+  content; to check: its cost on every uploaded JPEG, against the earlier header-only check), decoding with the
+  camera's recorded parameters (`measure`, `distance="embedded"`), the TIFF with the source's metadata and
+  `Camera:BandName` = `LWIR` (`exiftool_camera.config`), never raising (a failed file is left as it is and
+  logged).
 - `Plugin.enable()` logs whether dji-thermal-cli loads; imports through `python_imports()` (the plugin's
-  site-packages).
-- Django tests on R-JPEGs (detection, the TIFF's values and tags, a corrupt file, an RGB photo from the same drone).
+  site-packages). `requirements.txt`: `dji-thermal-cli==1.7.0`, `numpy==1.26.2`, `pillow==11.3.0`; until 1.7.0 is
+  on PyPI, the local wheel installed in the dev container's plugin site-packages.
+- **Tests without images** (always run): detection on JPEGs the tests make (with and without DJI's XMP, an RGB
+  photo's `ImageSource`), a corrupt file, a non-JPEG, the exiftool command and its failure handling.
+- **Tests with images** (skipped, naming the variable, when it is not set), as dji-thermal-cli's own:
+  `DJI_THERMAL_SAMPLES_DIR` (DJI's SDK sample images, one folder per camera: every camera converts, with the
+  library's temperatures) and `DJI_THERMAL_FLIGHT_DIR` (a real flight's images, thermal and RGB mixed: the thermal
+  ones convert, the RGB ones are left alone, the TIFFs keep GPS and orientation and are marked LWIR).
+  `dev/compose.yml` mounts the two folders read-only in the webapp and worker (`DT_SAMPLES_DIR`, `DT_FLIGHT_DIR`
+  on the host), the `test` skill passes the variables to `docker exec`.
 
-Open decisions:
-- **Which cameras**: every camera dji-thermal-cli decodes, or the M4T only, as before.
-- **Test images**: DJI's SDK sample images may not be redistributable in a public repo; use the user's own, or
-  keep them out of git (a download step for the tests).
+**Decided (the user, 2026-10-29):**
+- **No images in the repo**, DJI's or the user's: none of them is to be published. The tests read them from the
+  folders above; anyone working on the plugin brings their own (README and the `test` skill say how).
+- **Every camera dji-thermal-cli decodes** is converted (H20N, H20T, H30T, M2EA, M30T, M3T/M3TD, M4T, XT S). The
+  README says which were checked on a real flight (the M4T) and which on DJI's sample images only.
 
 ## 2. Thermal task flow
 
