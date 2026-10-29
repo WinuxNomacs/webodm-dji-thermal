@@ -3,16 +3,14 @@
 ## Phases (current and upcoming)
 
 **Up next**
-1. **Thermal task flow** — the plugin's own upload: R-JPEGs in, a WebODM task of temperature images out (below).
-
-**Then**
-2. **Release 1.0.0** — README, changelog, zip, release check; where to publish it (below).
+1. **Release 1.0.0** — README, changelog, zip, release check; where to publish it (below).
 
 **Later**
 - **Folder conversion** for administrators (images already on the server), if wanted (below).
 - **Thermal tools on the map** (temperature under the cursor, spot and area measurements): evaluate (below).
 
 **Done**
+- **Thermal task flow** — 2026-10-29, `thermal-task-flow` (details below).
 - **Conversion core** — 2026-10-29, `conversion-core`. `dji-thermal/converter.py`: `is_thermal_rjpeg` (by content,
   dji-thermal-cli's `classify`), `measure` (the camera's recorded parameters, `distance="embedded"`),
   `convert(source, dest)` (float32 TIFF written as `.part`, metadata by exiftool with `exiftool_camera.config`,
@@ -119,7 +117,38 @@ and `numpy==1.26.2` will raise alerts too and stay pinned: they are WebODM 3.3.2
 numpy 2.x in the plugin's site-packages, ahead of WebODM's own. The pins install nothing WebODM does not already
 run; when those alerts appear they are dismissed with that reason, and the pins move when WebODM's do.
 
-## 1. Thermal task flow
+## Done: Thermal task flow
+
+**Built** (2026-10-29, branch `thermal-task-flow`):
+- `converter.py`: `settings(values)` (the form's values as text or numbers, C or F, '' keeping the recorded value;
+  distance `lrf` by default, `embedded` or metres; a bad value raises naming the field), `measure` returning the
+  whole Measurement, `describe` (camera, recorded values and ranges, without the parameters a camera does not
+  use), and the values used written in each TIFF's XMP in dji-thermal-cli's own `dtc` namespace
+  (`exiftool_camera.config` defines it). A value outside a camera's range fails that photo with the library's
+  reason.
+- `api.py`, mounted by `plugin.py`: `POST /api/plugins/dji-thermal/describe` (one photo) and
+  `.../projects/<id>/tasks/<id>/convert` (one photo into a partial task, `change_project`; `converted`,
+  `ignored` or `failed` with the reason), converted in a work folder under `MEDIA_TMP` and moved in when complete
+  (WebODM counts every file in a task's folder as an image).
+- `public/main.js` (ES5) adds the button; `public/thermal/` (JSX, built by WebODM's webpack): `rjpeg.js` (the
+  photos picked sorted by an APP3 segment before the image data: RGB photos never uploaded), `measurement.js`,
+  `MeasurementSettings.jsx`, `ThermalTaskPanel.jsx`, `ThermalTaskButton.jsx` (the panel rendered by a portal at
+  the top of the project's content, where WebODM's own opens), `upload.js` (three conversions at a time; a task
+  with no image removed; cancel), `textFiles.js` (GCP, `geo.txt`, `image_groups.txt` with the photos' names
+  changed to the `.tif` images'), `serverApi.js` (jQuery, with WebODM's CSRF token).
+- Found while building it: NewTaskPanel shows plugin items (`addNewTaskPanelItem`) only with `showResize`, so
+  the Measurement section is its own panel, **above** WebODM's (below would put it after the Start button). Its
+  Start button cannot be disabled from outside: a refused value resets the panel through its ref (`loading`,
+  `inReview`). WebODM's components bring a bundled React 16.14 into the plugin's build (as with the Lightning
+  plugin); class components work across the two copies. The suggested name skips WebODM's Nominatim lookup. The
+  SDK sample images carry no rangefinder reading; every frame of the M4T flight does.
+- Tests: Django 45 with `app.tests.test_plugins` (`test_converter` 29, `test_api` 11; none skipped with the
+  images), Jest 28 (`public/__tests__`, babel-jest with Babel 7.29.7), ESLint, Ruff. Live check on :8002 (admin):
+  the whole M4T flight picked (434 files), 217 thermal photos found and 217 RGB ignored, an emissivity of 1.5
+  refused, the task created with 217 TIFFs (all `DistanceSource` rangefinder, LWIR, GPS),
+  processed on node-odx-1 with the default options in 7.3 minutes to a float32 orthophoto (690 x 793 px, UTM 16N,
+  median 20.3 °C, -16.8 to 44.9) that WebODM shows as its Thermal layer, on the house in the basemap; no console
+  error from the plugin (only WebODM's dev livereload); the project it created deleted afterwards.
 
 **Design** (agreed with the user, 2026-10-29):
 - **A "Thermal task" button** beside "Select Images and GCP" (`Dashboard.addNewTaskButton`, which gives
@@ -165,7 +194,7 @@ run; when those alerts appear they are dismissed with that reason, and the pins 
 the XMP) and the upload API with Django tests first; then the button, panel and Measurement section, with Jest
 tests and a live check on the M4T flight (a real task processed to a thermal orthophoto on the dev node).
 
-## 2. Release 1.0.0
+## 1. Release 1.0.0
 
 README (what it does, cameras, installing, using it, that it calls no outside service), `CHANGELOG.md`, the zip
 (`dev/package.sh`), the `release-check` skill.

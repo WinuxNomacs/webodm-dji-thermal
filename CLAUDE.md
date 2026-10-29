@@ -51,7 +51,10 @@ The `test`, `live-check` and `release-check` skills in `.claude/skills` have the
 - Django: `docker exec -w /webodm dt-webapp python manage.py test --noinput coreplugins.dji-thermal.tests.test_converter coreplugins.dji-thermal.tests.test_api`. The tests'
   images come from `DT_SAMPLES_DIR` and `DT_FLIGHT_DIR` (`.env`, untracked); never commit an image. One run
   at a time: every run uses the same test database.
-- Jest: `npm test` at the repo root (jsdom). ESLint: `npm run lint -- dji-thermal` (the scripts in `public/` are
-  ES5). Both need `dji-thermal/public/` to exist.
+- Jest: `npm test` at the repo root (jsdom, babel-jest; Babel's settings in `package.json`). ESLint: `npm run lint
+  -- dji-thermal` (`public/main.js` is ES5; `public/thermal/` is JSX and ES modules, built by WebODM's webpack
+  into `public/build/` when the plugin is registered, with `public/webpack.config.js` generated: both untracked).
+  After changing `thermal/`, rebuild in the dev container:
+  `docker exec -w /webodm/coreplugins/dji-thermal/public dt-webapp webpack-cli`.
 - Ruff: `.venv/bin/ruff check .`
 - Live checks: headless Playwright (Node) against http://localhost:8002 with a dev account from the user.
