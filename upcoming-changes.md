@@ -230,10 +230,17 @@ since libdirp can crash, with the SDK found by `DJI_THERMAL_SDK_DIR` (an unpacke
   the reason). Chosen explicitly: `Settings(sdk=dir)`, `describe(..., sdk=dir)`, `--sdk DIR`; the library reads
   no environment variable itself (its tests' `DJI_THERMAL_SDK_DIR` keeps meaning the oracle). The plugin reads
   `DJI_THERMAL_SDK_DIR` from WebODM's environment and passes it.
-- The plugin: an admin page (`main_menu` and `app_mount_points`, superusers only: plugins cannot add to the
-  Administration menu) showing which is in use (built-in, or DJI's with its API version), the upload, a test
-  conversion of a sample, and removing the SDK. `converter.py` passes the SDK's location to the library; the
-  Measurement section's ranges come from the same backend.
+- The plugin: a **DJI Thermal** page (`main_menu` and `app_mount_points`). WebODM shows a plugin's menu entry
+  to every user and has no per-plugin link in Administration > Plugins, so the page shows everyone which SDK
+  computes the temperatures (built-in, or DJI's v1.8, uploaded or set at deployment), and only superusers get
+  Upload / Update, Check (the SDK measuring its own samples) and Remove (an uploaded SDK only).
+  `sdk.py`: the SDK in use (`DJI_THERMAL_SDK_DIR` first, then the upload in the plugin's persistent folder);
+  an upload keeps only the libraries for the server's system, DJI's `License.txt` and one sample per camera
+  (for Check) from the zip, checked with `check_sdk` in a staging folder before it replaces the old one; zip
+  paths outside the folder are refused. `converter.py` passes the SDK to the library; the Measurement
+  section's ranges come from it too.
+- dji-thermal-cli restarts its child when the library file changes (an Update), so WebODM's processes pick
+  up the new SDK without a restart.
 
 - **The deploy-time variable wins** (the user, 2026-10-29): when `DJI_THERMAL_SDK_DIR` is set on the webapp,
   that SDK is used; the admin page's **Update** replaces the SDK there with a newly uploaded zip (the page says
