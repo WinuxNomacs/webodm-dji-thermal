@@ -227,8 +227,12 @@ since libdirp can crash, with the SDK found by `DJI_THERMAL_SDK_DIR` (an unpacke
   conversion of a sample, and removing the SDK. `converter.py` passes the SDK's location to the library; the
   Measurement section's ranges come from the same backend.
 
-**Open**: which wins when both the deploy-time variable and an upload are present; the CLI work's branch and
-version, to be agreed with the session working in that repo.
+- **The deploy-time variable wins** (the user, 2026-10-29): when `DJI_THERMAL_SDK_DIR` is set on the webapp,
+  that SDK is used; the admin page's **Update** replaces the SDK there with a newly uploaded zip (the page says
+  so when the folder cannot be written). Without the variable, the upload goes to the plugin's persistent folder,
+  and Update replaces it there.
+- **The CLI work** (the user, 2026-10-29): branch `native-sdk` in dji-thermal-cli from its `main` (1.8.0,
+  published), then `release/1.9.0`, merged there, not pushed; the plugin then pins 1.9.0.
 
 ## 2. Release 1.0.0
 
