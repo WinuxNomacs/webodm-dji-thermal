@@ -32,8 +32,12 @@ def work_folder():
 def save_upload(upload, folder):
     """The uploaded file written into folder (the library reads files), keeping its extension"""
     path = os.path.join(folder, 'source' + os.path.splitext(upload.name or '')[1].lower())
-    with open(path, 'wb') as f:
-        f.writelines(upload.chunks())
+    if hasattr(upload, 'temporary_file_path'):
+        # WebODM's upload handler closes an upload kept on disk (over 4.5 MB): it is read from its path
+        shutil.copyfile(upload.temporary_file_path(), path)
+    else:
+        with open(path, 'wb') as f:
+            f.writelines(upload.chunks())
     return path
 
 

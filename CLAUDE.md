@@ -48,8 +48,10 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
 
 The `test`, `live-check` and `release-check` skills in `.claude/skills` have the steps.
 
-- Django: `docker exec -w /webodm dt-webapp python manage.py test --noinput coreplugins.dji-thermal.tests.test_converter coreplugins.dji-thermal.tests.test_api`. The tests'
-  images come from `DT_SAMPLES_DIR` and `DT_FLIGHT_DIR` (`.env`, untracked); never commit an image. One run
+- Django: `docker exec -w /webodm dt-webapp python manage.py test --noinput coreplugins.dji-thermal.tests.test_converter coreplugins.dji-thermal.tests.test_api coreplugins.dji-thermal.tests.test_sdk`. The tests'
+  images come from `DT_SAMPLES_DIR` and `DT_FLIGHT_DIR`, DJI's SDK zip from `DT_SDK_ZIP` (`.env`, untracked);
+  never commit an image or DJI's files. Each run installs `requirements.txt` afresh in WebODM's test media
+  folder, so the tests use the pinned dji-thermal-cli. One run
   at a time: every run uses the same test database.
 - Jest: `npm test` at the repo root (jsdom, babel-jest; Babel's settings in `package.json`). ESLint: `npm run lint
   -- dji-thermal` (`public/main.js` is ES5; `public/thermal/` is JSX and ES modules, built by WebODM's webpack

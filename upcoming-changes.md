@@ -3,13 +3,15 @@
 ## Phases (current and upcoming)
 
 **Up next**
-1. **Release 1.0.0** — README, changelog, zip, release check; where to publish it (below).
+1. **Release 1.0.0** — README, changelog, zip, release check; in the directory and as a GitHub release (below).
+   Prepared once on `release/1.0.0` (unmerged), to be redone on `main` once dji-thermal-cli 1.9.0 is on PyPI.
 
 **Later**
 - **Folder conversion** for administrators (images already on the server), if wanted (below).
 - **Thermal tools on the map** (temperature under the cursor, spot and area measurements): evaluate (below).
 
 **Done**
+- **DJI's own Thermal SDK** — 2026-10-29, `native-sdk` here and in dji-thermal-cli (details below).
 - **Thermal task flow** — 2026-10-29, `thermal-task-flow` (details below).
 - **Conversion core** — 2026-10-29, `conversion-core`. `dji-thermal/converter.py`: `is_thermal_rjpeg` (by content,
   dji-thermal-cli's `classify`), `measure` (the camera's recorded parameters, `distance="embedded"`),
@@ -193,6 +195,93 @@ run; when those alerts appear they are dismissed with that reason, and the pins 
 **Build order**: the conversion's settings (`converter.measure` with overrides and `distance="lrf"`, the values in
 the XMP) and the upload API with Django tests first; then the button, panel and Measurement section, with Jest
 tests and a live check on the M4T flight (a real task processed to a thermal orthophoto on the dev node).
+
+## Done: DJI's own Thermal SDK
+
+**Built** (2026-10-29):
+- **dji-thermal-cli** (its repo, branch `native-sdk`, then `release/1.9.0`): `dji_thermal_cli/native`
+  (bindings of `dirp_api.h` apart from the tests' oracle, a child process serving the port's `RJpeg` calls over a
+  pipe, a proxy with the port's interface, DJI's error codes mapped to the port's exceptions); `Settings(sdk=)`,
+  `describe`/`list_dataset(sdk=)`, `check_sdk()`, `--sdk` on `process` and `list`. The child is restarted after a
+  crash, a timeout, or a library file replaced in place. `tests/test_native.py`: 20 (a stand-in child that crashes,
+  hangs and prints; with the SDK: every sample measured bit for bit as the port, `describe`, `process`, a real
+  SIGSEGV in `dirp_process` (H20T, palette -1) leaving the caller running, no libdirp in the caller's memory map).
+  Full suite on 3.14 with samples, flight and SDK: 1170 passed, 10 skipped, 1 failed
+  (`test_rjpeg.py::test_process_writes_r_jpegs_with_the_parameters_used`, a JPEG-compression threshold: it fails
+  the same on that repo's `main`, 1.8.0, so it is not this change's). On 3.9 lowest-direct: `test_native`,
+  `test_api`, `test_cli` pass. The wheel and sdist pass `check_dist.py` and twine.
+- **The plugin**: `sdk.py`, `page.py`, `templates/sdk.html` (the DJI Thermal page), `converter.py` (the SDK in
+  use for measuring and describing, recorded in the TIFF's `Software`), `api.save_upload` (an upload over 4.5 MB is
+  read from its temporary file: WebODM's upload handler closes it). `requirements.txt` pins dji-thermal-cli 1.9.0.
+  `tests/test_sdk.py`: 20 (which SDK, installing, the page; with `DT_SDK_ZIP`, DJI's zip installed from the page and
+  a photo converted as the port does). Django 65 with `app.tests.test_plugins`, none skipped; Ruff.
+- **Live check** on :8002 (admin, and a non-admin user made for it): the menu entry; the page as the built-in port;
+  DJI's zip uploaded (1.9 s, API revisions 19 and 20), then updated, Check (9 samples); the non-admin sees the SDK
+  in use, no form, and a POST is refused (403); a thermal task of 40 M4T frames (and 5 RGB ignored) measured with
+  DJI's SDK (`Software` "dji-thermal-cli 1.9.0 with DJI's Thermal SDK 1.8", rangefinder, LWIR), processed to a
+  float32 orthophoto (UTM 16N, -18.3 to 33.0 °C, mean 17.8); Remove back to the built-in port. Removed afterwards:
+  the project, the user, the SDK. A first try with the flight's first 20 frames failed in OpenSfM (take-off frames,
+  no reconstructable pair), not in the conversion.
+- Found: WebODM's tests install `requirements.txt` afresh in their own media folder, so they only test a library
+  version that pip can find; until 1.9.0 is on PyPI the dev containers have its wheel in `/tmp/wheels` and an
+  `/etc/pip.conf` `find-links` to it (not in the repo; removed once it is published). `pip install -U --target`
+  leaves an earlier version's `.dist-info` beside the new one (the version reported was still right).
+
+**The request** (the user, 2026-10-29): before the release, a plugin admin page where an administrator can upload
+the current DJI Thermal SDK, to be used in place of the built-in one if desired.
+
+**The request** (the user, 2026-10-29): before the release, a plugin admin page where an administrator can upload
+the current DJI Thermal SDK, to be used in place of the built-in one if desired.
+
+**Builds on**: dji-thermal-cli, a pure-Python port of SDK v1.8, bit-identical to it. It calls DJI's libraries only
+in its tests (`tests/native_sdk.py`, ctypes bindings of `dirp_api.h`, the port's oracle), always in a subprocess
+since libdirp can crash, with the SDK found by `DJI_THERMAL_SDK_DIR` (an unpacked SDK) or
+`DJI_THERMAL_SDK_LIB_DIR`, in DJI's `<os>/release_x64` layout.
+
+**Decided (the user, 2026-10-29):**
+- **The native calls go in dji-thermal-cli**, released there first (a minor version), the plugin pinning it. The
+  SDK's location by an environment variable, as its tests have, which an admin can also set at deploy time.
+- **Server-wide**: once DJI's SDK is in place, it converts every photo on the server; without it, the built-in
+  port.
+- **The upload is DJI's SDK zip as downloaded**: the plugin keeps the libraries for the server's platform (Linux
+  x64 in WebODM's Docker image) in its persistent folder (`get_persistent_path`, kept across plugin updates) and
+  checks they load. The plugin never ships DJI's files.
+- **A photo DJI's SDK fails on** (refused, or the library crashed) **fails**, left out with DJI's reason, as other
+  failures are; no fallback to the built-in port.
+
+- **Only the SDK versions the bindings were checked against** (the user, 2026-10-29): today v1.8 (API revisions
+  19 and 20). Another version is refused at upload, naming the one found and those supported; a new DJI release
+  is followed by a dji-thermal-cli release.
+
+**Design:**
+- dji-thermal-cli 1.9.0: a `native` module with the bindings moved from its tests, run in a **child process**
+  that loads the library once and serves requests over a pipe; a crash (signal) or a timeout fails that request
+  with a `TsdkError` subclass saying so, and the next request starts a new child. A proxy answers the same calls
+  as the port's `RJpeg`, so `measure`, `describe` and `process` work unchanged (a call DJI's API lacks fails with
+  the reason). Chosen explicitly: `Settings(sdk=dir)`, `describe(..., sdk=dir)`, `--sdk DIR`; the library reads
+  no environment variable itself (its tests' `DJI_THERMAL_SDK_DIR` keeps meaning the oracle). The plugin reads
+  `DJI_THERMAL_SDK_DIR` from WebODM's environment and passes it.
+- The plugin: a **DJI Thermal** page (`main_menu` and `app_mount_points`). WebODM shows a plugin's menu entry
+  to every user and has no per-plugin link in Administration > Plugins, so the page shows everyone which SDK
+  computes the temperatures (built-in, or DJI's v1.8, uploaded or set at deployment), and only superusers get
+  Upload / Update, Check (the SDK measuring its own samples) and Remove (an uploaded SDK only).
+  `sdk.py`: the SDK in use (`DJI_THERMAL_SDK_DIR` first, then the upload in the plugin's persistent folder);
+  an upload keeps only the libraries for the server's system, DJI's `License.txt` and one sample per camera
+  (for Check) from the zip, checked with `check_sdk` in a staging folder before it replaces the old one; zip
+  paths outside the folder are refused. `converter.py` passes the SDK to the library; the Measurement
+  section's ranges come from it too.
+- dji-thermal-cli restarts its child when the library file changes (an Update), so WebODM's processes pick
+  up the new SDK without a restart.
+
+- **The deploy-time variable wins** (the user, 2026-10-29): when `DJI_THERMAL_SDK_DIR` is set on the webapp,
+  that SDK is used; the admin page's **Update** replaces the SDK there with a newly uploaded zip (the page says
+  so when the folder cannot be written). Without the variable, the upload goes to the plugin's persistent folder,
+  and Update replaces it there.
+- **DJI's libraries can never crash dji-thermal-cli's process** (the user, 2026-10-29): they are loaded only in a
+  child process, never in the caller's; a crash or hang there (a signal, a timeout) is that photo's error, with
+  the reason, and the caller carries on.
+- **The CLI work** (the user, 2026-10-29): branch `native-sdk` in dji-thermal-cli from its `main` (1.8.0,
+  published), then `release/1.9.0`, merged there, not pushed; the plugin then pins 1.9.0.
 
 ## 1. Release 1.0.0
 
