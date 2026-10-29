@@ -137,12 +137,15 @@ run; when those alerts appear they are dismissed with that reason, and the pins 
   upload for the same files. A spike at the start of this phase checks how far that goes.
 - Progress, errors per file (a file that fails stays out, with the reason), permissions as WebODM's own upload.
 
-Open decisions:
-- **Mixed folders**: the M4T and others save RGB (`_V`, `_W`, `_Z`) and thermal (`_T`) photos side by side: skip
-  the RGB ones, refuse them, or offer a second (RGB) task.
-- **Measurement overrides at upload** (distance, humidity, emissivity, reflected temperature), or the camera's
-  values only.
-- **Resize**: thermal frames are small (640x512, 1280x1024); offer it or not.
+**Decided (the user, 2026-10-29):**
+- **Only the thermal photos are processed**: RGB photos (`_V`, `_W`, `_Z`) and unsupported ones (another camera's
+  R-JPEG, a corrupt file) picked with them are simply ignored, neither refused nor sent to a second task.
+- **No resizing** offered: the task's thermal frames keep their size.
+- **The measurement settings can be changed at upload**: emissivity, reflected (background) temperature, ambient
+  temperature, humidity and distance, each left at the camera's recorded value unless set (dji-thermal-cli's
+  `Settings`: `emissivity`, `reflected_temp`, `ambient_temp`, `humidity`, `distance`). To settle when planning
+  the phase: the limits each camera accepts (the library's per-camera ranges), cameras without an ambient
+  temperature, the unit the temperatures are entered in, and recording the values used (task or TIFF metadata).
 
 ## 2. Release 1.0.0
 
