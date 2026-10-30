@@ -3,7 +3,13 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- Nothing planned: the user tags `v1.0.0`, attaches the zip to the GitHub release and adds it to WebODM-Plugins'
+- **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
+  branch. Publishing 1.0.0 waits for it.
+
+**Last**
+- **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
+  (CHANGELOG, README, the zip rebuilt by `dev/package.sh` on the merge, its new sha256, the `release-check` skill);
+  then the user tags `v1.0.0`, attaches the zip to the GitHub release and adds `{url, sha256}` to WebODM-Plugins'
   `directory.json` (details under "Done: Release 1.0.0" below).
 
 **Later**
@@ -326,7 +332,8 @@ OpenSfM in both (no reconstructable pair, as in the SDK phase). Found: WebODM re
 copy's `media/plugins/dji-thermal` (its pip installs), set aside during the check (the skill says so). Afterwards
 the installed plugin removed in Administration, the project deleted, the mounted copy back.
 
-To publish (the user): tag `v1.0.0` on the merge, a GitHub release with the zip attached (notes: the changelog's
+Publishing held (the user, 2026-10-30) until their testing and polishing are done; the zip's sha256 changes with
+any later commit to `dji-thermal/`. To publish (the user): tag `v1.0.0` on the merge, a GitHub release with the zip attached (notes: the changelog's
 1.0.0 entry), then a PR to WebODM-Plugins adding `{url, sha256}` to `directory.json`.
 
 ## Done: The DJI Thermal page under Administration
