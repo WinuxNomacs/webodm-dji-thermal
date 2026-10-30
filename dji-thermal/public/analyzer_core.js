@@ -227,7 +227,7 @@
         var out = ["“" + d.name + "” and its " + count(d.file_count, "image", "images") + " are deleted" +
             (kept ? "." : ", with the task that holds them in the project.")];
         var with_ = [];
-        if (d.conversion_count) with_.push(count(d.conversion_count, "conversion", "conversions"));
+        if (d.conversion_count) with_.push(count(d.conversion_count, "workset", "worksets"));
         if (d.mosaic_count) with_.push(count(d.mosaic_count, "mosaic", "mosaics"));
         if (d.measurement_count) with_.push(count(d.measurement_count, "measurement", "measurements"));
         if (with_.length) {
@@ -237,7 +237,7 @@
             out.push("The dataset's task is kept as an ordinary WebODM task, “" + d.name + "”, with the " + count(d.parent.images_count, "image", "images") +
                 " sent to it" + (d.parent.processed ? " and what it processed" : "") + ".");
         }
-        if (d.task_count) out.push("The WebODM tasks made from its conversions are kept.");
+        if (d.task_count) out.push("The WebODM tasks made from its worksets are kept.");
         out.push("This cannot be undone.");
         return out;
     }

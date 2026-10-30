@@ -152,7 +152,7 @@ def get_conversion(request, pk, cid, perm='view_project'):
 
 def conversion_name(request, task):
     name = str(request.data.get('name', '') or '').strip()
-    return (name or "Conversion {}".format(len(conversions.ids(task)) + 1))[:255]
+    return (name or "Workset {}".format(len(conversions.ids(task)) + 1))[:255]
 
 
 def download_name(text):

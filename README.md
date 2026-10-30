@@ -7,8 +7,8 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
   processes them like any other task.
 - **Thermal Analyzer**, in WebODM's menu: for a flight you want to look at first. It checks the photos (what each one
   is, the problems found, the WebODM options to use), converts them with every dji-thermal-cli setting (several
-  conversions side by side), places the frames into mosaics shown on a map, and makes a WebODM task from the
-  conversion you choose.
+  worksets side by side), places the frames into mosaics shown on a map, and makes a WebODM task from the
+  workset you choose.
 
 Temperatures are computed with [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/), a pure-Python
 implementation of DJI's Thermal SDK: no native library and no outside service. An administrator can have DJI's own
@@ -59,7 +59,7 @@ OpenStreetMap's Nominatim; the Thermal Task does not, as the plugin calls no out
 ## The Thermal Analyzer
 
 **Thermal Analyzer**, in WebODM's menu, lists the thermal datasets of every project you can view, with their
-analysis and conversions at a glance.
+analysis and worksets at a glance.
 
 ### A dataset and its analysis
 
@@ -80,15 +80,17 @@ height and the size. A camera's row opens its frames on the Files tab, and each 
   names.
 - **WebODM plan**: how well the frames cover the ground, the task options to use (to copy) and the dji-thermal-cli
   command that prepares the images.
-- **Convert**: see below.
+- **Worksets**: see below.
 
 **Add images**, **Analyze again**, **Rename**, **Copy link** and **Delete** are on the dataset's page; adding images
 marks the analysis out of date until it is run again.
 
-### Conversions
+### Worksets
 
-The **Convert** tab converts the images with dji-thermal-cli's settings, in WebODM's worker, with progress and
-Cancel:
+The **Worksets** tab, the first on a dataset's page and the one it opens on, converts the images into a workset
+with dji-thermal-cli's settings, in WebODM's worker, with progress and Cancel. **Settings:** opens and closes the
+settings, its chips showing what differs from the defaults either way; the **Outputs** section shows its own when
+closed.
 
 - **Outputs**: temperature TIFFs in °C, °F or K, pseudo-colour PNGs, gray16, raw counts, DJI R-JPEGs and the others
   dji-thermal-cli writes, and their compression; the palette and colour range of the pictures.
@@ -97,16 +99,17 @@ Cancel:
 - **Corrections**: normalization (one ambient and reflected temperature for every frame, each frame's drift
   removed), a gimbal pitch limit for nadir frames only, gimbal overrides, temperatures above or below a threshold
   replaced, the location stripped.
-- **Use the WebODM plan's settings** fills in what the plan recommends; **Save as my defaults** keeps your settings
-  for new conversions (**Reset to defaults** goes back to dji-thermal-cli's).
+- **Use the WebODM plan's settings** fills in what the plan recommends; **Copy settings to form**, in a workset's
+  menu, fills in that workset's; **Save as my defaults** keeps your settings for new worksets (**Reset to defaults**
+  goes back to dji-thermal-cli's).
 
-Each conversion is kept beside the others, with what it changed from the defaults, its files (each image's outputs
+Each workset is kept beside the others, with what it changed from the defaults, its files (each image's outputs
 and why any was skipped), **Download all** (a zip) or each file, and **Rename** and **Delete** in its menu. DJI's own
 SDK measures them when an administrator has installed it.
 
 ### Mosaics
 
-After converting (on by default in the settings, or **Build mosaics** from a conversion's menu), dji-thermal-cli
+After converting (on by default in the settings, or **Build mosaics** from a workset's menu), dji-thermal-cli
 places the frames side by side from their positions and angles, with no WebODM task needed: as converted, and
 harmonized (normalized, each frame's offset against its neighbours removed). **View mosaics** shows them on a map
 over WebODM's base layers:
@@ -116,48 +119,48 @@ over WebODM's base layers:
   and **Auto** (the 2nd to 98th percentile);
 - the temperature, frame and view angle under the cursor;
 - what dji-thermal-cli reports (seams, misalignment, frame offsets, heights) and the mosaic files to download (also
-  in the conversion's zip).
+  in the workset's zip).
 
-### A WebODM task from a conversion
+### A WebODM task from a workset
 
-**Create task**, in a converted conversion's menu, makes a WebODM task in the dataset's project from the
-conversion's temperature TIFFs in °C (the `temp_c` TIFF output), without uploading them again:
+**Create task**, in a converted workset's menu, makes a WebODM task in the dataset's project from the
+workset's temperature TIFFs in °C (the `temp_c` TIFF output), without uploading them again:
 
-- It says what stops a task: a conversion not finished, its location stripped (ODM needs it to place the frames), or
-  fewer than 2 °C TIFFs. It also warns where the conversion's settings are off the WebODM plan (not normalized,
-  oblique frames kept, emissivity or humidity), with **New conversion with the plan's settings**.
+- It says what stops a task: a workset not finished converting, its location stripped (ODM needs it to place the frames), or
+  fewer than 2 °C TIFFs. It also warns where the workset's settings are off the WebODM plan (not normalized,
+  oblique frames kept, emissivity or humidity), with **New workset with the plan's settings**.
 - The plan's ODM options, the recommended ones ticked and the others to consider, each with its value and why; and
   the task's name.
 - The task is made **without a processing node**: it waits in the project with "Set a processing node", which opens
   WebODM's own panel (the node and the options, as ticked). Processing starts once you save it there.
 
-The conversion lists the tasks made from it, each with its status and a link to it on the dashboard. A task keeps
-its images when the conversion or the dataset is deleted.
+The workset lists the tasks made from it, each with its status and a link to it on the dashboard. A task keeps
+its images when the workset or the dataset is deleted.
 
-**Use for parent task**, in the same menu, sends the conversion's °C TIFFs to the dataset's own task (see below)
-instead of a new one, so one task is processed again and again as you try conversions:
+**Use for parent task**, in the same menu, sends the workset's °C TIFFs to the dataset's own task (see below)
+instead of a new one, so one task is processed again and again as you try worksets:
 
 - The TIFFs replace the images sent there before, and what the task processed from them (its orthophoto, models and
   other results) is removed; the dialog says what it replaces. It is refused while the task is processing.
 - The task then waits for a processing node, as a new one does: the link in the message opens it on the dashboard,
   where **Set a processing node** sets its node and options. A task without options gets the plan's recommended ones;
   options you set there are kept the next time.
-- The conversion shows that the dataset's task holds its TIFFs, with the task's status.
+- The workset shows that the dataset's task holds its TIFFs, with the task's status.
 
 ### Where a dataset is kept
 
-A dataset is kept in a task of its project, named "Thermal dataset: *name*": its photos and conversions are in that
-task's folder, apart from the images WebODM processes, so the task holds no image until a conversion is sent to it
+A dataset is kept in a task of its project, named "Thermal dataset: *name*": its photos and worksets are in that
+task's folder, apart from the images WebODM processes, so the task holds no image until a workset is sent to it
 (**Use for parent task**). It shows in the project's task list with "Set a processing node"; leave it unset until it
-holds a conversion's TIFFs. It is shared as the project is:
+holds a workset's TIFFs. It is shared as the project is:
 
-- viewing the project shows the dataset, its conversions and mosaics, and downloads them;
+- viewing the project shows the dataset, its worksets and mosaics, and downloads them;
 - changing the project allows adding images, analyzing, converting and making tasks;
 - deleting the dataset needs the project's delete permission.
 
-Its photos and conversions count toward the project owner's storage quota (no upload, conversion, mosaic or task once
-the owner is over it); a task made from a conversion counts its own images too. The dataset goes when its task or the
-project is deleted. Deleting the dataset deletes its task too, unless a conversion was sent to it: the task is then
+Its photos and worksets count toward the project owner's storage quota (no upload, conversion, mosaic or task once
+the owner is over it); a task made from a workset counts its own images too. The dataset goes when its task or the
+project is deleted. Deleting the dataset deletes its task too, unless a workset was sent to it: the task is then
 kept as an ordinary WebODM task (named without "Thermal dataset:") with those images and what it processed.
 Temperatures are shown in degrees Celsius, or Fahrenheit with WebODM's imperial units.
 

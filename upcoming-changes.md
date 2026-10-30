@@ -36,13 +36,18 @@
   - **To look into**: that live check's orthophoto (40 frames not normalized, 6.9 to 31.8 °C, the plan's options
     with orthophoto-resolution 2.1) read -601 to 603 °C in WebODM's statistics, where the release check's
     (normalized) gave 6.9 to 45.0 °C: not from sending (the same TIFFs a new task gets), to find out before 1.0.0.
-  - **The Convert tab as Worksets** (the user, `new.md`, 2026-10-30), after Use for parent task: the dataset page's
+  - Done: **The Convert tab as Worksets** (the user, `new.md`, 2026-10-30), `worksets`: the dataset page's
     Convert tab renamed **Worksets** and moved first, left of Files. In it, the **Settings:** section expandable and
     collapsible, and its **Outputs** subsection too; collapsed, each still shows what is selected that differs from
     the defaults (as the chips do), not the defaults. Builds on the tab's summary chips (`differences`, `chipsHtml`)
     and its sections (`details.ta-section`; Outputs is a plain section today). Decided (the user): **"workset"
     everywhere in the UI** (the tab, its heading, buttons, menu items, messages, the README; code and API names stay
-    "conversion"); **a dataset's page opens on Worksets**.
+    "conversion"); **a dataset's page opens on Worksets**. Built: the tab first and default (`templates/dataset.html`,
+    `dataset.js`); "workset" in the pages, scripts and the server's messages (the default name "Workset N"), the
+    verb kept (Convert, Converting, Converted); **Settings:** a toggle with a caret (`ta-collapse`), its chips shown
+    open or closed; **Outputs** a closed `details` section whose header shows its own chips when closed; every
+    section's caret drawn by the plugin (WebODM hid the browser's). Jest 122; live check on HomerunObliqueII (read
+    only): the tabs Worksets, Files, Problems, WebODM plan, opened on Worksets; no console error.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone

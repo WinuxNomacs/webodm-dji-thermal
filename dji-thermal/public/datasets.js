@@ -37,7 +37,7 @@
     function conversionsCell(d) {
         if (!d.conversion_count) return "";
         var ready = d.conversions_ready || 0;
-        return '<span class="' + (ready === d.conversion_count ? "text-success" : "") + '" title="' + core.count(ready, "conversion", "conversions") +
+        return '<span class="' + (ready === d.conversion_count ? "text-success" : "") + '" title="' + core.count(ready, "workset", "worksets") +
             " ready of " + d.conversion_count + '">' + ready + "/" + d.conversion_count + "</span>";
     }
 

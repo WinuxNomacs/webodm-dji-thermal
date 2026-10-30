@@ -121,7 +121,7 @@
         if (!rows.length) body = '<tr><td colspan="6" class="text-muted">No thermal frames in this dataset.</td></tr>';
         var notes = [];
         if (o.other) notes.push(o.other + " other file" + (o.other === 1 ? "" : "s") + ", not thermal frames");
-        notes.push(core.formatBytes(d.size) + " stored, conversions and mosaics included");
+        notes.push(core.formatBytes(d.size) + " stored, worksets and mosaics included");
         if (d.analyzed_at) notes.push("Analyzed " + core.formatDate(d.analyzed_at) + (a.version ? " with dji-thermal-cli " + a.version : ""));
         return '<div class="ta-summary"><table class="ta-summary-table"><thead><tr><th>Camera</th><th class="ta-num">Frames</th>' +
             '<th>Temperatures</th><th>Captured</th><th class="ta-num">Height</th><th class="ta-num">Size</th></tr></thead><tbody>' + body +
@@ -306,7 +306,7 @@
             "<h4>To consider</h4>" + optionsTable(p.consider) +
             "<h4>Preparing the images</h4>" +
             "<p>Convert the frames with these settings before processing them." +
-            (p.process_args && canConvert ? ' <button type="button" class="btn btn-primary btn-xs" id="ta-plan-convert" title="Open the Convert tab with these settings">' +
+            (p.process_args && canConvert ? ' <button type="button" class="btn btn-primary btn-xs" id="ta-plan-convert" title="Open the Worksets tab with these settings">' +
                 '<i class="fa fa-magic"></i> Convert with these</button>' : "") + "</p>" +
             '<div class="ta-command-row"><pre class="ta-command">' + esc(p.process_command || "") + "</pre>" +
             (p.process_command ? copy("the command", p.process_command) : "") + "</div>" +
@@ -335,7 +335,7 @@
         var url = API + "datasets/" + id;
         var csrf = (page.querySelector("input[name=csrfmiddlewaretoken]") || {}).value;
         var $ = function (i) { return doc.getElementById(i); };
-        var dataset = null, view = {show: "all", sort: "path", desc: false, filter: ""}, tab = "files", tabChosen = false, timer = null, uploading = false;
+        var dataset = null, view = {show: "all", sort: "path", desc: false, filter: ""}, tab = "convert", tabChosen = false, timer = null, uploading = false;
         var filesKey = null;
         try { view.thumbs = root.localStorage && root.localStorage.getItem(THUMBS_KEY) === "1" ? url + "/thumbnail?file=" : null; } catch (e) { view.thumbs = null; }
         // A link to a tab (#convert, as the mosaic viewer's way back) opens it
@@ -403,12 +403,11 @@
             $("ta-overview").innerHTML = overviewHtml(d);
             // Converting needs no analysis: the tabs show as soon as there are images (or conversions)
             $("ta-tabs").hidden = !a.files && !d.file_count && !(d.conversions || []).length;
-            // Before the analysis only the Convert tab has something to show; after it, the files unless a tab was chosen
+            // Before the analysis only the Worksets tab has something to show; the page opens on it unless a tab was chosen
             [].forEach.call(page.querySelectorAll("#ta-tabs a[data-tab]"), function (link) {
                 if (link.getAttribute("data-tab") !== "convert") link.parentNode.hidden = !a.files;
             });
-            if (!a.files) tab = "convert";
-            else if (!tabChosen) tab = "files";
+            if (!a.files || !tabChosen) tab = "convert";
             conversions.update(d);
             if (a.files) {
                 $("ta-files-count").textContent = a.files.length;

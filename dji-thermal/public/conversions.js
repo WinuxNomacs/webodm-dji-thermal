@@ -133,14 +133,14 @@
             "> Strip the location and identifiers from the outputs</label></div>";
 
         return '<div class="ta-section"><h4>Colours</h4>' + look + "</div>" +
-            '<div class="ta-section"><h4>Outputs</h4>' + products +
+            '<details class="ta-section ta-section-outputs"><summary><h4>Outputs</h4> <span class="ta-section-chips" data-chips="outputs"></span></summary>' + products +
             field("Compression (TIFF)", '<select class="form-control input-sm" name="compression">' + ["deflate", "none"].map(function (c) {
                 return '<option value="' + c + '"' + (c === s.compression ? " selected" : "") + ">" + c + "</option>";
             }).join("") + "</select>") +
             '<div class="checkbox"><label><input type="checkbox" name="mosaics"' + (s.mosaics ? " checked" : "") +
             "> Mosaics: the frames placed side by side, as converted and harmonized, to see on a map</label>" +
-            '<span class="help-block">Built after the conversion, from the frames\' positions and angles (no WebODM task needed).</span></div>' +
-            "</div>" +
+            '<span class="help-block">Built after converting, from the frames\' positions and angles (no WebODM task needed).</span></div>' +
+            "</details>" +
             '<details class="ta-section" open><summary><h4>Measurement</h4></summary><p class="text-muted">Empty keeps each image\'s own value.</p>' + measurement + "</details>" +
             '<details class="ta-section" open><summary><h4>Frames</h4></summary>' + frames + "</details>" +
             '<details class="ta-section"' + (!blank(s.gimbal_yaw) || !blank(s.gimbal_pitch) || !blank(s.gimbal_roll) || !blank(s.replace_above) ||
@@ -297,6 +297,9 @@
         return out;
     }
 
+    // The settings the Outputs section holds
+    var OUTPUT_KEYS = ["outputs", "compression", "mosaics"];
+
     // The differences as chips (none: what to say when there are none)
     function chipsHtml(diffs, none) {
         if (!diffs.length) return '<span class="text-muted">' + esc(none) + "</span>";
@@ -393,7 +396,7 @@
         if (info.warnings.length) {
             html += '<div class="alert alert-warning ta-task-warnings">' + info.warnings.map(esc).join("<br>") +
                 (info.process_args.length ? '<br><button type="button" class="btn btn-default btn-xs" data-act="task-plan" title="' +
-                    esc(info.process_args.join(" ")) + '"><i class="fa fa-magic"></i> New conversion with the plan\'s settings</button>' : "") + "</div>";
+                    esc(info.process_args.join(" ")) + '"><i class="fa fa-magic"></i> New workset with the plan\'s settings</button>' : "") + "</div>";
         }
         var d = draft || {};
         var picked = d.options || null;
@@ -439,7 +442,7 @@
         return {draft: draft, data: {name: draft.name.trim(), options: options}, problem: problem};
     }
 
-    var USE_TITLE = "Fill the Convert form with this conversion's settings, to start a new conversion from them";
+    var USE_TITLE = "Fill the settings form with this workset's settings, to start a new workset from them";
 
     // The dataset's own task when it holds this conversion's TIFFs: a link to it (parent: the dataset's, see
     // conversion_tasks.parent)
@@ -480,9 +483,9 @@
         if (canChange && ready && !building) {
             items.push(button("mosaics", "th", c.mosaic_status === "ready" ? "Build mosaics again" : "Build mosaics",
                 "Place the converted frames side by side, as converted and harmonized"));
-            items.push(button("task", "plus", "Create task", "A new WebODM task of this conversion's temperature TIFFs, in the dataset's project"));
+            items.push(button("task", "plus", "Create task", "A new WebODM task of this workset's temperature TIFFs, in the dataset's project"));
             items.push(button("parent", "file-import", "Use for parent task",
-                "Send this conversion's temperature TIFFs to the dataset's own WebODM task, in place of the images sent there before"));
+                "Send this workset's temperature TIFFs to the dataset's own WebODM task, in place of the images sent there before"));
         }
         if (canChange) {
             items.push(button("rename", "pencil-alt", "Rename", null, null, "Rename"));
@@ -500,7 +503,7 @@
     // against; menu: the conversion whose menu is open; viewerBase: their mosaics' pages, followed by their id;
     // dashboard: WebODM's dashboard, where their tasks are; parent: the dataset's own task)
     function listHtml(conversions, canChange, base, open, fresh, defaults, menu, viewerBase, dashboard, parent) {
-        if (!conversions.length) return '<p class="text-muted ta-none">No conversions yet.</p>';
+        if (!conversions.length) return '<p class="text-muted ta-none">No worksets yet.</p>';
         return conversions.map(function (c) {
             var cls = {ready: "success", failed: "danger", canceled: "default", converting: "info"}[c.status] || "default";
             var figures = [];
@@ -625,8 +628,14 @@
         function summarize() {
             var form = root$("ta-convert-form");
             var diffs = differences(readForm(form), meta.defaults, plan(), core.userUnit());
-            root$("ta-convert-summary").innerHTML = "<strong>Settings:</strong> " + chipsHtml(diffs, "dji-thermal-cli's defaults") +
-                (editing ? "" : ' <button type="button" class="btn btn-default btn-xs" data-act="edit"><i class="fa fa-sliders-h"></i> Edit settings</button>');
+            // Open or closed, the settings show what differs from the defaults; so does the Outputs section closed
+            root$("ta-convert-summary").innerHTML = '<button type="button" class="ta-collapse" data-act="edit" aria-expanded="' + !!editing +
+                '" aria-controls="ta-convert-form" title="' + (editing ? "Hide the settings" : "Show the settings") + '"><i class="fa fa-caret-' +
+                (editing ? "down" : "right") + '"></i> Settings:</button> ' + chipsHtml(diffs, "dji-thermal-cli's defaults");
+            var outputs = form.querySelector('[data-chips="outputs"]');
+            if (outputs) {
+                outputs.innerHTML = chipsHtml(diffs.filter(function (d) { return OUTPUT_KEYS.indexOf(d.key) >= 0; }), "the defaults");
+            }
             form.hidden = !editing;
             markForm(form, diffs);
         }
@@ -739,7 +748,7 @@
         // The settings and what can be chosen, loaded once, for those who can convert
         function loadPreferences() {
             loading = fetchFn(ctx.api + "preferences", {credentials: "same-origin"}).then(core.readJson).then(function (r) {
-                if (!r.ok) return message("Could not load the conversion settings.", "text-danger");
+                if (!r.ok) return message("Could not load the settings.", "text-danger");
                 meta = r.data;
                 settings = r.data.settings;
                 saved = r.data.saved;
@@ -783,7 +792,7 @@
 
         root$("ta-convert-summary").addEventListener("click", function (e) {
             if (!(e.target.closest && e.target.closest('[data-act="edit"]'))) return;
-            editing = true;
+            editing = !editing;
             summarize();
         });
 
@@ -802,7 +811,7 @@
             send(base.replace(/\/$/, ""), "POST", {name: root$("ta-convert-name").value.trim(), settings: s})
                 .then(function (r) {
                     btn.disabled = false;
-                    if (!r.ok) return message(esc(core.errorText(r.data, "Could not start the conversion.")), "text-danger");
+                    if (!r.ok) return message(esc(core.errorText(r.data, "Could not start the workset.")), "text-danger");
                     settings = s;
                     root$("ta-convert-name").value = "";
                     message("");
@@ -829,7 +838,7 @@
                 settings = r.data.settings;
                 saved = true;
                 renderForm();
-                message('<i class="fa fa-check"></i> Saved: new conversions start from these settings.', "text-success");
+                message('<i class="fa fa-check"></i> Saved: new worksets start from these settings.', "text-success");
             });
         });
 
@@ -889,7 +898,7 @@
                 editing = true;
                 renderForm();
                 message("The form has " + esc(c.name) + "'s settings with the WebODM plan's: <code>" + esc(task.info.process_args.join(" ")) +
-                    "</code>. Convert, then create the task from the new conversion.", "text-muted");
+                    "</code>. Convert, then create the task from the new workset.", "text-muted");
                 if (root$("ta-convert-settings").scrollIntoView) root$("ta-convert-settings").scrollIntoView();
             } else if (act === "files") {
                 open = open === id ? null : id;
@@ -911,7 +920,7 @@
                     return ctx.onChange();
                 });
             } else if (act === "rename") {
-                core.askName(doc, "Rename conversion", c.name).then(function (name) {
+                core.askName(doc, "Rename workset", c.name).then(function (name) {
                     return name && send(base + id, "PATCH", {name: name});
                 }).then(function (r) {
                     if (!r) return;
@@ -921,11 +930,11 @@
             } else if (act === "delete") {
                 var kept = (c.tasks || []).length ? " The WebODM " + (c.tasks.length === 1 ? "task" : "tasks") + " made from it " +
                     (c.tasks.length === 1 ? "is" : "are") + " kept, with " + (c.tasks.length === 1 ? "its" : "their") + " images." : "";
-                core.ask(doc, "Delete conversion", "Delete " + c.name + " and its files?" + kept + " This cannot be undone.", "Delete", "danger").then(function (yes) {
+                core.ask(doc, "Delete workset", "Delete " + c.name + " and its files?" + kept + " This cannot be undone.", "Delete", "danger").then(function (yes) {
                     return yes && send(base + id, "DELETE");
                 }).then(function (r) {
                     if (!r) return;
-                    if (!r.ok) return message(esc(core.errorText(r.data, "Could not delete the conversion.")), "text-danger");
+                    if (!r.ok) return message(esc(core.errorText(r.data, "Could not delete the workset.")), "text-danger");
                     if (open === id) open = null;
                     if (task && task.id === id) task = null;
                     return ctx.onChange();

@@ -539,8 +539,8 @@ describe("datasets list actions and an upload that does not all arrive", () => {
         click(document.querySelector(".ta-delete"));
         const text = askDialog().textContent;
         expect(text).toContain("“Roof” and its 3 images are deleted, with the task that holds them in the project.");
-        expect(text).toContain("With it: 2 conversions, 1 mosaic and 14 measurements.");
-        expect(text).toContain("WebODM tasks made from its conversions are kept");
+        expect(text).toContain("With it: 2 worksets, 1 mosaic and 14 measurements.");
+        expect(text).toContain("WebODM tasks made from its worksets are kept");
         expect(core.deleteText(Object.assign({}, DATASET, {conversion_count: 2})).join(" ")).not.toContain("tasks");
         const kept = core.deleteText(Object.assign({}, DATASET, {parent: {images_count: 12, processed: true}})).join(" ");
         expect(kept).toContain("are deleted.");
@@ -856,7 +856,11 @@ describe("a dataset's page", () => {
         jest.runOnlyPendingTimers();
         await ticks();
         expect(document.getElementById("ta-tabs").hidden).toBe(false);
-        expect(document.getElementById("ta-tab-files").hidden).toBe(false);    // the files once analyzed
+        // Still on the Worksets tab once analyzed, the other tabs shown beside it
+        expect(document.getElementById("ta-tab-convert").hidden).toBe(false);
+        expect(document.getElementById("ta-tab-files").hidden).toBe(true);
+        expect(document.querySelector('#ta-tabs a[data-tab="files"]').parentNode.hidden).toBe(false);
+        expect(document.querySelector("#ta-tabs li a").getAttribute("data-tab")).toBe("convert");
         expect(document.getElementById("ta-cancel").hidden).toBe(true);
         expect(document.getElementById("ta-add").hidden).toBe(false);
         expect(document.getElementById("ta-problems-count").textContent).toBe("1");
@@ -914,7 +918,7 @@ describe("a dataset's page", () => {
         expect(document.getElementById("ta-name").textContent).toBe("Roof east");
 
         click(document.getElementById("ta-delete"));
-        expect(askDialog().textContent).toContain("With it: 1 conversion and 1 mosaic.");
+        expect(askDialog().textContent).toContain("With it: 1 workset and 1 mosaic.");
         press("Delete");
         await flush();
         expect(calls(fetchFn)).toContain("DELETE " + URL5);
@@ -1129,9 +1133,17 @@ describe("a dataset's conversions", () => {
         const card = document.querySelector('.ta-conversion[data-id="9"] .ta-conversion-chips');
         expect([...card.querySelectorAll(".ta-chip")].map(c => c.textContent)).toEqual(["emissivity 0.95", "normalized"]);
 
+        expect(summary.querySelector('[data-act="edit"]').getAttribute("aria-expanded")).toBe("false");
         click(summary.querySelector('[data-act="edit"]'));
         expect(form().hidden).toBe(false);
-        expect(summary.querySelector('[data-act="edit"]')).toBe(null);
+        expect(summary.querySelector('[data-act="edit"]').getAttribute("aria-expanded")).toBe("true");
+        // Closed again, the chips stay; open, the Outputs section's own chips show only when it is closed
+        click(summary.querySelector('[data-act="edit"]'));
+        expect(form().hidden).toBe(true);
+        expect(summary.querySelectorAll(".ta-chip").length).toBe(2);
+        click(summary.querySelector('[data-act="edit"]'));
+        expect(form().querySelector("details.ta-section-outputs").open).toBe(false);
+        expect([...form().querySelectorAll('[data-chips="outputs"] .ta-chip')].map(c => c.getAttribute("data-key"))).toEqual(["outputs"]);
         input("reflected_temp").value = "68";
         input("reflected_temp").dispatchEvent(new Event("input", {bubbles: true}));
         expect(summary.querySelector('[data-key="reflected_temp"]').textContent).toBe("reflected 68 °F");
@@ -1182,7 +1194,7 @@ describe("a dataset's conversions", () => {
         dataset.init(document, fetchFn);
         await ticks();
         expect(form().hidden).toBe(false);
-        expect(document.querySelector('#ta-convert-summary [data-act="edit"]')).toBe(null);
+        expect(document.querySelector('#ta-convert-summary [data-act="edit"]').getAttribute("aria-expanded")).toBe("true");
     });
 
     it("opens a conversion's menu, and closes it on another click or Esc", async () => {
@@ -1222,7 +1234,7 @@ describe("a dataset's conversions", () => {
         html = conversions.listHtml([CONVERSION], false, base, null);
         expect(html).not.toContain('data-act="delete"');
         expect(html).toContain('data-act="use"');
-        expect(conversions.listHtml([], true, base)).toMatch(/No conversions yet/);
+        expect(conversions.listHtml([], true, base)).toMatch(/No worksets yet/);
 
         const files = conversions.resultsHtml(Object.assign({}, CONVERSION, {results: {
             files: [{path: "a_T.JPG", ok: true, outputs: ["sub/a_T_temp_c.tiff"], notes: [], distance: 21.4, distance_source: "lrf"},

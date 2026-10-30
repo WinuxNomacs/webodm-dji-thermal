@@ -108,7 +108,11 @@
 
 .ta-page .ta-convert-settings{ margin-bottom: 18px; }
 .ta-page .ta-section{ margin-bottom: 10px; }
-.ta-page .ta-section > summary{ cursor: pointer; list-style: revert; }
+.ta-page .ta-section > summary{ cursor: pointer; list-style: none; display: block; }
+.ta-page .ta-section > summary::-webkit-details-marker{ display: none; }
+/* The caret Settings has, closed or open (WebODM's styles hide the browser's own marker) */
+.ta-page .ta-section > summary::before{ content: "\25B8"; display: inline-block; width: 14px; font-size: 13px; }
+.ta-page .ta-section[open] > summary::before{ content: "\25BE"; }
 .ta-page .ta-section > summary h4{ display: inline; }
 .ta-page .ta-section h4{ margin: 10px 0 8px; font-size: 15px; }
 .ta-page .ta-output{ display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 13px; }
@@ -122,6 +126,10 @@
 .ta-page .ta-inline input[type=number]{ width: 110px; }
 .ta-page .ta-inline select{ width: auto; max-width: 100%; }
 .ta-page .ta-convert-summary{ display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.ta-page .ta-collapse{ background: none; border: 0; padding: 0 2px 0 0; color: inherit; font-weight: bold; cursor: pointer; }
+.ta-page .ta-collapse .fa{ width: 10px; }
+.ta-page .ta-section-chips{ margin-left: 6px; font-weight: normal; }
+.ta-page .ta-section[open] > summary .ta-section-chips{ display: none; }
 .ta-page .ta-chips{ display: inline-flex; gap: 4px; flex-wrap: wrap; }
 .ta-page .ta-chip{ display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 12px; background: rgba(128, 128, 128, .15); }
 .ta-page .ta-chip-changed{ background: rgba(52, 152, 219, .18); }
