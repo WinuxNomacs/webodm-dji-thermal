@@ -357,6 +357,88 @@
         return "";
     }
 
+    var TASK_STATUS = {10: "queued", 20: "running", 30: "failed", 40: "completed", 50: "canceled"};
+    function taskStatusLabel(t) {
+        if (t.last_error) return "failed";
+        if (TASK_STATUS[t.status]) return TASK_STATUS[t.status];
+        return t.processing_node === null || t.processing_node === undefined ? "waiting for a processing node" : "queued";
+    }
+
+    // The tasks made from a conversion, each a link to it in its project (dashboard: the dashboard's URL)
+    function tasksHtml(c, dashboard) {
+        if (!(c.tasks || []).length) return "";
+        return '<div class="ta-conversion-tasks"><i class="fa fa-tasks"></i> ' + (c.tasks.length === 1 ? "Task" : "Tasks") + ": " + c.tasks.map(function (t) {
+            return '<a href="' + esc(taskUrl(dashboard, t)) + '">' + esc(t.name) + "</a> (" + esc(taskStatusLabel(t)) + ")";
+        }).join(", ") + "</div>";
+    }
+
+    function taskUrl(dashboard, t) {
+        return (dashboard || "/dashboard/") + "?project_task_open=" + t.project + "&project_task_expanded=" + t.id;
+    }
+
+    function optionValue(v) {
+        return v === true ? "" : value(v);
+    }
+
+    // A task from a conversion (info: its task endpoint's): its name, the WebODM plan's options to tick and edit, and
+    // what stops or warns against it (draft: the fields as they were, to keep across a redraw). The processing node is
+    // set in WebODM, which starts processing the task once it has one
+    function taskHtml(info, draft) {
+        var html = '<div class="ta-task-head"><strong>New task</strong> from ' + core.count(info.frames, "temperature TIFF", "temperature TIFFs") +
+            ", in " + esc(info.project.name) + "</div>";
+        var close = '<button type="button" class="btn btn-default btn-xs" data-act="task">Close</button>';
+        if (info.problems.length) {
+            return html + '<div class="text-danger">' + info.problems.map(esc).join("<br>") + '</div><div class="ta-task-actions">' + close + "</div>";
+        }
+        if (info.warnings.length) {
+            html += '<div class="alert alert-warning ta-task-warnings">' + info.warnings.map(esc).join("<br>") +
+                (info.process_args.length ? '<br><button type="button" class="btn btn-default btn-xs" data-act="task-plan" title="' +
+                    esc(info.process_args.join(" ")) + '"><i class="fa fa-magic"></i> New conversion with the plan\'s settings</button>' : "") + "</div>";
+        }
+        var d = draft || {};
+        var picked = d.options || null;
+        if (info.options.length) {
+            html += '<table class="table table-condensed ta-task-options"><thead><tr><th></th><th>Option</th><th>Value</th><th>Why</th></tr></thead><tbody>' +
+                info.options.map(function (o, i) {
+                    var was = picked && picked[o.name];
+                    var on = picked ? !!was : o.recommended;
+                    var v = was && was.value !== undefined ? was.value : o.value;
+                    return '<tr' + (o.recommended ? "" : ' class="ta-task-consider"') + '><td><input type="checkbox" name="task-option" value="' + i + '"' +
+                        (on ? " checked" : "") + ' aria-label="' + esc(o.name) + '"></td><td><code>' + esc(o.name) + "</code>" +
+                        (o.recommended ? "" : ' <span class="text-muted">to consider</span>') + "</td><td>" +
+                        (o.value === true ? '<span class="text-muted">on</span>' : '<input type="text" class="form-control input-sm" name="task-value-' + i +
+                            '" value="' + esc(optionValue(v)) + '" aria-label="' + esc(o.name) + ' value">') +
+                        "</td><td>" + esc(o.reason) + "</td></tr>";
+                }).join("") + "</tbody></table>";
+        } else {
+            html += '<p class="text-muted">The WebODM plan has no options: the task has ODM\'s defaults.</p>';
+        }
+        html += '<p class="text-muted ta-task-note">The task waits in the project for a processing node: WebODM\'s <em>Set a processing node</em> opens its ' +
+            "own panel (the node, the options), and processing starts once it is saved.</p>";
+        html += '<div class="ta-task-actions"><input type="text" class="form-control input-sm" name="task-name" maxlength="255" value="' +
+            esc(d.name !== undefined ? d.name : info.name) + '" placeholder="Name" aria-label="Task name">' +
+            '<button type="button" class="btn btn-primary btn-xs" data-act="task-create"' + (info.can_create ? "" : " disabled") +
+            '><i class="fa fa-plus"></i> Create task</button> ' + close + '</div><div class="ta-task-message"></div>';
+        return html;
+    }
+
+    // The task panel's fields: {draft (taskHtml's), data (to send), problem (what stops it, or null)}
+    function readTaskForm(el, info) {
+        var get = function (name) { return el.querySelector('[name="' + name + '"]'); };
+        var draft = {name: get("task-name").value, options: {}};
+        var options = [], problem = null;
+        info.options.forEach(function (o, i) {
+            var box = el.querySelector('input[name="task-option"][value="' + i + '"]');
+            var v = o.value === true ? true : get("task-value-" + i).value.trim();
+            if (typeof o.value === "number" && v !== "" && !isNaN(Number(v))) v = Number(v);
+            draft.options[o.name] = box.checked ? {value: v} : null;
+            if (!box.checked) return;
+            if (v === "") problem = problem || "Give " + o.name + " a value, or untick it.";
+            options.push({name: o.name, value: v});
+        });
+        return {draft: draft, data: {name: draft.name.trim(), options: options}, problem: problem};
+    }
+
     // A conversion's actions: the one its state calls for, and the others in its menu (menu: open; viewer: the URL of
     // its mosaics' page)
     function actionsHtml(c, canChange, base, open, menu, viewer) {
@@ -388,6 +470,7 @@
         if (canChange && ready && !building) {
             items.push(button("mosaics", "th", c.mosaic_status === "ready" ? "Build mosaics again" : "Build mosaics",
                 "Place the converted frames side by side, as converted and harmonized"));
+            items.push(button("task", "plus", "Create task", "A WebODM task of this conversion's temperature TIFFs, in the dataset's project"));
         }
         if (canChange) {
             items.push(button("rename", "pencil-alt", "Rename", null, null, "Rename"));
@@ -402,8 +485,9 @@
     }
 
     // The dataset's conversions, newest first (base: their API's URL; defaults: what their settings are compared
-    // against; menu: the conversion whose menu is open; viewerBase: their mosaics' pages, followed by their id)
-    function listHtml(conversions, canChange, base, open, fresh, defaults, menu, viewerBase) {
+    // against; menu: the conversion whose menu is open; viewerBase: their mosaics' pages, followed by their id;
+    // dashboard: WebODM's dashboard, where their tasks are)
+    function listHtml(conversions, canChange, base, open, fresh, defaults, menu, viewerBase, dashboard) {
         if (!conversions.length) return '<p class="text-muted ta-none">No conversions yet.</p>';
         return conversions.map(function (c) {
             var cls = {ready: "success", failed: "danger", canceled: "default", converting: "info"}[c.status] || "default";
@@ -427,6 +511,7 @@
                 settings + progress + mosaicHtml(c) +
                 (c.error ? '<div class="text-danger">' + esc(c.error) + "</div>" : "") +
                 '<div class="ta-conversion-figures text-muted">' + esc(figures.join(" · ")) + "</div>" +
+                tasksHtml(c, dashboard) + '<div class="ta-conversion-task" data-task="' + c.id + '"></div>' +
                 '<div class="ta-conversion-files" data-files="' + c.id + '"></div></div>';
         }).join("");
     }
@@ -487,6 +572,7 @@
         var fresh = null; // the conversion just started, highlighted for a few seconds
         var editing = null; // the form unfolded: at first only for a dataset without conversions, then once opened
         var menu = null;    // the conversion whose menu is open
+        var task = null;    // the task panel open: {id, info, draft}
         var drawnWith;      // the analysis the form shows the recorded values of (its time)
         var panel = root$("ta-tab-convert");
 
@@ -545,9 +631,63 @@
         function renderList() {
             var list = (dataset && dataset.conversions) || [];
             root$("ta-convert-count").textContent = list.length || "";
+            var el = taskPanel();
+            if (el && task.info && el.querySelector('[name="task-name"]')) task.draft = readTaskForm(el, task.info).draft;
             root$("ta-conversions").innerHTML = listHtml(list, dataset && dataset.can_change, base, open, fresh,
-                dataset && dataset.defaults, menu, viewerBase);
+                dataset && dataset.defaults, menu, viewerBase, ctx.dashboard);
             if (open !== null) loadFiles(open);
+            renderTask();
+        }
+
+        function taskPanel() {
+            return task ? panel.querySelector('[data-task="' + task.id + '"]') : null;
+        }
+
+        function renderTask() {
+            var el = taskPanel();
+            if (el && task.info) el.innerHTML = taskHtml(task.info, task.draft);
+            else if (el) el.innerHTML = '<p class="text-muted">Loading…</p>';
+        }
+
+        function taskMessage(text, cls) {
+            var m = taskPanel() && taskPanel().querySelector(".ta-task-message");
+            if (!m) return;
+            m.className = "ta-task-message" + (cls ? " " + cls : "");
+            m.innerHTML = text;
+        }
+
+        // The task panel of a conversion: what its task would be
+        function openTask(id) {
+            task = {id: id, info: null, draft: null};
+            renderTask();
+            return fetchFn(base + id + "/task", {credentials: "same-origin"}).then(core.readJson).then(function (r) {
+                if (!task || task.id !== id) return;
+                if (!r.ok) {
+                    task = null;
+                    renderList();
+                    return message(esc(core.errorText(r.data, "Could not load the task's options.")), "text-danger");
+                }
+                task.info = r.data;
+                renderTask();
+            });
+        }
+
+        function createTask() {
+            var el = taskPanel();
+            if (!el || !task.info) return;
+            var form = readTaskForm(el, task.info);
+            task.draft = form.draft;
+            if (form.problem) return taskMessage(esc(form.problem), "text-danger");
+            var btn = el.querySelector('[data-act="task-create"]');
+            btn.disabled = true;
+            return send(base + task.id + "/task", "POST", form.data).then(function (r) {
+                btn.disabled = false;
+                if (!r.ok) return taskMessage(esc(core.errorText(r.data, "Could not create the task.")), "text-danger");
+                task = null;
+                message('<i class="fa fa-check"></i> Task created: <a href="' + esc(taskUrl(ctx.dashboard, r.data)) + '">' + esc(r.data.name) +
+                    "</a>, waiting for a processing node: open it and choose <em>Set a processing node</em> to start it.", "text-success");
+                return ctx.onChange();
+            });
         }
 
         function loadFiles(id) {
@@ -697,7 +837,22 @@
                 return;
             }
             closeMenu();
-            if (act === "files") {
+            if (act === "task") {
+                var shown = task && task.id === id;
+                task = null;
+                renderList();
+                if (!shown) openTask(id);
+            } else if (act === "task-create") {
+                createTask();
+            } else if (act === "task-plan") {
+                if (!meta || !task || !task.info) return;
+                settings = planSettings(task.info.process_args, c.settings);
+                editing = true;
+                renderForm();
+                message("The form has " + esc(c.name) + "'s settings with the WebODM plan's: <code>" + esc(task.info.process_args.join(" ")) +
+                    "</code>. Convert, then create the task from the new conversion.", "text-muted");
+                if (root$("ta-convert-settings").scrollIntoView) root$("ta-convert-settings").scrollIntoView();
+            } else if (act === "files") {
                 open = open === id ? null : id;
                 renderList();
             } else if (act === "use") {
@@ -723,12 +878,15 @@
                     return ctx.onChange();
                 });
             } else if (act === "delete") {
-                core.ask(doc, "Delete conversion", "Delete " + c.name + " and its files? This cannot be undone.", "Delete", "danger").then(function (yes) {
+                var kept = (c.tasks || []).length ? " The WebODM " + (c.tasks.length === 1 ? "task" : "tasks") + " made from it " +
+                    (c.tasks.length === 1 ? "is" : "are") + " kept, with " + (c.tasks.length === 1 ? "its" : "their") + " images." : "";
+                core.ask(doc, "Delete conversion", "Delete " + c.name + " and its files?" + kept + " This cannot be undone.", "Delete", "danger").then(function (yes) {
                     return yes && send(base + id, "DELETE");
                 }).then(function (r) {
                     if (!r) return;
                     if (!r.ok) return message(esc(core.errorText(r.data, "Could not delete the conversion.")), "text-danger");
                     if (open === id) open = null;
+                    if (task && task.id === id) task = null;
                     return ctx.onChange();
                 });
             }
@@ -739,7 +897,8 @@
 
     var api = {recorded: recorded, settingsIn: settingsIn, formHtml: formHtml, readForm: readForm, formProblem: formProblem, planSettings: planSettings, statusLabel: statusLabel,
                differences: differences, chipsHtml: chipsHtml, markForm: markForm, resetSetting: resetSetting,
-               mosaicHtml: mosaicHtml, actionsHtml: actionsHtml, listHtml: listHtml, skipReasons: skipReasons, resultsHtml: resultsHtml, init: init};
+               mosaicHtml: mosaicHtml, actionsHtml: actionsHtml, listHtml: listHtml, taskStatusLabel: taskStatusLabel, tasksHtml: tasksHtml,
+               taskHtml: taskHtml, readTaskForm: readTaskForm, skipReasons: skipReasons, resultsHtml: resultsHtml, init: init};
     root.ThermalAnalyzerConversions = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});
