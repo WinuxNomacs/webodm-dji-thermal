@@ -5,6 +5,12 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: the dataset page's summary as a table (2026-10-30, `dataset-summary-table`): a row per camera and one for
+    all of them, the temperatures as a bar on the dataset's scale with the median frame mean, GPS coverage, capture
+    span and duration, height range, size; a row opens the camera's frames on the Files tab, a figure opens them
+    sorted by it or only those without GPS (a chip on the Files tab clears it); stacked at phone width.
+    `public/dataset.js` (`summaryRows`, `duration`, `overviewHtml`, the Files tab's `camera` / `nogps` scope),
+    `analyzer.css`; Jest 119.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
