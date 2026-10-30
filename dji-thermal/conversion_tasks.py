@@ -11,7 +11,8 @@ from a conversion are kept as a list of ids in its folder:
     thermal/conversions/<id>/tasks.json   [task id, ...], those since deleted dropped when read
 
 Such a task also has a hidden tag naming its dataset, `.dji-thermal-from-<dataset id>`, so the dashboard's Thermal
-dataset button (main.js) links back to it without asking the server; the tag goes when the dataset does (unlink_made).
+dataset button (main.js) links back to it without asking the server; listing the tasks puts it back on one without it
+(made, e.g. a task made before the tag existed), and it goes when the dataset does (unlink_made).
 
 A conversion can also be sent to the dataset's own task, its "parent task" (use_for_parent): its TIFFs replace the
 images sent there before (the folder's root holds no other image: the dataset is under thermal/, which WebODM's
@@ -182,11 +183,18 @@ def unlink_made(task):
 
 
 def made(task, cid):
-    """The tasks made from the conversion that are still in its project, oldest first"""
+    """The tasks made from the conversion that are still in its project, oldest first; those made before the tag
+    linking them to the dataset existed (or that lost it) get it back"""
     ids = datasets.read_json(conversions.path(task, cid, TASKS_FILE), [])
     if not ids:
         return []
     found = {str(t.id): t for t in Task.objects.filter(pk__in=ids, project=task.project)}
+    tag = FROM_TAG + str(task.id)
+    for t in found.values():
+        tags = (t.tags or "").split()
+        if tag not in tags:
+            t.tags = " ".join(tags + [tag])
+            Task.objects.filter(pk=t.pk).update(tags=t.tags)
     return [found[i] for i in ids if i in found]
 
 

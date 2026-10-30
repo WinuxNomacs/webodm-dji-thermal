@@ -708,6 +708,14 @@ class TestConversionTasks(AnalyzerTestCase):
         Task.objects.get(pk=res.data["id"]).delete()
         self.assertEqual(self.client.get("{}/{}/conversions/{}".format(API, task.id, cid)).data["tasks"], [])
 
+    def test_a_task_made_without_the_link_tag_gets_it_when_the_dataset_is_listed(self):
+        task, cid = self.converted()
+        made = Task.objects.get(pk=self.client.post(self.url(task, cid), {"name": "x", "options": []}, format="json").data["id"])
+        self.addCleanup(shutil.rmtree, made.task_path(), True)
+        Task.objects.filter(pk=made.pk).update(tags="survey")
+        self.assertEqual(self.client.get(API).status_code, status.HTTP_200_OK)
+        self.assertEqual(Task.objects.get(pk=made.pk).tags, "survey .dji-thermal-from-{}".format(task.id))
+
     def test_tasks_made_from_a_deleted_dataset_no_longer_link_to_it(self):
         task, cid = self.converted()
         made = Task.objects.get(pk=self.client.post(self.url(task, cid), {"name": "x", "options": []}, format="json").data["id"])
