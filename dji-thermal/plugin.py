@@ -55,6 +55,7 @@ class Plugin(PluginBase):
             MountPoint(CONVERSION + '$', analyzer_api.ConversionDetail.as_view()),
             MountPoint(CONVERSION + '/cancel$', analyzer_api.ConversionCancel.as_view()),
             MountPoint(CONVERSION + '/download$', analyzer_api.ConversionDownload.as_view()),
+            MountPoint(CONVERSION + '/task$', analyzer_api.ConversionTask.as_view()),
             MountPoint(CONVERSION + '/mosaics$', analyzer_api.Mosaics.as_view()),
             MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/tiles/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)\.png$',
                        analyzer_api.MosaicTile.as_view()),

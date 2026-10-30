@@ -3,11 +3,9 @@
 ## Phases (current and upcoming)
 
 **Up next**
-1. **Thermal Analyzer, part 1** — datasets kept in a holder task, their analysis, conversions, mosaics on the map,
-   a conversion made into a task; the Analyzer at the root of the menu (below).
-2. **Release 1.0.0** — README, changelog, zip, release check; in the directory and as a GitHub release (below).
-   Prepared once on `release/1.0.0` (unmerged), to be redone on `main` after part 1 (dji-thermal-cli 1.9.0 is on
-   PyPI since 2026-10-29).
+1. **Release 1.0.0** — README, changelog, zip, release check; in the directory and as a GitHub release (below).
+   Prepared once on `release/1.0.0` (unmerged), to be redone on `main` now that part 1 is in (dji-thermal-cli 1.9.0
+   is on PyPI since 2026-10-29).
 
 **Later**
 - **Thermal Analyzer, part 2** — measurements (spot, line, area), comparisons and frame views (below).
@@ -17,6 +15,8 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **Thermal Analyzer, part 1** — 2026-10-29, in four steps (`analyzer-datasets`, `analyzer-conversions`,
+  `analyzer-mosaics`, `analyzer-task`; details under "1. Thermal Analyzer, part 1" below).
 - **The DJI Thermal page under Administration** — 2026-10-29, `admin-page` (details below).
 - **DJI's own Thermal SDK** — 2026-10-29, `native-sdk` here and in dji-thermal-cli (details below).
 - **Thermal task flow** — 2026-10-29, `thermal-task-flow` (details below).
@@ -445,6 +445,16 @@ emissivity / reflected-temperature correction, the frame page, comparisons and d
   for 1.2 to 1.4). Tests: the earlier Jest tests that apply, Django tests rewritten for the holder task, live
   checks on the M4T flight.
 
+**Decided for (d)** (the user, 2026-10-29):
+- **Create task makes the task but does not process it**: it is a normal task in the dataset's project (not
+  partial) with the conversion's °C TIFFs, its name and the plan's options as ticked in the plugin's dialog, and no
+  processing node (`auto_processing_node=False`). WebODM lists it with "Set a processing node", which opens
+  WebODM's own Edit panel (node, options); saving it with a node starts the processing. So the dialog has no node
+  choice; it shows what stops a task (not finished, location stripped, fewer than 2 °C TIFFs) and the plan's
+  warnings (not normalized, pitch limit, emissivity, humidity).
+- **The README gets a full pass as the public page for 1.0.0**: Create task added, then the whole page reread
+  (the two paths, order, wording, every claim checked against the code); no screenshots.
+
 **Possible steps** (each merged when tested): (a) holder tasks, datasets, uploads and the analysis; (b)
 conversions; (c) mosaics and the viewer; (d) Create task and the README.
 
@@ -496,3 +506,15 @@ conversions; (c) mosaics and the viewer; (d) Create task and the README.
   mosaics of 6 M4T frames, its tiles, values and downloads), Jest 109. Live check: 12 M4T frames converted with
   mosaics (12 placed, seams median 0.24 °C, misalignment 0.4 cm), the card's progress and View mosaics, the four
   tabs over the satellite base layer, the palette and range, the readout, the dataset deleted.
+- **(d) Create task and the README** — 2026-10-29, `analyzer-task`. `conversion_tasks.py` (the earlier
+  `thermal_task.py`: what stops a task, the plan's warnings and options, the °C TIFFs hard-linked, else copied, into
+  a task made in one transaction with WebODM's `TaskSerializer` checking the name and options, and no processing
+  node; `thermal/conversions/<id>/tasks.json` lists the tasks made, those deleted dropped when read), the API's
+  `conversions/<id>/task` (GET: what the task would be; POST: make it, refused over quota), the conversion's `tasks`
+  and the dataset's `task_count`. Front end: the Create task panel in the conversion's card (no node choice, no
+  preset: WebODM's Edit panel sets both), the tasks listed with their status and dashboard links, the conversion's
+  delete dialog saying its tasks are kept. The README reread as the public page: the two paths first, the
+  Analyzer in sections. Tests: `test_analyzer.py` 44 (one making a task from 3 converted M4T frames), Jest 116,
+  Django 109 in all with `app.tests.test_plugins`. Live check: 12 M4T frames converted, the panel (the plan's
+  warning and 7 options), a task of 12 images with 3 options and no node, WebODM's "Set a processing node"
+  opening its Edit panel with the options as "(Custom)"; the task and dataset deleted.

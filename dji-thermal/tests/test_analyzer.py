@@ -22,6 +22,7 @@ from rest_framework.test import APIClient
 
 from app.models import Project, Task
 from app.tests.classes import BootTestCase
+from nodeodm.models import ProcessingNode
 from worker.tasks import get_pending_tasks
 
 from .test_converter import jpegs_in, skip_without
@@ -30,6 +31,7 @@ datasets = importlib.import_module("coreplugins.dji-thermal.datasets")
 analysis = importlib.import_module("coreplugins.dji-thermal.analysis")
 conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
 mosaics = importlib.import_module("coreplugins.dji-thermal.mosaics")
+conversion_tasks = importlib.import_module("coreplugins.dji-thermal.conversion_tasks")
 
 API = "/api/plugins/dji-thermal/datasets"
 
@@ -544,3 +546,141 @@ class TestMosaics(AnalyzerTestCase):
         built_at = v["built_at"]
         self.client.post(self.url(task, cid))
         self.assertNotEqual(self.client.get(self.url(task, cid)).data["built_at"], built_at)
+
+
+PLAN = {'process_args': ['--normalize', '--max-pitch', '-80', '--emissivity', '0.95', '--outputs', 'temp_c:tiff'],
+        'recommended': {'radiometric-calibration': {'value': 'none', 'reason': "already temperatures"},
+                        'orthophoto-resolution': {'value': 6.2, 'reason': "the frames' GSD"}},
+        'consider': {'fast-orthophoto': {'value': True, 'reason': "flat ground"}}}
+
+
+class TestConversionTasks(AnalyzerTestCase):
+    def converted(self, frames=("a/DJI_0001_T.JPG", "b/DJI_0001_T.JPG", "b/DJI_0002_T.JPG"), **settings):
+        """A dataset with a WebODM plan and a converted conversion whose results name a TIFF per frame (small files
+        in place of the TIFFs)"""
+        task = self.create()
+        self.upload(task, [jpeg("a.jpg")])
+        datasets.write_json(datasets.data_path(task, datasets.ANALYSIS_FILE), {'webodm': PLAN})
+        with mock.patch.object(datasets, "start_job"):
+            cid = conversions.create(task, "Nadir", dict(conversions.DEFAULTS, mosaics=False, **settings), self.user)
+        files = []
+        for f in frames:
+            out = f.rsplit(".", 1)[0] + "_temp_c.tiff"
+            path = os.path.join(conversions.output_path(task, cid), out)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "wb") as fp:
+                fp.write(b"II*\0" + f.encode())
+            files.append({'path': f, 'ok': True, 'outputs': [out, out.replace("_temp_c.tiff", "_pseudo.png")]})
+        datasets.write_json(conversions.path(task, cid, conversions.RESULTS_FILE), {'files': files})
+        datasets.update_job(task, rel=conversions.rel(cid, "job.json"), status="ready", run_id="")
+        return task, cid
+
+    def url(self, task, cid):
+        return "{}/{}/conversions/{}/task".format(API, task.id, cid)
+
+    def test_a_task_is_made_of_the_conversions_tiffs_and_waits_for_a_processing_node(self):
+        task, cid = self.converted(normalize=True, max_pitch=-80.0, emissivity=0.95)
+        info = self.client.get(self.url(task, cid)).data
+        self.assertEqual((info["problems"], info["warnings"], info["frames"]), ([], [], 3))
+        self.assertEqual([o["name"] for o in info["options"]],
+                         ["radiometric-calibration", "orthophoto-resolution", "fast-orthophoto"])
+        self.assertEqual((info["name"], info["can_create"]), ("Roof - Nadir", True))
+
+        res = self.client.post(self.url(task, cid), {"name": "Roof thermal", "options": [
+            {"name": "radiometric-calibration", "value": "none"}, {"name": "orthophoto-resolution", "value": 6.2}]},
+            format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        new = Task.objects.get(pk=res.data["id"])
+        self.addCleanup(shutil.rmtree, new.task_path(), True)
+        self.assertEqual((new.project, new.name, new.partial, new.auto_processing_node, new.processing_node),
+                         (self.project, "Roof thermal", False, False, None))
+        self.assertEqual(new.options, [{"name": "radiometric-calibration", "value": "none"},
+                                       {"name": "orthophoto-resolution", "value": 6.2}])
+        # A name two subfolders share keeps its folders
+        self.assertEqual(sorted(new.scan_images()), ["DJI_0002_T_temp_c.tiff", "a_DJI_0001_T_temp_c.tiff",
+                                                     "b_DJI_0001_T_temp_c.tiff"])
+        self.assertEqual(new.images_count, 3)
+        self.assertGreater(new.size, 0)
+        src = os.path.join(conversions.output_path(task, cid), "a", "DJI_0001_T_temp_c.tiff")
+        self.assertTrue(os.path.samefile(src, new.task_path("a_DJI_0001_T_temp_c.tiff")))
+        self.assertNotIn(new, get_pending_tasks())
+
+        # Listed on the conversion and counted on the dataset
+        d = self.client.get("{}/{}".format(API, task.id)).data
+        self.assertEqual([t["id"] for t in d["conversions"][0]["tasks"]], [str(new.id)])
+        self.assertEqual(d["task_count"], 1)
+
+        # Given a node, as WebODM's Edit panel does, it is processed
+        new.processing_node = ProcessingNode.objects.create(hostname="localhost", port=11223)
+        new.save()
+        self.assertIn(new, get_pending_tasks())
+
+        # Deleting the conversion keeps the task's images
+        self.client.delete("{}/{}/conversions/{}".format(API, task.id, cid))
+        self.assertEqual(len(new.scan_images()), 3)
+
+    def test_what_stops_a_task_is_refused_and_where_it_is_off_the_plan_is_said(self):
+        tasks = Task.objects.exclude(tags__contains=datasets.TAG).count()
+        task, cid = self.converted()
+        info = self.client.get(self.url(task, cid)).data
+        self.assertEqual(info["problems"], [])
+        self.assertEqual(info["warnings"], [
+            "Not normalized: the frames' offsets show as seams where ODM blends them",
+            "Oblique frames kept: the plan leaves out frames above -80° pitch",
+            "Emissivity as recorded, the plan's is 0.95"])
+
+        for settings, problem in (({"strip_location": True}, "stripped the frames' location"),
+                                  ({}, "at least 2 frames")):
+            task, cid = self.converted(frames=("DJI_0001_T.JPG",), **settings)
+            self.assertIn(problem, " ".join(self.client.get(self.url(task, cid)).data["problems"]))
+            res = self.client.post(self.url(task, cid), {"name": "x", "options": []}, format="json")
+            self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        datasets.update_job(task, rel=conversions.rel(cid, "job.json"), status="converting")
+        self.assertIn("The conversion is not finished", self.client.get(self.url(task, cid)).data["problems"])
+        self.assertEqual(Task.objects.exclude(tags__contains=datasets.TAG).count(), tasks)
+
+    def test_options_refused_or_tiffs_gone_make_no_task(self):
+        task, cid = self.converted()
+        before = Task.objects.count()
+        for options in ("--fast", [{"name": "dsm"}], [{"name": "", "value": 1}]):
+            res = self.client.post(self.url(task, cid), {"name": "x", "options": options}, format="json")
+            self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST, options)
+        shutil.rmtree(conversions.output_path(task, cid))
+        res = self.client.post(self.url(task, cid), {"name": "x", "options": []}, format="json")
+        self.assertEqual(res.data["error"], "The conversion's TIFFs are no longer on the server")
+        self.assertEqual(Task.objects.count(), before)
+        with mock.patch.object(datasets, "over_quota", return_value=True):
+            self.assertEqual(self.client.post(self.url(task, cid), {"name": "x"}, format="json").status_code,
+                             status.HTTP_400_BAD_REQUEST)
+
+    def test_viewers_see_what_a_task_would_be_but_do_not_make_one(self):
+        task, cid = self.converted()
+        assign_perm("view_project", User.objects.get(username="testuser2"), self.project)
+        viewer = self.client_for("testuser2")
+        self.assertFalse(viewer.get(self.url(task, cid)).data["can_create"])
+        self.assertEqual(viewer.post(self.url(task, cid), {"name": "x"}, format="json").status_code,
+                         status.HTTP_404_NOT_FOUND)
+
+    def test_a_task_deleted_in_webodm_is_no_longer_listed(self):
+        task, cid = self.converted()
+        res = self.client.post(self.url(task, cid), {"name": "x", "options": []}, format="json")
+        Task.objects.get(pk=res.data["id"]).delete()
+        self.assertEqual(self.client.get("{}/{}/conversions/{}".format(API, task.id, cid)).data["tasks"], [])
+
+    @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def test_a_flights_conversion_makes_a_task_of_thermal_tiffs(self):
+        task = self.create()
+        with contextlib.ExitStack() as stack:
+            self.upload(task, [stack.enter_context(open(f, "rb")) for f in flight_frames(3)])
+        conv = self.client.post("{}/{}/conversions".format(API, task.id),
+                                {"name": "Nadir", "settings": {"outputs": ["temp_c:tiff"], "mosaics": False}},
+                                format="json").data
+        self.assertEqual(conv["status"], "ready", conv["error"])
+        res = self.client.post(self.url(task, conv["id"]), {"name": "Thermal", "options": [
+            {"name": "radiometric-calibration", "value": "none"}]}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        new = Task.objects.get(pk=res.data["id"])
+        self.addCleanup(shutil.rmtree, new.task_path(), True)
+        self.assertEqual(new.images_count, 3)
+        with Image.open(new.task_path(min(new.scan_images()))) as im:
+            self.assertEqual(im.mode, "F")

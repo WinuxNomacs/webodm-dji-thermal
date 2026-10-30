@@ -1,10 +1,14 @@
 # DJI Thermal plugin for WebODM
 
-Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature maps: the plugin's **Thermal Task**
-button converts each R-JPEG into a temperature image (degrees Celsius) as it is uploaded, with measurement
-settings you can change, then WebODM processes them like any other task. Its **Thermal Analyzer** checks a flight's
-photos before you process them (what each one is, the problems found and the WebODM options to use) and converts
-them with every dji-thermal-cli setting, several conversions side by side.
+Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature maps. The plugin gives two ways in:
+
+- **Thermal Task**, a button beside WebODM's "Select Images and GCP": the quick path. Each R-JPEG is converted into a
+  temperature image (degrees Celsius) as it is uploaded, with measurement settings you can change, then WebODM
+  processes them like any other task.
+- **Thermal Analyzer**, in WebODM's menu: for a flight you want to look at first. It checks the photos (what each one
+  is, the problems found, the WebODM options to use), converts them with every dji-thermal-cli setting (several
+  conversions side by side), places the frames into mosaics shown on a map, and makes a WebODM task from the
+  conversion you choose.
 
 **In development**: nothing is released yet. See [upcoming-changes.md](upcoming-changes.md) for the plan.
 
@@ -12,11 +16,11 @@ Temperatures are computed with [dji-thermal-cli](https://pypi.org/project/dji-th
 implementation of DJI's Thermal SDK: no native library and no outside service. An administrator can have DJI's own
 SDK compute them instead (see [DJI's own Thermal SDK](#djis-own-thermal-sdk)).
 
-## Using it
+## The Thermal Task
 
-1. In a project on the dashboard, press **Thermal Task** (beside "Select Images and GCP") and pick the flight's
-   photos, all of them if you like, and a GCP file if you have one. The plugin finds the thermal R-JPEGs among
-   them by their content; the RGB photos taken with them are ignored and not uploaded.
+1. In a project on the dashboard, press **Thermal Task** and pick the flight's photos, all of them if you like, and a
+   GCP file if you have one. The plugin finds the thermal R-JPEGs among them by their content; the RGB photos taken
+   with them are ignored and not uploaded.
 2. **Measurement**: the values the temperatures are computed with. Each field shows the value the camera recorded
    and the range the camera accepts; left empty, every photo keeps its own recorded value.
    - **Temperature unit** of the values you enter: Celsius or Fahrenheit, by default WebODM's unit system. The
@@ -25,8 +29,9 @@ SDK compute them instead (see [DJI's own Thermal SDK](#djis-own-thermal-sdk)).
      form says so) and **relative humidity**.
    - **Distance** to the subject: by default each photo's laser rangefinder distance where it has a valid one
      (each photo of the M4T flight checked has one; DJI's sample images have none), else the distance the camera
-     recorded (usually 5 m, whatever the flight height). Or the recorded distance, or one distance for all photos. With the rangefinder's distance, the
-     temperatures differ slightly from DJI's own apps, which use the recorded one.
+     recorded (usually 5 m, whatever the flight height). Or the recorded distance, or one distance for all photos.
+     With the rangefinder's distance, the temperatures differ slightly from DJI's own apps, which use the recorded
+     one.
 3. Below it, WebODM's own task panel: name, processing node, options and the photos on the map. Images are not
    resized: the thermal frames keep their size. **Review**, then **Start Processing**.
 4. Each photo is converted as it is uploaded, a few at a time. A photo that fails is left out with its reason;
@@ -38,48 +43,91 @@ OpenStreetMap's Nominatim; the Thermal Task does not, as the plugin calls no out
 
 ## The Thermal Analyzer
 
-**Thermal Analyzer**, in WebODM's menu, lists the thermal datasets of every project you can view.
+**Thermal Analyzer**, in WebODM's menu, lists the thermal datasets of every project you can view, with their
+analysis and conversions at a glance.
 
-1. **New Dataset**: a name, the project and the flight's photos (or their folder, whose subfolders are kept; you
-   can also drop them on the page). Only JPEGs are uploaded; the RGB photos taken with the thermal ones are listed,
-   not analyzed. The photos are then analyzed with dji-thermal-cli's check, in WebODM's worker, with its progress
-   and a Cancel button.
-2. **The dataset's page**: the frames, cameras, temperatures, capture times and height at a glance, then
-   - **Files**: every file with its capture time, height, gimbal pitch, temperatures, distance (recorded and the
-     rangefinder's) and emissivity, and the problems that name it; filtered by name, by kind or to those with
-     problems, sorted by any column, with thumbnails if you like.
-   - **Problems**: what dji-thermal-cli found (errors, warnings, notes), each with what addresses it and the files it
-     names.
-   - **WebODM plan**: how well the frames cover the ground, the task options to use (to copy) and the
-     dji-thermal-cli command that prepares the images.
-   - **Convert**: the images converted with dji-thermal-cli's settings, in WebODM's worker, with progress and Cancel:
-     the outputs (temperature TIFFs in °C, °F or K, pseudo-colour PNGs, gray16, raw counts, DJI R-JPEGs and the
-     others dji-thermal-cli writes) and their compression, the palette and colour range, each measurement parameter
-     (each field shows the flight's recorded median; empty keeps each image's own), the unit of the files,
-     normalization (one ambient and reflected temperature for every frame, each frame's drift removed), a gimbal
-     pitch limit for nadir frames only, gimbal overrides, replacing temperatures above or below a threshold, and
-     stripping the location. **Use the WebODM plan's settings** fills in what the plan recommends; **Save as my
-     defaults** keeps your settings for new conversions (**Reset to defaults** goes back to dji-thermal-cli's). Each
-     conversion is kept beside the others, with what it changed from the defaults, its files (each image's outputs
-     and why any was skipped) and **Download all** (a zip) or each file. DJI's own SDK measures them when an
-     administrator has installed it.
-   - **Mosaics** (on by default in the settings, or **Build mosaics** from a conversion's menu): after converting,
-     dji-thermal-cli places the frames side by side from their positions and angles, with no WebODM task needed,
-     as converted and harmonized (normalized, each frame's offset against its neighbours removed). **View mosaics**
-     shows them on a map over WebODM's base layers, a tab each, with the frame each pixel comes from and the angle
-     it was seen at: the palette (the usual ones and the DJI palettes of the images) and the range changed live,
-     with its colour scale and **Auto** (the 2nd to 98th percentile), the temperature, frame and view angle under
-     the cursor, and what dji-thermal-cli reports (seams, misalignment, frame offsets, heights) with the mosaic
-     files to download (also in the conversion's zip).
-3. **Add images**, **Analyze again**, **Rename**, **Copy link** and **Delete** on the dataset's page; adding images
-   marks the analysis out of date until it is run again. A conversion can be renamed and deleted from its menu.
+### A dataset and its analysis
 
-A dataset is kept in a task of its project, named "Thermal dataset: *name*", which WebODM never processes: it
-shows in the project's task list with "Set a processing node" (leave it unset). It is shared as the project is
-(viewing the project shows the dataset, changing it allows adding images and analyzing, deleting the dataset needs
-the project's delete permission), its photos and conversions count toward the project owner's storage quota (no
-upload or conversion once the owner is over it), and it goes when that task or the project is deleted. Temperatures are shown in degrees
-Celsius, or Fahrenheit with WebODM's imperial units.
+**New Dataset**: a name, the project and the flight's photos (or their folder, whose subfolders are kept; you can
+also drop them on the page). Only JPEGs are uploaded; the RGB photos taken with the thermal ones are listed, not
+analyzed. The photos are then analyzed with dji-thermal-cli's check, in WebODM's worker, with its progress and a
+Cancel button.
+
+The dataset's page shows the frames, cameras, temperatures, capture times and height at a glance, then:
+
+- **Files**: every file with its capture time, height, gimbal pitch, temperatures, distance (recorded and the
+  rangefinder's) and emissivity, and the problems that name it; filtered by name, by kind or to those with
+  problems, sorted by any column, with thumbnails if you like.
+- **Problems**: what dji-thermal-cli found (errors, warnings, notes), each with what addresses it and the files it
+  names.
+- **WebODM plan**: how well the frames cover the ground, the task options to use (to copy) and the dji-thermal-cli
+  command that prepares the images.
+- **Convert**: see below.
+
+**Add images**, **Analyze again**, **Rename**, **Copy link** and **Delete** are on the dataset's page; adding images
+marks the analysis out of date until it is run again.
+
+### Conversions
+
+The **Convert** tab converts the images with dji-thermal-cli's settings, in WebODM's worker, with progress and
+Cancel:
+
+- **Outputs**: temperature TIFFs in °C, °F or K, pseudo-colour PNGs, gray16, raw counts, DJI R-JPEGs and the others
+  dji-thermal-cli writes, and their compression; the palette and colour range of the pictures.
+- **Measurement**: each parameter, with the flight's recorded median beside it (left empty, each image keeps its
+  own), and the unit of the files.
+- **Corrections**: normalization (one ambient and reflected temperature for every frame, each frame's drift
+  removed), a gimbal pitch limit for nadir frames only, gimbal overrides, temperatures above or below a threshold
+  replaced, the location stripped.
+- **Use the WebODM plan's settings** fills in what the plan recommends; **Save as my defaults** keeps your settings
+  for new conversions (**Reset to defaults** goes back to dji-thermal-cli's).
+
+Each conversion is kept beside the others, with what it changed from the defaults, its files (each image's outputs
+and why any was skipped), **Download all** (a zip) or each file, and **Rename** and **Delete** in its menu. DJI's own
+SDK measures them when an administrator has installed it.
+
+### Mosaics
+
+After converting (on by default in the settings, or **Build mosaics** from a conversion's menu), dji-thermal-cli
+places the frames side by side from their positions and angles, with no WebODM task needed: as converted, and
+harmonized (normalized, each frame's offset against its neighbours removed). **View mosaics** shows them on a map
+over WebODM's base layers:
+
+- a tab for each mosaic, the frame each pixel comes from and the angle it was seen at;
+- the palette (the usual ones and the DJI palettes of the images) and the range, changed live, with the colour scale
+  and **Auto** (the 2nd to 98th percentile);
+- the temperature, frame and view angle under the cursor;
+- what dji-thermal-cli reports (seams, misalignment, frame offsets, heights) and the mosaic files to download (also
+  in the conversion's zip).
+
+### A WebODM task from a conversion
+
+**Create task**, in a converted conversion's menu, makes a WebODM task in the dataset's project from the
+conversion's temperature TIFFs in °C (the `temp_c` TIFF output), without uploading them again:
+
+- It says what stops a task: a conversion not finished, its location stripped (ODM needs it to place the frames), or
+  fewer than 2 °C TIFFs. It also warns where the conversion's settings are off the WebODM plan (not normalized,
+  oblique frames kept, emissivity or humidity), with **New conversion with the plan's settings**.
+- The plan's ODM options, the recommended ones ticked and the others to consider, each with its value and why; and
+  the task's name.
+- The task is made **without a processing node**: it waits in the project with "Set a processing node", which opens
+  WebODM's own panel (the node and the options, as ticked). Processing starts once you save it there.
+
+The conversion lists the tasks made from it, each with its status and a link to it on the dashboard. A task keeps
+its images when the conversion or the dataset is deleted.
+
+### Where a dataset is kept
+
+A dataset is kept in a task of its project, named "Thermal dataset: *name*", which WebODM never processes: it shows
+in the project's task list with "Set a processing node" (leave it unset). It is shared as the project is:
+
+- viewing the project shows the dataset, its conversions and mosaics, and downloads them;
+- changing the project allows adding images, analyzing, converting and making tasks;
+- deleting the dataset needs the project's delete permission.
+
+Its photos and conversions count toward the project owner's storage quota (no upload, conversion, mosaic or task once
+the owner is over it); a task made from a conversion counts its own images too. The dataset goes when its task or the
+project is deleted. Temperatures are shown in degrees Celsius, or Fahrenheit with WebODM's imperial units.
 
 ## The converted images
 
@@ -121,19 +169,19 @@ checked on a real flight; the others on DJI's Thermal SDK sample images only.
 
 `CLAUDE.md` describes the dev environment (WebODM in Docker on port 8002, `dev/webodm.sh`) and the checks.
 
-The plugin's parts: `converter.py` (R-JPEG to TIFF), `api.py` (its API, under `/api/plugins/dji-thermal/`:
-`describe` a photo's camera, recorded values and ranges; `projects/<id>/tasks/<id>/convert` one photo into a
-partial task, with WebODM's project permission), `sdk.py` with `page.py` and `templates/sdk.html` (DJI's own SDK
-and the DJI Thermal page, `/plugins/dji-thermal/sdk/`), the Thermal Analyzer (`datasets.py`: the holder tasks and
-their records; `analysis.py`: the analysis job, run by WebODM's worker; `conversions.py`: the conversions, their
-settings and job, and each user's defaults; `mosaics.py`: a conversion's mosaics, their job, and the viewer's tiles
-and values with WebODM's rio-tiler; `analyzer_api.py`: its API under `/api/plugins/dji-thermal/datasets`;
-`analyzer_pages.py` with `templates/datasets.html`, `dataset.html` and `viewer.html`: its pages,
-`/plugins/dji-thermal/`, `/plugins/dji-thermal/dataset/<id>` and its conversions' mosaics,
-`.../dataset/<id>/conversion/<id>`), and `public/` (`main.js`, which adds the button and the DJI Thermal page's link
-under Administration; `analyzer_core.js`, `datasets.js`, `dataset.js`, `conversions.js`, `viewer.js` and
-`analyzer.css`, the Analyzer's pages, plain scripts; and `thermal/`, the button and panel (JSX) and WebODM's own
-Leaflet for the viewer (`Leaflet.js`), built by WebODM's webpack when the plugin is installed).
+The plugin's parts: `converter.py` (R-JPEG to TIFF), `api.py` (its API, under `/api/plugins/dji-thermal/`: `describe`
+a photo's camera, recorded values and ranges; `projects/<id>/tasks/<id>/convert` one photo into a partial task, with
+WebODM's project permission), `sdk.py` with `page.py` and `templates/sdk.html` (DJI's own SDK and the DJI Thermal
+page, `/plugins/dji-thermal/sdk/`), the Thermal Analyzer (`datasets.py`: the holder tasks and their records;
+`analysis.py`: the analysis job, run by WebODM's worker; `conversions.py`: the conversions, their settings and job,
+and each user's defaults; `mosaics.py`: a conversion's mosaics, their job, and the viewer's tiles and values with
+WebODM's rio-tiler; `conversion_tasks.py`: a WebODM task from a conversion; `analyzer_api.py`: its API under
+`/api/plugins/dji-thermal/datasets`, with a conversion's `task`; `analyzer_pages.py` with `templates/datasets.html`,
+`dataset.html` and `viewer.html`: its pages, `/plugins/dji-thermal/`, `/plugins/dji-thermal/dataset/<id>` and its
+conversions' mosaics, `.../dataset/<id>/conversion/<id>`), and `public/` (`main.js`, which adds the button and the DJI
+Thermal page's link under Administration; `analyzer_core.js`, `datasets.js`, `dataset.js`, `conversions.js`,
+`viewer.js` and `analyzer.css`, the Analyzer's pages, plain scripts; and `thermal/`, the button and panel (JSX) and
+WebODM's own Leaflet for the viewer (`Leaflet.js`), built by WebODM's webpack when the plugin is installed).
 
 The tests never use images or DJI's files from this repository: none is committed or published. Those that need
 real R-JPEGs or DJI's SDK read them from your machine, set in an untracked `.env` file at the repo root, and are

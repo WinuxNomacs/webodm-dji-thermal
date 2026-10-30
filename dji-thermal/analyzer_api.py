@@ -2,12 +2,13 @@
 The Thermal Analyzer's API: a user's thermal datasets (those of every project they can view), creating one in a
 project, uploading its images, its analysis in WebODM's worker, a thumbnail of each file, its conversions (several,
 side by side, see conversions) with their downloads, their mosaics on a map (see mosaics: what the viewer shows, its
-tiles and the values at a point) and the user's saved conversion settings. A dataset is its
+tiles and the values at a point), the WebODM tasks made from them (see conversion_tasks) and the user's saved
+conversion settings. A dataset is its
 holder task's id (see datasets).
 
 A dataset is shared as its project is: viewing the project shows its datasets and conversions and downloads the
-outputs, changing it allows uploading, renaming, analyzing and converting (and deleting conversions), and deleting a
-dataset needs the project's delete permission (as a task does).
+outputs, changing it allows uploading, renaming, analyzing and converting (and deleting conversions, making tasks
+from them), and deleting a dataset needs the project's delete permission (as a task does).
 """
 
 import io
@@ -26,7 +27,7 @@ from app.api.tasks import download_file_response, download_file_stream
 from app.models import Project, Task
 from app.security import path_traversal_check
 
-from . import conversions, datasets, mosaics
+from . import conversion_tasks, conversions, datasets, mosaics
 
 THUMBNAIL_SIZE = (96, 96)
 OVER_QUOTA = "The project's owner is over their storage quota: free some space first"
@@ -68,6 +69,7 @@ def summary(task, user):
         'analyzed': bool(a),
         'analyzed_at': a.get('analyzed_at'),
         'conversion_count': len(jobs),
+        'task_count': sum(len(conversion_tasks.made(task, cid)) for cid in conversions.ids(task)),
         'conversions_ready': sum(1 for j in jobs if j['status'] == 'ready'),
         # A conversion of the dataset running, or its mosaics being built
         'busy': any(j['status'] == 'converting' for j in jobs) or
@@ -118,12 +120,19 @@ def conversion_summary(task, cid):
         'mosaic_stage': mosaic_job.get('stage') or {},
         'mosaic_error': mosaic_job.get('error') or '',
         'mosaic_files': mosaics.files(task, cid),
+        'tasks': [task_summary(t) for t in conversion_tasks.made(task, cid)],
         'file_count': count,
         'size': size,
         'created_at': record.get('created_at'),
         'finished_at': job.get('finished_at'),
         'created_by': record.get('created_by'),
     }
+
+
+def task_summary(t):
+    """A task made from a conversion, as the conversion lists it"""
+    return {'id': str(t.id), 'name': t.name or "Task #{}".format(t.id), 'project': t.project_id, 'status': t.status,
+            'processing_node': t.processing_node_id, 'last_error': t.last_error or '', 'images_count': t.images_count}
 
 
 def conversion_detail(task, cid):
@@ -326,6 +335,51 @@ class ConversionCancel(DatasetView):
         task = get_conversion(request, pk, cid, 'change_project')
         conversions.cancel(task, cid)
         return Response(conversion_detail(task, cid))
+
+
+def task_options(data):
+    """The ODM options asked for, [{name, value}]: WebODM's own serializer checks them further"""
+    if not isinstance(data, list):
+        raise ValidationError({'options': "A list of options is expected"})
+    out = []
+    for o in data:
+        name = str(o.get('name', '') or '').strip() if isinstance(o, dict) else ''
+        value = o.get('value') if isinstance(o, dict) else None
+        if not name or value is None or value == '' or isinstance(value, (list, dict)):
+            raise ValidationError({'options': "Each option needs a name and a value"})
+        out.append({'name': name, 'value': value})
+    return out
+
+
+class ConversionTask(DatasetView):
+    def get(self, request, pk, cid):
+        """What a task from the conversion would be: its name, the plan's options, and what stops or warns against it"""
+        task = get_conversion(request, pk, cid)
+        problems, warnings = conversion_tasks.checks(task, cid)
+        record = conversions.record(task, cid)
+        return Response({'options': conversion_tasks.plan_options(task), 'problems': problems, 'warnings': warnings,
+                         'frames': len(conversion_tasks.tiffs(task, cid)),
+                         'project': {'id': task.project.id, 'name': task.project.name},
+                         'name': "{} - {}".format(datasets.name_of(task), record.get('name') or cid)[:255],
+                         'process_args': conversion_tasks.plan_of(task).get('process_args') or [],
+                         'can_create': request.user.has_perm('change_project', task.project)})
+
+    def post(self, request, pk, cid):
+        """Makes a task in the dataset's project from the conversion's TIFFs (linked, not uploaded again), with the name
+        and options given, waiting for a processing node to be set in WebODM"""
+        task = get_conversion(request, pk, cid, 'change_project')
+        problems, _ = conversion_tasks.checks(task, cid)
+        if problems:
+            raise ValidationError({'error': " ".join(problems)})
+        if datasets.over_quota(task):
+            raise ValidationError({'error': OVER_QUOTA})
+        name = (str(request.data.get('name', '') or '').strip() or conversions.record(task, cid).get('name') or cid)
+        options = task_options(request.data.get('options', []))
+        try:
+            new_task = conversion_tasks.create(task, cid, name[:255], options)
+        except ValueError as e:
+            raise ValidationError({'error': str(e)}) from None
+        return Response(task_summary(new_task), status=status.HTTP_201_CREATED)
 
 
 class ConversionDownload(DatasetView):

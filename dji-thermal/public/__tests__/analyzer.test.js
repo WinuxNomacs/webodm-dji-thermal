@@ -1427,6 +1427,121 @@ describe("a conversion's mosaics on the dataset page", () => {
     });
 });
 
+describe("a task made from a conversion", () => {
+    const URL5 = "/api/plugins/dji-thermal/datasets/5";
+    const C9 = URL5 + "/conversions/9";
+    const INFO = {
+        options: [{name: "radiometric-calibration", value: "none", reason: "already temperatures", recommended: true},
+                  {name: "orthophoto-resolution", value: 6.2, reason: "the frames' GSD", recommended: true},
+                  {name: "fast-orthophoto", value: true, reason: "flat ground", recommended: false}],
+        problems: [], warnings: ["Not normalized: the frames' offsets show as seams where ODM blends them"],
+        frames: 12, project: {id: 1, name: "First Project"}, name: "Roof - Conversion 1",
+        process_args: ["--normalize", "--outputs", "temp_c:tiff"], can_create: true
+    };
+    const TASK = {id: "77", name: "Roof - Conversion 1", project: 1, status: null, processing_node: null, last_error: "", images_count: 12};
+    beforeEach(() => { document.body.innerHTML = page('dataset.html'); });
+    afterEach(() => { window.localStorage.clear(); window.history.replaceState(null, "", "/"); });
+    const card = () => document.querySelector('.ta-conversion[data-id="9"]');
+    const d = extra => Object.assign({}, DATASET, {analysis: ANALYSIS, defaults: DEFAULTS, conversions: [Object.assign({}, CONVERSION, extra)]});
+
+    it("is offered in a finished conversion's menu to those who can change the dataset", () => {
+        const el = document.createElement("div");
+        el.innerHTML = conversions.actionsHtml(CONVERSION, true, C9.replace(/9$/, ""), null, null, null);
+        expect(el.querySelector('[data-act="task"]').textContent).toContain("Create task");
+        el.innerHTML = conversions.actionsHtml(CONVERSION, false, C9.replace(/9$/, ""), null, null, null);
+        expect(el.querySelector('[data-act="task"]')).toBe(null);
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {status: "converting"}), true, C9.replace(/9$/, ""), null, null, null);
+        expect(el.querySelector('[data-act="task"]')).toBe(null);
+    });
+
+    it("lists the tasks made from a conversion, each linked to the dashboard with its status", () => {
+        const html = conversions.tasksHtml({tasks: [TASK, Object.assign({}, TASK, {id: "78", name: "B<2>", status: 40, processing_node: 1})]});
+        expect(html).toContain('href="/dashboard/?project_task_open=1&amp;project_task_expanded=77"');
+        expect(html).toContain("(waiting for a processing node)");
+        expect(html).toContain("B&lt;2&gt;</a> (completed)");
+        expect(conversions.taskStatusLabel(Object.assign({}, TASK, {last_error: "Out of memory"}))).toBe("failed");
+        expect(conversions.taskStatusLabel(Object.assign({}, TASK, {processing_node: 3}))).toBe("queued");
+        expect(conversions.tasksHtml({tasks: []})).toBe("");
+    });
+
+    it("shows only what stops a task when something does", () => {
+        const html = conversions.taskHtml(Object.assign({}, INFO, {problems: ["The conversion stripped the frames' location: ODM needs it to place them"]}));
+        expect(html).toContain("stripped the frames&#39; location");
+        expect(html).not.toContain('data-act="task-create"');
+    });
+
+    it("ticks the plan's recommended options, keeps what was typed and refuses a ticked option without a value", () => {
+        const el = document.createElement("div");
+        el.innerHTML = conversions.taskHtml(INFO);
+        expect(el.querySelector(".ta-task-warnings").textContent).toContain("Not normalized");
+        expect(el.querySelector('[data-act="task-plan"]')).not.toBe(null);
+        const boxes = el.querySelectorAll('input[name="task-option"]');
+        expect([].map.call(boxes, b => b.checked)).toEqual([true, true, false]);
+        expect(el.querySelector('[name="task-name"]').value).toBe("Roof - Conversion 1");
+        boxes[2].checked = true;
+        el.querySelector('[name="task-value-1"]').value = "5";
+        let form = conversions.readTaskForm(el, INFO);
+        expect(form.problem).toBe(null);
+        expect(form.data).toEqual({name: "Roof - Conversion 1", options: [
+            {name: "radiometric-calibration", value: "none"}, {name: "orthophoto-resolution", value: 5}, {name: "fast-orthophoto", value: true}]});
+
+        // Drawn again from the draft, as typed
+        el.innerHTML = conversions.taskHtml(INFO, form.draft);
+        expect([].map.call(el.querySelectorAll('input[name="task-option"]'), b => b.checked)).toEqual([true, true, true]);
+        expect(el.querySelector('[name="task-value-1"]').value).toBe("5");
+
+        el.querySelector('[name="task-value-0"]').value = " ";
+        form = conversions.readTaskForm(el, INFO);
+        expect(form.problem).toBe("Give radiometric-calibration a value, or untick it.");
+    });
+
+    it("creates the task from the panel, says it waits for a processing node and lists it on the conversion", async () => {
+        const fetchFn = server({
+            [URL5]: [d({}), d({tasks: [TASK]})],
+            [C9 + "/task"]: INFO,
+            ["POST " + C9 + "/task"]: TASK
+        });
+        dataset.init(document, fetchFn);
+        await ticks();
+        click(card().querySelector('[data-act="task"]'));
+        await ticks();
+        expect(card().querySelector(".ta-conversion-task").textContent).toContain("New task from 12 temperature TIFFs, in First Project");
+        card().querySelector('[name="task-name"]').value = "Roof thermal";
+        click(card().querySelector('[data-act="task-create"]'));
+        await ticks();
+        const post = fetchFn.mock.calls.filter(c => c[1] && c[1].method === "POST")[0];
+        expect(JSON.parse(post[1].body)).toEqual({name: "Roof thermal", options: [
+            {name: "radiometric-calibration", value: "none"}, {name: "orthophoto-resolution", value: 6.2}]});
+        expect(document.getElementById("ta-convert-message").textContent).toContain("waiting for a processing node");
+        expect(card().querySelector(".ta-conversion-task").innerHTML).toBe("");
+        expect(card().querySelector(".ta-conversion-tasks a").getAttribute("href")).toBe("/dashboard/?project_task_open=1&project_task_expanded=77");
+    });
+
+    it("says why the task was not created, in the panel", async () => {
+        const fetchFn = server({
+            [URL5]: d({}),
+            [C9 + "/task"]: INFO,
+            ["POST " + C9 + "/task"]: () => Promise.resolve({ok: false, status: 400, json: () => Promise.resolve({error: "The conversion's TIFFs are no longer on the server"})})
+        });
+        dataset.init(document, fetchFn);
+        await ticks();
+        click(card().querySelector('[data-act="task"]'));
+        await ticks();
+        click(card().querySelector('[data-act="task-create"]'));
+        await ticks();
+        expect(card().querySelector(".ta-task-message").textContent).toContain("no longer on the server");
+    });
+
+    it("says deleting a conversion keeps the tasks made from it", async () => {
+        const fetchFn = server({[URL5]: d({tasks: [TASK]})});
+        dataset.init(document, fetchFn);
+        await ticks();
+        click(card().querySelector('[data-act="delete"]'));
+        await ticks();
+        expect(document.body.textContent).toContain("The WebODM task made from it is kept, with its images.");
+    });
+});
+
 describe("the mosaic viewer", () => {
     const C9 = "/api/plugins/dji-thermal/datasets/5/conversions/9";
     const BOUNDS = [10.0, 45.0, 10.001, 45.001];
