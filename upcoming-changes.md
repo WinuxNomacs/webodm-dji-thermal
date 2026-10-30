@@ -64,8 +64,8 @@
     1. The viewer's **"As converted" tab becomes "Mosaic"** (as converted is what's expected); README to match.
     2. **Source frame shows the mosaic with lines between frames** instead of a random colour per frame: the
        as-converted temperatures in the temperature tabs' palette and range, with the seams (where the frame index
-       changes between neighbouring pixels) drawn over them; the readout gives the temperature too. Open: the
-       lines' colour.
+       changes between neighbouring pixels) drawn over them; the readout gives the temperature too. Decided (the
+       user): the lines are black and white, a pixel each side of the seam, to show over any palette.
     3. On a dataset's page, **Copy link becomes a link icon beside the dataset's name**.
     4. **The gear only on the Thermal Analyzer's main page**: gone from the dataset's page (where it sits right of
        the dataset's buttons) and the viewer; README to match.
