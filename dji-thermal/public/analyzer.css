@@ -134,11 +134,14 @@
 .ta-page .ta-conversion-chips{ margin: 3px 0; }
 .ta-page .ta-menu{ display: inline-block; }
 .ta-page .ta-menu .dropdown-menu{ font-size: 13px; min-width: 180px; }
-.ta-page .ta-menu .dropdown-menu > li > button{ display: block; width: 100%; padding: 3px 20px; border: 0; background: none; text-align: left;
-    color: inherit; white-space: nowrap; line-height: 1.43; }
-.ta-page .ta-menu .dropdown-menu > li > button:hover, .ta-page .ta-menu .dropdown-menu > li > button:focus{ background: rgba(128, 128, 128, .15); }
+/* Its links and buttons alike (WebODM's theme pads a menu's links differently) */
+.ta-page .ta-menu .dropdown-menu > li > button, .ta-page .ta-menu .dropdown-menu > li > a{ display: block; width: 100%; padding: 3px 20px;
+    border: 0; background: none; text-align: left; color: inherit; font-size: 13px; font-weight: normal; white-space: nowrap;
+    line-height: 1.43; text-decoration: none; }
+.ta-page .ta-menu .dropdown-menu > li > button:hover, .ta-page .ta-menu .dropdown-menu > li > button:focus,
+.ta-page .ta-menu .dropdown-menu > li > a:hover, .ta-page .ta-menu .dropdown-menu > li > a:focus{ background: rgba(128, 128, 128, .15); }
 .ta-page .ta-menu .dropdown-menu > li > button.text-danger{ color: #c0392b; }
-.ta-page .ta-menu .dropdown-menu .fa{ width: 16px; margin-right: 4px; }
+.ta-page .ta-menu .dropdown-menu .fa{ width: 16px; margin-right: 6px; text-align: center; }
 .ta-page .ta-convert-actions{ display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
 .ta-page .ta-convert-actions input{ width: 220px; }
 .ta-page .ta-convert-message{ margin-top: 6px; font-size: 13px; }
