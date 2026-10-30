@@ -48,10 +48,12 @@ describe("the cameras' ranges", () => {
         expect(mixed.ranges.humidity).toEqual([20, 100]);
     });
 
-    test("the default unit is WebODM's: Fahrenheit in an imperial unit system", () => {
+    test("the default unit is the user's preferred one, else WebODM's: Fahrenheit in an imperial unit system", () => {
         expect(defaultUnit({temperatureUnit: () => ({abbr: "°F"})})).toBe("F");
         expect(defaultUnit({temperatureUnit: () => ({abbr: "°C"})})).toBe("C");
         expect(defaultUnit(undefined)).toBe("C");
+        expect(defaultUnit({temperatureUnit: () => ({abbr: "°F"})}, "K")).toBe("K");
+        expect(defaultUnit(undefined, "nonsense")).toBe("C");
     });
 });
 

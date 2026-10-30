@@ -334,10 +334,13 @@
         var id = page.getAttribute("data-id");
         var url = API + "datasets/" + id;
         var csrf = (page.querySelector("input[name=csrfmiddlewaretoken]") || {}).value;
+        // Thumbnails: thermal frames in the user's preferred DJI palette when they have one, else each image's own
+        var palette = core.preferences().palette;
+        var thumbsUrl = url + "/thumbnail?" + (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file=";
         var $ = function (i) { return doc.getElementById(i); };
         var dataset = null, view = {show: "all", sort: "path", desc: false, filter: ""}, tab = "convert", tabChosen = false, timer = null, uploading = false;
         var filesKey = null;
-        try { view.thumbs = root.localStorage && root.localStorage.getItem(THUMBS_KEY) === "1" ? url + "/thumbnail?file=" : null; } catch (e) { view.thumbs = null; }
+        try { view.thumbs = root.localStorage && root.localStorage.getItem(THUMBS_KEY) === "1" ? thumbsUrl : null; } catch (e) { view.thumbs = null; }
         // A link to a tab (#convert, as the mosaic viewer's way back) opens it
         var linked = ((root.location && root.location.hash) || "").replace(/[^a-z]/g, "");
         if (linked && page.querySelector('#ta-tabs a[data-tab="' + linked + '"]')) { tab = linked; tabChosen = true; }
@@ -494,7 +497,7 @@
                 view.show = e.target.value;
                 renderFilesTable();
             } else if (e.target.classList.contains("ta-files-thumbs")) {
-                view.thumbs = e.target.checked ? url + "/thumbnail?file=" : null;
+                view.thumbs = e.target.checked ? thumbsUrl : null;
                 try { root.localStorage.setItem(THUMBS_KEY, e.target.checked ? "1" : "0"); } catch (err) { /* not remembered */ }
                 renderFilesTable();
             }

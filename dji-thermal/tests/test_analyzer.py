@@ -245,6 +245,12 @@ class TestAnalysis(AnalyzerTestCase):
         self.assertLess(row["tmin"], row["tmax"])
         thumb = self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": row["path"]})
         self.assertEqual(thumb["Content-Type"], "image/jpeg")
+        drawn = self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": row["path"], "palette": "rainbow1"})
+        self.assertEqual(drawn["Content-Type"], "image/jpeg")
+        self.assertNotEqual(drawn.content, thumb.content)
+        self.assertEqual(len(os.listdir(datasets.data_path(task, "thumbnails", "rainbow1"))), 1)
+        again = self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": row["path"], "palette": "rainbow1"})
+        self.assertEqual(again.content, drawn.content)
         self.assertEqual(self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": "../x.jpg"}).status_code,
                          status.HTTP_404_NOT_FOUND)
 
@@ -291,6 +297,37 @@ class TestConversionSettings(AnalyzerTestCase):
         self.assertFalse(self.client_for("testuser2").get(url).data["saved"])
         self.client.delete(url)
         self.assertFalse(self.client.get(url).data["saved"])
+
+
+    def test_a_user_saves_their_display_preferences_and_the_pages_get_them(self):
+        url = "/api/plugins/dji-thermal/display"
+        res = self.client.get(url)
+        self.assertEqual((res.data["unit"], res.data["palette"]), (None, None))
+        self.assertIn("ironred", res.data["palettes"])
+        self.assertEqual(self.client.put(url, {"unit": "R", "palette": "pink"}, format="json").data.keys(),
+                         {"unit", "palette"})
+        self.client.put(url, {"unit": "K", "palette": "ironred"}, format="json")
+        self.assertEqual((self.client.get(url).data["unit"], self.client.get(url).data["palette"]), ("K", "ironred"))
+        self.assertEqual(self.client_for("testuser2").get(url).data["unit"], None)
+        self.assertContains(self.client.get("/plugins/dji-thermal/"),
+                            '<script id="ta-display" type="application/json">{"unit": "K", "palette": "ironred"}')
+        self.client.put(url, {"unit": "", "palette": None}, format="json")
+        self.assertEqual((self.client.get(url).data["unit"], self.client.get(url).data["palette"]), (None, None))
+
+    def test_new_conversions_start_with_the_preferred_palette_unless_the_saved_defaults_have_one(self):
+        url = "/api/plugins/dji-thermal/preferences"
+        self.client.put("/api/plugins/dji-thermal/display", {"palette": "ironred"}, format="json")
+        self.assertEqual(self.client.get(url).data["settings"]["palette"], "ironred")
+        self.client.put(url, {"settings": {"palette": "rainbow1"}}, format="json")
+        self.assertEqual(self.client.get(url).data["settings"]["palette"], "rainbow1")
+
+    def test_the_viewer_opens_in_the_preferred_palette_when_the_frames_hold_it(self):
+        held = {"ironred": [], "whitehot": []}
+        with mock.patch.object(mosaics, "palettes_of", return_value=held), \
+                mock.patch.object(mosaics, "result", return_value={"kinds": {"as_converted": {"palette": "whitehot"}}}):
+            self.assertEqual(mosaics.default_palette(None, "c", {}, "ironred"), "dji_ironred")
+            self.assertEqual(mosaics.default_palette(None, "c", {}, "hotiron"), "dji_whitehot")
+            self.assertEqual(mosaics.default_palette(None, "c", {}, None), "dji_whitehot")
 
 
 class TestConversions(AnalyzerTestCase):

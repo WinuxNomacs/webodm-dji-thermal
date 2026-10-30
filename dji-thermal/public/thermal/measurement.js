@@ -9,7 +9,7 @@ export const FIELDS = [
     {name: "humidity", label: "Relative humidity", temperature: false, step: "1", suffix: "%"}
 ];
 
-export const UNITS = {C: "°C", F: "°F"};
+export const UNITS = {C: "°C", F: "°F", K: "K"};
 
 // The cameras' EXIF models, as DJI names them elsewhere
 const CAMERA_NAMES = {"ZH20T": "H20T", "ZH20N": "H20N", "MAVIC2-ENTERPRISE-ADVANCED": "M2EA"};
@@ -19,15 +19,19 @@ export function cameraName(model){
 }
 
 export function toCelsius(value, unit){
+    if (unit === "K") return value - 273.15;
     return unit === "F" ? (value - 32) * 5 / 9 : value;
 }
 
 export function fromCelsius(celsius, unit){
+    if (unit === "K") return celsius + 273.15;
     return unit === "F" ? celsius * 9 / 5 + 32 : celsius;
 }
 
-// The unit of WebODM's unit system (Units.js's unitSystem())
-export function defaultUnit(system){
+// The unit of the user's display preferences (the plugin's display API) when they chose one, else of WebODM's unit
+// system (Units.js's unitSystem())
+export function defaultUnit(system, preferred){
+    if (UNITS[preferred]) return preferred;
     return system && system.temperatureUnit(0).abbr === UNITS.F ? "F" : "C";
 }
 

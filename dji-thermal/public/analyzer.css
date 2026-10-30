@@ -2,6 +2,8 @@
 .ta-page [hidden]{ display: none !important; }
 .ta-page .ta-header{ display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .ta-page .ta-header h3{ margin: 0; }
+.ta-page .ta-header h3 .ta-prefs{ padding: 0 4px; font-size: 16px; vertical-align: middle; color: inherit; opacity: .6; }
+.ta-page .ta-header h3 .ta-prefs:hover, .ta-page .ta-header h3 .ta-prefs:focus{ opacity: 1; }
 .ta-page .ta-header-actions{ display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .ta-page .ta-header-actions select{ width: auto; }
 .ta-page .ta-subtitle{ font-size: 13px; opacity: .75; margin-top: 4px; }

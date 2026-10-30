@@ -22,7 +22,8 @@ function page(name) {
         .replace(/\{\{ dataset\.name \}\}/g, 'Roof')
         .replace(/\{\{ conversion\.id \}\}/g, '9')
         .replace(/\{\{ conversion\.name \}\}/g, 'Nadir')
-        .replace(/\{\{ basemaps\|json_script:"ta-basemaps" \}\}/g, '');
+        .replace(/\{\{ basemaps\|json_script:"ta-basemaps" \}\}/g, '')
+        .replace(/\{\{ display\|json_script:"ta-display" \}\}/g, '');
 }
 
 const jsonResponse = (data, ok = true) => Promise.resolve({ok, json: () => Promise.resolve(data)});
@@ -143,6 +144,18 @@ describe("analyzer core", () => {
         expect(core.formatTemp(273.15, "K", 1)).toBe("32.0 °F");
         window.localStorage.setItem("unit_system", "metric");
         expect(core.userUnit()).toBe("C");
+        window.localStorage.clear();
+    });
+
+    it("shows temperatures in the unit of the user's preferences, whatever WebODM's units are", () => {
+        window.localStorage.setItem("unit_system", "imperial");
+        core.setPreferences({unit: "K", palette: "ironred", palettes: ["ironred"]});
+        expect(core.preferences()).toEqual({unit: "K", palette: "ironred"});
+        expect(core.formatTemp(21.5, "C")).toBe("294.65 K");
+        core.setPreferences({unit: "C"});
+        expect(core.formatTemp(70.7, "F")).toBe("21.50 °C");
+        core.setPreferences(null);
+        expect(core.userUnit()).toBe("F");
         window.localStorage.clear();
     });
 
@@ -285,6 +298,36 @@ describe("the pages' dialog", () => {
         const beside = core.ask(document, "Delete?", "", "Delete", "danger");
         click(shown());
         expect(await beside).toBe(false);
+    });
+
+    it("edits the preferences: the unit and DJI palette, saved for the user", async () => {
+        const saved = [];
+        const fetchFn = jest.fn((url, opts) => {
+            if (opts && opts.method === "PUT") { saved.push(JSON.parse(opts.body)); return jsonResponse(Object.assign({palettes: []}, JSON.parse(opts.body))); }
+            return jsonResponse({unit: null, palette: "ironred", palettes: ["whitehot", "ironred"]});
+        });
+        let edited = core.editPreferences(document, fetchFn, "/api/plugins/dji-thermal/", "tok");
+        await flush();
+        expect(shown().querySelector("h4").textContent).toBe("Preferences");
+        const [unit, palette] = shown().querySelectorAll("select");
+        expect([].map.call(unit.options, o => o.value)).toEqual(["", "C", "F", "K"]);
+        expect(unit.options[0].textContent).toBe("As WebODM's units (°C)");
+        expect(palette.value).toBe("ironred");
+        expect([].map.call(palette.options, o => o.textContent)).toEqual(["Each image's own", "whitehot", "ironred"]);
+        unit.value = "F";
+        palette.value = "";
+        click(button("Save"));
+        expect(await edited).toEqual({unit: "F", palette: null});
+        expect(saved).toEqual([{unit: "F", palette: null}]);
+        expect(fetchFn.mock.calls[1][1].headers["X-CSRFToken"]).toBe("tok");
+        expect(core.userUnit()).toBe("F");
+
+        edited = core.editPreferences(document, fetchFn, "/api/plugins/dji-thermal/", "tok");
+        await flush();
+        click(button("Cancel"));
+        expect(await edited).toBe(null);
+        expect(saved.length).toBe(1);
+        core.setPreferences(null);
     });
 
     it("asks for a new name, Enter renaming, and gives nothing back for the same name or a blank one", async () => {
@@ -768,6 +811,14 @@ describe("a dataset's page", () => {
         dataset.init(document, fetchFn);
         await ticks();
         expect(document.querySelector(".ta-files-thumbs").checked).toBe(true);
+        // With a preferred DJI palette, thermal frames are drawn in it
+        core.setPreferences({palette: "ironred"});
+        document.body.innerHTML = page('dataset.html');
+        dataset.init(document, fetchFn);
+        await ticks();
+        document.querySelector('#ta-tabs a[data-tab="files"]').click();
+        expect(document.querySelector(".ta-thumb img").getAttribute("src")).toBe(URL5 + "/thumbnail?palette=ironred&file=rgb%2Fa_V.JPG");
+        core.setPreferences(null);
         expect(document.querySelectorAll(".ta-thumb img").length).toBe(3);
         jest.clearAllTimers();    // no more polls into the next test's page
     });

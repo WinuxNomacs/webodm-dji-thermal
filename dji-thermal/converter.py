@@ -37,7 +37,7 @@ JPEG_EXTENSIONS = ('.jpg', '.jpeg')
 # upload's unit; humidity is a percent.
 MEASUREMENT_FIELDS = ('emissivity', 'reflected_temp', 'ambient_temp', 'humidity')
 DISTANCES = ('lrf', 'embedded')
-UNITS = ('C', 'F')
+UNITS = ('C', 'F', 'K')
 
 # The library's measurement parameter names (in a Measurement's .params, and describe()) to the Settings fields
 PARAM_FIELDS = {'distance': 'distance', 'humidity': 'humidity', 'emissivity': 'emissivity',
@@ -108,7 +108,7 @@ def settings(values=None):
     """
     dji-thermal-cli's Settings from an upload's measurement values (a dict): 'distance' ('lrf', the laser
     rangefinder's distance where valid, else the recorded one; 'embedded', the recorded one; or metres), 'unit'
-    ('C' or 'F', of the temperatures) and the MEASUREMENT_FIELDS. A field left out, None or '' keeps each photo's
+    ('C', 'F' or 'K', of the temperatures) and the MEASUREMENT_FIELDS. A field left out, None or '' keeps each photo's
     recorded value. Measured with the SDK in use (sdk.current()).
     :raises ValueError: a value that is not a number, or that the library refuses, naming the field; the SDK
         set at deployment is missing (sdk.SdkError)
@@ -130,7 +130,7 @@ def settings(values=None):
 
     unit = str(values.get('unit') or 'C').upper()
     if unit not in UNITS:
-        raise ValueError("unit must be C or F, not {!r}".format(values.get('unit')))
+        raise ValueError("unit must be C, F or K, not {!r}".format(values.get('unit')))
     distance = values.get('distance')
     distance = 'lrf' if distance is None or distance == '' else distance
     if distance not in DISTANCES:
@@ -148,6 +148,26 @@ def measure(path, measurement_settings=None):
     :raises: the library's errors, for a file it cannot measure or a value outside the camera's range
     """
     return library().measure(path, measurement_settings or settings(), unit='C')
+
+
+def palette_picture(path, palette):
+    """
+    An R-JPEG's temperatures drawn in one of DJI's palettes, with its colours as the file holds them, over the frame's
+    own range (as DJI's preview is stretched): a PIL RGB image of the thermal resolution
+    :raises: the library's errors, for a file it cannot measure; ValueError, a palette the file does not hold
+    """
+    import numpy as np
+    dtc = library()
+    with open(path, 'rb') as f:
+        lut = dtc.tsdk.open(f.read()).get_pseudo_color_lut()        # (3, palettes, 256)
+    index = dtc.PALETTES.index(palette)
+    if index >= lut.shape[1]:
+        raise ValueError("the file does not hold the palette {}".format(palette))
+    t = measure(path).temperature
+    finite = t[np.isfinite(t)]
+    lo, hi = (float(finite.min()), float(finite.max())) if finite.size else (0.0, 1.0)
+    levels = np.clip((np.nan_to_num(t, nan=lo) - lo) / max(hi - lo, 1e-6) * 255, 0, 255).astype(np.uint8)
+    return Image.fromarray(lut[:, index, :].T.astype(np.uint8)[levels], 'RGB')
 
 
 def describe(path):

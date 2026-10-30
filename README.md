@@ -38,8 +38,8 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
    with them are ignored and not uploaded.
 2. **Measurement**: the values the temperatures are computed with. Each field shows the value the camera recorded
    and the range the camera accepts; left empty, every photo keeps its own recorded value.
-   - **Temperature unit** of the values you enter: Celsius or Fahrenheit, by default WebODM's unit system. The
-     task's images are always in degrees Celsius.
+   - **Temperature unit** of the values you enter: Celsius, Fahrenheit or Kelvin, by default the unit of your
+     Thermal Analyzer preferences, else WebODM's unit system. The task's images are always in degrees Celsius.
    - **Emissivity**, **reflected temperature**, **ambient temperature** (the H20T and XT S do not use it, and the
      form says so) and **relative humidity**.
    - **Distance** to the subject: by default each photo's laser rangefinder distance where it has a valid one
@@ -61,6 +61,16 @@ OpenStreetMap's Nominatim; the Thermal Task does not, as the plugin calls no out
 **Thermal Analyzer**, in WebODM's menu, lists the thermal datasets of every project you can view, with their
 analysis and worksets at a glance.
 
+**Preferences** (the gear beside the heading, and on a dataset's and a mosaic's page) are kept for your WebODM
+account:
+
+- **Temperature unit**: °C, °F or K, used throughout the Analyzer and the Thermal Task whatever unit an image or
+  workset holds; by default WebODM's unit system (°F when imperial, else °C).
+- **DJI palette**, where the frames hold it: the mosaics' temperature tabs open in it, new worksets start with it
+  (unless your saved defaults have a palette of their own), and the Files tab's thumbnails of thermal frames are
+  drawn in it, from their temperatures, on the server (the first view of a large dataset takes a while; they are
+  kept with the dataset). By default each image's own.
+
 ### A dataset and its analysis
 
 **New Dataset**: a name, the project and the flight's photos (or their folder, whose subfolders are kept; you can
@@ -75,7 +85,7 @@ height and the size. A camera's row opens its frames on the Files tab, and each 
 
 - **Files**: every file with its capture time, height, gimbal pitch, temperatures, distance (recorded and the
   rangefinder's) and emissivity, and the problems that name it; filtered by name, by kind or to those with
-  problems, sorted by any column, with thumbnails if you like.
+  problems, sorted by any column, with thumbnails if you like (in your preferred DJI palette, if you chose one).
 - **Problems**: what dji-thermal-cli found (errors, warnings, notes), each with what addresses it and the files it
   names.
 - **WebODM plan**: how well the frames cover the ground, the task options to use (to copy) and the dji-thermal-cli
@@ -115,7 +125,8 @@ harmonized (normalized, each frame's offset against its neighbours removed). **V
 over WebODM's base layers:
 
 - a tab for each mosaic, the frame each pixel comes from and the angle it was seen at;
-- the palette (the usual ones and the DJI palettes of the images) and the range, changed live, with the colour scale
+- the palette (the usual ones and the DJI palettes of the images; opening in your preferred one, if they hold it) and the
+  range, changed live, with the colour scale
   and **Auto** (the 2nd to 98th percentile);
 - the temperature, frame and view angle under the cursor;
 - what dji-thermal-cli reports (seams, misalignment, frame offsets, heights) and the mosaic files to download (also
@@ -164,7 +175,7 @@ Its photos and worksets count toward the project owner's storage quota (no uploa
 the owner is over it); a task made from a workset counts its own images too. The dataset goes when its task or the
 project is deleted. Deleting the dataset deletes its task too, unless a workset was sent to it: the task is then
 kept as an ordinary WebODM task (named without "Thermal dataset:") with those images and what it processed.
-Temperatures are shown in degrees Celsius, or Fahrenheit with WebODM's imperial units.
+Temperatures are shown in the unit of your preferences (see above).
 
 ## The converted images
 
