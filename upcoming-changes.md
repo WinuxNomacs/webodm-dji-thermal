@@ -13,6 +13,7 @@
   endpoints served by the plugin (below).
 - **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
   the earlier "Folder conversion" item (below).
+- **macOS**: the dev setup and checks run on macOS, at the very end.
 
 **Done**
 - **Thermal Analyzer, part 1** — 2026-10-29, in four steps (`analyzer-datasets`, `analyzer-conversions`,
@@ -291,14 +292,24 @@ since libdirp can crash, with the SDK found by `DJI_THERMAL_SDK_DIR` (an unpacke
 - **The CLI work** (the user, 2026-10-29): branch `native-sdk` in dji-thermal-cli from its `main` (1.8.0,
   published), then `release/1.9.0`, merged there, not pushed; the plugin then pins 1.9.0.
 
-## 2. Release 1.0.0
+## 1. Release 1.0.0
 
 README (what it does, cameras, installing, using it, that it calls no outside service), `CHANGELOG.md`, the zip
 (`dev/package.sh`), the `release-check` skill.
 
-Open decision: **where to publish**. WebODM's docs point DJI users to Thermal Tools, a paid tool from WebODM's
-maintainers, which this plugin would replace for those cameras. Submit it to WebODM-Plugins' directory as well,
-or distribute it from this repo's releases only.
+Plan: a clean-up pass (unused code, the manifest), README (no longer "in development"; Installing: WebODM 3.3.2 or
+later, Administration > Plugins, the zip and its sha256 or the directory), `CHANGELOG.md` (the Thermal Task, the
+Thermal Analyzer part 1, DJI's own SDK), manifest 1.0.0 with a description naming both ways in, the zip, the
+`release-check` skill (the zip installed as a user would, a live check of the Thermal Task and the Analyzer), merge.
+Redone on `main` (2026-10-30) after part 1; the first `release/1.0.0` (2026-10-29, before the Analyzer) was
+replaced, its changes carried over.
+
+**Decided (the user, 2026-10-29):**
+- **Published in WebODM-Plugins' directory and as this repo's GitHub release**: the zip attached to the release,
+  `{url, sha256}` added to `directory.json` by a PR (the user's).
+- **Not experimental**: the manifest's `experimental` is false from 1.0.0 (the directory's guidance marks plugins
+  experimental unless the author asks otherwise).
+- **macOS checks after 1.0.0**, at the very end.
 
 ## Done: The DJI Thermal page under Administration
 

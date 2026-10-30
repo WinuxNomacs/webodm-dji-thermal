@@ -9,10 +9,6 @@ export const FIELDS = [
     {name: "humidity", label: "Relative humidity", temperature: false, step: "1", suffix: "%"}
 ];
 
-// Distance: the laser rangefinder's where a photo has a valid one, else the recorded one (the server's default);
-// the recorded one; or a distance in metres for all photos
-export const DISTANCE_MODES = ["lrf", "embedded", "value"];
-
 export const UNITS = {C: "°C", F: "°F"};
 
 // The cameras' EXIF models, as DJI names them elsewhere
