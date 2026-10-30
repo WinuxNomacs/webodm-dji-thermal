@@ -56,6 +56,25 @@
     flight test's `skip_without` moved back from `parent_url`, where the parent-task branch had put it. Tests: Django
     113 with `app.tests.test_plugins`, Jest 125. Live check on :8002: the button on the user's dataset task and the
     check dataset's, on a task made from a workset (opens the dataset), none on ordinary tasks or tasks made before.
+  - **Next: user preferences** (the user, `new.md`, 2026-10-30), planned: a **settings gear** beside the Thermal
+    Analyzer's heading (the datasets page) opening the user's preferences: a **temperature unit** (°C, °F or K) used
+    throughout the UI whatever unit an image or workset holds, and a **preferred DJI palette** used throughout the UI
+    where it is available. Builds on: `analyzer_core.js`'s `userUnit()` (today °F with WebODM's imperial units,
+    else °C; never K), used by the dataset, worksets and viewer pages; the Thermal task panel's own unit (°C/°F,
+    `measurement.js` `defaultUnit`, the converter's `UNITS`; dji-thermal-cli also takes K); the viewer's
+    `default_palette` (the workset's palette, else the frames', else inferno; DJI's palettes there are the ones the
+    frames hold); the Worksets form's palette ("Each image's own" by default). Files-tab thumbnails are the frames'
+    embedded previews, in the palette they were shot with. Decided (the user, 2026-10-30):
+    - **Kept per WebODM user** on the server (the plugin's user data store), so they follow the user to any browser
+      and reach the Thermal task panel; the pages read them, a small API saves them.
+    - **The unit follows WebODM's units until one is picked** (°F with imperial, else °C, as today); the Thermal
+      task panel offers K too (the converter's `UNITS`).
+    - **The palette applies to the viewer's default** (temperature mosaics open in it when the frames hold it),
+      **new worksets' palette** (the form starts with it instead of "Each image's own"), and **Files-tab
+      thumbnails** (drawn from the temperatures in it, on the server, cached, instead of the embedded preview; slower
+      on large datasets). No palette picked: everything as today.
+    - **The gear opens a dialog** (Save / Cancel), on the datasets page beside the heading, and on the dataset and
+      viewer pages too.
   - **To look into**: WebODM answers 404 for a processed thermal task's dashboard thumbnail (`/thumbnail?size=164`,
     seen on the user's "HomerunObliqueII - default-webodm-recommendations" and a check task): WebODM's own, with a
     float °C orthophoto; to find out whether the plugin can do anything about it.
