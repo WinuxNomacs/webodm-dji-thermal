@@ -222,11 +222,15 @@ class TestMeasurementSettings(ConverterTestCase):
         self.assertEqual(s.overrides().reflection, 10.0)
         self.assertEqual(s.overrides().ambient_temp, 0.0)
 
+    def test_temperatures_in_kelvin_are_measured_in_celsius(self):
+        s = converter.settings({"unit": "K", "reflected_temp": "283.15"})
+        self.assertAlmostEqual(s.overrides().reflection, 10.0, places=4)
+
     def test_a_value_that_is_not_a_number_is_refused_naming_it(self):
         for values, message in (({"emissivity": "high"}, "emissivity must be a number"),
                                 ({"distance": "far"}, "distance must be a number"),
                                 ({"humidity": "nan"}, "humidity must be a number"),
-                                ({"unit": "K"}, "unit must be C or F"),
+                                ({"unit": "R"}, "unit must be C, F or K"),
                                 ({"reflected_temp": "-500"}, "reflected_temp")):
             with self.subTest(values=values), self.assertRaisesRegex(ValueError, message):
                 converter.settings(values)

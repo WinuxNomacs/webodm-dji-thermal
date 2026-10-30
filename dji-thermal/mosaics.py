@@ -351,11 +351,12 @@ def colormap(task, cid, name):
     return webodm_colormaps.get(name)
 
 
-def default_palette(task, cid, settings):
-    """The conversion's own palette, else the flight's (as dji-thermal-cli's preview used it), else inferno"""
+def default_palette(task, cid, settings, preferred=None):
+    """The user's preferred palette, else the conversion's own, else the flight's (as dji-thermal-cli's preview used
+    it), each when the frames hold it; else inferno"""
     dji = palettes_of(task, cid)
     kinds = result(task, cid).get('kinds') or {}
-    for name in (settings.get('palette'), (kinds.get('as_converted') or {}).get('palette')):
+    for name in (preferred, settings.get('palette'), (kinds.get('as_converted') or {}).get('palette')):
         if name and name in dji:
             return DJI_PREFIX + name
     return 'inferno'

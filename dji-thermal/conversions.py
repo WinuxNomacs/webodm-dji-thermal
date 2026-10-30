@@ -1,7 +1,7 @@
 """
 A dataset's conversions: its images converted with dji-thermal-cli's process, several side by side to compare
 settings. The settings a user can choose are checked here, kept with the conversion and as the user's saved defaults
-(in the plugin's user data store); the conversion runs in WebODM's worker.
+(in the plugin's user data store, beside their display preferences); the conversion runs in WebODM's worker.
 
 Each conversion is a folder of the dataset's (see datasets), with records changed under the dataset's lock:
 
@@ -32,6 +32,7 @@ JOB_FILE = 'job.json'
 RESULTS_FILE = 'results.json'
 OUTPUT_DIR = 'output'
 PREFERENCES_KEY = 'conversion_settings'
+DISPLAY_KEY = 'display'
 
 UNITS = ('C', 'F', 'K')
 COMPRESSIONS = ('deflate', 'none')
@@ -520,3 +521,32 @@ def save_preferences(user, settings):
 
 def forget_preferences(user):
     preferences_store(user).del_key(PREFERENCES_KEY)
+
+
+# The user's display preferences: the unit temperatures are shown in throughout the UI (None: WebODM's units, °F
+# when imperial) and DJI's palette pictures are drawn in where the frames hold it (None: each picture's own)
+
+def display(user):
+    """{'unit': 'C', 'F', 'K' or None, 'palette': one of palettes() or None}; what is no longer valid is None"""
+    saved = preferences_store(user).get_json(DISPLAY_KEY, None)
+    saved = saved if isinstance(saved, dict) else {}
+    return {'unit': saved.get('unit') if saved.get('unit') in UNITS else None,
+            'palette': saved.get('palette') if saved.get('palette') in palettes() else None}
+
+
+def parse_display(raw):
+    """Display preferences from the API (blank: None) and {field: message} for what is not valid"""
+    raw = raw if isinstance(raw, dict) else {}
+    out, errors = {}, {}
+    unit, palette = raw.get('unit'), raw.get('palette')
+    out['unit'] = None if blank(unit) else unit
+    if out['unit'] is not None and out['unit'] not in UNITS:
+        errors['unit'] = "Must be C, F or K"
+    out['palette'] = None if blank(palette) else palette
+    if out['palette'] is not None and out['palette'] not in palettes():
+        errors['palette'] = "Not one of dji-thermal-cli's palettes"
+    return out, errors
+
+
+def save_display(user, value):
+    preferences_store(user).set_json(DISPLAY_KEY, value)

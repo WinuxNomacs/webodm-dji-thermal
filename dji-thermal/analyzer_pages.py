@@ -14,15 +14,16 @@ from app.models import Basemap, Task
 from . import conversions, datasets
 
 
-def common(plugin):
+def common(plugin, request):
+    # display: the user's preferences (conversions.display), read by analyzer_core.js
     return {'title': _("Thermal Analyzer"), 'public': plugin.public_url(""),
-            'api': "/api/plugins/{}/".format(plugin.get_name())}
+            'api': "/api/plugins/{}/".format(plugin.get_name()), 'display': conversions.display(request.user)}
 
 
 def datasets_page(plugin):
     @login_required
     def view(request):
-        return render(request, plugin.template_path("datasets.html"), common(plugin))
+        return render(request, plugin.template_path("datasets.html"), common(plugin, request))
     return view
 
 
@@ -34,7 +35,7 @@ def dataset_page(plugin):
         except Task.DoesNotExist:
             raise Http404("No such dataset") from None
         return render(request, plugin.template_path("dataset.html"),
-                      dict(common(plugin), dataset={'id': str(task.id), 'name': datasets.name_of(task)}))
+                      dict(common(plugin, request), dataset={'id': str(task.id), 'name': datasets.name_of(task)}))
     return view
 
 
@@ -49,6 +50,6 @@ def viewer_page(plugin):
         if not record:
             raise Http404("No such workset")
         return render(request, plugin.template_path("viewer.html"), dict(
-            common(plugin), dataset={'id': str(task.id), 'name': datasets.name_of(task)},
+            common(plugin, request), dataset={'id': str(task.id), 'name': datasets.name_of(task)},
             conversion={'id': cid, 'name': record.get('name') or cid}, basemaps=Basemap.get_cached_basemaps()))
     return view

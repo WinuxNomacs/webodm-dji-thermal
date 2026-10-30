@@ -62,6 +62,7 @@ class Plugin(PluginBase):
                        analyzer_api.MosaicTile.as_view()),
             MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/point$', analyzer_api.MosaicPoint.as_view()),
             MountPoint('preferences$', analyzer_api.Preferences.as_view()),
+            MountPoint('display$', analyzer_api.Display.as_view()),
         ]
 
 

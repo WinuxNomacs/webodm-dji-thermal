@@ -56,7 +56,7 @@
     flight test's `skip_without` moved back from `parent_url`, where the parent-task branch had put it. Tests: Django
     113 with `app.tests.test_plugins`, Jest 125. Live check on :8002: the button on the user's dataset task and the
     check dataset's, on a task made from a workset (opens the dataset), none on ordinary tasks or tasks made before.
-  - **Next: user preferences** (the user, `new.md`, 2026-10-30), planned: a **settings gear** beside the Thermal
+  - Done: **user preferences** (the user, `new.md`, 2026-10-30), `user-preferences`: a **settings gear** beside the Thermal
     Analyzer's heading (the datasets page) opening the user's preferences: a **temperature unit** (°C, °F or K) used
     throughout the UI whatever unit an image or workset holds, and a **preferred DJI palette** used throughout the UI
     where it is available. Builds on: `analyzer_core.js`'s `userUnit()` (today °F with WebODM's imperial units,
@@ -75,6 +75,17 @@
       on large datasets). No palette picked: everything as today.
     - **The gear opens a dialog** (Save / Cancel), on the datasets page beside the heading, and on the dataset and
       viewer pages too.
+    Built: `conversions.py` (`display`, `parse_display`, `save_display`, key `display` beside the saved defaults),
+    `analyzer_api.py` (`Display` at `display`; `Preferences` fills the palette; the viewer's and tiles'
+    `default_palette` with the preferred one first; `palette_thumbnail`, cached in `thermal/thumbnails/<palette>/` by
+    the file's path, size and time), `converter.py` (`palette_picture`: the frame's own LUT over its min..max; `UNITS`
+    with K), `analyzer_pages.py` (the preferences in `#ta-display`), the templates (the gear), `analyzer_core.js`
+    (`userUnit` from them, the dialog's selects, `editPreferences`, `bindPreferences`; the page reloads on Save),
+    `dataset.js` (`?palette=` on thumbnails), the Thermal task panel (`display` read on open, K offered). Tests:
+    Django 117 with `app.tests.test_plugins`, Jest 127. Live check on :8002, a dataset of its own (8 M4T frames, a
+    workset with mosaics): the dialog saved K and ironred; K on the dataset page and viewer, thumbnails in ironred,
+    the viewer opened in DJI ironred, new worksets' palette ironred, the Thermal task panel in K; the admin's
+    preferences restored, the dataset removed.
   - **To look into**: WebODM answers 404 for a processed thermal task's dashboard thumbnail (`/thumbnail?size=164`,
     seen on the user's "HomerunObliqueII - default-webodm-recommendations" and a check task): WebODM's own, with a
     float °C orthophoto; to find out whether the plugin can do anything about it.

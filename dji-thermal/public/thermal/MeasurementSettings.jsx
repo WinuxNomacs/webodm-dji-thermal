@@ -73,6 +73,7 @@ export default class MeasurementSettings extends React.Component {
                                 onChange={e => this.props.onUnitChange(e.target.value)}>
                             <option value="C">{_("Celsius")} ({UNITS.C})</option>
                             <option value="F">{_("Fahrenheit")} ({UNITS.F})</option>
+                            <option value="K">{_("Kelvin")} ({UNITS.K})</option>
                         </select>
                         <span className="help-block">{_("For the values below. The task's images are always in degrees Celsius.")}</span>
                     </div>

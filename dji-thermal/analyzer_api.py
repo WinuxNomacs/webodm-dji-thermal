@@ -11,6 +11,7 @@ outputs, changing it allows uploading, renaming, analyzing and converting (and d
 from them), and deleting a dataset needs the project's delete permission (as a task does).
 """
 
+import hashlib
 import io
 import os
 
@@ -27,9 +28,10 @@ from app.api.tasks import download_file_response, download_file_stream
 from app.models import Project, Task
 from app.security import path_traversal_check
 
-from . import conversion_tasks, conversions, datasets, mosaics
+from . import conversion_tasks, conversions, converter, datasets, mosaics
 
 THUMBNAIL_SIZE = (96, 96)
+THUMBNAILS_DIR = 'thumbnails'
 OVER_QUOTA = "The project's owner is over their storage quota: free some space first"
 
 
@@ -269,17 +271,24 @@ class DatasetCancel(DatasetView):
 
 class DatasetThumbnail(DatasetView):
     def get(self, request, pk):
-        """A small JPEG of one of the files its analysis lists (?file=), for the Files tab"""
+        """A small JPEG of one of the files its analysis lists (?file=), for the Files tab: its embedded picture, or a
+        thermal frame's temperatures in one of DJI's palettes (?palette=, the user's preferred), cached in the dataset"""
         from PIL import Image
         task = get_dataset(request, pk)
         rel = request.query_params.get('file') or ""
-        if not rel or rel not in {r.get('path') for r in datasets.analysis(task).get('files') or []}:
+        kinds = {r.get('path'): r.get('kind') for r in datasets.analysis(task).get('files') or []}
+        if not rel or rel not in kinds:
             raise NotFound({'error': "Not a file of this dataset"})
         root = datasets.images_path(task)
         try:
             path = path_traversal_check(root + '/' + rel, root)
         except SuspiciousFileOperation:
             raise NotFound({'error': "Not a file of this dataset"}) from None
+        palette = request.query_params.get('palette') or ""
+        if kinds[rel] == 'thermal' and palette in conversions.palettes():
+            data = palette_thumbnail(task, path, palette)
+            if data:
+                return thumbnail_response(data)
         out = io.BytesIO()
         try:
             with Image.open(path) as im:
@@ -292,9 +301,41 @@ class DatasetThumbnail(DatasetView):
             raise NotFound({'error': "The file is not on the server any more"}) from None
         except (OSError, ValueError):
             raise NotFound({'error': "The file is not an image"}) from None
-        response = HttpResponse(out.getvalue(), content_type="image/jpeg")
-        response['Cache-Control'] = 'private, max-age=86400'
-        return response
+        return thumbnail_response(out.getvalue())
+
+
+def thumbnail_response(data):
+    response = HttpResponse(data, content_type="image/jpeg")
+    response['Cache-Control'] = 'private, max-age=86400'
+    return response
+
+
+def palette_thumbnail(task, path, palette):
+    """A thermal frame's thumbnail in a DJI palette, as JPEG bytes, kept in the dataset's thumbnails/<palette>/ by
+    the file's path, size and time; None when the frame cannot be drawn (its embedded picture is shown instead)"""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    key = hashlib.sha1("{}|{}|{}".format(path, st.st_size, st.st_mtime_ns).encode()).hexdigest()
+    cached = datasets.data_path(task, THUMBNAILS_DIR, palette, key + '.jpg')
+    try:
+        with open(cached, 'rb') as f:
+            return f.read()
+    except OSError:
+        pass
+    try:
+        im = converter.palette_picture(path, palette)
+    except Exception:  # noqa: BLE001 - any frame the library cannot draw falls back to its embedded picture
+        return None
+    im.thumbnail(THUMBNAIL_SIZE)
+    out = io.BytesIO()
+    im.save(out, 'JPEG', quality=75)
+    os.makedirs(os.path.dirname(cached), exist_ok=True)
+    with open(cached + '.part', 'wb') as f:
+        f.write(out.getvalue())
+    os.replace(cached + '.part', cached)
+    return out.getvalue()
 
 
 class ConversionListCreate(DatasetView):
@@ -439,8 +480,11 @@ class Preferences(DatasetView):
     def get(self, request):
         """The user's saved conversion settings (or the defaults), and what can be chosen"""
         saved = conversions.preferences(request.user)
+        settings = dict(saved if saved is not None else conversions.DEFAULTS)
+        # New conversions start with the preferred palette when the saved defaults keep each image's own
+        settings['palette'] = settings.get('palette') or conversions.display(request.user)['palette']
         return Response({
-            'settings': saved if saved is not None else conversions.DEFAULTS,
+            'settings': settings,
             'saved': saved is not None,
             'defaults': conversions.DEFAULTS,
             'products': conversions.products(),
@@ -460,6 +504,19 @@ class Preferences(DatasetView):
         """Back to dji-thermal-cli's defaults"""
         conversions.forget_preferences(request.user)
         return Response({'settings': conversions.DEFAULTS, 'saved': False})
+
+
+class Display(DatasetView):
+    def get(self, request):
+        """The user's display preferences (see conversions.display) and DJI's palettes to choose from"""
+        return Response(dict(conversions.display(request.user), palettes=conversions.palettes()))
+
+    def put(self, request):
+        value, errors = conversions.parse_display(request.data)
+        if errors:
+            raise ValidationError(errors)
+        conversions.save_display(request.user, value)
+        return Response(dict(value, palettes=conversions.palettes()))
 
 
 def viewer(task, cid, user):
@@ -486,7 +543,8 @@ def viewer(task, cid, user):
         'flown': [times[0], times[-1]] if times else [], 'built_at': built.get('built_at'),
         'stripped': bool(built.get('stripped')), 'frames': built.get('frames') or [], 'tabs': tabs,
         'kinds': {kind: {key: v for key, v in k.items() if key != 'raster'} for kind, k in kinds.items()},
-        'palettes': palettes, 'default_palette': mosaics.default_palette(task, cid, settings) if kinds else None,
+        'palettes': palettes,
+        'default_palette': mosaics.default_palette(task, cid, settings, conversions.display(user)['palette']) if kinds else None,
         'frame_colors': mosaics.encoded(mosaics.frame_colormap()[i] for i in range(mosaics.FRAME_COLORS)),
         'can_change': user.has_perm('change_project', task.project),
     })
@@ -533,7 +591,8 @@ class MosaicTile(DatasetView):
             settings = conversions.record(task, cid).get('settings') or {}
             try:
                 cmap = mosaics.colormap(task, cid, request.query_params.get('color_map') or
-                                        mosaics.default_palette(task, cid, settings))
+                                        mosaics.default_palette(task, cid, settings,
+                                                                conversions.display(request.user)['palette']))
                 low, high = (float(v) for v in (request.query_params.get('rescale') or '0,1').split(','))
             except ValueError as e:
                 raise ValidationError({'error': str(e) if 'color' in str(e) else "Invalid rescale value"}) from None

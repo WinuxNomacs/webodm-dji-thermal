@@ -47,6 +47,18 @@ export default class ThermalTaskPanel extends React.Component {
 
     componentDidMount(){
         this.describeCameras();
+        this.readPreferredUnit();
+    }
+
+    // The unit of the user's display preferences, unless they already picked one here
+    readPreferredUnit(){
+        if (!this.props.api.display) return;
+        this.props.api.display().then(d => {
+            if (this.unmounted || this.unitPicked || !d || !d.unit) return;
+            const unit = defaultUnit(unitSystem(), d.unit);
+            // Before the cameras are described there is nothing to check yet
+            this.setState({unit, errors: this.state.combined ? validate(this.state.values, this.state.combined, unit) : this.state.errors});
+        }, () => {});
     }
 
     componentWillUnmount(){
@@ -117,6 +129,7 @@ export default class ThermalTaskPanel extends React.Component {
     };
 
     handleUnitChange = unit => {
+        this.unitPicked = true;
         this.setState({unit, errors: validate(this.state.values, this.state.combined, unit)});
     };
 

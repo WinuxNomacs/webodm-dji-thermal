@@ -36,13 +36,29 @@
     }
 
     // Temperatures: a conversion's values are in the unit its files were written in (C, F or K); they are shown, and
-    // typed, in the user's own: Fahrenheit with WebODM's imperial units (its unit_system, kept in the browser)
+    // typed, in the user's own: the unit of their display preferences, else Fahrenheit with WebODM's imperial units
+    // (its unit_system, kept in the browser), else Celsius
     var UNIT_SYMBOLS = {C: "°C", F: "°F", K: "K"};
     var UNIT_SCALE = {C: 1, F: 1.8, K: 1};
     var UNIT_ZERO = {C: 0, F: 32, K: 273.15};   // 0 °C in each unit
 
+    // The user's display preferences ({unit, palette}, null for not chosen), as the page was given them
+    // (analyzer_pages.common, in #ta-display)
+    var display = readDisplay();
+    function readDisplay() {
+        var el = root.document && root.document.getElementById("ta-display");
+        var p;
+        try { p = el ? JSON.parse(el.textContent) : null; } catch (e) { p = null; }
+        return {unit: (p && p.unit) || null, palette: (p && p.palette) || null};
+    }
+    function preferences() { return display; }
+    function setPreferences(p) { display = {unit: (p && p.unit) || null, palette: (p && p.palette) || null}; }
+
     function unitOf(u) { return UNIT_SYMBOLS[u] ? u : "C"; }
     function userUnit() {
+        return UNIT_SYMBOLS[display.unit] ? display.unit : userUnitOfWebODM();
+    }
+    function userUnitOfWebODM() {
         var system;
         try { system = root.localStorage && root.localStorage.getItem("unit_system"); } catch (e) { system = null; }
         return system === "imperial" ? "F" : "C";
@@ -250,9 +266,10 @@
     }
 
     // The pages' dialog, in place of the browser's prompt and confirm: themed as the page is. opts: title, text (a
-    // paragraph, or a list of them), field ({label, value, readonly}: a text field), buttons ([{label, value,
-    // style: "primary" | "danger" | "default"}], left to right). Resolves to {button, value}: the value of the button
-    // pressed (null when dismissed: Escape, or a click beside it) and the field's text.
+    // paragraph, or a list of them), field ({label, value, readonly}: a text field), selects ([{name, label, value,
+    // options: [[value, label]], help}]), buttons ([{label, value, style: "primary" | "danger" | "default"}], left to
+    // right). Resolves to {button, value, selects}: the value of the button pressed (null when dismissed: Escape, or a
+    // click beside it), the field's text and each select's value by name.
     function dialog(doc, opts) {
         var host = doc.querySelector(".ta-page") || doc.body;
         var buttons = opts.buttons || [{label: "OK", value: true, style: "primary"}];
@@ -265,6 +282,13 @@
             (opts.field ? '<div class="form-group">' + (opts.field.label ? '<label for="ta-ask-field">' + escapeHtml(opts.field.label) + "</label>" : "") +
                 '<input type="text" id="ta-ask-field" class="form-control input-sm" maxlength="255"' +
                 (opts.field.readonly ? " readonly" : "") + (opts.field.label ? "" : ' aria-label="' + escapeHtml(opts.title) + '"') + "></div>" : "") +
+            (opts.selects || []).map(function (sel, i) {
+                return '<div class="form-group"><label for="ta-ask-select-' + i + '">' + escapeHtml(sel.label) + "</label>" +
+                    '<select id="ta-ask-select-' + i + '" class="form-control input-sm" data-name="' + escapeHtml(sel.name) + '">' +
+                    sel.options.map(function (o) {
+                        return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === (sel.value || "") ? " selected" : "") + ">" + escapeHtml(o[1]) + "</option>";
+                    }).join("") + "</select>" + (sel.help ? '<p class="help-block">' + escapeHtml(sel.help) + "</p>" : "") + "</div>";
+            }).join("") +
             '<div class="ta-dialog-actions">' + buttons.map(function (b, i) {
                 return '<button type="button" class="btn btn-' + (b.style || "default") + ' btn-sm" data-button="' + i + '">' +
                     escapeHtml(b.label) + "</button>";
@@ -280,7 +304,9 @@
                 doc.removeEventListener("keydown", onKey, true);
                 if (el.parentNode) el.parentNode.removeChild(el);
                 if (before && before.focus) before.focus();
-                resolve({button: value, value: field ? field.value : undefined});
+                var selects = {};
+                [].forEach.call(el.querySelectorAll("select[data-name]"), function (sel) { selects[sel.getAttribute("data-name")] = sel.value; });
+                resolve({button: value, value: field ? field.value : undefined, selects: selects});
             }
             function onKey(e) {
                 if (e.key === "Escape") { e.preventDefault(); close(null); }
@@ -315,6 +341,47 @@
                 var v = (r.value || "").trim();
                 return r.button === true && v && v !== name ? v : null;
             });
+    }
+
+    // The Preferences dialog (the gear on each page): the unit and DJI palette used throughout the Analyzer, saved for
+    // the user (api: the plugin's API URL). Resolves to the preferences saved, or null when dismissed or not saved.
+    function editPreferences(doc, fetchFn, api, csrf) {
+        return fetchFn(api + "display", {credentials: "same-origin"}).then(readJson).then(function (r) {
+            if (!r.ok) throw new Error(errorText(r.data, "Could not read the preferences"));
+            return dialog(doc, {title: "Preferences", selects: [
+                {name: "unit", label: "Temperature unit", value: r.data.unit || "",
+                 options: [["", "As WebODM's units (" + UNIT_SYMBOLS[userUnitOfWebODM()] + ")"], ["C", "Celsius (°C)"], ["F", "Fahrenheit (°F)"], ["K", "Kelvin (K)"]],
+                 help: "Temperatures are shown and typed in it, whatever unit an image or workset holds."},
+                {name: "palette", label: "DJI palette", value: r.data.palette || "",
+                 options: [["", "Each image's own"]].concat((r.data.palettes || []).map(function (p) { return [p, p]; })),
+                 help: "Where the frames hold it: the viewer's temperature mosaics, new worksets and the Files tab's thumbnails."}
+            ], buttons: [{label: "Cancel", value: false}, {label: "Save", value: true, style: "primary"}]});
+        }).then(function (d) {
+            if (d.button !== true) return null;
+            var body = {unit: d.selects.unit || null, palette: d.selects.palette || null};
+            return fetchFn(api + "display", {method: "PUT", credentials: "same-origin",
+                headers: {"Content-Type": "application/json", "X-CSRFToken": csrf}, body: JSON.stringify(body)})
+                .then(readJson).then(function (r) {
+                    if (!r.ok) throw new Error(errorText(r.data, "Could not save the preferences"));
+                    setPreferences(r.data);
+                    return preferences();
+                });
+        });
+    }
+
+    // The gear (#ta-prefs) of a page: the dialog, then the page drawn again in the preferences saved
+    function bindPreferences(doc, win) {
+        var button = doc.getElementById("ta-prefs");
+        var page = doc.querySelector(".ta-page");
+        if (!button || !page) return;
+        button.addEventListener("click", function () {
+            var csrf = (page.querySelector("input[name=csrfmiddlewaretoken]") || {}).value;
+            editPreferences(doc, win.fetch.bind(win), page.getAttribute("data-api"), csrf).then(function (saved) {
+                if (saved) win.location.reload();
+            }, function (e) {
+                dialog(doc, {title: "Preferences", text: e.message});
+            });
+        });
     }
 
     function readJson(res) {
@@ -356,8 +423,13 @@
         isImage: isImage, batches: batches, uploadFiles: uploadFiles, readJson: readJson, errorText: errorText,
         unitOf: unitOf, userUnit: userUnit, unitSymbol: unitSymbol, convertTemp: convertTemp, convertDelta: convertDelta,
         formatTemp: formatTemp, formatDelta: formatDelta, stageText: stageText, mosaicLabel: mosaicLabel,
-        batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName
+        batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName,
+        preferences: preferences, setPreferences: setPreferences, editPreferences: editPreferences, bindPreferences: bindPreferences
     };
     root.ThermalAnalyzerCore = api;
+    if (root.document && root.fetch) {
+        if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", function () { bindPreferences(root.document, root); });
+        else bindPreferences(root.document, root);
+    }
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

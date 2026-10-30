@@ -34,6 +34,8 @@ const tasksUrl = projectId => `/api/projects/${projectId}/tasks/`;
 export default {
     describe: photo => postForm(`${PLUGIN_API}/describe`, {}, [photo]),
 
+    display: () => request({url: `${PLUGIN_API}/display`, type: "GET", dataType: "json"}),
+
     createTask: (projectId, data) => request({
         url: tasksUrl(projectId), type: "POST", contentType: "application/json", data: JSON.stringify(data),
         dataType: "json"
