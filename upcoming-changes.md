@@ -107,9 +107,13 @@
     workset with mosaics): the dialog saved K and ironred; K on the dataset page and viewer, thumbnails in ironred,
     the viewer opened in DJI ironred, new worksets' palette ironred, the Thermal task panel in K; the admin's
     preferences restored, the dataset removed.
-  - **To look into**: WebODM answers 404 for a processed thermal task's dashboard thumbnail (`/thumbnail?size=164`,
-    seen on the user's "HomerunObliqueII - default-webodm-recommendations" and a check task): WebODM's own, with a
-    float °C orthophoto; to find out whether the plugin can do anything about it.
+  - Closed: WebODM answers 404 for a processed thermal task's dashboard thumbnail (`/thumbnail?size=164`,
+    seen on the user's "HomerunObliqueII - default-webodm-recommendations" and a check task). **WebODM's own, by
+    design** (2026-10-30): `TaskThumbnail` (`app/api/tasks.py`) raises NotFound for an orthophoto with fewer than 3
+    bands, and a °C orthophoto has one (and alpha); the dashboard's `TaskListItem` hides the thumbnail on error, so
+    only the console shows the 404. Nothing for the plugin: the Dashboard hooks (`addTaskActionButton`,
+    `addNewTaskPanelItem`, `addNewTaskButton`, `addImportTaskItem`, `presetDialogOptionsReady`) don't reach the
+    thumbnail. A thumbnail would need WebODM to render a single band with a colour map (a WebODM change).
   - Done: **The Convert tab as Worksets** (the user, `new.md`, 2026-10-30), `worksets`: the dataset page's
     Convert tab renamed **Worksets** and moved first, left of Files. In it, the **Settings:** section expandable and
     collapsible, and its **Outputs** subsection too; collapsed, each still shows what is selected that differs from
