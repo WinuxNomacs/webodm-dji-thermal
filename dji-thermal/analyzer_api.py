@@ -71,6 +71,8 @@ def summary(task, user):
         'conversion_count': len(jobs),
         'task_count': sum(len(conversion_tasks.made(task, cid)) for cid in conversions.ids(task)),
         'conversions_ready': sum(1 for j in jobs if j['status'] == 'ready'),
+        # The dataset's own task, as conversions are sent to it
+        'parent': conversion_tasks.parent(task),
         # A conversion of the dataset running, or its mosaics being built
         'busy': any(j['status'] == 'converting' for j in jobs) or
         any(mosaics.job(task, cid)['status'] == 'building' for cid in conversions.ids(task)),
@@ -204,7 +206,11 @@ class DatasetDetail(DatasetView):
 
     def delete(self, request, pk):
         task = get_dataset(request, pk, 'delete_project')
-        task.delete()       # its folder with it; a running analysis is canceled (see task_removing)
+        if task.scan_images():
+            # A conversion was sent to it: kept as an ordinary task, with those images and what it processed
+            conversion_tasks.release(task)
+        else:
+            task.delete()       # its folder with it; a running analysis is canceled (see task_removing)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -380,6 +386,24 @@ class ConversionTask(DatasetView):
         except ValueError as e:
             raise ValidationError({'error': str(e)}) from None
         return Response(task_summary(new_task), status=status.HTTP_201_CREATED)
+
+
+class ConversionParent(DatasetView):
+    def post(self, request, pk, cid):
+        """Sends the conversion's TIFFs to the dataset's own task, in place of the images sent there before and what it
+        processed from them; it then waits for a processing node to be set in WebODM"""
+        task = get_conversion(request, pk, cid, 'change_project')
+        problems, _ = conversion_tasks.checks(task, cid)
+        if problems:
+            raise ValidationError({'error': " ".join(problems)})
+        if datasets.over_quota(task):
+            raise ValidationError({'error': OVER_QUOTA})
+        try:
+            conversion_tasks.use_for_parent(task, cid, request.user)
+        except ValueError as e:
+            raise ValidationError({'error': str(e)}) from None
+        task.refresh_from_db()
+        return Response(conversion_tasks.parent(task))
 
 
 class ConversionDownload(DatasetView):

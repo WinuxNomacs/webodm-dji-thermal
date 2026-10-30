@@ -22,6 +22,7 @@ from rest_framework.test import APIClient
 
 from app.models import Project, Task
 from app.tests.classes import BootTestCase
+from nodeodm import status_codes
 from nodeodm.models import ProcessingNode
 from worker.tasks import get_pending_tasks
 
@@ -555,12 +556,13 @@ PLAN = {'process_args': ['--normalize', '--max-pitch', '-80', '--emissivity', '0
 
 
 class TestConversionTasks(AnalyzerTestCase):
-    def converted(self, frames=("a/DJI_0001_T.JPG", "b/DJI_0001_T.JPG", "b/DJI_0002_T.JPG"), **settings):
-        """A dataset with a WebODM plan and a converted conversion whose results name a TIFF per frame (small files
-        in place of the TIFFs)"""
-        task = self.create()
-        self.upload(task, [jpeg("a.jpg")])
-        datasets.write_json(datasets.data_path(task, datasets.ANALYSIS_FILE), {'webodm': PLAN})
+    def converted(self, frames=("a/DJI_0001_T.JPG", "b/DJI_0001_T.JPG", "b/DJI_0002_T.JPG"), task=None, **settings):
+        """A dataset (or another conversion of `task`) with a WebODM plan and a converted conversion whose results name
+        a TIFF per frame (small files in place of the TIFFs)"""
+        if task is None:
+            task = self.create()
+            self.upload(task, [jpeg("a.jpg")])
+            datasets.write_json(datasets.data_path(task, datasets.ANALYSIS_FILE), {'webodm': PLAN})
         with mock.patch.object(datasets, "start_job"):
             cid = conversions.create(task, "Nadir", dict(conversions.DEFAULTS, mosaics=False, **settings), self.user)
         files = []
@@ -668,6 +670,75 @@ class TestConversionTasks(AnalyzerTestCase):
         self.assertEqual(self.client.get("{}/{}/conversions/{}".format(API, task.id, cid)).data["tasks"], [])
 
     @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def parent_url(self, task, cid):
+        return "{}/{}/conversions/{}/parent".format(API, task.id, cid)
+
+    def test_a_conversion_sent_to_the_datasets_task_replaces_what_was_sent_there_before(self):
+        task, cid = self.converted()
+        res = self.client.post(self.parent_url(task, cid), format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual((res.data["images_count"], res.data["conversion"], res.data["processed"]), (3, cid, False))
+        task.refresh_from_db()
+        self.assertEqual(sorted(task.scan_images()), ["DJI_0002_T_temp_c.tiff", "a_DJI_0001_T_temp_c.tiff",
+                                                      "b_DJI_0001_T_temp_c.tiff"])
+        self.assertEqual((task.images_count, task.processing_node, task.auto_processing_node), (3, None, False))
+        # A task without options gets the plan's recommended ones; it waits for a node, and is still the dataset
+        self.assertEqual(task.options, [{"name": "radiometric-calibration", "value": "none"},
+                                        {"name": "orthophoto-resolution", "value": 6.2}])
+        self.assertNotIn(task, get_pending_tasks())
+        d = self.client.get("{}/{}".format(API, task.id)).data
+        self.assertEqual((d["name"], d["parent"]["conversion"], len(d["conversions"])), ("Roof", cid, 1))
+
+        # Processed in WebODM, its options changed there
+        node = ProcessingNode.objects.create(hostname="localhost", port=11223)
+        os.makedirs(task.assets_path(), exist_ok=True)
+        with open(task.assets_path("orthophoto.tif"), "wb") as fp:
+            fp.write(b"II*\0")
+        Task.objects.filter(pk=task.pk).update(status=status_codes.COMPLETED, uuid="old-uuid", processing_node=node,
+                                               available_assets=["orthophoto.tif"], options=[{"name": "dsm", "value": True}])
+        self.assertTrue(self.client.get("{}/{}".format(API, task.id)).data["parent"]["processed"])
+
+        # Another conversion replaces its images and what it processed; its options are kept
+        task, cid2 = self.converted(frames=("DJI_0005_T.JPG", "DJI_0006_T.JPG"), task=task)
+        with mock.patch.object(ProcessingNode, "remove_task") as remove:
+            res = self.client.post(self.parent_url(task, cid2), format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        remove.assert_called_once_with("old-uuid")
+        task.refresh_from_db()
+        self.assertEqual(sorted(task.scan_images()), ["DJI_0005_T_temp_c.tiff", "DJI_0006_T_temp_c.tiff"])
+        self.assertEqual((task.status, task.uuid, task.processing_node, task.available_assets, task.images_count),
+                         (None, "", None, [], 2))
+        self.assertFalse(os.path.exists(task.assets_path("orthophoto.tif")))
+        self.assertEqual(task.options, [{"name": "dsm", "value": True}])
+        self.assertEqual(res.data["conversion"], cid2)
+        # The conversion's own files are untouched
+        self.assertTrue(os.path.isfile(os.path.join(conversions.output_path(task, cid), "a", "DJI_0001_T_temp_c.tiff")))
+
+    def test_the_datasets_task_is_not_replaced_while_it_processes_nor_by_a_conversion_it_cannot_use(self):
+        task, cid = self.converted()
+        Task.objects.filter(pk=task.pk).update(status=status_codes.RUNNING)
+        res = self.client.post(self.parent_url(task, cid), format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("processing in WebODM", str(res.data))
+        self.assertEqual(Task.objects.get(pk=task.pk).scan_images(), [])
+
+        task, cid = self.converted(frames=("DJI_0001_T.JPG",))
+        self.assertEqual(self.client.post(self.parent_url(task, cid), format="json").status_code, status.HTTP_400_BAD_REQUEST)
+        assign_perm("view_project", User.objects.get(username="testuser2"), self.project)
+        viewer = self.client_for("testuser2")
+        task, cid = self.converted()
+        self.assertEqual(viewer.post(self.parent_url(task, cid), format="json").status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_deleting_a_dataset_keeps_the_task_a_conversion_was_sent_to(self):
+        task, cid = self.converted()
+        self.client.post(self.parent_url(task, cid), format="json")
+        res = self.client.delete("{}/{}".format(API, task.id))
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        kept = Task.objects.get(pk=task.pk)
+        self.assertEqual((kept.name, datasets.is_dataset(kept), len(kept.scan_images())), ("Roof", False, 3))
+        self.assertFalse(os.path.exists(datasets.data_path(kept)))
+        self.assertNotIn(str(kept.id), [d["id"] for d in self.client.get(API).data["datasets"]])
+
     def test_a_flights_conversion_makes_a_task_of_thermal_tiffs(self):
         task = self.create()
         with contextlib.ExitStack() as stack:

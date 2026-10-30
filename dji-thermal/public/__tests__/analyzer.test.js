@@ -542,6 +542,9 @@ describe("datasets list actions and an upload that does not all arrive", () => {
         expect(text).toContain("With it: 2 conversions, 1 mosaic and 14 measurements.");
         expect(text).toContain("WebODM tasks made from its conversions are kept");
         expect(core.deleteText(Object.assign({}, DATASET, {conversion_count: 2})).join(" ")).not.toContain("tasks");
+        const kept = core.deleteText(Object.assign({}, DATASET, {parent: {images_count: 12, processed: true}})).join(" ");
+        expect(kept).toContain("are deleted.");
+        expect(kept).toContain("The dataset's task is kept as an ordinary WebODM task, “Roof”, with the 12 images sent to it and what it processed.");
         expect(text).toContain("cannot be undone");
         press("Cancel");
         await flush();
@@ -1591,6 +1594,61 @@ describe("a task made from a conversion", () => {
         click(card().querySelector('[data-act="delete"]'));
         await ticks();
         expect(document.body.textContent).toContain("The WebODM task made from it is kept, with its images.");
+    });
+
+    const PARENT = {id: "50", project: 1, name: "Thermal dataset: Roof", images_count: 5, status: 40, processing_node: 1,
+                    last_error: "", processed: true, busy: false, conversion: "", sent_at: null, sent_by: null};
+
+    it("sends a conversion to the dataset's task once what it replaces is confirmed, then links to it", async () => {
+        const sent = Object.assign({}, PARENT, {images_count: 12, status: null, processing_node: null, processed: false, conversion: "9"});
+        const fetchFn = server({
+            [URL5]: [Object.assign(d({}), {parent: PARENT}), Object.assign(d({}), {parent: sent})],
+            [C9 + "/task"]: INFO,
+            ["POST " + C9 + "/parent"]: sent
+        });
+        dataset.init(document, fetchFn);
+        await ticks();
+        expect(card().querySelector('[data-act="parent"]').textContent).toContain("Use for parent task");
+        click(card().querySelector('[data-act="parent"]'));
+        await ticks();
+        const text = askDialog().textContent;
+        expect(text).toContain("Send Nadir's 12 temperature TIFFs to the dataset's task, Thermal dataset: Roof?");
+        expect(text).toContain("They replace the 5 images sent there before, and what the task processed from them");
+        expect(text).toContain("Note: Not normalized");
+        press("Replace");
+        await ticks();
+        expect(calls(fetchFn)).toContain("POST " + C9 + "/parent");
+        const msg = document.getElementById("ta-convert-message");
+        expect(msg.textContent).toContain("12 TIFFs of Nadir are in the dataset's task, waiting for a processing node");
+        expect(msg.querySelector("a").getAttribute("href")).toBe("/dashboard/?project_task_open=1&project_task_expanded=50");
+        expect(card().querySelector(".ta-conversion-tasks").textContent).toContain("In the dataset's task: Thermal dataset: Roof (12 images, waiting for a processing node)");
+    });
+
+    it("does not send a conversion to the dataset's task while it processes, nor when nothing is confirmed", async () => {
+        let fetchFn = server({[URL5]: Object.assign(d({}), {parent: Object.assign({}, PARENT, {busy: true})})});
+        dataset.init(document, fetchFn);
+        await ticks();
+        click(card().querySelector('[data-act="parent"]'));
+        await ticks();
+        expect(document.getElementById("ta-convert-message").textContent).toContain("processing in WebODM");
+        expect(calls(fetchFn)).not.toContain("GET " + C9 + "/task");
+
+        document.body.innerHTML = page('dataset.html');
+        fetchFn = server({[URL5]: Object.assign(d({}), {parent: Object.assign({}, PARENT, {images_count: 0, processed: false})}), [C9 + "/task"]: INFO});
+        dataset.init(document, fetchFn);
+        await ticks();
+        click(card().querySelector('[data-act="parent"]'));
+        await ticks();
+        expect(askDialog().textContent).not.toContain("replace");
+        press("Cancel");
+        await ticks();
+        expect(calls(fetchFn)).not.toContain("POST " + C9 + "/parent");
+    });
+
+    it("calls the action that fills the form Copy settings to form", () => {
+        const el = document.createElement("div");
+        el.innerHTML = conversions.actionsHtml(CONVERSION, true, C9.replace(/9$/, ""), null, null, null);
+        expect(el.querySelector('[data-act="use"]').textContent).toContain("Copy settings to form");
     });
 });
 

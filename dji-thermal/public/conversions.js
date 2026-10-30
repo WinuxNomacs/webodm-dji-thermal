@@ -439,6 +439,16 @@
         return {draft: draft, data: {name: draft.name.trim(), options: options}, problem: problem};
     }
 
+    var USE_TITLE = "Fill the Convert form with this conversion's settings, to start a new conversion from them";
+
+    // The dataset's own task when it holds this conversion's TIFFs: a link to it (parent: the dataset's, see
+    // conversion_tasks.parent)
+    function parentHtml(c, parent, dashboard) {
+        if (!parent || String(parent.conversion) !== String(c.id) || !parent.images_count) return "";
+        return '<div class="ta-conversion-tasks"><i class="fa fa-file-import"></i> In the dataset\'s task: <a href="' +
+            esc(taskUrl(dashboard, parent)) + '">' + esc(parent.name) + "</a> (" + esc(parent.images_count + " images, " + taskStatusLabel(parent)) + ")</div>";
+    }
+
     // A conversion's actions: the one its state calls for, and the others in its menu (menu: open; viewer: the URL of
     // its mosaics' page)
     function actionsHtml(c, canChange, base, open, menu, viewer) {
@@ -461,16 +471,18 @@
         } else if (ready && download) {
             main = link(download, "download", "Download all", "btn btn-primary btn-xs");
         } else {
-            main = button("use", "sliders-h", "Use settings", "Fill the form with this conversion's settings", mainCls);
+            main = button("use", "copy", "Copy settings to form", USE_TITLE, mainCls);
         }
         if (download && !(ready && !view && !building)) items.push(link(download, "download", "Download all"));
         if (viewer && building) items.push(link(viewer, "map", "Mosaics"));
         items.push(button("files", "list", open === c.id ? "Hide files" : "Files"));
-        if (ready || busy) items.push(button("use", "sliders-h", "Use settings", "Fill the form with this conversion's settings"));
+        if (ready || busy) items.push(button("use", "copy", "Copy settings to form", USE_TITLE));
         if (canChange && ready && !building) {
             items.push(button("mosaics", "th", c.mosaic_status === "ready" ? "Build mosaics again" : "Build mosaics",
                 "Place the converted frames side by side, as converted and harmonized"));
-            items.push(button("task", "plus", "Create task", "A WebODM task of this conversion's temperature TIFFs, in the dataset's project"));
+            items.push(button("task", "plus", "Create task", "A new WebODM task of this conversion's temperature TIFFs, in the dataset's project"));
+            items.push(button("parent", "file-import", "Use for parent task",
+                "Send this conversion's temperature TIFFs to the dataset's own WebODM task, in place of the images sent there before"));
         }
         if (canChange) {
             items.push(button("rename", "pencil-alt", "Rename", null, null, "Rename"));
@@ -486,8 +498,8 @@
 
     // The dataset's conversions, newest first (base: their API's URL; defaults: what their settings are compared
     // against; menu: the conversion whose menu is open; viewerBase: their mosaics' pages, followed by their id;
-    // dashboard: WebODM's dashboard, where their tasks are)
-    function listHtml(conversions, canChange, base, open, fresh, defaults, menu, viewerBase, dashboard) {
+    // dashboard: WebODM's dashboard, where their tasks are; parent: the dataset's own task)
+    function listHtml(conversions, canChange, base, open, fresh, defaults, menu, viewerBase, dashboard, parent) {
         if (!conversions.length) return '<p class="text-muted ta-none">No conversions yet.</p>';
         return conversions.map(function (c) {
             var cls = {ready: "success", failed: "danger", canceled: "default", converting: "info"}[c.status] || "default";
@@ -511,7 +523,7 @@
                 settings + progress + mosaicHtml(c) +
                 (c.error ? '<div class="text-danger">' + esc(c.error) + "</div>" : "") +
                 '<div class="ta-conversion-figures text-muted">' + esc(figures.join(" · ")) + "</div>" +
-                tasksHtml(c, dashboard) + '<div class="ta-conversion-task" data-task="' + c.id + '"></div>' +
+                parentHtml(c, parent, dashboard) + tasksHtml(c, dashboard) + '<div class="ta-conversion-task" data-task="' + c.id + '"></div>' +
                 '<div class="ta-conversion-files" data-files="' + c.id + '"></div></div>';
         }).join("");
     }
@@ -634,7 +646,7 @@
             var el = taskPanel();
             if (el && task.info && el.querySelector('[name="task-name"]')) task.draft = readTaskForm(el, task.info).draft;
             root$("ta-conversions").innerHTML = listHtml(list, dataset && dataset.can_change, base, open, fresh,
-                dataset && dataset.defaults, menu, viewerBase, ctx.dashboard);
+                dataset && dataset.defaults, menu, viewerBase, ctx.dashboard, dataset && dataset.parent);
             if (open !== null) loadFiles(open);
             renderTask();
         }
@@ -686,6 +698,33 @@
                 task = null;
                 message('<i class="fa fa-check"></i> Task created: <a href="' + esc(taskUrl(ctx.dashboard, r.data)) + '">' + esc(r.data.name) +
                     "</a>, waiting for a processing node: open it and choose <em>Set a processing node</em> to start it.", "text-success");
+                return ctx.onChange();
+            });
+        }
+
+        // The conversion's TIFFs to the dataset's own task, once what it would replace is confirmed
+        function useForParent(c) {
+            var parent = (dataset && dataset.parent) || {};
+            if (parent.busy) return message("The dataset's task is processing in WebODM: cancel it there first, or wait for it to finish.", "text-danger");
+            return fetchFn(base + c.id + "/task", {credentials: "same-origin"}).then(core.readJson).then(function (r) {
+                if (!r.ok) return message(esc(core.errorText(r.data, "Could not check " + c.name + ".")), "text-danger");
+                if (r.data.problems.length) return message(esc(r.data.problems.join(" ")), "text-danger");
+                var text = ["Send " + c.name + "'s " + r.data.frames + " temperature TIFFs to the dataset's task, " + parent.name + "?"];
+                if (parent.images_count) {
+                    text.push("They replace the " + parent.images_count + " images sent there before" +
+                        (parent.processed ? ", and what the task processed from them (its orthophoto, models and other results) is removed." : "."));
+                }
+                if (r.data.warnings.length) text.push("Note: " + r.data.warnings.join("; ") + ".");
+                text.push("The task then waits for a processing node: you set it, and the task's options, in WebODM.");
+                return core.ask(doc, "Use for parent task", text, parent.images_count ? "Replace" : "Send", parent.images_count ? "danger" : "primary");
+            }).then(function (yes) {
+                return yes === true && send(base + c.id + "/parent", "POST", {});
+            }).then(function (r) {
+                if (!r) return;
+                if (!r.ok) return message(esc(core.errorText(r.data, "Could not send " + c.name + " to the dataset's task.")), "text-danger");
+                message('<i class="fa fa-check"></i> ' + esc(r.data.images_count + " TIFFs of " + c.name + " are in the dataset's task, waiting for a processing node: ") +
+                    '<a href="' + esc(taskUrl(ctx.dashboard, r.data)) + '">open ' + esc(r.data.name) + "</a> and choose <em>Set a processing node</em> " +
+                    "to set its node and options, then process it.", "text-success");
                 return ctx.onChange();
             });
         }
@@ -855,6 +894,8 @@
             } else if (act === "files") {
                 open = open === id ? null : id;
                 renderList();
+            } else if (act === "parent") {
+                useForParent(c);
             } else if (act === "use") {
                 settings = c.settings;
                 renderForm();
@@ -897,7 +938,7 @@
 
     var api = {recorded: recorded, settingsIn: settingsIn, formHtml: formHtml, readForm: readForm, formProblem: formProblem, planSettings: planSettings, statusLabel: statusLabel,
                differences: differences, chipsHtml: chipsHtml, markForm: markForm, resetSetting: resetSetting,
-               mosaicHtml: mosaicHtml, actionsHtml: actionsHtml, listHtml: listHtml, taskStatusLabel: taskStatusLabel, tasksHtml: tasksHtml,
+               mosaicHtml: mosaicHtml, actionsHtml: actionsHtml, listHtml: listHtml, parentHtml: parentHtml, taskStatusLabel: taskStatusLabel, tasksHtml: tasksHtml,
                taskHtml: taskHtml, readTaskForm: readTaskForm, skipReasons: skipReasons, resultsHtml: resultsHtml, init: init};
     root.ThermalAnalyzerConversions = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
