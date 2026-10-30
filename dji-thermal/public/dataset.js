@@ -565,9 +565,18 @@
             }
         });
 
-        // To the clipboard, the button saying so; without one (or refused), a dialog to copy it from
+        // To the clipboard, the button saying so (an icon's tick for a moment); without one (or refused), a dialog to
+        // copy it from
         function copyText(text, button, title) {
-            var done = function () { button.innerHTML = '<i class="fa fa-check"></i> Copied'; };
+            var done = function () {
+                if (!button.classList.contains("ta-icon")) {
+                    button.innerHTML = '<i class="fa fa-check"></i> Copied';
+                    return;
+                }
+                var before = button.innerHTML;
+                button.innerHTML = '<i class="fa fa-check"></i>';
+                root.setTimeout(function () { button.innerHTML = before; }, 1500);
+            };
             var show = function () {
                 core.dialog(doc, {title: title, text: "Copy this:", field: {value: text, readonly: true},
                                   buttons: [{label: "Close", value: true, style: "primary"}]});

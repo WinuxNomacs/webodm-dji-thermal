@@ -983,6 +983,23 @@ describe("a dataset's page", () => {
         expect(askDialog()).toBeNull();
     });
 
+    it("copies the dataset's link from the icon beside its name, ticked for a moment", async () => {
+        navigator.clipboard = {writeText: jest.fn(() => Promise.resolve())};
+        dataset.init(document, server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS})}));
+        await flush();
+        jest.useFakeTimers();
+        const icon = document.getElementById("ta-copy-link");
+        expect(icon.closest("h3")).not.toBeNull();
+        expect(document.getElementById("ta-prefs")).toBeNull();
+        click(icon);
+        await Promise.resolve();
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(window.location.origin + "/plugins/dji-thermal/dataset/5");
+        expect(icon.innerHTML).toContain("fa-check");
+        jest.advanceTimersByTime(2000);
+        expect(icon.innerHTML).toContain("fa-link");
+        jest.useRealTimers();
+    });
+
     it("names the added images that could not be sent, and sends only them again", async () => {
         let failing = true;
         const fetchFn = server({
@@ -1725,7 +1742,7 @@ describe("the mosaic viewer", () => {
         dataset_name: "Roof", unit: "C", flown: ["2026:10:12 18:29:50", "2026:10:12 18:30:10"], built_at: "2026-10-18T11:05:00Z",
         stripped: false, frames: ["a_T.JPG", "b_T.JPG"], mosaic_status: "ready", can_change: true,
         tabs: [tab("as_converted", "as_converted", TEMPS), tab("harmonized", "harmonized", TEMPS),
-               tab("source_frame", "as_converted", null), tab("view_angle", "as_converted", {min: 0, max: 14, percentiles: [1, 12]})],
+               tab("source_frame", "as_converted", TEMPS), tab("view_angle", "as_converted", {min: 0, max: 14, percentiles: [1, 12]})],
         kinds: {
             as_converted: {frames: 2, oblique: 1, unusable: 0, width: 400, height: 300, gsd_m: 0.021, files: ["mosaic.tif"],
                            normalization: null, report: {}},
@@ -1798,7 +1815,7 @@ describe("the mosaic viewer", () => {
     it("asks for the tiles with the palette and range, and a new URL when the mosaic is built again", () => {
         const url = viewer.tileUrl(C9, "harmonized", {palette: "dji_ironred", range: [12.3, 40.1]}, "2026-10-18T11:05:00Z");
         expect(url).toBe(C9 + "/mosaics/harmonized/tiles/{z}/{x}/{y}.png?v=2026-10-18T11%3A05%3A00Z&color_map=dji_ironred&rescale=12.3,40.1");
-        expect(viewer.tileUrl(C9, "source_frame", {palette: "inferno", range: [0, 1]}, "x")).toBe(C9 + "/mosaics/source_frame/tiles/{z}/{x}/{y}.png?v=x");
+        expect(viewer.tileUrl(C9, "source_frame", {palette: "inferno", range: [0, 1]}, "x")).toBe(C9 + "/mosaics/source_frame/tiles/{z}/{x}/{y}.png?v=x&color_map=inferno&rescale=0,1");
     });
 
     it("describes the values under the cursor and the mosaic's report", () => {
@@ -1846,7 +1863,7 @@ describe("the mosaic viewer", () => {
         expect($("ta-viewer-main").hidden).toBe(false);
         expect($("ta-viewer-subtitle").textContent).toContain("Roof");
         expect($("ta-viewer-subtitle").textContent).toContain("flown 2026-10-12 18:29–18:30");
-        expect([...$("ta-viewer-tabs").querySelectorAll("a")].map(a => a.textContent)).toEqual(["As converted", "Harmonized", "Source frame", "View angle"]);
+        expect([...$("ta-viewer-tabs").querySelectorAll("a")].map(a => a.textContent)).toEqual(["Mosaic", "Harmonized", "Source frame", "View angle"]);
         const map = L.maps[0];
         expect(map.fitted).toEqual([[45.0, 10.0], [45.001, 10.001]]);
         expect(L.tiles[0].url).toContain("/mosaics/as_converted/tiles/");
@@ -1875,13 +1892,14 @@ describe("the mosaic viewer", () => {
         click($("ta-viewer-auto"));
         expect(t.url).toMatch(/rescale=12\.3\d*,40\.1\d*/);
 
-        // The view angles keep their own; the source frames have no palette
+        // The view angles keep their own; the source frames are drawn over the temperatures, in their palette and range
         click($("ta-viewer-tabs").querySelector('[data-tab="view_angle"]'));
         await ticks();
         expect(L.tiles[L.tiles.length - 1].url).toContain("color_map=inferno&rescale=1,12");
         click($("ta-viewer-tabs").querySelector('[data-tab="source_frame"]'));
         await ticks();
-        expect($("ta-viewer-palette")).toBe(null);
+        expect($("ta-viewer-palette").value).toBe("inferno");
+        expect(L.tiles[L.tiles.length - 1].url).toMatch(/source_frame\/tiles\/.*color_map=inferno&rescale=12\.3\d*,40\.1\d*/);
         click($("ta-viewer-tabs").querySelector('[data-tab="harmonized"]'));
         await ticks();
         expect($("ta-viewer-palette").value).toBe("inferno");
