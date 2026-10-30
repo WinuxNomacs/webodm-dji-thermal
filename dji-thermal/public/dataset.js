@@ -11,40 +11,121 @@
     // EXIF's "2026:10:12 18:29:50" as "2026-10-12 18:29:50"
     function captureTime(t) { return t ? String(t).replace(/^(\d{4}):(\d{2}):/, "$1-$2-") : ""; }
 
-    // The figures above the tabs, from the analysis
-    function overview(a) {
-        var thermal = (a.files || []).filter(function (f) { return f.kind === "thermal"; });
-        var out = {frames: thermal.length, other: (a.files || []).length - thermal.length};
-        if (!thermal.length) return out;
-        var mins = thermal.map(function (f) { return f.tmin; }).filter(function (x) { return x !== null && x !== undefined; });
-        var maxs = thermal.map(function (f) { return f.tmax; }).filter(function (x) { return x !== null && x !== undefined; });
+    var blank = function (x) { return x === null || x === undefined; };
+
+    // A thermal frame's camera, as the analysis groups them: model, serial and image size
+    function cameraKey(f) { return [f.model || "", f.serial || "", f.width || "", f.height || ""].join("|"); }
+
+    // "2026-10-12 18:29:50" to "2026-10-12 18:37:01" as "7 min 11 s"
+    function duration(first, last) {
+        var parse = function (t) { var m = /^(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/.exec(t || ""); return m ? Date.UTC(m[1], m[2] - 1, m[3], m[4], m[5], m[6]) : NaN; };
+        var s = Math.round((parse(last) - parse(first)) / 1000);
+        if (!(s > 0)) return "";
+        if (s < 60) return s + " s";
+        if (s < 3600) return Math.floor(s / 60) + " min" + (s % 60 ? " " + s % 60 + " s" : "");
+        return Math.floor(s / 3600) + " h " + ("0" + Math.floor(s % 3600 / 60)).slice(-2) + " min";
+    }
+
+    // The figures of some thermal frames: count, temperatures, capture times, heights, GPS, size
+    function stats(thermal) {
+        var out = {frames: thermal.length};
+        var pick = function (k) { return thermal.map(function (f) { return f[k]; }).filter(function (x) { return !blank(x); }); };
+        var mins = pick("tmin"), maxs = pick("tmax"), alts = pick("alt"), sizes = pick("size");
         if (mins.length) out.tmin = Math.min.apply(null, mins);
         if (maxs.length) out.tmax = Math.max.apply(null, maxs);
+        out.tmean = core.median(pick("tmean"));
         var times = thermal.map(function (f) { return captureTime(f.time); }).filter(function (t) { return t; }).sort();
         if (times.length) { out.first = times[0]; out.last = times[times.length - 1]; }
-        out.altitude = core.median(thermal.map(function (f) { return f.alt; }));
-        out.gps = thermal.filter(function (f) { return f.lat !== null && f.lat !== undefined; }).length;
+        out.altitude = core.median(alts);
+        if (alts.length) { out.altMin = Math.min.apply(null, alts); out.altMax = Math.max.apply(null, alts); }
+        out.gps = thermal.filter(function (f) { return !blank(f.lat); }).length;
+        out.size = sizes.length ? sizes.reduce(function (a, b) { return a + b; }, 0) : null;
         return out;
     }
 
+    // The figures above the tabs, from the analysis
+    function overview(a) {
+        var thermal = (a.files || []).filter(function (f) { return f.kind === "thermal"; });
+        return Object.assign(stats(thermal), {other: (a.files || []).length - thermal.length});
+    }
+
+    // The summary's rows: one per camera, most frames first, with the figures of its frames
+    function summaryRows(a) {
+        var thermal = (a.files || []).filter(function (f) { return f.kind === "thermal"; });
+        var cams = a.cameras || [];
+        return cams.map(function (c) {
+            var key = cameraKey(c);
+            return Object.assign(stats(cams.length === 1 ? thermal : thermal.filter(function (f) { return cameraKey(f) === key; })),
+                                 {key: key, model: c.model, serial: c.serial, width: c.width, height: c.height});
+        });
+    }
+
+    function cameraLabel(c) { return (c.model || "Unknown camera") + (c.serial ? " " + c.serial : ""); }
+
+    // A summary cell's figure that opens the Files tab sorted by it (for the row's camera when it has one)
+    function sortLink(text, sort, desc, camera, title) {
+        return '<button type="button" class="ta-summary-link" data-files-sort="' + sort + '"' + (desc ? ' data-desc="1"' : "") +
+            (camera ? ' data-camera="' + esc(camera) + '"' : "") + ' title="' + esc(title) + '">' + text + "</button>";
+    }
+
+    // The temperatures' span on the dataset's scale, with the frames' median mean marked
+    function rangeBar(r, scale) {
+        if (blank(r.tmin) || blank(r.tmax) || !(scale.max > scale.min)) return "";
+        var at = function (v) { return Math.max(0, Math.min(100, (v - scale.min) / (scale.max - scale.min) * 100)).toFixed(1) + "%"; };
+        return '<div class="ta-range" aria-hidden="true"><span class="ta-range-span" style="left: ' + at(r.tmin) + "; right: calc(100% - " + at(r.tmax) + ')"></span>' +
+            (blank(r.tmean) ? "" : '<span class="ta-range-mean" style="left: ' + at(r.tmean) + '"></span>') + "</div>";
+    }
+
+    function summaryRowHtml(r, scale, all) {
+        var camera = all ? "" : r.key;
+        var scope = all ? "these frames" : "this camera's frames";
+        var cells = [];
+        cells.push(["Camera", all ? "<strong>All frames</strong>" + '<div class="ta-sub">' + esc(r.cameras) + " cameras</div>" :
+            "<strong>" + esc(r.model || "Unknown camera") + "</strong>" + '<div class="ta-sub">' +
+            esc([r.width ? r.width + "×" + r.height : "", r.serial ? "SN " + r.serial : ""].filter(function (x) { return x; }).join(" · ")) + "</div>"]);
+        var gpsPct = r.frames ? Math.round(r.gps / r.frames * 100) : 0;
+        var gpsText = r.gps === r.frames ? '<i class="fa fa-check"></i> GPS on all' : r.gps + " of " + r.frames + " with GPS";
+        cells.push(["Frames", '<span class="ta-figure">' + r.frames + "</span>" + '<div class="ta-sub">' +
+            (r.gps === r.frames ? '<span class="ta-gps-ok">' + gpsText + "</span>" :
+                '<button type="button" class="ta-summary-link ta-gps-missing" data-nogps="1"' + (camera ? ' data-camera="' + esc(camera) + '"' : "") +
+                ' title="Show the frames without GPS">' + gpsText + "</button>") +
+            '</div><div class="ta-meter" aria-hidden="true"><span style="width: ' + gpsPct + '%"></span></div>', "ta-num"]);
+        cells.push(["Temperatures", blank(r.tmin) ? '<span class="text-muted">-</span>' :
+            sortLink('<span class="ta-figure">' + esc(core.formatTemp(r.tmin, "C", 1)) + ' <span class="ta-to">to</span> ' + esc(core.formatTemp(r.tmax, "C", 1)) + "</span>",
+                     "tmax", true, camera, "Show " + scope + ", hottest first") +
+            rangeBar(r, scale) + (blank(r.tmean) ? "" : '<div class="ta-sub">median frame mean ' + esc(core.formatTemp(r.tmean, "C", 1)) + "</div>")]);
+        cells.push(["Captured", !r.first ? '<span class="text-muted">-</span>' :
+            sortLink('<span class="ta-figure">' + esc(r.first.split(" ")[0]) + "</span>", "time", false, camera, "Show " + scope + " in the order they were taken") +
+            '<div class="ta-sub">' + esc(r.first.split(" ")[1] + (r.last !== r.first ? " – " + (r.last.split(" ")[0] === r.first.split(" ")[0] ? r.last.split(" ")[1] : r.last) : "")) +
+            (duration(r.first, r.last) ? " · " + esc(duration(r.first, r.last)) : "") + "</div>"]);
+        cells.push(["Height", blank(r.altitude) ? '<span class="text-muted">-</span>' :
+            sortLink('<span class="ta-figure">' + esc(core.formatNumber(r.altitude, 1, " m")) + "</span>", "alt", true, camera, "Show " + scope + ", highest first") +
+            '<div class="ta-sub">median' + (r.altMax > r.altMin ? ", " + esc(core.formatNumber(r.altMin, 1, "") + " – " + core.formatNumber(r.altMax, 1, " m")) : "") + "</div>", "ta-num"]);
+        cells.push(["Size", blank(r.size) ? '<span class="text-muted">-</span>' : '<span class="ta-figure">' + esc(core.formatBytes(r.size)) + "</span>", "ta-num"]);
+        return "<tr" + (all ? ' class="ta-summary-total"' : ' class="ta-summary-row" data-camera="' + esc(r.key) + '" tabindex="0" title="Show ' +
+            esc(cameraLabel(r)) + "'s frames on the Files tab\"") + ">" + cells.map(function (c) {
+            return '<td data-label="' + c[0] + '"' + (c[2] ? ' class="' + c[2] + '"' : "") + ">" + c[1] + "</td>";
+        }).join("") + "</tr>";
+    }
+
+    // The summary above the tabs: a row per camera (and all of them when there are several), each figure a way into
+    // the Files tab; below it, the files not analyzed and the analysis
     function overviewHtml(d) {
         var a = d.analysis || {};
         if (!a.files) return "";
         var o = overview(a);
-        var items = [["Thermal frames", String(o.frames) + (o.other ? " (and " + o.other + " other file(s))" : "")]];
-        (a.cameras || []).forEach(function (c) {
-            items.push(["Camera", (c.model || "?") + (c.width ? " · " + c.width + "×" + c.height : "") +
-                (c.serial ? " · " + c.serial : "") + " · " + c.frames + " frame(s)"]);
-        });
-        if (o.tmin !== undefined) items.push(["Temperatures", core.formatTemp(o.tmin, "C", 1) + " to " + core.formatTemp(o.tmax, "C", 1)]);
-        if (o.first) items.push(["Captured", o.first === o.last ? o.first : o.first + " to " + o.last.split(" ")[1]]);
-        if (o.altitude !== null && o.altitude !== undefined) items.push(["Height (median)", core.formatNumber(o.altitude, 1, " m")]);
-        if (o.frames) items.push(["With GPS", o.gps + " of " + o.frames]);
-        items.push(["Size", core.formatBytes(d.size)]);
-        if (d.analyzed_at) items.push(["Analyzed", core.formatDate(d.analyzed_at) + (a.version ? " · dji-thermal-cli " + a.version : "")]);
-        return '<dl class="ta-figures">' + items.map(function (i) {
-            return "<div><dt>" + esc(i[0]) + "</dt><dd>" + esc(i[1]) + "</dd></div>";
-        }).join("") + "</dl>";
+        var rows = summaryRows(a);
+        var scale = {min: o.tmin, max: o.tmax};
+        var body = rows.map(function (r) { return summaryRowHtml(r, scale, false); }).join("");
+        if (rows.length > 1) body += summaryRowHtml(Object.assign({}, o, {cameras: rows.length}), scale, true);
+        if (!rows.length) body = '<tr><td colspan="6" class="text-muted">No thermal frames in this dataset.</td></tr>';
+        var notes = [];
+        if (o.other) notes.push(o.other + " other file" + (o.other === 1 ? "" : "s") + ", not thermal frames");
+        notes.push(core.formatBytes(d.size) + " stored, conversions and mosaics included");
+        if (d.analyzed_at) notes.push("Analyzed " + core.formatDate(d.analyzed_at) + (a.version ? " with dji-thermal-cli " + a.version : ""));
+        return '<div class="ta-summary"><table class="ta-summary-table"><thead><tr><th>Camera</th><th class="ta-num">Frames</th>' +
+            '<th>Temperatures</th><th>Captured</th><th class="ta-num">Height</th><th class="ta-num">Size</th></tr></thead><tbody>' + body +
+            '</tbody></table><div class="ta-summary-notes">' + notes.map(esc).join(" · ") + "</div></div>";
     }
 
     // The problems each file is named in: {path: [finding, ...]}
@@ -101,6 +182,8 @@
         var rows = (a.files || []).filter(function (f) {
             var path = String(f.path).toLowerCase();
             if (!words.every(function (w) { return path.indexOf(w) >= 0; })) return false;
+            if (view.camera && (f.kind !== "thermal" || ((a.cameras || []).length > 1 && cameraKey(f) !== view.camera))) return false;
+            if (view.nogps && (f.kind !== "thermal" || !blank(f.lat))) return false;
             if (view.show === "thermal") return f.kind === "thermal";
             if (view.show === "flagged") return !!flags[f.path] || f.kind !== "thermal" && f.kind !== "not_thermal" || (f.warnings || []).length;
             return true;
@@ -136,6 +219,19 @@
         return {html: html + "</tbody></table></div>", count: rows.length};
     }
 
+    // What the summary narrowed the Files tab to (a camera, the frames without GPS), with a way back to all files
+    function scopeHtml(a, view) {
+        var parts = [];
+        if (view.camera) {
+            var c = (a.cameras || []).filter(function (x) { return cameraKey(x) === view.camera; })[0];
+            parts.push(esc(c ? cameraLabel(c) : "One camera"));
+        }
+        if (view.nogps) parts.push("without GPS");
+        if (!parts.length) return "";
+        return '<span class="ta-files-scope">' + parts.join(", ") +
+            ' <button type="button" class="close" data-act="scope-clear" title="Show every camera\'s files" aria-label="Clear">&times;</button></span>';
+    }
+
     // The Files tab: a bar (all / thermal / flagged, a name filter, thumbnails), then the table
     function filesHtml(a, view) {
         view = view || {};
@@ -147,6 +243,7 @@
             }).join("") +
             '<input type="search" class="form-control input-sm ta-files-filter" placeholder="Filter by name" value="' + esc(view.filter || "") + '">' +
             '<label class="checkbox-inline"><input type="checkbox" class="ta-files-thumbs"' + (view.thumbs ? " checked" : "") + "> Thumbnails</label>" +
+            scopeHtml(a, view) +
             '<span class="text-muted ta-files-shown">' + table.count + " shown</span></div>" +
             '<div class="ta-files-table">' + table.html + "</div>";
     }
@@ -375,6 +472,11 @@
 
         $("ta-tab-files").addEventListener("click", function (e) {
             if (!dataset || !e.target.closest) return;
+            if (e.target.closest('[data-act="scope-clear"]')) {
+                view.camera = null;
+                view.nogps = false;
+                return renderFiles();
+            }
             var th = e.target.closest("th[data-sort]");
             if (th) {
                 var key = th.getAttribute("data-sort");
@@ -406,12 +508,47 @@
         });
 
         // A file named by a problem: the Files tab, filtered to it
+        // The summary: a camera's row, or a figure in it, opens the Files tab narrowed and sorted to match
+        function openFiles(camera, sort, desc, nogps) {
+            if (!dataset || !dataset.analysis) return;
+            view.camera = camera || null;
+            view.nogps = !!nogps;
+            view.show = "all";
+            view.filter = "";
+            view.sort = sort || "path";
+            view.desc = !!desc;
+            renderFiles();
+            showTab("files");
+            var tabs = $("ta-tabs");
+            if (tabs.scrollIntoView) tabs.scrollIntoView({behavior: "smooth", block: "start"});
+        }
+
+        $("ta-overview").addEventListener("click", function (e) {
+            if (!e.target.closest) return;
+            var link = e.target.closest(".ta-summary-link");
+            if (link) {
+                return openFiles(link.getAttribute("data-camera"), link.getAttribute("data-files-sort"), link.hasAttribute("data-desc"),
+                                 link.hasAttribute("data-nogps"));
+            }
+            var row = e.target.closest("tr[data-camera]");
+            if (row) openFiles(row.getAttribute("data-camera"));
+        });
+
+        $("ta-overview").addEventListener("keydown", function (e) {
+            var row = e.target.matches && e.target.matches("tr[data-camera]") ? e.target : null;
+            if (!row || (e.key !== "Enter" && e.key !== " ")) return;
+            e.preventDefault();
+            openFiles(row.getAttribute("data-camera"));
+        });
+
         $("ta-tab-problems").addEventListener("click", function (e) {
             var a = e.target.closest ? e.target.closest("a[data-file]") : null;
             if (!a || !dataset) return;
             e.preventDefault();
             view.filter = a.getAttribute("data-file");
             view.show = "all";
+            view.camera = null;
+            view.nogps = false;
             renderFiles();
             showTab("files");
         });
@@ -529,7 +666,7 @@
         return load();
     }
 
-    var api = {captureTime: captureTime, median: core.median, overview: overview, overviewHtml: overviewHtml, flagsByFile: flagsByFile,
+    var api = {captureTime: captureTime, median: core.median, overview: overview, summaryRows: summaryRows, duration: duration, overviewHtml: overviewHtml, flagsByFile: flagsByFile,
                sortRows: sortRows, fileRows: fileRows, filesHtml: filesHtml, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
     root.ThermalAnalyzerDataset = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

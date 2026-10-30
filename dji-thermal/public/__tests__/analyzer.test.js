@@ -654,9 +654,33 @@ describe("a dataset's page", () => {
         const o = dataset.overview(ANALYSIS);
         expect(o).toMatchObject({frames: 2, other: 1, tmin: 15.2, tmax: 50.6, first: "2026-10-12 18:29:50", last: "2026-10-12 18:30:10", altitude: 21, gps: 1});
         const html = dataset.overviewHtml(Object.assign({}, DATASET, {analysis: ANALYSIS}));
-        expect(html).toContain("M4T · 640×512 · SN1 · 2 frame(s)");
-        expect(html).toContain("15.2 °C to 50.6 °C");
+        expect(html).toContain("<strong>M4T</strong>");
+        expect(html).toContain("640×512 · SN SN1");
+        expect(html).toContain('15.2 °C <span class="ta-to">to</span> 50.6 °C');
+        expect(html).toContain("1 of 2 with GPS");
+        expect(html).toContain("18:29:50 – 18:30:10 · 20 s");
+        expect(html).toContain("1 other file, not thermal frames");
         expect(html).toContain("dji-thermal-cli 1.1.0");
+        expect(html).not.toContain("All frames");
+    });
+
+    it("gives each camera a row of its own, with a row for all of them", () => {
+        const two = Object.assign({}, ANALYSIS, {
+            cameras: ANALYSIS.cameras.concat([{model: "H20T", serial: "SN2", width: 640, height: 512, frames: 1}]),
+            files: ANALYSIS.files.map(f => Object.assign({model: "M4T", serial: "SN1", width: 640, height: 512}, f)).concat([
+                {path: "h20t/c_T.JPG", kind: "thermal", model: "H20T", serial: "SN2", width: 640, height: 512, tmin: 5, tmax: 12, lat: 42, alt: 40}])
+        });
+        const rows = dataset.summaryRows(two);
+        expect(rows.map(r => [r.model, r.frames, r.tmax])).toEqual([["M4T", 2, 50.6], ["H20T", 1, 12]]);
+        const html = dataset.overviewHtml(Object.assign({}, DATASET, {analysis: two}));
+        expect(html).toContain("All frames");
+        expect(html).toContain('data-camera="H20T|SN2|640|512"');
+    });
+
+    it("says how long the frames were taken over", () => {
+        expect(dataset.duration("2026-10-22 16:32:53", "2026-10-22 16:40:04")).toBe("7 min 11 s");
+        expect(dataset.duration("2026-10-22 16:32:53", "2026-10-22 18:02:53")).toBe("1 h 30 min");
+        expect(dataset.duration("2026-10-22 16:32:53", "2026-10-22 16:32:53")).toBe("");
     });
 
     it("lists the files sorted, with the problems that name them, and filters them", () => {
@@ -760,6 +784,34 @@ describe("a dataset's page", () => {
         expect(tab.querySelector(".ta-files-filter").value).toBe("thermal/b_T.JPG");
         expect(tab.querySelector('input[value="all"]').checked).toBe(true);
         expect([...tab.querySelectorAll("tbody tr")].map(r => r.className)).toEqual(["ta-kind-thermal"]);
+    });
+
+    it("opens the Files tab from the summary: a camera's frames, sorted by the figure clicked, or those without GPS", async () => {
+        const analysis = Object.assign({}, ANALYSIS, {files: ANALYSIS.files.map(f => f.kind === "thermal" ?
+            Object.assign({model: "M4T", serial: "SN1", width: 640, height: 512}, f) : f)});
+        const fetchFn = server({[URL5]: Object.assign({}, DATASET, {analysis})});
+        dataset.init(document, fetchFn);
+        await ticks();
+        const tab = document.getElementById("ta-tab-files");
+        const paths = () => [...tab.querySelectorAll("tbody tr td:first-child")].map(td => td.textContent);
+        click(document.querySelector('#ta-tabs a[data-tab="problems"]'));
+
+        click(document.querySelector('.ta-summary-link[data-files-sort="tmax"] .ta-figure'));
+        expect(tab.hidden).toBe(false);
+        expect(paths()).toEqual(["thermal/b_T.JPG", "thermal/a_T.JPG"]);
+        expect(tab.querySelector(".ta-files-scope").textContent).toContain("M4T SN1");
+
+        click(document.querySelector(".ta-gps-missing"));
+        expect(paths()).toEqual(["thermal/a_T.JPG"]);
+        expect(tab.querySelector(".ta-files-scope").textContent).toContain("without GPS");
+
+        click(tab.querySelector('[data-act="scope-clear"]'));
+        expect(paths()).toEqual(["rgb/a_V.JPG", "thermal/a_T.JPG", "thermal/b_T.JPG"]);
+        expect(tab.querySelector(".ta-files-scope")).toBeNull();
+
+        const row = document.querySelector("tr.ta-summary-row");
+        row.dispatchEvent(new KeyboardEvent("keydown", {key: "Enter", bubbles: true}));
+        expect(paths()).toEqual(["thermal/a_T.JPG", "thermal/b_T.JPG"]);
     });
 
     it("copies the plan's options and command, and offers to convert with it only to who can", async () => {

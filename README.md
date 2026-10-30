@@ -68,7 +68,10 @@ also drop them on the page). Only JPEGs are uploaded; the RGB photos taken with 
 analyzed. The photos are then analyzed with dji-thermal-cli's check, in WebODM's worker, with its progress and a
 Cancel button.
 
-The dataset's page shows the frames, cameras, temperatures, capture times and height at a glance, then:
+The dataset's page opens with a summary, a row per camera (and one for all of them when there are several): its
+frames and how many have GPS, the temperatures on the dataset's scale, when they were taken and over how long, the
+height and the size. A camera's row opens its frames on the Files tab, and each figure opens them sorted by it
+(hottest or highest first, in capture order; or only those without GPS). Then:
 
 - **Files**: every file with its capture time, height, gimbal pitch, temperatures, distance (recorded and the
   rangefinder's) and emissivity, and the problems that name it; filtered by name, by kind or to those with
