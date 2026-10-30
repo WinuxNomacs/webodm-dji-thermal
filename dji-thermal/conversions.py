@@ -9,9 +9,11 @@ Each conversion is a folder of the dataset's (see datasets), with records change
     thermal/conversions/<id>/job.json          the conversion's status, progress, stage, error and run id
     thermal/conversions/<id>/results.json      what was written for each image (see compact)
     thermal/conversions/<id>/output/           the files written, mirroring the images' folders
+    thermal/conversions/<id>/mosaics/ ...      its mosaics, when built (see mosaics)
 
 Settings are kept as JSON: dji-thermal-cli's Settings fields (None keeps each image's own embedded value), plus the
-outputs, the compression, normalization and the nadir-only pitch limit. DJI's own SDK measures them when one is
+outputs, the compression, normalization, the nadir-only pitch limit and whether to build the mosaics after the
+images. DJI's own SDK measures them when one is
 installed (sdk.current()).
 """
 
@@ -57,6 +59,7 @@ DEFAULTS = {
     'max_pitch': None,
     'outputs': ['temp_c:tiff', 'pseudo:png'],
     'compression': 'deflate',
+    'mosaics': True,        # the plugin's own: build the mosaics after the images
 }
 
 # (low, high) of the numbers; the camera's own limits are narrower and are checked per image when converting
@@ -167,6 +170,7 @@ def parse_settings(raw):
 
     out['strip_location'] = bool(get('strip_location'))
     out['normalize'] = bool(get('normalize'))
+    out['mosaics'] = bool(get('mosaics'))
 
     compression = get('compression')
     if compression in COMPRESSIONS:
@@ -215,6 +219,8 @@ def summary_text(s):
         parts.append('measurement: ' + ', '.join(f.replace('_', ' ') for f in changed))
     if s.get('palette'):
         parts.append(s['palette'])
+    if s.get('mosaics'):
+        parts.append('mosaics')
     return ' · '.join(p for p in parts if p)
 
 
@@ -324,18 +330,18 @@ def results(task, cid):
 
 
 def files_size(task, cid):
-    """The files a conversion wrote: (count, bytes)"""
-    count, total = 0, 0
-    for dirpath, _, filenames in os.walk(output_path(task, cid)):
+    """A conversion's files: (the outputs and mosaics to download, the bytes of all it holds)"""
+    from . import mosaics
+    total = 0
+    for dirpath, _, filenames in os.walk(path(task, cid)):
         for f in filenames:
             fp = os.path.join(dirpath, f)
             if not os.path.islink(fp):
                 try:
                     total += os.path.getsize(fp)
-                    count += 1
                 except OSError:
                     pass
-    return count, total
+    return len(output_files(task, cid)) + len(mosaics.files(task, cid)), total
 
 
 def output_files(task, cid):
@@ -383,7 +389,11 @@ def delete(task, cid):
 
 
 def cancel(task, cid):
-    """A running conversion stops at its next progress write; what it wrote so far is kept, and counted"""
+    """A running conversion stops at its next progress write; what it wrote so far is kept, and counted. Once the
+    images are converted, it is the mosaics being built that are canceled"""
+    from . import mosaics
+    if mosaics.cancel(task, cid):
+        return
     try:
         with datasets.locked(task):
             state = job(task, cid)
@@ -397,6 +407,8 @@ def cancel(task, cid):
 
 
 def check_stale(task, cid):
+    from . import mosaics
+    mosaics.check_stale(task, cid)
     return datasets.check_stale(task, rel(cid, JOB_FILE), 'converting', 'conversion')
 
 
@@ -476,6 +488,9 @@ def convert(task_id, run_id, cid):
         left_behind(task, cid)
         return {'canceled': True}
     datasets.update_size(task)
+    if ok and (record(task, cid).get('settings') or {}).get('mosaics'):
+        from . import mosaics
+        mosaics.start(task, cid)
     return {'converted': result['converted']}
 
 

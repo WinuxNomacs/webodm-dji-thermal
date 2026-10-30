@@ -7,6 +7,7 @@ const datasets = require('../datasets');
 const conversions = require('../conversions');
 window.ThermalAnalyzerConversions = conversions;
 const dataset = require('../dataset');
+const viewer = require('../viewer');
 
 // A page's markup from its Django template, with the template tags filled in as the plugin does
 function page(name) {
@@ -18,7 +19,10 @@ function page(name) {
         .replace(/\{\{ api \}\}/g, '/api/plugins/dji-thermal/')
         .replace(/\{\{ public \}\}/g, '/plugins/dji-thermal/')
         .replace(/\{\{ dataset\.id \}\}/g, '5')
-        .replace(/\{\{ dataset\.name \}\}/g, 'Roof');
+        .replace(/\{\{ dataset\.name \}\}/g, 'Roof')
+        .replace(/\{\{ conversion\.id \}\}/g, '9')
+        .replace(/\{\{ conversion\.name \}\}/g, 'Nadir')
+        .replace(/\{\{ basemaps\|json_script:"ta-basemaps" \}\}/g, '');
 }
 
 const jsonResponse = (data, ok = true) => Promise.resolve({ok, json: () => Promise.resolve(data)});
@@ -82,7 +86,7 @@ const DEFAULTS = {
     distance: "lrf", humidity: null, emissivity: null, reflected_temp: null, ambient_temp: null, unit: "C", range_min: null,
     range_max: null, palette: null, gimbal_yaw: null, gimbal_pitch: null, gimbal_roll: null, replace_above: null,
     replace_above_value: null, replace_below: null, replace_below_value: null, strip_location: false, normalize: false,
-    max_pitch: null, outputs: ["temp_c:tiff", "pseudo:png"], compression: "deflate"
+    max_pitch: null, outputs: ["temp_c:tiff", "pseudo:png"], compression: "deflate", mosaics: true
 };
 const PREFERENCES = {
     settings: DEFAULTS, saved: false, defaults: DEFAULTS, palettes: ["whitehot", "ironred"],
@@ -1330,5 +1334,320 @@ describe("a dataset's conversions", () => {
         click(list.querySelector('button[data-act="files"]'));
         await flush();
         expect(list.querySelector('[data-files="9"]').innerHTML).toContain("a.tiff");
+    });
+});
+
+describe("a conversion's mosaics on the dataset page", () => {
+    const URL5 = "/api/plugins/dji-thermal/datasets/5";
+    const C9 = URL5 + "/conversions/9";
+    beforeEach(() => { document.body.innerHTML = page('dataset.html'); });
+    afterEach(() => { window.localStorage.clear(); window.history.replaceState(null, "", "/"); });
+    const card = () => document.querySelector('.ta-conversion[data-id="9"]');
+
+    it("says how the mosaics are going, and only when there is something to say", () => {
+        const building = conversions.mosaicHtml(Object.assign({}, CONVERSION, {mosaic_status: "building", mosaic_progress: 0.4,
+            mosaic_stage: {stage: "composite", step: 3, steps: 4, done: 5, total: 12, unit: "frames"}}));
+        expect(building).toContain("width: 40%");
+        expect(building).toContain("Building the mosaics: step 3 of 4, compositing, 5/12 frames");
+        expect(conversions.mosaicHtml(Object.assign({}, CONVERSION, {mosaic_status: "failed", mosaic_error: "No <frames>"})))
+            .toContain("The mosaics failed: No &lt;frames&gt;");
+        expect(conversions.mosaicHtml(Object.assign({}, CONVERSION, {mosaic_status: "canceled"}))).toContain("canceled");
+        expect(conversions.mosaicHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready"}))).toBe("");
+        expect(conversions.mosaicHtml(CONVERSION)).toBe("");
+    });
+
+    it("links a conversion with mosaics to its viewer, and offers to build them", () => {
+        const viewerUrl = "/plugins/dji-thermal/dataset/5/conversion/9";
+        const el = document.createElement("div");
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready"}), true, C9.replace(/9$/, ""), null, null, viewerUrl);
+        expect(el.firstChild.textContent).toContain("View mosaics");
+        expect(el.firstChild.getAttribute("href")).toBe(viewerUrl);
+        expect(el.querySelector(".dropdown-menu").textContent).toContain("Download all");
+        expect(el.querySelector('[data-act="mosaics"]').textContent).toContain("Build mosaics again");
+
+        el.innerHTML = conversions.actionsHtml(CONVERSION, true, C9.replace(/9$/, ""), null, null, viewerUrl);
+        expect(el.firstChild.textContent).toContain("Download all");
+        expect(el.querySelector('[data-act="mosaics"]').textContent.trim()).toBe("Build mosaics");
+
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "building"}), true, C9.replace(/9$/, ""), null, null, viewerUrl);
+        expect(el.firstChild.getAttribute("data-act")).toBe("cancel");
+        expect(el.firstChild.getAttribute("title")).toBe("Stop building the mosaics");
+        expect(el.querySelector('[data-act="mosaics"]')).toBe(null);
+        expect(el.querySelector('a[href="' + viewerUrl + '"]').textContent).toContain("Mosaics");
+
+        // Who cannot change the dataset can look, not build
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready"}), false, C9.replace(/9$/, ""), null, null, viewerUrl);
+        expect(el.firstChild.textContent).toContain("View mosaics");
+        expect(el.querySelector('[data-act="mosaics"]')).toBe(null);
+    });
+
+    it("builds the mosaics of a conversion without them, and polls until they are built", async () => {
+        jest.useFakeTimers();
+        const d = mosaic => Object.assign({}, DATASET, {analysis: ANALYSIS, defaults: DEFAULTS,
+            conversions: [Object.assign({}, CONVERSION, mosaic)]});
+        const fetchFn = server({
+            [URL5]: [d({mosaic_status: ""}), d({mosaic_status: "building", mosaic_progress: 0.5}), d({mosaic_status: "ready"})],
+            ["POST " + C9 + "/mosaics"]: Object.assign({}, CONVERSION, {mosaic_status: "building"})
+        });
+        dataset.init(document, fetchFn);
+        await ticks();
+        click(card().querySelector('[data-act="mosaics"]'));
+        await ticks();
+        expect(calls(fetchFn)).toContain("POST " + C9 + "/mosaics");
+        expect(card().innerHTML).toContain("Building the mosaics");
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect(card().querySelector(".ta-conversion-actions a").textContent).toContain("View mosaics");
+        expect(card().querySelector(".ta-conversion-actions a").getAttribute("href")).toBe("/plugins/dji-thermal/dataset/5/conversion/9");
+        // Built: no more polling
+        const n = fetchFn.mock.calls.length;
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect(fetchFn.mock.calls.length).toBe(n);
+    });
+
+    it("reads the mosaics option from the form, on by default", () => {
+        document.body.innerHTML = '<div id="f">' + conversions.formHtml(DEFAULTS, PREFERENCES, {}) + "</div>";
+        const box = document.querySelector('[name="mosaics"]');
+        expect(box.checked).toBe(true);
+        box.checked = false;
+        const read = conversions.readForm(document.getElementById("f"));
+        expect(read.mosaics).toBe(false);
+        expect(conversions.differences(read, DEFAULTS, null, "C").map(d => [d.key, d.text])).toEqual([["mosaics", "no mosaics"]]);
+    });
+
+    it("lists the mosaic files with the conversion's files", () => {
+        const html = conversions.resultsHtml(Object.assign({}, CONVERSION, {
+            results: {files: [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []}]},
+            mosaic_files: ["harmonized/mosaic.tif", "harmonized/report.json"]}), C9.replace(/9$/, ""));
+        expect(html).toContain('href="' + C9 + '/download?mosaic=harmonized%2Fmosaic.tif"');
+        expect(html).toContain("harmonized/report.json");
+        expect(conversions.resultsHtml(Object.assign({}, CONVERSION, {results: {files: [{path: "a_T.JPG", ok: true, outputs: [], notes: []}]}}), "/x/"))
+            .not.toContain("Mosaics:");
+    });
+});
+
+describe("the mosaic viewer", () => {
+    const C9 = "/api/plugins/dji-thermal/datasets/5/conversions/9";
+    const BOUNDS = [10.0, 45.0, 10.001, 45.001];
+    const tab = (name, kind, stats) => ({tab: name, kind, bounds: BOUNDS, minzoom: 15, maxzoom: 21, stats});
+    const TEMPS = {min: 10.2, max: 48.9, percentiles: [12.34, 40.06]};
+    const INFERNO = Array.from({length: 256}, (_, i) => ((i << 24) | (0 << 16) | ((255 - i) << 8) | 255) >>> 0);
+    const VIEWER = Object.assign({}, CONVERSION, {
+        dataset_name: "Roof", unit: "C", flown: ["2026:10:12 18:29:50", "2026:10:12 18:30:10"], built_at: "2026-10-18T11:05:00Z",
+        stripped: false, frames: ["a_T.JPG", "b_T.JPG"], mosaic_status: "ready", can_change: true,
+        tabs: [tab("as_converted", "as_converted", TEMPS), tab("harmonized", "harmonized", TEMPS),
+               tab("source_frame", "as_converted", null), tab("view_angle", "as_converted", {min: 0, max: 14, percentiles: [1, 12]})],
+        kinds: {
+            as_converted: {frames: 2, oblique: 1, unusable: 0, width: 400, height: 300, gsd_m: 0.021, files: ["mosaic.tif"],
+                           normalization: null, report: {}},
+            harmonized: {frames: 2, oblique: 1, unusable: 0, width: 400, height: 300, gsd_m: 0.021, files: ["mosaic.tif", "report.json"],
+                         normalization: [18, 12.5], report: {radiometric_seams: {pixels: 100, median_abs_c: 0.2, p95_abs_c: 0.9},
+                         misalignment: {pairs: 3, median_m: 0.05, p90_m: 0.12}, frame_offsets: {offset_c: {min: -0.5, max: 0.7}, normalized: true}}}
+        },
+        palettes: [{key: "inferno", label: "Inferno", color_map: INFERNO}, {key: "dji_ironred", label: "Iron red (DJI)", color_map: INFERNO}],
+        default_palette: "dji_ironred"
+    });
+
+    // A Leaflet stand-in: the map and the tile layers the viewer made
+    function fakeLeaflet() {
+        const L = {maps: [], tiles: []};
+        const layer = extra => Object.assign({addTo(m) { (m.layers = m.layers || []).push(this); return this; }}, extra);
+        L.map = el => {
+            const handlers = {};
+            const m = {el, layers: [], fitted: null, on(ev, f) { handlers[ev] = f; return m; }, fire(ev, e) { handlers[ev](e); },
+                       fitBounds(b) { m.fitted = b; }, removeLayer(l) { m.layers = m.layers.filter(x => x !== l); }};
+            L.maps.push(m);
+            return m;
+        };
+        L.tileLayer = (url, opts) => {
+            const t = layer({url, opts, setUrl(u) { t.url = u; }});
+            if (url.indexOf("/mosaics/") >= 0) L.tiles.push(t);
+            return t;
+        };
+        L.tileLayer.wms = (url, opts) => layer({url, opts, wms: true});
+        L.layerGroup = () => layer({group: true});
+        L.control = {layers: (bases) => layer({bases}), scale: () => layer({})};
+        return L;
+    }
+
+    beforeEach(() => { document.body.innerHTML = page('viewer.html'); });
+    afterEach(() => { window.localStorage.clear(); });
+    const $ = id => document.getElementById(id);
+    const start = (fetchFn, L, basemaps) => viewer.init({doc: document, fetchFn, loadLeaflet: () => Promise.resolve(L), basemaps: basemaps || []});
+
+    it("works out a tab's starting range, in the user's unit, and reads a typed one back", () => {
+        expect(viewer.defaultRange({tab: "harmonized", stats: TEMPS}, "C")).toEqual([12.3, 40.1]);
+        window.localStorage.setItem("unit_system", "imperial");
+        // 12.34 °C is 54.21 °F, 40.06 °C 104.11 °F: rounded outwards in °F, kept in °C
+        const r = viewer.defaultRange({tab: "harmonized", stats: TEMPS}, "C");
+        expect(viewer.shownRange("harmonized", r, "C").map(x => Math.round(x * 100) / 100)).toEqual([54.2, 104.2]);
+        expect(viewer.defaultRange({tab: "view_angle", stats: {percentiles: [1.04, 12.01]}}, "C")).toEqual([1, 12.1]);
+        expect(viewer.defaultRange({tab: "view_angle"}, "C")).toEqual([0, 1]);
+        expect(viewer.parseRange("32", "212", "harmonized", "C")).toEqual({range: [0, 100]});
+        expect(viewer.parseRange("5", "60", "view_angle", "C")).toEqual({range: [5, 60]});
+        expect(viewer.parseRange("", "1", "harmonized", "C").error).toMatch(/minimum and a maximum/);
+        expect(viewer.parseRange("3", "3", "harmonized", "C").error).toMatch(/above the minimum/);
+        expect(viewer.styleGroup("as_converted")).toBe(viewer.styleGroup("harmonized"));
+    });
+
+    it("marks round values on the colour scale", () => {
+        expect(viewer.scaleTicks(12.3, 40.1, 5).map(t => t.label)).toEqual(["15", "20", "25", "30", "35", "40"]);
+        expect(viewer.scaleTicks(0, 1, 5).map(t => t.label)).toEqual(["0.0", "0.2", "0.4", "0.6", "0.8", "1.0"]);
+        expect(viewer.scaleTicks(-1, 1, 4).map(t => t.label)).toEqual(["-1.0", "-0.5", "0.0", "0.5", "1.0"]);
+        expect(viewer.scaleTicks(0, 10, 5)[0].at).toBe(0);
+        expect(viewer.scaleTicks(3, 3, 5)).toEqual([]);
+        expect(viewer.gradientCss(INFERNO)).toMatch(/^linear-gradient\(to right, rgb\(0,0,255\), /);
+    });
+
+    it("says when the frames were flown", () => {
+        expect(viewer.takenText(["2026:10:12 18:29:50", "2026:10:12 18:30:10"])).toBe("2026-10-12 18:29–18:30");
+        expect(viewer.takenText(["2026:10:12 18:29:50", "2026:10:13 09:00:00"])).toBe("2026-10-12 18:29 – 2026-10-13 09:00");
+        expect(viewer.takenText(["2026:10:12 18:29:50"])).toBe("2026-10-12 18:29");
+        expect(viewer.takenText([])).toBe("");
+    });
+
+    it("asks for the tiles with the palette and range, and a new URL when the mosaic is built again", () => {
+        const url = viewer.tileUrl(C9, "harmonized", {palette: "dji_ironred", range: [12.3, 40.1]}, "2026-10-18T11:05:00Z");
+        expect(url).toBe(C9 + "/mosaics/harmonized/tiles/{z}/{x}/{y}.png?v=2026-10-18T11%3A05%3A00Z&color_map=dji_ironred&rescale=12.3,40.1");
+        expect(viewer.tileUrl(C9, "source_frame", {palette: "inferno", range: [0, 1]}, "x")).toBe(C9 + "/mosaics/source_frame/tiles/{z}/{x}/{y}.png?v=x");
+    });
+
+    it("describes the values under the cursor and the mosaic's report", () => {
+        window.localStorage.setItem("unit_system", "imperial");
+        const el = document.createElement("div");
+        el.innerHTML = viewer.readoutHtml({valid: true, temperature: 20, frame: "a_T.JPG", view_angle: 3.21}, "C");
+        expect(el.textContent).toContain("68.00 °F");
+        expect(el.textContent).toContain("a_T.JPG");
+        expect(el.textContent).toContain("3.2°");
+        expect(viewer.readoutHtml({valid: false, reason: "outside_raster"}, "C")).toContain("Outside the mosaic");
+        expect(viewer.readoutHtml({valid: false, reason: "nodata"}, "C")).toContain("No data here");
+
+        el.innerHTML = viewer.reportHtml(VIEWER.kinds.harmonized, "harmonized", C9);
+        const text = el.textContent;
+        expect(text).toContain("2 placed, 1 oblique left out");
+        expect(text).toContain("400 × 300 px at 2.1 cm");
+        expect(text).toContain("median 0.36 °F, 95% under 1.62 °F");
+        expect(text).toContain("median 5.0 cm, 90% under 12.0 cm (3 overlapping pairs)");
+        expect(text).toContain("-0.90 to 1.26 °F, removed");
+        expect(text).toContain("ambient 64.4 °F, reflected 54.5 °F");
+        expect(el.querySelector('a[href="' + C9 + '/download?mosaic=harmonized%2Freport.json"]')).not.toBe(null);
+    });
+
+    it("makes WebODM's base layers, its default one shown, and a None", () => {
+        const L = fakeLeaflet();
+        const b = viewer.baseLayers(L, [{label: "Streets", url: "https://s/{z}/{x}/{y}.png", maxzoom: 19},
+                                        {label: "Satellite", url: "https://a/{z}/{x}/{y}.jpg", default: true},
+                                        {label: "WMS", url: "https://w", type: "wms", layers: "1"}]);
+        expect(Object.keys(b.layers)).toEqual(["Streets", "Satellite", "WMS", "None"]);
+        expect(b.shown).toBe(b.layers.Satellite);
+        expect(b.layers.Streets.opts.maxNativeZoom).toBe(19);
+        expect(b.layers.WMS.wms).toBe(true);
+        const none = viewer.baseLayers(L, []);
+        expect(none.shown).toBe(none.layers.None);
+        expect(viewer.baseLayers(L, [{label: "A", url: "a"}, {label: "B", url: "b"}]).shown.url).toBe("a");
+    });
+
+    it("shows a tab per mosaic, with the palette and range changed live", async () => {
+        window.localStorage.setItem("unit_system", "imperial");
+        const L = fakeLeaflet();
+        const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
+                                [C9 + "/mosaics/harmonized/point?lon=10.0005&lat=45.0005"]: {valid: true, temperature: 30, frame: "b_T.JPG", view_angle: 2}});
+        await start(fetchFn, L, [{label: "Streets", url: "https://s/{z}/{x}/{y}.png"}]);
+        await ticks();
+        expect($("ta-viewer-main").hidden).toBe(false);
+        expect($("ta-viewer-subtitle").textContent).toContain("Roof");
+        expect($("ta-viewer-subtitle").textContent).toContain("flown 2026-10-12 18:29–18:30");
+        expect([...$("ta-viewer-tabs").querySelectorAll("a")].map(a => a.textContent)).toEqual(["As converted", "Harmonized", "Source frame", "View angle"]);
+        const map = L.maps[0];
+        expect(map.fitted).toEqual([[45.0, 10.0], [45.001, 10.001]]);
+        expect(L.tiles[0].url).toContain("/mosaics/as_converted/tiles/");
+        expect(L.tiles[0].url).toContain("color_map=dji_ironred");
+        expect($("ta-viewer-palette").value).toBe("dji_ironred");
+        // 12.3 to 40.1 °C is 54.2 to 104.2 °F
+        expect([...$("ta-viewer-scale").querySelectorAll(".ta-tick")].map(t => t.textContent)).toEqual(["60", "70", "80", "90", "100"]);
+
+        // Harmonized shares the palette and range of the temperatures
+        click($("ta-viewer-tabs").querySelector('[data-tab="harmonized"]'));
+        await ticks();
+        const t = L.tiles[L.tiles.length - 1];
+        expect(t.url).toContain("/mosaics/harmonized/tiles/");
+        expect(map.layers.filter(l => L.tiles.indexOf(l) >= 0)).toEqual([t]);
+        $("ta-viewer-palette").value = "inferno";
+        change($("ta-viewer-palette"));
+        expect(t.url).toContain("color_map=inferno");
+        $("ta-viewer-min").value = "32";
+        $("ta-viewer-max").value = "212";
+        change($("ta-viewer-max"));
+        expect(t.url).toContain("rescale=0,100");
+        $("ta-viewer-max").value = "20";
+        change($("ta-viewer-max"));
+        expect($("ta-viewer-range-error").textContent).toMatch(/above the minimum/);
+        expect(t.url).toContain("rescale=0,100");
+        click($("ta-viewer-auto"));
+        expect(t.url).toMatch(/rescale=12\.3\d*,40\.1\d*/);
+
+        // The view angles keep their own; the source frames have no palette
+        click($("ta-viewer-tabs").querySelector('[data-tab="view_angle"]'));
+        await ticks();
+        expect(L.tiles[L.tiles.length - 1].url).toContain("color_map=inferno&rescale=1,12");
+        click($("ta-viewer-tabs").querySelector('[data-tab="source_frame"]'));
+        await ticks();
+        expect($("ta-viewer-palette")).toBe(null);
+        click($("ta-viewer-tabs").querySelector('[data-tab="harmonized"]'));
+        await ticks();
+        expect($("ta-viewer-palette").value).toBe("inferno");
+
+        // The values under the cursor, once it rests
+        jest.useFakeTimers();
+        map.fire("mousemove", {latlng: {lng: 10.0005, lat: 45.0005}});
+        jest.advanceTimersByTime(200);
+        await ticks();
+        expect($("ta-viewer-readout").textContent).toContain("86.00 °F");
+        expect($("ta-viewer-readout").textContent).toContain("b_T.JPG");
+        expect(L.maps.length).toBe(1);
+    });
+
+    it("builds missing mosaics and follows them until they are built", async () => {
+        jest.useFakeTimers();
+        const none = Object.assign({}, CONVERSION, {mosaic_status: "", can_change: true, tabs: [], kinds: {}, dataset_name: "Roof"});
+        const fetchFn = server({[C9 + "/mosaics"]: [none, Object.assign({}, none, {mosaic_status: "building", mosaic_progress: 0.3}), VIEWER],
+                                ["POST " + C9 + "/mosaics"]: Object.assign({}, CONVERSION, {mosaic_status: "building"})});
+        const L = fakeLeaflet();
+        start(fetchFn, L);
+        await ticks();
+        expect($("ta-viewer-main").hidden).toBe(true);
+        expect($("ta-viewer-status").textContent).toContain("no mosaics");
+        expect($("ta-viewer-build").hidden).toBe(false);
+        expect(L.maps.length).toBe(0);
+        click($("ta-viewer-build"));
+        await ticks();
+        expect(calls(fetchFn)).toContain("POST " + C9 + "/mosaics");
+        expect($("ta-viewer-status").textContent).toContain("Building the mosaics");
+        expect($("ta-viewer-cancel").hidden).toBe(false);
+        expect($("ta-viewer-build").hidden).toBe(true);
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect($("ta-viewer-main").hidden).toBe(false);
+        expect($("ta-viewer-cancel").hidden).toBe(true);
+        expect($("ta-viewer-build").textContent).toContain("Build again");
+        expect(L.tiles.length).toBe(1);
+    });
+
+    it("lets viewers look but not build", async () => {
+        const fetchFn = server({[C9 + "/mosaics"]: Object.assign({}, VIEWER, {can_change: false})});
+        await start(fetchFn, fakeLeaflet());
+        await ticks();
+        expect($("ta-viewer-main").hidden).toBe(false);
+        expect($("ta-viewer-build").hidden).toBe(true);
+        expect($("ta-viewer-cancel").hidden).toBe(true);
+    });
+
+    it("says why there is nothing to show", () => {
+        expect(viewer.statusHtml({status: "converting"}).text).toContain("being converted");
+        expect(viewer.statusHtml({status: "ready", mosaic_status: "failed", mosaic_error: "No <frames>"}).text).toContain("No &lt;frames&gt;");
+        expect(viewer.statusHtml({status: "ready", mosaic_status: "canceled"}).text).toContain("canceled");
+        expect(viewer.statusHtml({status: "failed", mosaic_status: ""}).text).toContain("were not converted");
+        expect(viewer.statusHtml({status: "ready", mosaic_status: "ready"}).text).toBe("");
     });
 });
