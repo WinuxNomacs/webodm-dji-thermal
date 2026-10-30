@@ -36,6 +36,21 @@
   - **To look into**: that live check's orthophoto (40 frames not normalized, 6.9 to 31.8 °C, the plan's options
     with orthophoto-resolution 2.1) read -601 to 603 °C in WebODM's statistics, where the release check's
     (normalized) gave 6.9 to 45.0 °C: not from sending (the same TIFFs a new task gets), to find out before 1.0.0.
+  - Done: **a link from a WebODM task to its thermal dataset** (the user, 2026-10-30), `task-dataset-link`: a
+    **Thermal dataset** button in a task's expanded panel on the dashboard, through `PluginsAPI.Dashboard.
+    addTaskActionButton` (the official hook; it adds to the action row only, not the details table or title, which
+    would need a WebODM change). The dataset's own task is known by its hidden `.dji-thermal-dataset` tag, in the
+    browser, with no request. Decided (the user): **tasks made from a workset (Create task) link back too**, through
+    a hidden tag naming the dataset added when the task is made (kept by WebODM's Edit panel), opening it on
+    Worksets; tasks made before have no tag and no button. Built: `public/main.js` (the button, a link styled as
+    WebODM's own `btn btn-sm btn-primary`); `conversion_tasks.py` (`FROM_TAG` on `create`, `unlink_made` when the
+    dataset goes: deleted, from the Analyzer or WebODM, through `datasets.task_removing`, or released). Also: the
+    flight test's `skip_without` moved back from `parent_url`, where the parent-task branch had put it. Tests: Django
+    113 with `app.tests.test_plugins`, Jest 125. Live check on :8002: the button on the user's dataset task and the
+    check dataset's, on a task made from a workset (opens the dataset), none on ordinary tasks or tasks made before.
+  - **To look into**: WebODM answers 404 for a processed thermal task's dashboard thumbnail (`/thumbnail?size=164`,
+    seen on the user's "HomerunObliqueII - default-webodm-recommendations" and a check task): WebODM's own, with a
+    float °C orthophoto; to find out whether the plugin can do anything about it.
   - Done: **The Convert tab as Worksets** (the user, `new.md`, 2026-10-30), `worksets`: the dataset page's
     Convert tab renamed **Worksets** and moved first, left of Files. In it, the **Settings:** section expandable and
     collapsible, and its **Outputs** subsection too; collapsed, each still shows what is selected that differs from

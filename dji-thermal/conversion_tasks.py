@@ -10,6 +10,9 @@ from a conversion are kept as a list of ids in its folder:
 
     thermal/conversions/<id>/tasks.json   [task id, ...], those since deleted dropped when read
 
+Such a task also has a hidden tag naming its dataset, `.dji-thermal-from-<dataset id>`, so the dashboard's Thermal
+dataset button (main.js) links back to it without asking the server; the tag goes when the dataset does (unlink_made).
+
 A conversion can also be sent to the dataset's own task, its "parent task" (use_for_parent): its TIFFs replace the
 images sent there before (the folder's root holds no other image: the dataset is under thermal/, which WebODM's
 processing never reads) and what the task processed from them, and it waits for a processing node as a task made
@@ -35,6 +38,7 @@ TASKS_FILE = 'tasks.json'
 PARENT_FILE = 'parent.json'
 TIFF_SUFFIX = '_temp_c.tiff'
 MIN_FRAMES = 2      # as WebODM's own task creation
+FROM_TAG = '.dji-thermal-from-'     # then the dataset's id; hidden, as datasets.TAG
 
 
 def plan_of(task):
@@ -150,7 +154,8 @@ def create(task, cid, name, options):
     new_task = None
     try:
         with transaction.atomic():
-            new_task = Task.objects.create(project=task.project, auto_processing_node=False, processing_node=None)
+            new_task = Task.objects.create(project=task.project, auto_processing_node=False, processing_node=None,
+                                           tags=FROM_TAG + str(task.id))
             if link_frames(task, cid, new_task) < MIN_FRAMES:
                 raise ValueError("The workset's TIFFs are no longer on the server")
             new_task.images_count = len(new_task.scan_images())
@@ -166,6 +171,14 @@ def create(task, cid, name, options):
         ids = datasets.read_json(conversions.path(task, cid, TASKS_FILE), [])
         datasets.write_json(conversions.path(task, cid, TASKS_FILE), ids + [str(new_task.id)])
     return new_task
+
+
+def unlink_made(task):
+    """The dataset going: the tasks made from its conversions lose the tag that links them to it (in any project,
+    the tag edited around or not)"""
+    tag = FROM_TAG + str(task.id)
+    for t in Task.objects.filter(tags__contains=tag).exclude(pk=task.pk):
+        Task.objects.filter(pk=t.pk).update(tags=" ".join(x for x in (t.tags or "").split() if x != tag))
 
 
 def made(task, cid):
@@ -270,6 +283,7 @@ def release(task):
     for c in conversions_.ids(task):
         conversions_.cancel(task, c)
     shutil.rmtree(datasets.data_path(task), ignore_errors=True)
+    unlink_made(task)
     task.tags = " ".join(t for t in (task.tags or "").split() if t != datasets.TAG)
     task.name = datasets.name_of(task)[:255]
     task.save()
