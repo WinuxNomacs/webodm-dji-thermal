@@ -33,7 +33,7 @@
     (40 M4T frames): sent from the menu (no replace asked), 40 images and the plan's options, no node; given a node and
     processed (8.5 min); a second conversion sent with the Replace dialog (images replaced, results gone, waiting
     again); the dataset deleted, its task kept as "Live check parent task" without the tag, then removed.
-  - **To look into**: that live check's orthophoto (40 frames not normalized, 6.9 to 31.8 °C, the plan's options
+  - Closed: that live check's orthophoto (40 frames not normalized, 6.9 to 31.8 °C, the plan's options
     with orthophoto-resolution 2.1) read -601 to 603 °C in WebODM's statistics, where the release check's
     (normalized) gave 6.9 to 45.0 °C: not from sending (the same TIFFs a new task gets), to find out before 1.0.0.
     **Not reproduced** (2026-10-30): the same 40 frames, the same workset settings and options, processed three
@@ -42,8 +42,8 @@
     within the frames' range, the masked area 0. Not seam leveling, not the route. The bad run (511 s against
     295-330 s) had a different reconstruction, likely ODM's own once-off; its task is gone, so nothing more to read.
     The user's own orthophotos are within their frames' range (HomerunObliqueII's frames -45.4 to 65.0 °C with sky in
-    the oblique views; its orthophoto -42.5 to 56.7 °C). Open for the user: whether the plugin should warn when a
-    processed task's orthophoto reads outside the frames' range.
+    the oblique views; its orthophoto -42.5 to 56.7 °C). Decided (the user): no warning for an orthophoto outside the
+    frames' range; closed.
   - Done: **a link from a WebODM task to its thermal dataset** (the user, 2026-10-30), `task-dataset-link`: a
     **Thermal dataset** button in a task's expanded panel on the dashboard, through `PluginsAPI.Dashboard.
     addTaskActionButton` (the official hook; it adds to the action row only, not the details table or title, which
