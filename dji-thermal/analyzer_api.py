@@ -585,22 +585,41 @@ class MosaicTile(DatasetView):
         """
         task = get_conversion(request, pk, cid)
         tab_raster(task, cid, tab)
-        settings = conversions.record(task, cid).get('settings') or {}
-        try:
-            cmap = mosaics.colormap(task, cid, request.query_params.get('color_map') or
-                                    mosaics.default_palette(task, cid, settings,
-                                                            conversions.display(request.user)['palette']))
-            low, high = (float(v) for v in (request.query_params.get('rescale') or '0,1').split(','))
-        except ValueError as e:
-            raise ValidationError({'error': str(e) if 'color' in str(e) else "Invalid rescale value"}) from None
-        if not high > low:
-            raise ValidationError({'rescale': "The range's maximum must be above its minimum"})
-        content = mosaics.tile(task, cid, tab, int(z), int(x), int(y), cmap, low, high)
+        content = mosaics.tile(task, cid, tab, int(z), int(x), int(y), *mosaic_style(request, task, cid))
         if content is None:
             raise NotFound()
-        response = HttpResponse(content, content_type="image/png")
-        response['Cache-Control'] = 'private, max-age=86400'
-        return response
+        return png_response(content)
+
+
+def mosaic_style(request, task, cid):
+    """A viewer image's colour map and range from its query: (cmap, low, high)"""
+    settings = conversions.record(task, cid).get('settings') or {}
+    try:
+        cmap = mosaics.colormap(task, cid, request.query_params.get('color_map') or
+                                mosaics.default_palette(task, cid, settings, conversions.display(request.user)['palette']))
+        low, high = (float(v) for v in (request.query_params.get('rescale') or '0,1').split(','))
+    except ValueError as e:
+        raise ValidationError({'error': str(e) if 'color' in str(e) else "Invalid rescale value"}) from None
+    if not high > low:
+        raise ValidationError({'rescale': "The range's maximum must be above its minimum"})
+    return cmap, low, high
+
+
+def png_response(content):
+    response = HttpResponse(content, content_type="image/png")
+    response['Cache-Control'] = 'private, max-age=86400'
+    return response
+
+
+def point_query(request):
+    """The lon and lat of a viewer request's query"""
+    try:
+        lon, lat = float(request.query_params.get('lon')), float(request.query_params.get('lat'))
+    except (TypeError, ValueError):
+        raise ValidationError({'error': "lon and lat are required"}) from None
+    if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+        raise ValidationError({'error': "Coordinates out of range"})
+    return lon, lat
 
 
 class MosaicPoint(DatasetView):
@@ -608,10 +627,32 @@ class MosaicPoint(DatasetView):
         """A viewer tab's values at a point (lon, lat): temperature, source frame and view angle"""
         task = get_conversion(request, pk, cid)
         tab_raster(task, cid, tab)
+        return Response(mosaics.point(task, cid, tab, *point_query(request)))
+
+
+class MosaicFrames(DatasetView):
+    def get(self, request, pk, cid, tab):
+        """The frames that saw a point (lon, lat), for the viewer's source frame window: the mosaic's own first; models
+        false for mosaics built without the frames' models (built again, they have them)"""
+        task = get_conversion(request, pk, cid)
+        tab_raster(task, cid, tab)
+        frames = mosaics.frames_at(task, cid, tab, *point_query(request))
+        return Response({'frames': frames or [], 'models': frames is not None})
+
+
+class MosaicFrame(DatasetView):
+    def get(self, request, pk, cid, tab, index):
+        """
+        A PNG of one of the mosaic's frames as the tab shows it (its temperatures, or on View angle each pixel's angle
+        from straight down), over rescale=min,max with color_map, as the tiles; cached as they are
+        """
+        task = get_conversion(request, pk, cid)
+        tab_raster(task, cid, tab)
+        style = mosaic_style(request, task, cid)
         try:
-            lon, lat = float(request.query_params.get('lon')), float(request.query_params.get('lat'))
-        except (TypeError, ValueError):
-            raise ValidationError({'error': "lon and lat are required"}) from None
-        if not (-180 <= lon <= 180 and -90 <= lat <= 90):
-            raise ValidationError({'error': "Coordinates out of range"})
-        return Response(mosaics.point(task, cid, tab, lon, lat))
+            content = mosaics.frame_image(task, cid, tab, int(index), *style)
+        except LookupError as e:
+            raise NotFound({'error': str(e)}) from None
+        except Exception as e:  # noqa: BLE001 - a frame the library cannot measure (or the SDK gone) is reported
+            raise NotFound({'error': "The frame could not be measured: {}".format(e)}) from None
+        return png_response(content)

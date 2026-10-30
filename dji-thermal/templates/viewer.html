@@ -21,12 +21,15 @@
     <div id="ta-viewer-main" hidden>
         <ul class="nav nav-tabs ta-tabs" id="ta-viewer-tabs"></ul>
         <div class="ta-viewer-body">
-            <div class="ta-viewer-map" id="ta-viewer-map"></div>
+            <div class="ta-viewer-mapbox">
+                <div class="ta-viewer-map" id="ta-viewer-map"></div>
+                <div class="ta-viewer-pip" id="ta-viewer-pip" hidden></div>
+            </div>
             <div class="ta-viewer-panel">
                 <div id="ta-viewer-controls"></div>
                 <details class="ta-section" open data-section="cursor">
                     <summary><h5>Under the cursor</h5></summary>
-                    <div class="ta-viewer-readout" id="ta-viewer-readout"><span class="ta-message">Move the cursor over the mosaic.</span></div>
+                    <div class="ta-viewer-readout" id="ta-viewer-readout"><span class="ta-message">Move the cursor over the mosaic; click it to see the frames that saw that point.</span></div>
                 </details>
                 <details class="ta-section" open data-section="report">
                     <summary><h5>The mosaic</h5></summary>

@@ -1771,7 +1771,9 @@ describe("the mosaic viewer", () => {
             return t;
         };
         L.tileLayer.wms = (url, opts) => layer({url, opts, wms: true});
-        L.layerGroup = () => layer({group: true});
+        L.layerGroup = () => layer({group: true, clearLayers() { this.layers = []; }});
+        L.circleMarker = (latlng, opts) => layer({marker: latlng, opts});
+        L.polygon = (points, opts) => layer({polygon: points, opts});
         L.control = {layers: (bases) => layer({bases}), scale: () => layer({})};
         return L;
     }
@@ -1947,6 +1949,72 @@ describe("the mosaic viewer", () => {
         expect($("ta-viewer-main").hidden).toBe(false);
         expect($("ta-viewer-build").hidden).toBe(true);
         expect($("ta-viewer-cancel").hidden).toBe(true);
+    });
+
+    it("shows the frames that saw a point clicked, drawn as the tab draws the mosaic, with a crosshair on the point", async () => {
+        const L = fakeLeaflet();
+        const frame = (index, file, x, source) => ({index, file, x, y: 255.5, width: 640, height: 512, view_angle: 2.25 + index,
+            source, footprint: [[10, 45], [10.001, 45], [10.001, 45.001], [10, 45.001]]});
+        const at = "?lon=10.0005&lat=45.0005";
+        const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
+                                [C9 + "/mosaics/as_converted/frames" + at]: {frames: [frame(1, "b_T.JPG", 319.5, true), frame(0, "a_T.JPG", 63.5, false)], models: true},
+                                [C9 + "/mosaics/view_angle/frames" + at]: {frames: [frame(1, "b_T.JPG", 319.5, true), frame(0, "a_T.JPG", 63.5, false)], models: true},
+                                [C9 + "/mosaics/harmonized/frames" + at]: {frames: [], models: true}});
+        await start(fetchFn, L);
+        await ticks();
+        const map = L.maps[0], picked = map.layers.filter(l => l.group).pop();   // after the "None" base layer
+        expect($("ta-viewer-pip").hidden).toBe(true);
+        map.fire("click", {latlng: {lng: 10.0005, lat: 45.0005}});
+        await ticks();
+        const pip = $("ta-viewer-pip"), img = () => pip.querySelector("img");
+        expect(pip.hidden).toBe(false);
+        expect(pip.textContent).toContain("Frame 1 of 2 that saw this point");
+        expect(pip.textContent).toContain("b_T.JPG");
+        expect(pip.textContent).toContain("comes from this frame");
+        expect(img().getAttribute("src")).toBe(C9 + "/mosaics/as_converted/frames/1.png?v=2026-10-18T11%3A05%3A00Z&color_map=dji_ironred&rescale=12.3,40.1");
+        // The pixel's centre: (319.5 + 0.5) / 640 across, (255.5 + 0.5) / 512 down
+        expect(pip.querySelector(".ta-pip-mark").getAttribute("style")).toBe("left: 50.00%; top: 50.00%;");
+        expect(picked.layers.map(l => l.marker || l.polygon && "footprint")).toEqual([{lng: 10.0005, lat: 45.0005}, "footprint"]);
+        expect(picked.layers[1].polygon[0]).toEqual([45, 10]);
+        expect(pip.querySelector('[data-pip="prev"]').disabled).toBe(true);
+
+        // The next frame; a palette changed redraws it
+        click(pip.querySelector('[data-pip="next"]'));
+        expect(pip.textContent).toContain("Frame 2 of 2");
+        expect(pip.textContent).not.toContain("comes from this frame");
+        expect(pip.querySelector('[data-pip="next"]').disabled).toBe(true);
+        expect(pip.querySelector(".ta-pip-mark").getAttribute("style")).toBe("left: 10.00%; top: 50.00%;");
+        $("ta-viewer-palette").value = "inferno";
+        change($("ta-viewer-palette"));
+        expect(img().getAttribute("src")).toContain("/frames/0.png?");
+        expect(img().getAttribute("src")).toContain("color_map=inferno");
+
+        // Another tab finds the frames for its mosaic, keeping the frame shown, in its own palette and range
+        click($("ta-viewer-tabs").querySelector('[data-tab="view_angle"]'));
+        await ticks();
+        expect(pip.textContent).toContain("Frame 2 of 2");
+        expect(img().getAttribute("src")).toContain("/mosaics/view_angle/frames/0.png?");
+        expect(img().getAttribute("src")).toContain("rescale=1,12");
+        click($("ta-viewer-tabs").querySelector('[data-tab="harmonized"]'));
+        await ticks();
+        expect(pip.textContent).toContain("No frame saw this point");
+        expect(picked.layers.length).toBe(1);
+
+        // A frame that cannot be drawn says so; closed, the window and its marks go
+        click($("ta-viewer-tabs").querySelector('[data-tab="as_converted"]'));
+        await ticks();
+        img().dispatchEvent(new Event("error"));
+        expect(pip.textContent).toContain("Could not draw this frame");
+        click(pip.querySelector('[data-pip="close"]'));
+        expect(pip.hidden).toBe(true);
+        expect(picked.layers.length).toBe(0);
+    });
+
+    it("asks for the mosaics to be built again when they have no frame positions", () => {
+        const el = document.createElement("div");
+        el.innerHTML = viewer.pipHtml({frames: [], models: false, at: 0}, "");
+        expect(el.textContent).toContain("build them again");
+        expect(el.querySelector("img")).toBeNull();
     });
 
     it("says why there is nothing to show", () => {

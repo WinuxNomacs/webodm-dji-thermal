@@ -1,6 +1,7 @@
 // A conversion's mosaics on a map (viewer.html), over WebODM's base layers: a tab per mosaic (as converted, harmonized,
 // and the as-converted mosaic's source frames, over its temperatures, and view angles), its palette and range changed live through the tile
-// URL with its colour scale, the values under the cursor, and what dji-thermal-cli reports about the mosaic. Leaflet is
+// URL with its colour scale, the values under the cursor, the frames that saw a point clicked (in a window over the
+// map, drawn as the tab draws the mosaic), and what dji-thermal-cli reports about the mosaic. Leaflet is
 // WebODM's own, from the plugin's build (thermal/Leaflet.js).
 (function (root) {
     var core = root.ThermalAnalyzerCore || (typeof require !== "undefined" ? require("./analyzer_core") : null);
@@ -116,6 +117,41 @@
         var query = ["v=" + encodeURIComponent(builtAt || ""), "color_map=" + encodeURIComponent(style.palette),
                      "rescale=" + style.range[0] + "," + style.range[1]];
         return base + "/mosaics/" + tab + "/tiles/{z}/{x}/{y}.png?" + query.join("&");
+    }
+
+    // One of the mosaic's frames as the tab draws it (its temperatures, or on View angle its pixels' angles), with the
+    // tab's palette and range, cached as the tiles are
+    function frameUrl(base, tab, index, style, builtAt) {
+        var query = ["v=" + encodeURIComponent(builtAt || ""), "color_map=" + encodeURIComponent(style.palette),
+                     "rescale=" + style.range[0] + "," + style.range[1]];
+        return base + "/mosaics/" + tab + "/frames/" + index + ".png?" + query.join("&");
+    }
+
+    // The window of the frames that saw a point (pick: {frames, models, at: the one shown}), the frame drawn from url
+    // with a crosshair on the point
+    function pipHtml(pick, url) {
+        var close = '<button type="button" class="btn btn-link btn-sm" data-pip="close" title="Close" aria-label="Close">' +
+            '<i class="fa fa-times"></i></button>';
+        var frames = pick.frames || [];
+        if (!frames.length) {
+            return '<div class="ta-pip-head"><span class="ta-pip-title">Source frame</span>' + close + "</div>" +
+                '<div class="ta-message">' + (pick.models ? "No frame saw this point." :
+                "These mosaics were built without their frames' positions: build them again to see the frames.") + "</div>";
+        }
+        var f = frames[pick.at], n = frames.length;
+        var nav = function (action, icon, label, disabled) {
+            return '<button type="button" class="btn btn-default btn-sm" data-pip="' + action + '" title="' + label + '" aria-label="' +
+                label + '"' + (disabled ? " disabled" : "") + '><i class="fa fa-' + icon + '"></i></button>';
+        };
+        var left = ((f.x + 0.5) / f.width * 100).toFixed(2), top = ((f.y + 0.5) / f.height * 100).toFixed(2);
+        return '<div class="ta-pip-head"><span class="ta-pip-title">Frame ' + (pick.at + 1) + " of " + n + " that saw this point</span>" +
+            nav("prev", "chevron-left", "Previous frame", pick.at === 0) + nav("next", "chevron-right", "Next frame", pick.at === n - 1) +
+            close + "</div>" +
+            '<div class="ta-pip-image" style="aspect-ratio: ' + f.width + " / " + f.height + ';"><img src="' + esc(url) +
+            '" alt="' + esc(f.file) + '"><span class="ta-pip-mark" style="left: ' + left + "%; top: " + top + '%;"></span></div>' +
+            '<div class="ta-pip-foot">' + esc(f.file) + '<br><span class="ta-message">' +
+            (f.source ? "The mosaic's pixel here comes from this frame; " : "") + "seen " +
+            esc(core.formatNumber(f.view_angle, 1, "°")) + " from straight down</span></div>";
     }
 
     function tabsHtml(tabs, current) {
@@ -240,7 +276,7 @@
             page.getAttribute("data-id");
         var csrf = (page.querySelector("input[name=csrfmiddlewaretoken]") || {}).value;
         var v = null, tab = null, styles = {}, map = null, L = null, layer = null, timer = null, hover = null, fitted = false;
-        var mapReady = null;
+        var mapReady = null, pick = null, pickLayer = null;
 
         function status(s) {
             $("ta-viewer-status").className = "ta-status" + (s.cls ? " " + s.cls : "");
@@ -270,6 +306,8 @@
                     hover = root.setTimeout(function () { readout(e.latlng); }, HOVER_MS);
                 });
                 map.on("mouseout", function () { if (hover) root.clearTimeout(hover); });
+                map.on("click", function (e) { select(e.latlng); });
+                pickLayer = L.layerGroup().addTo(map);
                 return map;
             });
             return mapReady;
@@ -283,6 +321,44 @@
                     $("ta-viewer-readout").innerHTML = r.ok ? readoutHtml(r.data, v.unit) : '<span class="text-danger">' +
                         esc(core.errorText(r.data, "Could not read the mosaic here.")) + "</span>";
                 });
+        }
+
+        // The frames that saw a point, for the tab shown; keep: the frame to show again if it saw it too
+        function select(latlng, keep) {
+            var askedTab = tab;
+            return fetchFn(base + "/mosaics/" + tab + "/frames?lon=" + latlng.lng + "&lat=" + latlng.lat, {credentials: "same-origin"})
+                .then(core.readJson).then(function (r) {
+                    if (askedTab !== tab) return;
+                    if (!r.ok) {
+                        pick = {latlng: latlng, frames: [], models: true, at: 0};
+                        showPick();
+                        $("ta-viewer-pip").querySelector(".ta-message").textContent = core.errorText(r.data, "Could not find the frames here.");
+                        return;
+                    }
+                    var frames = r.data.frames || [];
+                    var at = frames.map(function (f) { return f.index; }).indexOf(keep);
+                    pick = {latlng: latlng, frames: frames, models: r.data.models, at: at < 0 ? 0 : at};
+                    showPick();
+                });
+        }
+
+        function showPick() {
+            var box = $("ta-viewer-pip"), f = pick.frames[pick.at];
+            box.hidden = false;
+            box.innerHTML = pipHtml(pick, f ? frameUrl(base, tab, f.index, style(), v.built_at) : "");
+            pickLayer.clearLayers();
+            L.circleMarker(pick.latlng, {radius: 6, color: "#000", weight: 1, fillColor: "#fff", fillOpacity: 1}).addTo(pickLayer);
+            if (f && f.footprint) {
+                L.polygon(f.footprint.map(function (c) { return [c[1], c[0]]; }),
+                          {color: "#fff", weight: 2, dashArray: "6 4", fill: false, interactive: false}).addTo(pickLayer);
+            }
+        }
+
+        function closePick() {
+            pick = null;
+            $("ta-viewer-pip").hidden = true;
+            $("ta-viewer-pip").innerHTML = "";
+            if (pickLayer) pickLayer.clearLayers();
         }
 
         function showLayer() {
@@ -303,7 +379,7 @@
             $("ta-viewer-tabs").innerHTML = tabsHtml(v.tabs, tab);
             $("ta-viewer-controls").innerHTML = controlsHtml(t, style(), v.palettes || [], v.unit);
             $("ta-viewer-report").innerHTML = reportHtml(v.kinds[t.kind], t.kind, base);
-            $("ta-viewer-readout").innerHTML = '<span class="ta-message">Move the cursor over the mosaic.</span>';
+            $("ta-viewer-readout").innerHTML = '<span class="ta-message">Move the cursor over the mosaic; click it to see the frames that saw that point.</span>';
             return ensureMap().then(showLayer);
         }
 
@@ -312,6 +388,7 @@
             var p = (v.palettes || []).filter(function (x) { return x.key === style().palette; })[0];
             $("ta-viewer-scale").innerHTML = legendHtml(p && p.color_map, shownRange(tab, style().range, v.unit));
             if (layer) layer.setUrl(tileUrl(base, tab, style(), v.built_at));
+            if (pick) showPick();
         }
 
         function render(data) {
@@ -330,7 +407,10 @@
             if (timer) root.clearTimeout(timer);
             timer = busy ? root.setTimeout(load, POLL_MS) : null;
             if (!ready) return Promise.resolve();
-            if (builtBefore !== v.built_at) styles = {};
+            if (builtBefore !== v.built_at) {
+                styles = {};
+                closePick();
+            }
             if (!tab || !current()) tab = v.tabs[0].tab;
             return renderTab();
         }
@@ -356,7 +436,24 @@
             e.preventDefault();
             tab = a.getAttribute("data-tab");
             renderTab();
+            var f = pick && pick.frames[pick.at];
+            if (pick) select(pick.latlng, f && f.index);
         });
+
+        $("ta-viewer-pip").addEventListener("click", function (e) {
+            var b = e.target.closest ? e.target.closest("button[data-pip]") : null;
+            if (!b || b.disabled) return;
+            var action = b.getAttribute("data-pip");
+            if (action === "close") return closePick();
+            pick.at = Math.max(0, Math.min(pick.frames.length - 1, pick.at + (action === "next" ? 1 : -1)));
+            showPick();
+        });
+
+        // A frame that cannot be drawn says so in its place
+        $("ta-viewer-pip").addEventListener("error", function (e) {
+            if (e.target.tagName !== "IMG") return;
+            e.target.parentNode.outerHTML = '<div class="text-danger">Could not draw this frame.</div>';
+        }, true);
 
         $("ta-viewer-controls").addEventListener("change", function (e) {
             if (e.target.id === "ta-viewer-palette") {
@@ -396,7 +493,7 @@
 
     var api = {tabLabel: tabLabel, styleGroup: styleGroup, defaultRange: defaultRange, parseRange: parseRange, shownRange: shownRange,
                gradientCss: gradientCss, scaleTicks: scaleTicks, legendHtml: legendHtml, takenText: takenText, tileUrl: tileUrl,
-               tabsHtml: tabsHtml, controlsHtml: controlsHtml, readoutHtml: readoutHtml, reportHtml: reportHtml, statusHtml: statusHtml,
+               frameUrl: frameUrl, pipHtml: pipHtml, tabsHtml: tabsHtml, controlsHtml: controlsHtml, readoutHtml: readoutHtml, reportHtml: reportHtml, statusHtml: statusHtml,
                baseLayers: baseLayers, loadLeaflet: loadLeaflet, init: init};
     root.ThermalAnalyzerViewer = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
