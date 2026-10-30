@@ -60,6 +60,15 @@
     `link-older-tasks`: listing a workset's tasks (`conversion_tasks.made`, called by the Analyzer's datasets list
     and dataset page) now adds the tag to a task without it. Test: Django 118. Live check: opening the Analyzer
     tagged the user's "HomerunObliqueII - default-webodm-recommendations", whose panel now has the button.
+  - Planned: **viewer and header polish** (the user, `new.md`, 2026-10-30), `viewer-header-polish`:
+    1. The viewer's **"As converted" tab becomes "Mosaic"** (as converted is what's expected); README to match.
+    2. **Source frame shows the mosaic with lines between frames** instead of a random colour per frame: the
+       as-converted temperatures in the temperature tabs' palette and range, with the seams (where the frame index
+       changes between neighbouring pixels) drawn over them; the readout gives the temperature too. Decided (the
+       user): the lines are black and white, a pixel each side of the seam, to show over any palette.
+    3. On a dataset's page, **Copy link becomes a link icon beside the dataset's name**.
+    4. **The gear only on the Thermal Analyzer's main page**: gone from the dataset's page (where it sits right of
+       the dataset's buttons) and the viewer; README to match.
   - Done: **user preferences** (the user, `new.md`, 2026-10-30), `user-preferences`: a **settings gear** beside the Thermal
     Analyzer's heading (the datasets page) opening the user's preferences: a **temperature unit** (°C, °F or K) used
     throughout the UI whatever unit an image or workset holds, and a **preferred DJI palette** used throughout the UI
