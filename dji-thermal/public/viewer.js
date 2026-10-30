@@ -213,7 +213,7 @@
         if (v.mosaic_status === "failed") return {text: '<i class="fa fa-exclamation-triangle"></i> The mosaics failed: ' + esc(v.mosaic_error), cls: "text-danger"};
         if (v.mosaic_status === "canceled") return {text: "Building the mosaics was canceled.", cls: "text-muted"};
         if (v.status !== "ready") return {text: "The images were not converted: there is nothing to make mosaics of.", cls: "text-muted"};
-        if (v.mosaic_status !== "ready") return {text: "This conversion has no mosaics.", cls: "text-muted"};
+        if (v.mosaic_status !== "ready") return {text: "This workset has no mosaics.", cls: "text-muted"};
         return {text: "", cls: ""};
     }
 

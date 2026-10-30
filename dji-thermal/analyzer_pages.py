@@ -47,7 +47,7 @@ def viewer_page(plugin):
             raise Http404("No such dataset") from None
         record = conversions.record(task, cid)
         if not record:
-            raise Http404("No such conversion")
+            raise Http404("No such workset")
         return render(request, plugin.template_path("viewer.html"), dict(
             common(plugin), dataset={'id': str(task.id), 'name': datasets.name_of(task)},
             conversion={'id': cid, 'name': record.get('name') or cid}, basemaps=Basemap.get_cached_basemaps()))

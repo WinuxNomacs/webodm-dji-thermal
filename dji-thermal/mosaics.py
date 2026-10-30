@@ -343,7 +343,7 @@ def colormap(task, cid, name):
     if name.startswith(DJI_PREFIX):
         lut = palettes_of(task, cid).get(name[len(DJI_PREFIX):])
         if lut is None:
-            raise ValueError("Not a palette of this conversion")
+            raise ValueError("Not a palette of this workset")
         return {i: (c[0], c[1], c[2], 255) for i, c in enumerate(lut)}
     if name not in VIEWER_COLORMAPS:
         raise ValueError("Not a valid color_map value")

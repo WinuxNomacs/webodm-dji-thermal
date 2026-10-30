@@ -82,12 +82,12 @@ def checks(task, cid):
     problems, warnings = [], []
     settings = conversions.record(task, cid).get('settings') or {}
     if conversions.job(task, cid)['status'] != 'ready':
-        problems.append("The conversion is not finished")
+        problems.append("The workset is not finished converting")
     if settings.get('strip_location'):
-        problems.append("The conversion stripped the frames' location: ODM needs it to place them")
+        problems.append("The workset stripped the frames' location: ODM needs it to place them")
     count = len(tiffs(task, cid))
     if not count:
-        problems.append("The conversion wrote no temperature TIFFs in °C (temp_c, TIFF)")
+        problems.append("The workset has no temperature TIFFs in °C (temp_c, TIFF)")
     elif count < MIN_FRAMES:
         problems.append("A task needs at least {} frames".format(MIN_FRAMES))
 
@@ -152,7 +152,7 @@ def create(task, cid, name, options):
         with transaction.atomic():
             new_task = Task.objects.create(project=task.project, auto_processing_node=False, processing_node=None)
             if link_frames(task, cid, new_task) < MIN_FRAMES:
-                raise ValueError("The conversion's TIFFs are no longer on the server")
+                raise ValueError("The workset's TIFFs are no longer on the server")
             new_task.images_count = len(new_task.scan_images())
             serializer = TaskSerializer(new_task, data={'name': name, 'options': options}, partial=True)
             serializer.is_valid(raise_exception=True)
@@ -247,7 +247,7 @@ def use_for_parent(task, cid, user=None):
             for name in t.scan_images():
                 os.remove(t.get_image_path(name))
             t.save()
-            raise ValueError("The conversion's TIFFs are no longer on the server")
+            raise ValueError("The workset's TIFFs are no longer on the server")
         t.images_count = count
         if not t.options:
             options = [{'name': o['name'], 'value': o['value']} for o in plan_options(task) if o['recommended']]

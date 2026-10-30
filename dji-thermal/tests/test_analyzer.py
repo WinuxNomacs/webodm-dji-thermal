@@ -314,7 +314,7 @@ class TestConversions(AnalyzerTestCase):
         self.upload(task, [jpeg("DJI_0001_V.JPG")])
         res = self.convert(task)
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        self.assertEqual((res.data["name"], res.data["status"]), ("Conversion 1", "failed"))
+        self.assertEqual((res.data["name"], res.data["status"]), ("Workset 1", "failed"))
         self.assertIn("No image could be converted", res.data["error"])
         self.assertEqual([(f["path"], f["ok"]) for f in res.data["results"]["files"]], [("DJI_0001_V.JPG", False)])
         d = self.client.get("{}/{}".format(API, task.id)).data
@@ -638,7 +638,7 @@ class TestConversionTasks(AnalyzerTestCase):
             res = self.client.post(self.url(task, cid), {"name": "x", "options": []}, format="json")
             self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         datasets.update_job(task, rel=conversions.rel(cid, "job.json"), status="converting")
-        self.assertIn("The conversion is not finished", self.client.get(self.url(task, cid)).data["problems"])
+        self.assertIn("The workset is not finished converting", self.client.get(self.url(task, cid)).data["problems"])
         self.assertEqual(Task.objects.exclude(tags__contains=datasets.TAG).count(), tasks)
 
     def test_options_refused_or_tiffs_gone_make_no_task(self):
@@ -649,7 +649,7 @@ class TestConversionTasks(AnalyzerTestCase):
             self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST, options)
         shutil.rmtree(conversions.output_path(task, cid))
         res = self.client.post(self.url(task, cid), {"name": "x", "options": []}, format="json")
-        self.assertEqual(res.data["error"], "The conversion's TIFFs are no longer on the server")
+        self.assertEqual(res.data["error"], "The workset's TIFFs are no longer on the server")
         self.assertEqual(Task.objects.count(), before)
         with mock.patch.object(datasets, "over_quota", return_value=True):
             self.assertEqual(self.client.post(self.url(task, cid), {"name": "x"}, format="json").status_code,
