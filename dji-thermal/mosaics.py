@@ -12,13 +12,11 @@ Files, in the conversion's folder (see conversions):
     mosaics.json                   what was built (see build)
 """
 
-import colorsys
 import json
 import math
 import os
 import shutil
 import time
-from functools import cache
 from pathlib import Path
 
 from . import converter, datasets
@@ -44,7 +42,7 @@ REPORT_DETAIL = ('pairs_detail', 'frames', 'per_frame')
 # The colour maps of WebODM's tiler offered beside DJI's palettes
 VIEWER_COLORMAPS = ('inferno', 'magma', 'plasma', 'viridis', 'hot', 'jet', 'rainbow', 'gray', 'gray_r')
 DJI_PREFIX = 'dji_'
-FRAME_COLORS = 256      # the source frame tab colours frame n with colour n % FRAME_COLORS
+SEAM_COLORS = ((0, 0, 0), (255, 255, 255))   # the source frame tab's lines: a pixel of each, either side of a seam
 TILE_SIZE = 256
 
 
@@ -302,16 +300,6 @@ def tab_raster(task, cid, tab):
     return None
 
 
-@cache
-def frame_colormap():
-    """Distinct colours for neighbouring frames (hues a golden angle apart): {index: (r, g, b, 255)}"""
-    out = {}
-    for i in range(FRAME_COLORS):
-        r, g, b = colorsys.hsv_to_rgb((i * 0.618033988749895) % 1.0, 0.65 + 0.3 * (i % 2), 0.95 - 0.25 * (i % 3 == 2))
-        out[i] = (int(r * 255), int(g * 255), int(b * 255), 255)
-    return out
-
-
 def encoded(colors):
     """Colours as WebODM's tiler gives them (0xRRGGBBAA integers), for the colour scale"""
     return [(int(c[0]) << 24) | (int(c[1]) << 16) | (int(c[2]) << 8) | 255 for c in colors]
@@ -362,10 +350,24 @@ def default_palette(task, cid, settings, preferred=None):
     return 'inferno'
 
 
+def seams(frames, valid):
+    """The pixels either side of where neighbouring pixels come from different frames: (first side, second side) masks,
+    the first left of or above the seam"""
+    import numpy as np
+    first, second = np.zeros(frames.shape, bool), np.zeros(frames.shape, bool)
+    across = valid[:, :-1] & valid[:, 1:] & (frames[:, :-1] != frames[:, 1:])
+    first[:, :-1] |= across
+    second[:, 1:] |= across
+    down = valid[:-1, :] & valid[1:, :] & (frames[:-1, :] != frames[1:, :])
+    first[:-1, :] |= down
+    second[1:, :] |= down
+    return first, second
+
+
 def tile(task, cid, tab, z, x, y, cmap, low, high):
     """
-    A tile of a viewer tab as PNG bytes: temperatures and view angles over low..high in cmap, source frames each in
-    their own colour; never interpolated (nearest pixel).
+    A tile of a viewer tab as PNG bytes: temperatures and view angles over low..high in cmap; the source frames as the
+    temperatures with black and white lines where one frame meets the next; never interpolated (nearest pixel).
     :return: None when the tile is outside the mosaic
     """
     import numpy as np
@@ -377,6 +379,9 @@ def tile(task, cid, tab, z, x, y, cmap, low, high):
     from app.raster_utils import ZOOM_EXTRA_LEVELS
 
     raster, band = tab_raster(task, cid, tab)
+    framed = tab == 'source_frame'
+    # The source frames read the temperatures too, and a pixel around the tile to find the seams on its edges
+    buffer = 1 if framed else 0
     with COGReader(raster) as src:
         if not src.tile_exists(z, x, y):
             return None
@@ -384,20 +389,27 @@ def tile(task, cid, tab, z, x, y, cmap, low, high):
         if z < minzoom - ZOOM_EXTRA_LEVELS or z > maxzoom + ZOOM_EXTRA_LEVELS:
             return None
         try:
-            t = src.tile(x, y, z, indexes=(band,), tilesize=TILE_SIZE, resampling_method='nearest')
+            t = src.tile(x, y, z, indexes=(1, band) if framed else (band,), tilesize=TILE_SIZE,
+                         resampling_method='nearest', tile_buffer=buffer or None)
         except TileOutsideBounds:
             return None
     data = np.asarray(t.data[0], dtype=np.float64)
     valid = (t.mask > 0) & np.isfinite(data)
-    if band == 1:
+    if framed or band == 1:
         valid &= data > low_value(result(task, cid).get('unit') or 'C')
-    if tab == 'source_frame':
-        levels = np.mod(np.rint(np.where(valid, data, 0)), FRAME_COLORS)
-        cmap = frame_colormap()
-    else:
-        levels = np.clip(np.rint((np.where(valid, data, low) - low) / (high - low) * 255), 0, 255)
+    levels = np.clip(np.rint((np.where(valid, data, low) - low) / (high - low) * 255), 0, 255).astype(np.uint8)
+    if framed:
+        lut = np.array([cmap[i][:3] for i in range(256)], dtype=np.uint8)
+        rgb = lut[levels]
+        frames = np.asarray(t.data[1], dtype=np.float64)
+        first, second = seams(np.rint(np.where(np.isfinite(frames), frames, -1)), valid & np.isfinite(frames))
+        rgb[first], rgb[second] = SEAM_COLORS
+        inner = (slice(buffer, -buffer), slice(buffer, -buffer))
+        rgb, valid = rgb[inner], valid[inner]
+        mask = np.where(valid, 255, 0).astype(np.uint8)
+        return render(np.moveaxis(rgb, 2, 0), mask, img_format='PNG')
     mask = np.where(valid, 255, 0).astype(np.uint8)
-    return render(levels.astype(np.uint8)[np.newaxis], mask, img_format='PNG', colormap=cmap)
+    return render(levels[np.newaxis], mask, img_format='PNG', colormap=cmap)
 
 
 def point(task, cid, tab, lon, lat):

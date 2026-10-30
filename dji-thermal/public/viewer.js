@@ -1,5 +1,5 @@
 // A conversion's mosaics on a map (viewer.html), over WebODM's base layers: a tab per mosaic (as converted, harmonized,
-// and the as-converted mosaic's source frames and view angles), its palette and range changed live through the tile
+// and the as-converted mosaic's source frames, over its temperatures, and view angles), its palette and range changed live through the tile
 // URL with its colour scale, the values under the cursor, and what dji-thermal-cli reports about the mosaic. Leaflet is
 // WebODM's own, from the plugin's build (thermal/Leaflet.js).
 (function (root) {
@@ -7,22 +7,23 @@
     var esc = function (t) { return core.escapeHtml(t); };
     var POLL_MS = 2000;
     var HOVER_MS = 120;         // the readout asks for the point the cursor rests on, not every point it crosses
-    var TAB_LABELS = {as_converted: "As converted", harmonized: "Harmonized", source_frame: "Source frame",
+    var TAB_LABELS = {as_converted: "Mosaic", harmonized: "Harmonized", source_frame: "Source frame",
                       view_angle: "View angle"};
     var TAB_HINTS = {
         as_converted: "Each pixel is one frame's own temperature, as the frames were converted.",
         harmonized: "Normalized: one ambient and reflected temperature for every frame, and each frame's offset against " +
             "its neighbours removed (camera drift between recalibrations).",
-        source_frame: "Which frame each pixel comes from (the one that saw it closest to straight down), each frame in " +
-            "its own colour: the seams are where the colours change.",
+        source_frame: "Where each frame was placed: the mosaic, with a line where one frame meets the next (each pixel " +
+            "comes from the frame that saw it closest to straight down).",
         view_angle: "How far from straight down each pixel was seen, in degrees."
     };
 
     function tabLabel(tab) { return TAB_LABELS[tab] || tab; }
 
-    function isTemperature(tab) { return tab === "as_converted" || tab === "harmonized"; }
+    // The source frames are shown over the as-converted temperatures
+    function isTemperature(tab) { return tab === "as_converted" || tab === "harmonized" || tab === "source_frame"; }
 
-    // The tabs that share a palette and range: both temperature mosaics show the same scale, to compare them
+    // The tabs that share a palette and range: the temperature mosaics show the same scale, to compare them
     function styleGroup(tab) { return isTemperature(tab) ? "temperature" : tab; }
 
     // A temperature in the mosaic's unit as the user types it, and back
@@ -112,11 +113,8 @@
     // A tab's tile URL template (base: the conversion's API URL) with its palette and range; the build time makes a
     // mosaic built again a new URL, so the browser keeps tiles no longer than the mosaic they show
     function tileUrl(base, tab, style, builtAt) {
-        var query = ["v=" + encodeURIComponent(builtAt || "")];
-        if (tab !== "source_frame") {
-            query.push("color_map=" + encodeURIComponent(style.palette));
-            query.push("rescale=" + style.range[0] + "," + style.range[1]);
-        }
+        var query = ["v=" + encodeURIComponent(builtAt || ""), "color_map=" + encodeURIComponent(style.palette),
+                     "rescale=" + style.range[0] + "," + style.range[1]];
         return base + "/mosaics/" + tab + "/tiles/{z}/{x}/{y}.png?" + query.join("&");
     }
 
@@ -127,10 +125,9 @@
         }).join("");
     }
 
-    // The tab's palette, colour scale and range (none for the source frames)
+    // The tab's palette, colour scale and range
     function controlsHtml(tab, style, palettes, unit) {
         var out = '<p class="ta-viewer-hint">' + esc(TAB_HINTS[tab.tab] || "") + "</p>";
-        if (tab.tab === "source_frame") return out;
         var temperature = isTemperature(tab.tab);
         var symbol = temperature ? core.unitSymbol(core.userUnit()) : "°";
         var shown = function (x) { return temperature ? shownTemp(x, unit) : x; };

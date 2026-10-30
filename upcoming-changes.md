@@ -60,7 +60,7 @@
     `link-older-tasks`: listing a workset's tasks (`conversion_tasks.made`, called by the Analyzer's datasets list
     and dataset page) now adds the tag to a task without it. Test: Django 118. Live check: opening the Analyzer
     tagged the user's "HomerunObliqueII - default-webodm-recommendations", whose panel now has the button.
-  - Planned: **viewer and header polish** (the user, `new.md`, 2026-10-30), `viewer-header-polish`:
+  - Done: **viewer and header polish** (the user, `new.md`, 2026-10-30), `viewer-header-polish`:
     1. The viewer's **"As converted" tab becomes "Mosaic"** (as converted is what's expected); README to match.
     2. **Source frame shows the mosaic with lines between frames** instead of a random colour per frame: the
        as-converted temperatures in the temperature tabs' palette and range, with the seams (where the frame index
@@ -69,6 +69,14 @@
     3. On a dataset's page, **Copy link becomes a link icon beside the dataset's name**.
     4. **The gear only on the Thermal Analyzer's main page**: gone from the dataset's page (where it sits right of
        the dataset's buttons) and the viewer; README to match.
+    Built: `public/viewer.js` (the tab's label; the source frames styled as a temperature tab, sharing its palette
+    and range), `mosaics.py` (`seams`; the source-frame tile reads the temperatures and the frame index with a
+    pixel's buffer, so seams on a tile's edge are drawn; the per-frame colours gone), `analyzer_api.py` (the tab has
+    the temperatures' stats; `frame_colors` gone), `templates/` (the link icon in the dataset's heading, the gear
+    only on the main page; the icon style `.ta-icon` shared), `public/dataset.js` (the icon ticks for 1.5 s once
+    copied). Tests: Django 119 with `app.tests.test_plugins`, Jest 128. Live check on :8002 on the user's dataset
+    (thumbnails blocked, nothing written): tabs Mosaic, Harmonized, Source frame, View angle; Source frame in DJI
+    ironred with the lines; the link icon copies the link and ticks; the gear only on the main page.
   - Done: **user preferences** (the user, `new.md`, 2026-10-30), `user-preferences`: a **settings gear** beside the Thermal
     Analyzer's heading (the datasets page) opening the user's preferences: a **temperature unit** (°C, °F or K) used
     throughout the UI whatever unit an image or workset holds, and a **preferred DJI palette** used throughout the UI

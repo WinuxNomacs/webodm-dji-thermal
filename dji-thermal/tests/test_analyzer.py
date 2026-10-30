@@ -469,6 +469,17 @@ class TestMosaics(AnalyzerTestCase):
     def url(self, task, cid, rest=""):
         return "{}/{}/conversions/{}/mosaics{}".format(API, task.id, cid, rest)
 
+    def test_the_source_frames_lines_are_a_black_and_a_white_pixel_either_side_of_where_frames_meet(self):
+        import numpy as np
+        frames = np.array([[0, 0, 1],
+                           [0, 0, 1],
+                           [2, 2, 2]])
+        valid = np.ones(frames.shape, bool)
+        valid[2, 2] = False
+        first, second = mosaics.seams(frames, valid)
+        self.assertEqual(first.astype(int).tolist(), [[0, 1, 0], [1, 1, 0], [0, 0, 0]])
+        self.assertEqual(second.astype(int).tolist(), [[0, 0, 1], [0, 0, 1], [1, 1, 0]])
+
     def test_mosaics_are_built_only_of_a_converted_conversion_by_who_can_change_it(self):
         task, cid = self.converted()
         self.assertEqual(self.client.get(self.url(task, cid)).data["mosaic_status"], "")
@@ -560,8 +571,15 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual(Image.open(io.BytesIO(tile.content)).size, (256, 256))
         self.assertEqual(self.client.get(tile_url, {"color_map": "pink"}).status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.client.get(tile_url, {"rescale": "5,1"}).status_code, status.HTTP_400_BAD_REQUEST)
-        frames_tile = self.client.get(self.url(task, cid, "/source_frame/tiles/{}/{}/{}.png".format(t.z, t.x, t.y)))
+        # The source frames: the temperatures in the palette, with black and white lines where frames meet (white is
+        # not in inferno), the whole mosaic in one tile
+        whole = web_mercator_tile(lon, lat, tab["minzoom"])
+        frames_tile = self.client.get(self.url(task, cid, "/source_frame/tiles/{}/{}/{}.png".format(whole.z, whole.x, whole.y)),
+                                      {"color_map": "inferno", "rescale": "{},{}".format(lo, hi)})
         self.assertEqual(frames_tile.status_code, status.HTTP_200_OK)
+        pixels = Image.open(io.BytesIO(frames_tile.content)).convert("RGBA").getdata()
+        self.assertIn((255, 255, 255, 255), pixels)
+        self.assertIn((0, 0, 0, 255), pixels)
         self.assertEqual(self.client.get(self.url(task, cid, "/harmonized/tiles/{}/0/0.png".format(t.z))).status_code,
                          status.HTTP_404_NOT_FOUND)
 

@@ -61,8 +61,7 @@ OpenStreetMap's Nominatim; the Thermal Task does not, as the plugin calls no out
 **Thermal Analyzer**, in WebODM's menu, lists the thermal datasets of every project you can view, with their
 analysis and worksets at a glance.
 
-**Preferences** (the gear beside the heading, and on a dataset's and a mosaic's page) are kept for your WebODM
-account:
+**Preferences** (the gear beside the Thermal Analyzer's heading) are kept for your WebODM account:
 
 - **Temperature unit**: °C, °F or K, used throughout the Analyzer and the Thermal Task whatever unit an image or
   workset holds; by default WebODM's unit system (°F when imperial, else °C).
@@ -92,8 +91,8 @@ height and the size. A camera's row opens its frames on the Files tab, and each 
   command that prepares the images.
 - **Worksets**: see below.
 
-**Add images**, **Analyze again**, **Rename**, **Copy link** and **Delete** are on the dataset's page; adding images
-marks the analysis out of date until it is run again.
+**Add images**, **Analyze again**, **Rename** and **Delete** are on the dataset's page, with a link icon beside its
+name to copy a link to it; adding images marks the analysis out of date until it is run again.
 
 ### Worksets
 
@@ -124,7 +123,8 @@ places the frames side by side from their positions and angles, with no WebODM t
 harmonized (normalized, each frame's offset against its neighbours removed). **View mosaics** shows them on a map
 over WebODM's base layers:
 
-- a tab for each mosaic, the frame each pixel comes from and the angle it was seen at;
+- a tab for each mosaic (**Mosaic**, as converted, and **Harmonized**), **Source frame** (the mosaic with a black and
+  white line where one frame meets the next) and **View angle** (the angle each pixel was seen at);
 - the palette (the usual ones and the DJI palettes of the images; opening in your preferred one, if they hold it) and the
   range, changed live, with the colour scale
   and **Auto** (the 2nd to 98th percentile);

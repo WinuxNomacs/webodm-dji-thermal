@@ -533,7 +533,7 @@ def viewer(task, cid, user):
             continue
         stats = k.get('view_angle') if tab == 'view_angle' else k.get('temperature')
         tabs.append({'tab': tab, 'kind': kind, 'bounds': k.get('bounds'), 'minzoom': k.get('minzoom'),
-                     'maxzoom': k.get('maxzoom'), 'stats': stats if tab != 'source_frame' else None})
+                     'maxzoom': k.get('maxzoom'), 'stats': stats})
     in_mosaic = set(built.get('frames') or [])
     times = sorted(f['time'] for f in datasets.analysis(task).get('files') or []
                    if f.get('path') in in_mosaic and f.get('time'))
@@ -545,7 +545,6 @@ def viewer(task, cid, user):
         'kinds': {kind: {key: v for key, v in k.items() if key != 'raster'} for kind, k in kinds.items()},
         'palettes': palettes,
         'default_palette': mosaics.default_palette(task, cid, settings, conversions.display(user)['palette']) if kinds else None,
-        'frame_colors': mosaics.encoded(mosaics.frame_colormap()[i] for i in range(mosaics.FRAME_COLORS)),
         'can_change': user.has_perm('change_project', task.project),
     })
     return out
@@ -581,23 +580,21 @@ class MosaicTile(DatasetView):
     def get(self, request, pk, cid, tab, z, x, y):
         """
         A PNG tile of a viewer tab: temperatures and view angles over rescale=min,max with color_map (one of the
-        viewer's palettes), source frames each in their own colour. The viewer's URL carries the mosaics' build time,
-        so a tile is cached until they are built again.
+        viewer's palettes), the source frames as the temperatures with lines between the frames. The viewer's URL
+        carries the mosaics' build time, so a tile is cached until they are built again.
         """
         task = get_conversion(request, pk, cid)
         tab_raster(task, cid, tab)
-        cmap, low, high = None, 0.0, 1.0
-        if tab != 'source_frame':
-            settings = conversions.record(task, cid).get('settings') or {}
-            try:
-                cmap = mosaics.colormap(task, cid, request.query_params.get('color_map') or
-                                        mosaics.default_palette(task, cid, settings,
-                                                                conversions.display(request.user)['palette']))
-                low, high = (float(v) for v in (request.query_params.get('rescale') or '0,1').split(','))
-            except ValueError as e:
-                raise ValidationError({'error': str(e) if 'color' in str(e) else "Invalid rescale value"}) from None
-            if not high > low:
-                raise ValidationError({'rescale': "The range's maximum must be above its minimum"})
+        settings = conversions.record(task, cid).get('settings') or {}
+        try:
+            cmap = mosaics.colormap(task, cid, request.query_params.get('color_map') or
+                                    mosaics.default_palette(task, cid, settings,
+                                                            conversions.display(request.user)['palette']))
+            low, high = (float(v) for v in (request.query_params.get('rescale') or '0,1').split(','))
+        except ValueError as e:
+            raise ValidationError({'error': str(e) if 'color' in str(e) else "Invalid rescale value"}) from None
+        if not high > low:
+            raise ValidationError({'rescale': "The range's maximum must be above its minimum"})
         content = mosaics.tile(task, cid, tab, int(z), int(x), int(y), cmap, low, high)
         if content is None:
             raise NotFound()

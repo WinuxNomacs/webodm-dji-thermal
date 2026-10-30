@@ -7,7 +7,8 @@
     <div class="ta-breadcrumb"><a href="{{ public }}"><i class="fa fa-arrow-left"></i> Thermal Analyzer</a></div>
     <div class="ta-header">
         <div>
-            <h3 id="ta-name">{{ dataset.name }}</h3>
+            <h3><span id="ta-name">{{ dataset.name }}</span>
+                <button type="button" class="btn btn-link btn-sm ta-icon" id="ta-copy-link" title="Copy a link to this dataset" aria-label="Copy link"><i class="fa fa-link"></i></button></h3>
             <div class="ta-subtitle" id="ta-subtitle"></div>
         </div>
         <div class="ta-header-actions" id="ta-actions">
@@ -15,10 +16,8 @@
                 <input type="file" id="ta-add-files" multiple accept=".jpg,.jpeg,image/jpeg" hidden></label>
             <button type="button" class="btn btn-default btn-sm" id="ta-analyze" hidden><i class="fa fa-sync"></i> Analyze again</button>
             <button type="button" class="btn btn-default btn-sm" id="ta-cancel" hidden><i class="fa fa-stop"></i> Cancel</button>
-            <button type="button" class="btn btn-default btn-sm" id="ta-copy-link" title="Copy a link to this dataset"><i class="fa fa-link"></i> Copy link</button>
             <button type="button" class="btn btn-default btn-sm" id="ta-rename" hidden title="Rename"><i class="fa fa-pencil-alt"></i></button>
             <button type="button" class="btn btn-danger btn-sm" id="ta-delete" hidden title="Delete"><i class="fa fa-trash"></i></button>
-            <button type="button" class="btn btn-default btn-sm" id="ta-prefs" title="Preferences: temperature unit and DJI palette" aria-label="Preferences"><i class="fa fa-cog"></i></button>
         </div>
     </div>
 
