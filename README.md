@@ -134,10 +134,22 @@ conversion's temperature TIFFs in °C (the `temp_c` TIFF output), without upload
 The conversion lists the tasks made from it, each with its status and a link to it on the dashboard. A task keeps
 its images when the conversion or the dataset is deleted.
 
+**Use for parent task**, in the same menu, sends the conversion's °C TIFFs to the dataset's own task (see below)
+instead of a new one, so one task is processed again and again as you try conversions:
+
+- The TIFFs replace the images sent there before, and what the task processed from them (its orthophoto, models and
+  other results) is removed; the dialog says what it replaces. It is refused while the task is processing.
+- The task then waits for a processing node, as a new one does: the link in the message opens it on the dashboard,
+  where **Set a processing node** sets its node and options. A task without options gets the plan's recommended ones;
+  options you set there are kept the next time.
+- The conversion shows that the dataset's task holds its TIFFs, with the task's status.
+
 ### Where a dataset is kept
 
-A dataset is kept in a task of its project, named "Thermal dataset: *name*", which WebODM never processes: it shows
-in the project's task list with "Set a processing node" (leave it unset). It is shared as the project is:
+A dataset is kept in a task of its project, named "Thermal dataset: *name*": its photos and conversions are in that
+task's folder, apart from the images WebODM processes, so the task holds no image until a conversion is sent to it
+(**Use for parent task**). It shows in the project's task list with "Set a processing node"; leave it unset until it
+holds a conversion's TIFFs. It is shared as the project is:
 
 - viewing the project shows the dataset, its conversions and mosaics, and downloads them;
 - changing the project allows adding images, analyzing, converting and making tasks;
@@ -145,7 +157,9 @@ in the project's task list with "Set a processing node" (leave it unset). It is 
 
 Its photos and conversions count toward the project owner's storage quota (no upload, conversion, mosaic or task once
 the owner is over it); a task made from a conversion counts its own images too. The dataset goes when its task or the
-project is deleted. Temperatures are shown in degrees Celsius, or Fahrenheit with WebODM's imperial units.
+project is deleted. Deleting the dataset deletes its task too, unless a conversion was sent to it: the task is then
+kept as an ordinary WebODM task (named without "Thermal dataset:") with those images and what it processed.
+Temperatures are shown in degrees Celsius, or Fahrenheit with WebODM's imperial units.
 
 ## The converted images
 
@@ -187,19 +201,20 @@ checked on a real flight; the others on DJI's Thermal SDK sample images only.
 
 `CLAUDE.md` describes the dev environment (WebODM in Docker on port 8002, `dev/webodm.sh`) and the checks.
 
-The plugin's parts: `converter.py` (R-JPEG to TIFF), `api.py` (its API, under `/api/plugins/dji-thermal/`: `describe`
-a photo's camera, recorded values and ranges; `projects/<id>/tasks/<id>/convert` one photo into a partial task, with
-WebODM's project permission), `sdk.py` with `page.py` and `templates/sdk.html` (DJI's own SDK and the DJI Thermal
-page, `/plugins/dji-thermal/sdk/`), the Thermal Analyzer (`datasets.py`: the holder tasks and their records;
-`analysis.py`: the analysis job, run by WebODM's worker; `conversions.py`: the conversions, their settings and job,
-and each user's defaults; `mosaics.py`: a conversion's mosaics, their job, and the viewer's tiles and values with
-WebODM's rio-tiler; `conversion_tasks.py`: a WebODM task from a conversion; `analyzer_api.py`: its API under
-`/api/plugins/dji-thermal/datasets`, with a conversion's `task`; `analyzer_pages.py` with `templates/datasets.html`,
-`dataset.html` and `viewer.html`: its pages, `/plugins/dji-thermal/`, `/plugins/dji-thermal/dataset/<id>` and its
-conversions' mosaics, `.../dataset/<id>/conversion/<id>`), and `public/` (`main.js`, which adds the button and the DJI
-Thermal page's link under Administration; `analyzer_core.js`, `datasets.js`, `dataset.js`, `conversions.js`,
-`viewer.js` and `analyzer.css`, the Analyzer's pages, plain scripts; and `thermal/`, the button and panel (JSX) and
-WebODM's own Leaflet for the viewer (`Leaflet.js`), built by WebODM's webpack when the plugin is installed).
+The plugin's parts: `converter.py` (R-JPEG to TIFF), `api.py` (its API, under `/api/plugins/dji-thermal/`: `describe` a
+photo's camera, recorded values and ranges; `projects/<id>/tasks/<id>/convert` one photo into a partial task, with
+WebODM's project permission), `sdk.py` with `page.py` and `templates/sdk.html` (DJI's own SDK and the DJI Thermal page,
+`/plugins/dji-thermal/sdk/`), the Thermal Analyzer (`datasets.py`: the holder tasks and their records; `analysis.py`:
+the analysis job, run by WebODM's worker; `conversions.py`: the conversions, their settings and job, and each user's
+defaults; `mosaics.py`: a conversion's mosaics, their job, and the viewer's tiles and values with WebODM's rio-tiler;
+`conversion_tasks.py`: a WebODM task from a conversion, or the dataset's own task given its TIFFs; `analyzer_api.py`:
+its API under `/api/plugins/dji-thermal/datasets`, with a conversion's `task` and `parent`; `analyzer_pages.py` with
+`templates/datasets.html`, `dataset.html` and `viewer.html`: its pages, `/plugins/dji-thermal/`,
+`/plugins/dji-thermal/dataset/<id>` and its conversions' mosaics, `.../dataset/<id>/conversion/<id>`), and `public/`
+(`main.js`, which adds the button and the DJI Thermal page's link under Administration; `analyzer_core.js`,
+`datasets.js`, `dataset.js`, `conversions.js`, `viewer.js` and `analyzer.css`, the Analyzer's pages, plain scripts; and
+`thermal/`, the button and panel (JSX) and WebODM's own Leaflet for the viewer (`Leaflet.js`), built by WebODM's webpack
+when the plugin is installed).
 
 The tests never use images or DJI's files from this repository: none is committed or published. Those that need
 real R-JPEGs or DJI's SDK read them from your machine, set in an untracked `.env` file at the repo root, and are

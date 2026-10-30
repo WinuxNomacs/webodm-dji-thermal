@@ -223,14 +223,19 @@
 
     // What deleting a dataset (a summary of it, or its detail) takes with it, paragraph by paragraph
     function deleteText(d) {
-        var out = ["“" + d.name + "” and its " + count(d.file_count, "image", "images") + " are deleted, with the task " +
-            "that holds them in the project."];
+        var kept = d.parent && d.parent.images_count;
+        var out = ["“" + d.name + "” and its " + count(d.file_count, "image", "images") + " are deleted" +
+            (kept ? "." : ", with the task that holds them in the project.")];
         var with_ = [];
         if (d.conversion_count) with_.push(count(d.conversion_count, "conversion", "conversions"));
         if (d.mosaic_count) with_.push(count(d.mosaic_count, "mosaic", "mosaics"));
         if (d.measurement_count) with_.push(count(d.measurement_count, "measurement", "measurements"));
         if (with_.length) {
             out.push("With it: " + with_.slice(0, -1).join(", ") + (with_.length > 1 ? " and " : "") + with_[with_.length - 1] + ".");
+        }
+        if (kept) {
+            out.push("The dataset's task is kept as an ordinary WebODM task, “" + d.name + "”, with the " + count(d.parent.images_count, "image", "images") +
+                " sent to it" + (d.parent.processed ? " and what it processed" : "") + ".");
         }
         if (d.task_count) out.push("The WebODM tasks made from its conversions are kept.");
         out.push("This cannot be undone.");

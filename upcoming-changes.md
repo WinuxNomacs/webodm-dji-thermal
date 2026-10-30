@@ -11,6 +11,38 @@
     sorted by it or only those without GPS (a chip on the Files tab clears it); stacked at phone width.
     `public/dataset.js` (`summaryRows`, `duration`, `overviewHtml`, the Files tab's `camera` / `nogps` scope),
     `analyzer.css`; Jest 119.
+  - Done: a conversion's menu items aligned (2026-10-30, `conversion-menu-align`): WebODM's theme padded the menu's
+    link (Download all) 10px less than its buttons; links and buttons now share one rule in `analyzer.css`.
+  - Done: **Use for parent task** (the user, 2026-10-30), `use-for-parent-task`: a conversion's menu sends its °C TIFFs to
+    the dataset's own task (the holder, "Thermal dataset: *name*") instead of a new task, replacing all the images
+    sent there before, so one task is reused rather than a task per conversion; on success, a link to the task on
+    the dashboard to configure it there. The holder can be processed: WebODM reads only the images at its folder's
+    root and writes only `assets/`, never `thermal/`; its Edit panel keeps the hidden tag. Decided (the user):
+    - **Old results removed** when its images are replaced: the task goes back to waiting for a processing node
+      (as WebODM itself starts a task again: no node task, no status, assets and console cleared, the old node task
+      removed), never showing results of other images; refused while it is queued or processing.
+    - **Deleting the dataset keeps a task a conversion was sent to**, as an ordinary task (tag and name prefix
+      dropped, `thermal/` removed) with those images and what it processed; otherwise the task goes, as before.
+    - **"Use settings" renamed "Copy settings to form"** (it fills the Convert form with the conversion's settings,
+      for a new conversion).
+    Also: a task without options gets the plan's recommended ones (options set in WebODM are kept next time);
+    `thermal/parent.json` records which conversion it holds, shown on that conversion. Code: `conversion_tasks.py`
+    (`use_for_parent`, `clear_parent`, `parent`, `release`), `analyzer_api.py` (`ConversionParent`, the dataset's
+    `parent`, Delete), `public/conversions.js` (`parentHtml`, `useForParent`), `analyzer_core.js` (`deleteText`).
+    Tests: Django 112 with `app.tests.test_plugins` (analyzer 47), Jest 122. Live check on :8002, a dataset of its own
+    (40 M4T frames): sent from the menu (no replace asked), 40 images and the plan's options, no node; given a node and
+    processed (8.5 min); a second conversion sent with the Replace dialog (images replaced, results gone, waiting
+    again); the dataset deleted, its task kept as "Live check parent task" without the tag, then removed.
+  - **To look into**: that live check's orthophoto (40 frames not normalized, 6.9 to 31.8 °C, the plan's options
+    with orthophoto-resolution 2.1) read -601 to 603 °C in WebODM's statistics, where the release check's
+    (normalized) gave 6.9 to 45.0 °C: not from sending (the same TIFFs a new task gets), to find out before 1.0.0.
+  - **The Convert tab as Worksets** (the user, `new.md`, 2026-10-30), after Use for parent task: the dataset page's
+    Convert tab renamed **Worksets** and moved first, left of Files. In it, the **Settings:** section expandable and
+    collapsible, and its **Outputs** subsection too; collapsed, each still shows what is selected that differs from
+    the defaults (as the chips do), not the defaults. Builds on the tab's summary chips (`differences`, `chipsHtml`)
+    and its sections (`details.ta-section`; Outputs is a plain section today). Decided (the user): **"workset"
+    everywhere in the UI** (the tab, its heading, buttons, menu items, messages, the README; code and API names stay
+    "conversion"); **a dataset's page opens on Worksets**.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
