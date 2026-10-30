@@ -1,12 +1,12 @@
 {
 	"name": "DJI Thermal",
 	"webodmMinVersion": "3.3.2",
-	"description": "Converts DJI radiometric thermal images (R-JPEG) into temperature images and processes them as a WebODM task.",
-	"version": "0.1.0",
+	"description": "Turns DJI radiometric thermal photos (R-JPEG) into temperature maps: a Thermal Task button, and a Thermal Analyzer to check, convert and mosaic a flight before processing it.",
+	"version": "1.0.0",
 	"author": "Winux Nomacs",
 	"repository": "https://github.com/WinuxNomacs/webodm-dji-thermal",
 	"tags": ["thermal", "dji"],
 	"homepage": "https://github.com/WinuxNomacs/webodm-dji-thermal",
-	"experimental": true,
+	"experimental": false,
 	"deprecated": false
 }

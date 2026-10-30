@@ -10,11 +10,26 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
   conversions side by side), places the frames into mosaics shown on a map, and makes a WebODM task from the
   conversion you choose.
 
-**In development**: nothing is released yet. See [upcoming-changes.md](upcoming-changes.md) for the plan.
-
 Temperatures are computed with [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/), a pure-Python
 implementation of DJI's Thermal SDK: no native library and no outside service. An administrator can have DJI's own
 SDK compute them instead (see [DJI's own Thermal SDK](#djis-own-thermal-sdk)).
+
+## Installing
+
+WebODM 3.3.2 or later. Checked on WebODM's Docker install.
+
+- **From WebODM's plugin list**: Administration > Plugins, find DJI Thermal, install it. WebODM installs without
+  webpack (the native ones) get the copy the plugin list builds for them.
+- **From a release**: download `dji-thermal-X.Y.Z.zip` from this repository's
+  [releases](https://github.com/WinuxNomacs/webodm-dji-thermal/releases) (its sha256 is given there), then
+  Administration > Plugins > **Load Plugin (.zip)**. The plugin's scripts are then built by WebODM's webpack,
+  which the Docker install has.
+
+WebODM installs the plugin's requirements in the plugin's own folder: dji-thermal-cli, with numpy and Pillow at
+WebODM's own versions. Restart WebODM if it asks you to.
+
+The plugin calls no outside service: photos are converted, analyzed and mosaicked on your WebODM server. The mosaic
+viewer's base layers are WebODM's own, loaded by your browser as on WebODM's other maps.
 
 ## The Thermal Task
 

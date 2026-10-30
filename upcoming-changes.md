@@ -3,9 +3,8 @@
 ## Phases (current and upcoming)
 
 **Up next**
-1. **Release 1.0.0** — README, changelog, zip, release check; in the directory and as a GitHub release (below).
-   Prepared once on `release/1.0.0` (unmerged), to be redone on `main` now that part 1 is in (dji-thermal-cli 1.9.0
-   is on PyPI since 2026-10-29).
+- Nothing planned: the user tags `v1.0.0`, attaches the zip to the GitHub release and adds it to WebODM-Plugins'
+  `directory.json` (details under "Done: Release 1.0.0" below).
 
 **Later**
 - **Thermal Analyzer, part 2** — measurements (spot, line, area), comparisons and frame views (below).
@@ -13,8 +12,10 @@
   endpoints served by the plugin (below).
 - **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
   the earlier "Folder conversion" item (below).
+- **macOS**: the dev setup and checks run on macOS, at the very end.
 
 **Done**
+- **Release 1.0.0** — 2026-10-30, `release/1.0.0` (details below).
 - **Thermal Analyzer, part 1** — 2026-10-29, in four steps (`analyzer-datasets`, `analyzer-conversions`,
   `analyzer-mosaics`, `analyzer-task`; details under "1. Thermal Analyzer, part 1" below).
 - **The DJI Thermal page under Administration** — 2026-10-29, `admin-page` (details below).
@@ -291,14 +292,42 @@ since libdirp can crash, with the SDK found by `DJI_THERMAL_SDK_DIR` (an unpacke
 - **The CLI work** (the user, 2026-10-29): branch `native-sdk` in dji-thermal-cli from its `main` (1.8.0,
   published), then `release/1.9.0`, merged there, not pushed; the plugin then pins 1.9.0.
 
-## 2. Release 1.0.0
+## Done: Release 1.0.0
 
 README (what it does, cameras, installing, using it, that it calls no outside service), `CHANGELOG.md`, the zip
 (`dev/package.sh`), the `release-check` skill.
 
-Open decision: **where to publish**. WebODM's docs point DJI users to Thermal Tools, a paid tool from WebODM's
-maintainers, which this plugin would replace for those cameras. Submit it to WebODM-Plugins' directory as well,
-or distribute it from this repo's releases only.
+Plan: a clean-up pass (unused code, the manifest), README (no longer "in development"; Installing: WebODM 3.3.2 or
+later, Administration > Plugins, the zip and its sha256 or the directory), `CHANGELOG.md` (the Thermal Task, the
+Thermal Analyzer part 1, DJI's own SDK), manifest 1.0.0 with a description naming both ways in, the zip, the
+`release-check` skill (the zip installed as a user would, a live check of the Thermal Task and the Analyzer), merge.
+Redone on `main` (2026-10-30) after part 1; the first `release/1.0.0` (2026-10-29, before the Analyzer) was
+replaced, its changes carried over.
+
+**Decided (the user, 2026-10-29):**
+- **Published in WebODM-Plugins' directory and as this repo's GitHub release**: the zip attached to the release,
+  `{url, sha256}` added to `directory.json` by a PR (the user's).
+- **Not experimental**: the manifest's `experimental` is false from 1.0.0 (the directory's guidance marks plugins
+  experimental unless the author asks otherwise).
+- **macOS checks after 1.0.0**, at the very end.
+
+**Built** (2026-10-30, `release/1.0.0`): manifest 1.0.0, not experimental, its description naming the Thermal Task
+and the Analyzer; `CHANGELOG.md`; README's Installing (no longer "in development"); `DISTANCE_MODES` in
+`thermal/measurement.js` removed (unused). Checks: Ruff, ESLint, Jest 116, Django 109 with `app.tests.test_plugins`.
+`dev/package.sh`: `dist/dji-thermal-1.0.0.zip` (one root `dji-thermal/` with `LICENSE`, no tests), sha256 in the
+merge's report. Release check on :8002: WebODM without the mounted plugin, the zip uploaded with Load Plugin (.zip)
+("DJI Thermal installed successfully", no restart asked; pip installed dji-thermal-cli 1.9.0 from PyPI with numpy
+1.26.2 and Pillow 11.3.0, webpack built the bundles; 1.0.0 listed, enabled). On the installed copy, in a project of
+its own: a Thermal Task of the M4T flight's first 40 thermal frames (3 RGB ignored) processed in 15 min to an
+orthophoto of 11.5 to 31.1 °C, WebODM's Thermal layer; a dataset of the same frames analyzed, converted
+(normalized) with mosaics (40 placed, the viewer's tiles on the base map), a task created from it, given the node and
+processed in 14 min (6.9 to 45.0 °C); no console error but WebODM's dev livereload. The first 20 frames failed in
+OpenSfM in both (no reconstructable pair, as in the SDK phase). Found: WebODM refuses the upload over the mounted
+copy's `media/plugins/dji-thermal` (its pip installs), set aside during the check (the skill says so). Afterwards
+the installed plugin removed in Administration, the project deleted, the mounted copy back.
+
+To publish (the user): tag `v1.0.0` on the merge, a GitHub release with the zip attached (notes: the changelog's
+1.0.0 entry), then a PR to WebODM-Plugins adding `{url, sha256}` to `directory.json`.
 
 ## Done: The DJI Thermal page under Administration
 
