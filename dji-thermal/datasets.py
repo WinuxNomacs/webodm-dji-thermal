@@ -350,10 +350,12 @@ def revoke(celery_task_id):
 
 
 def task_removing(task_id):
-    """The task being deleted: its jobs canceled (they would stop anyway, its folder gone)"""
-    from . import conversions
+    """The task being deleted: its jobs canceled (they would stop anyway, its folder gone), and the tasks made from
+    its conversions no longer linked to it"""
+    from . import conversion_tasks, conversions
     task = Task.objects.filter(pk=task_id).first()
     if task is not None and is_dataset(task):
         cancel_analysis(task)
         for c in conversions.ids(task):
             conversions.cancel(task, c)
+        conversion_tasks.unlink_made(task)

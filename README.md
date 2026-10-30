@@ -134,8 +134,9 @@ workset's temperature TIFFs in °C (the `temp_c` TIFF output), without uploading
 - The task is made **without a processing node**: it waits in the project with "Set a processing node", which opens
   WebODM's own panel (the node and the options, as ticked). Processing starts once you save it there.
 
-The workset lists the tasks made from it, each with its status and a link to it on the dashboard. A task keeps
-its images when the workset or the dataset is deleted.
+The workset lists the tasks made from it, each with its status and a link to it on the dashboard. On the
+dashboard, such a task has a **Thermal dataset** button in its expanded panel, back to the dataset. A task keeps
+its images when the workset or the dataset is deleted (the button then goes).
 
 **Use for parent task**, in the same menu, sends the workset's °C TIFFs to the dataset's own task (see below)
 instead of a new one, so one task is processed again and again as you try worksets:
@@ -152,7 +153,8 @@ instead of a new one, so one task is processed again and again as you try workse
 A dataset is kept in a task of its project, named "Thermal dataset: *name*": its photos and worksets are in that
 task's folder, apart from the images WebODM processes, so the task holds no image until a workset is sent to it
 (**Use for parent task**). It shows in the project's task list with "Set a processing node"; leave it unset until it
-holds a workset's TIFFs. It is shared as the project is:
+holds a workset's TIFFs. Its expanded panel on the dashboard has a **Thermal dataset** button that opens the
+dataset in the Thermal Analyzer. It is shared as the project is:
 
 - viewing the project shows the dataset, its worksets and mosaics, and downloads them;
 - changing the project allows adding images, analyzing, converting and making tasks;

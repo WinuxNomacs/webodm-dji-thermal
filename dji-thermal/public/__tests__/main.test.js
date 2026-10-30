@@ -1,4 +1,5 @@
-// main.js as WebODM loads it on every page: the Thermal Task button, and the DJI Thermal page under Administration
+// main.js as WebODM loads it on every page: the Thermal Task button, the Thermal dataset button on a task's panel, and
+// the DJI Thermal page under Administration
 
 function sideMenu(staff){
     document.body.innerHTML = '<ul id="side-menu"><li><a href="/dashboard/">Dashboard</a></li>' +
@@ -8,7 +9,8 @@ function sideMenu(staff){
 }
 
 function loadMain(){
-    global.PluginsAPI = {Dashboard: {addNewTaskButton: jest.fn()}};
+    global.PluginsAPI = {Dashboard: {addNewTaskButton: jest.fn(), addTaskActionButton: jest.fn()}};
+    global.React = {createElement: (type, props, ...children) => ({type, props, children})};
     jest.isolateModules(() => require("../main.js"));
 }
 
@@ -33,4 +35,31 @@ test("the Thermal Task button is added to the dashboard", () => {
     sideMenu(false);
     loadMain();
     expect(global.PluginsAPI.Dashboard.addNewTaskButton).toHaveBeenCalledTimes(1);
+});
+
+const DATASET = "27fcf631-25ec-4742-b8fc-5a3367c9db77";
+
+function taskButton(task){
+    sideMenu(false);
+    loadMain();
+    return global.PluginsAPI.Dashboard.addTaskActionButton.mock.calls[0][0]({task});
+}
+
+test("a dataset's own task gets a Thermal dataset button to the dataset", () => {
+    const button = taskButton({id: DATASET, tags: ["survey", ".dji-thermal-dataset"]});
+    expect(button.type).toBe("a");
+    expect(button.props.href).toBe("/plugins/dji-thermal/dataset/" + DATASET);
+    expect(button.props.className).toBe("btn btn-sm btn-primary");
+    expect(button.children[1]).toBe(" Thermal dataset");
+});
+
+test("a task made from a workset links back to its dataset", () => {
+    const button = taskButton({id: "11111111-2222-3333-4444-555555555555", tags: [".dji-thermal-from-" + DATASET]});
+    expect(button.props.href).toBe("/plugins/dji-thermal/dataset/" + DATASET);
+});
+
+test("other tasks, and a tag naming no dataset, get no button", () => {
+    expect(taskButton({id: DATASET, tags: ["survey"]})).toBeNull();
+    expect(taskButton({id: DATASET})).toBeNull();
+    expect(taskButton({id: DATASET, tags: [".dji-thermal-from-../../admin"]})).toBeNull();
 });

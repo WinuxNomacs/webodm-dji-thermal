@@ -603,6 +603,8 @@ class TestConversionTasks(AnalyzerTestCase):
                                                      "b_DJI_0001_T_temp_c.tiff"])
         self.assertEqual(new.images_count, 3)
         self.assertGreater(new.size, 0)
+        # Its hidden tag names the dataset, for the dashboard's Thermal dataset button
+        self.assertEqual(new.tags, ".dji-thermal-from-{}".format(task.id))
         src = os.path.join(conversions.output_path(task, cid), "a", "DJI_0001_T_temp_c.tiff")
         self.assertTrue(os.path.samefile(src, new.task_path("a_DJI_0001_T_temp_c.tiff")))
         self.assertNotIn(new, get_pending_tasks())
@@ -669,7 +671,22 @@ class TestConversionTasks(AnalyzerTestCase):
         Task.objects.get(pk=res.data["id"]).delete()
         self.assertEqual(self.client.get("{}/{}/conversions/{}".format(API, task.id, cid)).data["tasks"], [])
 
-    @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def test_tasks_made_from_a_deleted_dataset_no_longer_link_to_it(self):
+        task, cid = self.converted()
+        made = Task.objects.get(pk=self.client.post(self.url(task, cid), {"name": "x", "options": []}, format="json").data["id"])
+        self.addCleanup(shutil.rmtree, made.task_path(), True)
+        Task.objects.filter(pk=made.pk).update(tags="survey {} roof".format(made.tags))
+        self.assertEqual(self.client.delete("{}/{}".format(API, task.id)).status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Task.objects.get(pk=made.pk).tags, "survey roof")
+
+        # A dataset whose own task is kept as an ordinary task unlinks them too
+        task, cid = self.converted()
+        made = Task.objects.get(pk=self.client.post(self.url(task, cid), {"name": "x", "options": []}, format="json").data["id"])
+        self.addCleanup(shutil.rmtree, made.task_path(), True)
+        self.client.post(self.parent_url(task, cid), format="json")
+        self.client.delete("{}/{}".format(API, task.id))
+        self.assertEqual((Task.objects.get(pk=made.pk).tags, Task.objects.get(pk=task.pk).tags), ("", ""))
+
     def parent_url(self, task, cid):
         return "{}/{}/conversions/{}/parent".format(API, task.id, cid)
 
@@ -739,6 +756,7 @@ class TestConversionTasks(AnalyzerTestCase):
         self.assertFalse(os.path.exists(datasets.data_path(kept)))
         self.assertNotIn(str(kept.id), [d["id"] for d in self.client.get(API).data["datasets"]])
 
+    @skip_without("DJI_THERMAL_FLIGHT_DIR")
     def test_a_flights_conversion_makes_a_task_of_thermal_tiffs(self):
         task = self.create()
         with contextlib.ExitStack() as stack:
