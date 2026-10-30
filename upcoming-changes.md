@@ -77,22 +77,29 @@
     copied). Tests: Django 119 with `app.tests.test_plugins`, Jest 128. Live check on :8002 on the user's dataset
     (thumbnails blocked, nothing written): tabs Mosaic, Harmonized, Source frame, View angle; Source frame in DJI
     ironred with the lines; the link icon copies the link and ticks; the gear only on the main page.
-  - Planned: **the source frame in a window over the map** (the user, 2026-10-30), `source-frame-window`: on every
+  - Done: **the source frame in a window over the map** (the user, 2026-10-30), `source-frame-window`: on every
     viewer tab (Mosaic, Harmonized, Source frame, View angle), a picture-in-picture window showing the source frame
     for the place selected, in the palette and range the map shows, so the colours under its crosshair match the
-    map's. Builds on the mosaic sidecar's frame models (dji-thermal-cli's `FrameModels`, 1.5.0 on; the pinned 1.9.0
-    has them; a stripped conversion's located copy in `viewer/` keeps them): `pixels(lon, lat)` finds the point in
-    every frame that saw it, and the tile's colour maps. Decided (the user):
+    map's. Built on the mosaic sidecar's frame models (dji-thermal-cli's `FrameModels`, 1.5.0 on; a stripped
+    conversion's located copy in `viewer/` keeps them) and its frame table (each frame's recorded measurement and
+    offset). Decided (the user):
     - **A click selects a point** (a marker on the map); hovering still only updates the readout.
     - **Every frame that saw the point**, stepped through with arrows ("Frame 1 of 4 that saw this point"), the
       mosaic's own first, then by view angle; each with the crosshair on the same ground point.
-    - **On View angle, the frame's view angles** (each pixel's angle from straight down) in that tab's palette and
-      range; on the other tabs its temperatures: as converted (the workset's settings, as the mosaic measured them)
-      on Mosaic and Source frame, harmonized (the mosaic's normalized ambient and reflected temperatures, less the
-      frame's offset) on Harmonized.
-    Proposed: the selected frame's footprint outlined on the map; the window at a corner of the map, closable, with
-    the frame's name; frame images drawn at the frame's size, cached by the browser with the mosaics' build time (as
-    the tiles), nothing written to the dataset.
+    - **On View angle, the frame's view angles** (each pixel's angle from straight down, from its camera model) in
+      that tab's palette and range; on the other tabs its temperatures, measured again with the parameters the
+      mosaic recorded for it (and the workset's replacements): as converted on Mosaic and Source frame, the
+      harmonized less the frame's offset on Harmonized.
+    Also: the frame's footprint dashed on the map; the window at the map's lower left, closable, with the frame's
+    name and view angle; a mosaic built without frame models says to build it again; nothing written to the dataset
+    (frames measured in memory, the last 8 kept; the browser caches the images by the build time, as the tiles).
+    Code: `mosaics.py` (`frames_at`, `frame_values`, `pixel_angles`, `frame_image`, `rendered` shared with the
+    tiles), `analyzer_api.py` (`MosaicFrames`, `MosaicFrame`; the style and point parsing shared), `plugin.py`,
+    `public/viewer.js` (`frameUrl`, `pipHtml`, `select`), `templates/viewer.html`, `analyzer.css`. Tests: Django 120
+    with `app.tests.test_plugins` (the flight's frame at a mosaic pixel's centre equals the mosaic on all three
+    kinds), Jest 130. Live check on :8002 on the user's dataset (nothing written): a click found 42 frames, the
+    mosaic's own (0107) first in DJI ironred with the crosshair and footprint; next and back; Harmonized, Source frame
+    and View angle each drew it in their own palette and range; closed.
   - Done: **user preferences** (the user, `new.md`, 2026-10-30), `user-preferences`: a **settings gear** beside the Thermal
     Analyzer's heading (the datasets page) opening the user's preferences: a **temperature unit** (°C, °F or K) used
     throughout the UI whatever unit an image or workset holds, and a **preferred DJI palette** used throughout the UI

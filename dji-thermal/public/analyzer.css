@@ -182,6 +182,20 @@
 .ta-viewer{ max-width: none; }
 .ta-viewer .ta-viewer-body{ display: flex; gap: 12px; align-items: stretch; }
 .ta-viewer .ta-viewer-map{ flex: 1 1 auto; min-width: 0; height: calc(100vh - 230px); min-height: 360px; border-radius: 4px; }
+/* The source frame window: over the map's lower left corner, the frame drawn pixel by pixel, a crosshair on the point */
+.ta-viewer .ta-viewer-mapbox{ flex: 1 1 auto; min-width: 0; position: relative; }
+.ta-viewer .ta-viewer-mapbox .ta-viewer-map{ width: 100%; }
+.ta-viewer .ta-viewer-pip{ position: absolute; left: 10px; bottom: 30px; z-index: 1000; width: 300px; max-width: calc(100% - 20px);
+    padding: 6px; background: #fff; color: #333; border-radius: 4px; box-shadow: 0 1px 6px rgba(0, 0, 0, .4); font-size: 12px; }
+.ta-viewer .ta-viewer-pip[hidden]{ display: none; }
+.ta-viewer .ta-pip-head{ display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
+.ta-viewer .ta-pip-head .ta-pip-title{ margin-right: auto; font-weight: bold; }
+.ta-viewer .ta-pip-head .btn{ padding: 0 6px; }
+.ta-viewer .ta-pip-image{ position: relative; background: #222; line-height: 0; }
+.ta-viewer .ta-pip-image img{ display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; }
+.ta-viewer .ta-pip-mark{ position: absolute; width: 17px; height: 17px; margin: -8px 0 0 -8px; pointer-events: none;
+    border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #000; }
+.ta-viewer .ta-pip-foot{ margin-top: 4px; overflow-wrap: anywhere; }
 .ta-viewer .ta-viewer-panel{ flex: 0 0 300px; max-height: calc(100vh - 230px); overflow-y: auto; font-size: 13px; }
 .ta-viewer .ta-viewer-panel h5{ margin: 14px 0 6px; font-weight: bold; }
 .ta-viewer .ta-viewer-panel .ta-section{ margin-bottom: 0; }

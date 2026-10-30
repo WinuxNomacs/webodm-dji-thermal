@@ -8,10 +8,15 @@ Files, in the conversion's folder (see conversions):
     viewer/<kind>.tif (+ .json)    a georeferenced copy for the map, only when the conversion strips the location (the
                                    downloads are then stripped); never downloaded
     viewer/palettes.json           DJI's palettes, read from one of the frames
+
+The viewer's source frame window reads the mosaic's JSON sidecar: its frame table (each frame's measurement and
+offset) and frame models (dji-thermal-cli's FrameModels: where each frame saw a point).
     mosaic-job.json                the build's status, progress, stage, error and run id
     mosaics.json                   what was built (see build)
 """
 
+import dataclasses
+import functools
 import json
 import math
 import os
@@ -397,17 +402,25 @@ def tile(task, cid, tab, z, x, y, cmap, low, high):
     valid = (t.mask > 0) & np.isfinite(data)
     if framed or band == 1:
         valid &= data > low_value(result(task, cid).get('unit') or 'C')
+    if not framed:
+        return rendered(data, valid, cmap, low, high)
     levels = np.clip(np.rint((np.where(valid, data, low) - low) / (high - low) * 255), 0, 255).astype(np.uint8)
-    if framed:
-        lut = np.array([cmap[i][:3] for i in range(256)], dtype=np.uint8)
-        rgb = lut[levels]
-        frames = np.asarray(t.data[1], dtype=np.float64)
-        first, second = seams(np.rint(np.where(np.isfinite(frames), frames, -1)), valid & np.isfinite(frames))
-        rgb[first], rgb[second] = SEAM_COLORS
-        inner = (slice(buffer, -buffer), slice(buffer, -buffer))
-        rgb, valid = rgb[inner], valid[inner]
-        mask = np.where(valid, 255, 0).astype(np.uint8)
-        return render(np.moveaxis(rgb, 2, 0), mask, img_format='PNG')
+    lut = np.array([cmap[i][:3] for i in range(256)], dtype=np.uint8)
+    rgb = lut[levels]
+    frames = np.asarray(t.data[1], dtype=np.float64)
+    first, second = seams(np.rint(np.where(np.isfinite(frames), frames, -1)), valid & np.isfinite(frames))
+    rgb[first], rgb[second] = SEAM_COLORS
+    inner = (slice(buffer, -buffer), slice(buffer, -buffer))
+    rgb, valid = rgb[inner], valid[inner]
+    mask = np.where(valid, 255, 0).astype(np.uint8)
+    return render(np.moveaxis(rgb, 2, 0), mask, img_format='PNG')
+
+
+def rendered(data, valid, cmap, low, high):
+    """Values (where valid) over low..high in cmap, as PNG bytes, transparent elsewhere"""
+    import numpy as np
+    from rio_tiler.utils import render
+    levels = np.clip(np.rint((np.where(valid, data, low) - low) / (high - low) * 255), 0, 255).astype(np.uint8)
     mask = np.where(valid, 255, 0).astype(np.uint8)
     return render(levels[np.newaxis], mask, img_format='PNG', colormap=cmap)
 
@@ -445,3 +458,119 @@ def point(task, cid, tab, lon, lat):
     if not out['valid']:
         out['reason'] = 'nodata'
     return out
+
+
+# The source frame window
+
+def sidecar_path(raster):
+    return os.path.splitext(raster)[0] + '.json'
+
+
+@functools.lru_cache(maxsize=4)
+def _sidecar(path, mtime_ns):
+    with open(path) as f:
+        info = json.load(f)
+    return info, converter.library().mosaic.FrameModels.from_sidecar(info)
+
+
+def sidecar(raster):
+    """(the contents of a mosaic's JSON sidecar, its FrameModels or None when it has none), read once while it is
+    unchanged; ({}, None) without a sidecar"""
+    path = sidecar_path(raster)
+    try:
+        return _sidecar(path, os.stat(path).st_mtime_ns)
+    except (OSError, ValueError):
+        return {}, None
+
+
+def frames_at(task, cid, tab, lon, lat):
+    """
+    The frames that saw a point (lon, lat): [{index, file, x, y (the point's pixel in the frame, continuous, pixel
+    centres at whole numbers), width, height, view_angle, footprint ([lon, lat] corners), source (the mosaic's pixel
+    came from it)}], the mosaic's own first, then from the one that saw it closest to straight down; None when the
+    mosaic has no frame models (built by a dji-thermal-cli before 1.5.0)
+    """
+    import numpy as np
+    raster, _band = tab_raster(task, cid, tab)
+    info, models = sidecar(raster)
+    if models is None:
+        return None
+    pixels, angles = models.pixels(lon, lat)[:, 0], models.view_angles(lon, lat)[:, 0]
+    own = point(task, cid, tab, lon, lat)['frame_index']
+    sizes = {f['index']: (f['width'], f['height']) for f in info['frame_models']['frames']}
+    seen = sorted((int(k) for k in np.flatnonzero(np.isfinite(pixels[:, 0]))), key=lambda k: (k != own, angles[k]))
+    return [{'index': k, 'file': models.files[k], 'x': float(pixels[k, 0]), 'y': float(pixels[k, 1]),
+             'width': sizes[k][0], 'height': sizes[k][1], 'view_angle': float(angles[k]),
+             'footprint': models.footprints[k].tolist(), 'source': k == own} for k in seen]
+
+
+def pixel_angles(model):
+    """Each pixel's angle from straight down (degrees) of a frame as its frame model (a sidecar's frame_models entry)
+    saw the ground; NaN for a pixel looking up"""
+    import numpy as np
+    w, h, f = model['width'], model['height'], model['focal_px']
+    cx, cy = model['principal_point_px']
+    u, v = np.meshgrid(np.arange(w, dtype=float), np.arange(h, dtype=float))
+    # The pixels' rays: camera (forward, right, down) to north, east, down
+    ned = np.tensordot(np.asarray(model['ned_to_camera'], float).T, np.stack([np.ones_like(u), (u - cx) / f, (v - cy) / f]),
+                       axes=1)
+    return np.where(ned[2] > 0, np.degrees(np.arctan2(np.hypot(ned[0], ned[1]), ned[2])), np.nan)
+
+
+@functools.lru_cache(maxsize=8)
+def _measured(path, settings, unit):
+    import numpy as np
+    return np.asarray(converter.library().measure(path, settings, unit=unit).temperature, dtype=np.float64)
+
+
+def frame_values(task, cid, tab, index):
+    """
+    A frame as a viewer tab shows it: on View angle each pixel's angle from straight down, in degrees; otherwise its
+    temperatures in the mosaic's unit as the tab's mosaic measured them (its recorded measurement, the workset's
+    replacements), the harmonized less the frame's offset. A float array (height, width), NaN where there is no data.
+    :raises LookupError: not a frame of the mosaic, or its file is gone
+    :raises: the library's errors, for a frame it cannot measure
+    """
+    import numpy as np
+    from django.core.exceptions import SuspiciousFileOperation
+
+    from app.security import path_traversal_check
+    conversions = conversions_module()
+    dtc = converter.library()
+    raster, _band = tab_raster(task, cid, tab)
+    info, _models = sidecar(raster)
+    models = (info.get('frame_models') or {}).get('frames') or []
+    table = {f.get('index'): f for f in info.get('frames') or []}
+    if not 0 <= index < len(models) or index not in table:
+        raise LookupError("Not a frame of this mosaic")
+    if tab == 'view_angle':
+        return pixel_angles(models[index])
+    row = table[index]
+    root = datasets.images_path(task)
+    try:
+        path = path_traversal_check(os.path.join(root, row['file']), root)
+    except SuspiciousFileOperation:
+        raise LookupError("Not a frame of this mosaic") from None
+    if not os.path.isfile(path):
+        raise LookupError("The frame is not on the server any more")
+    unit = result(task, cid).get('unit') or 'C'
+    settings = conversions.api_arguments(conversions.record(task, cid).get('settings') or conversions.DEFAULTS)['settings']
+    m, celsius = row.get('measurement') or {}, lambda v: None if v is None else dtc.units.from_celsius(v, settings.unit)
+    # As the mosaic measured it: its own recorded parameters (the distance in metres), the workset's replacements
+    recorded = dataclasses.replace(settings, distance=m.get('distance', settings.distance),
+                                   humidity=m.get('humidity'), emissivity=m.get('emissivity'),
+                                   reflected_temp=celsius(m.get('reflection')), ambient_temp=celsius(m.get('ambient_temp')))
+    values = _measured(path, recorded, unit).copy()
+    values[~np.isfinite(values) | (values <= low_value(unit))] = np.nan
+    if ((info.get('report') or {}).get('frame_offsets') or {}).get('normalized'):
+        offset = row.get('temperature_offset_c') or 0.0
+        values -= offset * (1.8 if unit == 'F' else 1.0)
+    return values
+
+
+def frame_image(task, cid, tab, index, cmap, low, high):
+    """A frame as frame_values gives it, over low..high in cmap, as PNG bytes"""
+    import numpy as np
+    values = frame_values(task, cid, tab, index)
+    valid = np.isfinite(values)
+    return rendered(values, valid, cmap, low, high)

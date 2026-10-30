@@ -480,6 +480,18 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual(first.astype(int).tolist(), [[0, 1, 0], [1, 1, 0], [0, 0, 0]])
         self.assertEqual(second.astype(int).tolist(), [[0, 0, 1], [0, 0, 1], [1, 1, 0]])
 
+    def test_a_frames_pixels_angles_are_from_its_camera_model(self):
+        import numpy as np
+        # Looking straight down, the frame's top to the north: forward is down, right is east, the image's down south
+        model = {'width': 5, 'height': 3, 'focal_px': 2.0, 'principal_point_px': [2.0, 1.0],
+                 'ned_to_camera': [[0, 0, 1], [0, 1, 0], [-1, 0, 0]]}
+        angles = mosaics.pixel_angles(model)
+        self.assertEqual(angles.shape, (3, 5))
+        self.assertAlmostEqual(angles[1, 2], 0)
+        self.assertAlmostEqual(angles[1, 4], 45)
+        self.assertAlmostEqual(angles[1, 0], 45)
+        self.assertAlmostEqual(angles[0, 2], np.degrees(np.arctan(0.5)))
+
     def test_mosaics_are_built_only_of_a_converted_conversion_by_who_can_change_it(self):
         task, cid = self.converted()
         self.assertEqual(self.client.get(self.url(task, cid)).data["mosaic_status"], "")
@@ -589,6 +601,32 @@ class TestMosaics(AnalyzerTestCase):
         self.assertIn(p["frame"], v["frames"])
         self.assertTrue(set(v["frames"]) <= {os.path.basename(f) for f in frames}, v["frames"])
         self.assertFalse(self.client.get(self.url(task, cid, "/harmonized/point"), {"lon": 0, "lat": 0}).data["valid"])
+
+        # The frames that saw a mosaic pixel's centre, the mosaic's own first; each drawn as its tab draws the mosaic,
+        # the same value at the point's pixel as the mosaic's (the view angle from the frame's pixel, not the ground's)
+        import rasterio
+        from rasterio.warp import transform as warp
+        with rasterio.open(mosaics.tab_raster(task, cid, "harmonized")[0]) as r:
+            (clon,), (clat,) = warp(r.crs, "EPSG:4326", *([c] for c in r.xy(r.height // 2, r.width // 2)))
+        centre = {"lon": clon, "lat": clat}
+        found = self.client.get(self.url(task, cid, "/harmonized/frames"), centre).data
+        self.assertTrue(found["models"])
+        first = found["frames"][0]
+        own = self.client.get(self.url(task, cid, "/harmonized/point"), centre).data
+        self.assertEqual((first["file"], first["source"]), (own["frame"], True))
+        self.assertTrue(all(not f["source"] for f in found["frames"][1:]))
+        here = (math.floor(first["y"] + 0.5), math.floor(first["x"] + 0.5))
+        for name, key, delta in (("harmonized", "temperature", 0.01), ("as_converted", "temperature", 0.01),
+                                 ("view_angle", "view_angle", 0.2)):
+            want = self.client.get(self.url(task, cid, "/{}/point".format(name)), centre).data[key]
+            self.assertAlmostEqual(mosaics.frame_values(task, cid, name, first["index"])[here], want, delta=delta, msg=name)
+        image = self.client.get(self.url(task, cid, "/harmonized/frames/{}.png".format(first["index"])),
+                                {"color_map": "inferno", "rescale": "{},{}".format(lo, hi)})
+        self.assertEqual((image.status_code, image["Content-Type"]), (status.HTTP_200_OK, "image/png"))
+        self.assertEqual(Image.open(io.BytesIO(image.content)).size, (first["width"], first["height"]))
+        self.assertEqual(self.client.get(self.url(task, cid, "/harmonized/frames/999.png")).status_code,
+                         status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.client.get(self.url(task, cid, "/harmonized/frames"), {"lon": 0, "lat": 0}).data["frames"], [])
 
         download = "{}/{}/conversions/{}/download".format(API, task.id, cid)
         name = v["kinds"]["harmonized"]["files"][0]
