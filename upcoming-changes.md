@@ -50,12 +50,16 @@
     would need a WebODM change). The dataset's own task is known by its hidden `.dji-thermal-dataset` tag, in the
     browser, with no request. Decided (the user): **tasks made from a workset (Create task) link back too**, through
     a hidden tag naming the dataset added when the task is made (kept by WebODM's Edit panel), opening it on
-    Worksets; tasks made before have no tag and no button. Built: `public/main.js` (the button, a link styled as
+    Worksets; tasks made before have no tag and no button (fixed since, see below). Built: `public/main.js` (the button, a link styled as
     WebODM's own `btn btn-sm btn-primary`); `conversion_tasks.py` (`FROM_TAG` on `create`, `unlink_made` when the
     dataset goes: deleted, from the Analyzer or WebODM, through `datasets.task_removing`, or released). Also: the
     flight test's `skip_without` moved back from `parent_url`, where the parent-task branch had put it. Tests: Django
     113 with `app.tests.test_plugins`, Jest 125. Live check on :8002: the button on the user's dataset task and the
     check dataset's, on a task made from a workset (opens the dataset), none on ordinary tasks or tasks made before.
+  - Done: **bug, tasks made from a workset before the tag had no Thermal dataset button** (the user, 2026-10-30),
+    `link-older-tasks`: listing a workset's tasks (`conversion_tasks.made`, called by the Analyzer's datasets list
+    and dataset page) now adds the tag to a task without it. Test: Django 118. Live check: opening the Analyzer
+    tagged the user's "HomerunObliqueII - default-webodm-recommendations", whose panel now has the button.
   - Done: **user preferences** (the user, `new.md`, 2026-10-30), `user-preferences`: a **settings gear** beside the Thermal
     Analyzer's heading (the datasets page) opening the user's preferences: a **temperature unit** (°C, °F or K) used
     throughout the UI whatever unit an image or workset holds, and a **preferred DJI palette** used throughout the UI
