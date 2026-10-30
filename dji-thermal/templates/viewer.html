@@ -1,0 +1,43 @@
+{% extends "app/plugins/templates/base.html" %}
+{% block content %}
+<link rel="stylesheet" href="{{ public }}build/Leaflet.css">
+<link rel="stylesheet" href="{{ public }}analyzer.css">
+
+<div id="ta-viewer" class="ta-page ta-viewer" data-api="{{ api }}" data-public="{{ public }}" data-dataset="{{ dataset.id }}" data-id="{{ conversion.id }}">
+    {% csrf_token %}
+    <div class="ta-breadcrumb"><a href="{{ public }}dataset/{{ dataset.id }}#convert"><i class="fa fa-arrow-left"></i> {{ dataset.name }}</a></div>
+    <div class="ta-header">
+        <div>
+            <h3 id="ta-viewer-name">{{ conversion.name }}</h3>
+            <div class="ta-subtitle" id="ta-viewer-subtitle"></div>
+        </div>
+        <div class="ta-header-actions">
+            <button type="button" class="btn btn-default btn-sm" id="ta-viewer-build" hidden><i class="fa fa-th"></i> Build mosaics</button>
+            <button type="button" class="btn btn-default btn-sm" id="ta-viewer-cancel" hidden><i class="fa fa-stop"></i> Cancel</button>
+        </div>
+    </div>
+    <div class="ta-status" id="ta-viewer-status"></div>
+
+    <div id="ta-viewer-main" hidden>
+        <ul class="nav nav-tabs ta-tabs" id="ta-viewer-tabs"></ul>
+        <div class="ta-viewer-body">
+            <div class="ta-viewer-map" id="ta-viewer-map"></div>
+            <div class="ta-viewer-panel">
+                <div id="ta-viewer-controls"></div>
+                <details class="ta-section" open data-section="cursor">
+                    <summary><h5>Under the cursor</h5></summary>
+                    <div class="ta-viewer-readout" id="ta-viewer-readout"><span class="ta-message">Move the cursor over the mosaic.</span></div>
+                </details>
+                <details class="ta-section" open data-section="report">
+                    <summary><h5>The mosaic</h5></summary>
+                    <div id="ta-viewer-report"></div>
+                </details>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ basemaps|json_script:"ta-basemaps" }}
+<script src="{{ public }}analyzer_core.js"></script>
+<script src="{{ public }}viewer.js"></script>
+{% endblock %}

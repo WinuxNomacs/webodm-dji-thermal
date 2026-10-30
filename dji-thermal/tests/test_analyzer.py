@@ -4,9 +4,11 @@ tests run in place), and who sees and changes what.
 
 The tests with real R-JPEGs read them from DJI_THERMAL_FLIGHT_DIR and are skipped without it.
 """
+import collections
 import contextlib
 import importlib
 import io
+import math
 import os
 import shutil
 import zipfile
@@ -27,6 +29,7 @@ from .test_converter import jpegs_in, skip_without
 datasets = importlib.import_module("coreplugins.dji-thermal.datasets")
 analysis = importlib.import_module("coreplugins.dji-thermal.analysis")
 conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
+mosaics = importlib.import_module("coreplugins.dji-thermal.mosaics")
 
 API = "/api/plugins/dji-thermal/datasets"
 
@@ -385,7 +388,8 @@ class TestConversions(AnalyzerTestCase):
         with contextlib.ExitStack() as stack:
             self.upload(task, [stack.enter_context(open(f, "rb")) for f in frames])
         size = Task.objects.get(pk=task.id).size
-        res = self.convert(task, {"outputs": ["temp_c:tiff", "pseudo:png"], "emissivity": 0.95}, name="Nadir")
+        res = self.convert(task, {"outputs": ["temp_c:tiff", "pseudo:png"], "emissivity": 0.95, "mosaics": False},
+                           name="Nadir")
         self.assertEqual((res.data["status"], res.data["converted"], res.data["skipped"]), ("ready", 3, 0),
                          res.data["error"])
         self.assertEqual(res.data["file_count"], 6)
@@ -403,3 +407,140 @@ class TestConversions(AnalyzerTestCase):
         with zipfile.ZipFile(io.BytesIO(b"".join(everything.streaming_content))) as z:
             self.assertEqual(sorted(z.namelist()), sorted(conversions.output_files(task, res.data["id"])))
             self.assertEqual(len(z.namelist()), 6)
+
+
+def web_mercator_tile(lon, lat, z):
+    """The (z, x, y) of the Web Mercator tile with a point"""
+    n = 2 ** z
+    y = (1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * n
+    return collections.namedtuple("Tile", "z x y")(z, int((lon + 180) / 360 * n), int(y))
+
+
+class TestMosaics(AnalyzerTestCase):
+    def converted(self, mosaics_too=False):
+        """A dataset with a conversion its job says is converted (nothing converted in fact)"""
+        task = self.create()
+        self.upload(task, [jpeg("a.jpg")])
+        with mock.patch.object(datasets, "start_job"):
+            cid = conversions.create(task, "Nadir", dict(conversions.DEFAULTS, mosaics=mosaics_too), self.user)
+        datasets.update_job(task, rel=conversions.rel(cid, "job.json"), status="ready", run_id="")
+        return task, cid
+
+    def url(self, task, cid, rest=""):
+        return "{}/{}/conversions/{}/mosaics{}".format(API, task.id, cid, rest)
+
+    def test_mosaics_are_built_only_of_a_converted_conversion_by_who_can_change_it(self):
+        task, cid = self.converted()
+        self.assertEqual(self.client.get(self.url(task, cid)).data["mosaic_status"], "")
+        datasets.update_job(task, rel=conversions.rel(cid, "job.json"), status="converting")
+        self.assertEqual(self.client.post(self.url(task, cid)).status_code, status.HTTP_400_BAD_REQUEST)
+        datasets.update_job(task, rel=conversions.rel(cid, "job.json"), status="ready")
+        assign_perm("view_project", User.objects.get(username="testuser2"), self.project)
+        self.assertEqual(self.client_for("testuser2").post(self.url(task, cid)).status_code, status.HTTP_404_NOT_FOUND)
+        with mock.patch.object(datasets, "over_quota", return_value=True):
+            self.assertEqual(self.client.post(self.url(task, cid)).status_code, status.HTTP_400_BAD_REQUEST)
+        with mock.patch.object(datasets, "start_job") as start:
+            res = self.client.post(self.url(task, cid))
+        self.assertEqual((res.status_code, res.data["mosaic_status"]), (status.HTTP_200_OK, "building"))
+        start.assert_called_once()
+        self.assertEqual(self.client.post(self.url(task, cid)).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(self.client.get("{}/{}".format(API, task.id)).data["busy"])
+
+    def test_a_failed_build_keeps_no_mosaic_files_and_says_why(self):
+        task, cid = self.converted()
+        with mock.patch.object(datasets, "start_job"):
+            mosaics.start(task, cid)
+        datasets.update_job(task, rel=mosaics.rel(cid, mosaics.JOB_FILE), run_id="run")
+
+        def build(task, cid, write_progress):
+            os.makedirs(mosaics.path(task, cid, mosaics.MOSAICS_DIR, "harmonized"))
+            raise RuntimeError("No frame could be placed")
+
+        with mock.patch.object(mosaics, "build", build):
+            self.assertEqual(mosaics.make(str(task.id), "run", cid), {"error": "No frame could be placed"})
+        d = self.client.get(self.url(task, cid)).data
+        self.assertEqual((d["mosaic_status"], d["mosaic_error"]), ("failed", "No frame could be placed"))
+        self.assertEqual((d["mosaic_files"], d["tabs"]), ([], []))
+        self.assertFalse(os.path.exists(mosaics.path(task, cid, mosaics.MOSAICS_DIR)))
+        self.assertEqual(self.client.get(self.url(task, cid, "/harmonized/tiles/20/1/1.png")).status_code,
+                         status.HTTP_404_NOT_FOUND)
+
+    def test_a_canceled_build_stops_at_its_next_progress_and_keeps_nothing(self):
+        task, cid = self.converted()
+        with mock.patch.object(datasets, "start_job"):
+            mosaics.start(task, cid)
+        datasets.update_job(task, rel=mosaics.rel(cid, mosaics.JOB_FILE), run_id="run")
+        res = self.client.post("{}/{}/conversions/{}/cancel".format(API, task.id, cid))
+        self.assertEqual((res.data["status"], res.data["mosaic_status"]), ("ready", "canceled"))
+
+        def build(task, cid, write_progress):
+            os.makedirs(mosaics.path(task, cid, mosaics.MOSAICS_DIR, "harmonized"))
+            write_progress(0.5, now=True)
+
+        with mock.patch.object(mosaics, "build", build):
+            self.assertEqual(mosaics.make(str(task.id), "run", cid), {"canceled": True})
+        self.assertFalse(os.path.exists(mosaics.path(task, cid, mosaics.MOSAICS_DIR)))
+        self.assertEqual(mosaics.job(task, cid)["status"], "canceled")
+
+    def test_a_mosaic_job_that_is_gone_is_marked_failed(self):
+        task, cid = self.converted()
+        with mock.patch.object(datasets, "start_job"):
+            mosaics.start(task, cid)
+        with mock.patch.object(datasets, "job_gone", return_value=True):
+            d = self.client.get(self.url(task, cid)).data
+        self.assertEqual(d["mosaic_status"], "failed")
+
+    @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def test_a_flights_frames_make_mosaics_shown_on_a_map_and_downloaded(self):
+        frames = flight_frames(6)
+        task = self.create()
+        with contextlib.ExitStack() as stack:
+            self.upload(task, [stack.enter_context(open(f, "rb")) for f in frames])
+        self.client.post("{}/{}/analyze".format(API, task.id))
+        res = self.client.post("{}/{}/conversions".format(API, task.id),
+                               {"name": "Nadir", "settings": {"outputs": ["temp_c:tiff"]}}, format="json")
+        cid = res.data["id"]
+        size = Task.objects.get(pk=task.id).size
+        v = self.client.get(self.url(task, cid)).data
+        self.assertEqual((v["status"], v["mosaic_status"]), ("ready", "ready"), v["mosaic_error"] or v["error"])
+        self.assertEqual([t["tab"] for t in v["tabs"]], ["as_converted", "harmonized", "source_frame", "view_angle"])
+        self.assertEqual(set(v["kinds"]), {"as_converted", "harmonized"})
+        self.assertIn(v["default_palette"], [p["key"] for p in v["palettes"]])
+        self.assertEqual(len(v["flown"]), 2)
+        self.assertGreaterEqual(Task.objects.get(pk=task.id).size, size)
+
+        tab = v["tabs"][1]
+        west, south, east, north = tab["bounds"]
+        lon, lat = (west + east) / 2, (south + north) / 2
+        t = web_mercator_tile(lon, lat, tab["maxzoom"])
+        lo, hi = tab["stats"]["percentiles"]
+        tile_url = self.url(task, cid, "/harmonized/tiles/{}/{}/{}.png".format(t.z, t.x, t.y))
+        tile = self.client.get(tile_url, {"color_map": "inferno", "rescale": "{},{}".format(lo, hi)})
+        self.assertEqual((tile.status_code, tile["Content-Type"]), (status.HTTP_200_OK, "image/png"))
+        self.assertEqual(Image.open(io.BytesIO(tile.content)).size, (256, 256))
+        self.assertEqual(self.client.get(tile_url, {"color_map": "pink"}).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.get(tile_url, {"rescale": "5,1"}).status_code, status.HTTP_400_BAD_REQUEST)
+        frames_tile = self.client.get(self.url(task, cid, "/source_frame/tiles/{}/{}/{}.png".format(t.z, t.x, t.y)))
+        self.assertEqual(frames_tile.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.client.get(self.url(task, cid, "/harmonized/tiles/{}/0/0.png".format(t.z))).status_code,
+                         status.HTTP_404_NOT_FOUND)
+
+        p = self.client.get(self.url(task, cid, "/harmonized/point"), {"lon": lon, "lat": lat}).data
+        self.assertTrue(p["valid"], p)
+        self.assertLess(tab["stats"]["min"] - 1, p["temperature"])
+        self.assertIn(p["frame"], v["frames"])
+        self.assertTrue(set(v["frames"]) <= {os.path.basename(f) for f in frames}, v["frames"])
+        self.assertFalse(self.client.get(self.url(task, cid, "/harmonized/point"), {"lon": 0, "lat": 0}).data["valid"])
+
+        download = "{}/{}/conversions/{}/download".format(API, task.id, cid)
+        name = v["kinds"]["harmonized"]["files"][0]
+        self.assertEqual(self.client.get(download, {"mosaic": "harmonized/" + name}).status_code, status.HTTP_200_OK)
+        self.assertEqual(self.client.get(download, {"mosaic": "../conversion.json"}).status_code,
+                         status.HTTP_404_NOT_FOUND)
+        with zipfile.ZipFile(io.BytesIO(b"".join(self.client.get(download).streaming_content))) as z:
+            self.assertIn("mosaics/harmonized/" + name, z.namelist())
+
+        # Built again: a new build time, so new tile URLs
+        built_at = v["built_at"]
+        self.client.post(self.url(task, cid))
+        self.assertNotEqual(self.client.get(self.url(task, cid)).data["built_at"], built_at)

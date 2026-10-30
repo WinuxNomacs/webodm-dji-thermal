@@ -137,6 +137,9 @@
             field("Compression (TIFF)", '<select class="form-control input-sm" name="compression">' + ["deflate", "none"].map(function (c) {
                 return '<option value="' + c + '"' + (c === s.compression ? " selected" : "") + ">" + c + "</option>";
             }).join("") + "</select>") +
+            '<div class="checkbox"><label><input type="checkbox" name="mosaics"' + (s.mosaics ? " checked" : "") +
+            "> Mosaics: the frames placed side by side, as converted and harmonized, to see on a map</label>" +
+            '<span class="help-block">Built after the conversion, from the frames\' positions and angles (no WebODM task needed).</span></div>' +
             "</div>" +
             '<details class="ta-section" open><summary><h4>Measurement</h4></summary><p class="text-muted">Empty keeps each image\'s own value.</p>' + measurement + "</details>" +
             '<details class="ta-section" open><summary><h4>Frames</h4></summary>' + frames + "</details>" +
@@ -167,6 +170,7 @@
         s.normalize = get("normalize").checked;
         s.max_pitch = num("max_pitch");
         s.compression = get("compression").value;
+        s.mosaics = get("mosaics").checked;
         s.outputs = [].filter.call(form.querySelectorAll('input[name="output"]'), function (c) { return c.checked; }).map(function (c) {
             return c.value + ":" + get("format-" + c.value).value;
         });
@@ -231,6 +235,7 @@
     var DIFFERENCES = [
         {key: "outputs", fields: ["output"], same: sameOutputs, text: function (s) { return (s.outputs || []).join(", ") || "no outputs"; }},
         {key: "compression", fields: ["compression"], text: function (s) { return s.compression === "none" ? "no compression" : s.compression + " compression"; }},
+        {key: "mosaics", fields: ["mosaics"], text: function (s) { return s.mosaics ? "mosaics" : "no mosaics"; }},
         {key: "distance", fields: ["distance_mode", "distance"], text: function (s) {
             return typeof s.distance === "number" ? "distance " + num(s.distance, 1) + " m" :
                 s.distance === "embedded" ? "embedded distance" : s.distance === "" ? "distance not given" : "rangefinder distance";
@@ -271,7 +276,7 @@
         return fields.map(function (f) {
             var v = s[f];
             if (f === "unit") return core.unitOf(v);
-            if (typeof v === "boolean" || f === "normalize" || f === "strip_location") return !!v;
+            if (typeof v === "boolean" || f === "normalize" || f === "strip_location" || f === "mosaics") return !!v;
             return blank(v) ? null : round2(v);
         });
     }
@@ -340,8 +345,21 @@
         return label;
     }
 
-    // A conversion's actions: the one its state calls for, and the others in its menu (menu: open)
-    function actionsHtml(c, canChange, base, open, menu) {
+    // A conversion's mosaics as its card shows them: being built, failed or canceled (built ones: its main action)
+    function mosaicHtml(c) {
+        if (c.mosaic_status === "building") {
+            return '<div class="progress"><div class="progress-bar progress-bar-striped active" style="width: ' +
+                Math.round((c.mosaic_progress || 0) * 100) + '%;"></div></div><div class="text-muted">' +
+                esc(core.mosaicLabel({stage: c.mosaic_stage})) + "</div>";
+        }
+        if (c.mosaic_status === "failed") return '<div class="text-danger">The mosaics failed: ' + esc(c.mosaic_error) + "</div>";
+        if (c.mosaic_status === "canceled") return '<div class="text-muted">Building the mosaics was canceled.</div>';
+        return "";
+    }
+
+    // A conversion's actions: the one its state calls for, and the others in its menu (menu: open; viewer: the URL of
+    // its mosaics' page)
+    function actionsHtml(c, canChange, base, open, menu, viewer) {
         var button = function (act, icon, label, title, cls, aria) {
             return '<button type="button" class="' + (cls || "") + '" data-act="' + act + '"' + (title ? ' title="' + esc(title) + '"' : "") +
                 (aria ? ' aria-label="' + esc(aria + " " + c.name) + '"' : "") + '><i class="fa fa-' + icon + '"></i> ' + esc(label) + "</button>";
@@ -349,20 +367,28 @@
         var link = function (href, icon, label, cls) {
             return '<a class="' + (cls || "") + '" href="' + esc(href) + '"><i class="fa fa-' + icon + '"></i> ' + esc(label) + "</a>";
         };
-        var ready = c.status === "ready", busy = c.status === "converting";
+        var ready = c.status === "ready", busy = c.status === "converting", building = c.mosaic_status === "building";
         var download = c.file_count && !busy ? base + c.id + "/download" : null;
         var main = "", items = [];
         var mainCls = "btn btn-default btn-xs";
-        if (busy) {
-            if (canChange) main = button("cancel", "stop", "Cancel", "Stop converting", mainCls);
+        var view = viewer && c.mosaic_status === "ready";
+        if (busy || building) {
+            if (canChange) main = button("cancel", "stop", "Cancel", busy ? "Stop converting" : "Stop building the mosaics", mainCls);
+        } else if (ready && view) {
+            main = link(viewer, "map", "View mosaics", "btn btn-primary btn-xs");
         } else if (ready && download) {
             main = link(download, "download", "Download all", "btn btn-primary btn-xs");
         } else {
             main = button("use", "sliders-h", "Use settings", "Fill the form with this conversion's settings", mainCls);
         }
-        if (download && !ready) items.push(link(download, "download", "Download all"));
+        if (download && !(ready && !view && !building)) items.push(link(download, "download", "Download all"));
+        if (viewer && building) items.push(link(viewer, "map", "Mosaics"));
         items.push(button("files", "list", open === c.id ? "Hide files" : "Files"));
         if (ready || busy) items.push(button("use", "sliders-h", "Use settings", "Fill the form with this conversion's settings"));
+        if (canChange && ready && !building) {
+            items.push(button("mosaics", "th", c.mosaic_status === "ready" ? "Build mosaics again" : "Build mosaics",
+                "Place the converted frames side by side, as converted and harmonized"));
+        }
         if (canChange) {
             items.push(button("rename", "pencil-alt", "Rename", null, null, "Rename"));
             items.push("divider");
@@ -376,8 +402,8 @@
     }
 
     // The dataset's conversions, newest first (base: their API's URL; defaults: what their settings are compared
-    // against; menu: the conversion whose menu is open)
-    function listHtml(conversions, canChange, base, open, fresh, defaults, menu) {
+    // against; menu: the conversion whose menu is open; viewerBase: their mosaics' pages, followed by their id)
+    function listHtml(conversions, canChange, base, open, fresh, defaults, menu, viewerBase) {
         if (!conversions.length) return '<p class="text-muted ta-none">No conversions yet.</p>';
         return conversions.map(function (c) {
             var cls = {ready: "success", failed: "danger", canceled: "default", converting: "info"}[c.status] || "default";
@@ -397,8 +423,8 @@
                 '<div class="text-muted">' + esc(c.description) + "</div>";
             return '<div class="ta-conversion' + (c.id === fresh ? " ta-conversion-new" : "") + '" data-id="' + c.id + '">' +
                 '<div class="ta-conversion-head"><strong>' + esc(c.name) + '</strong> <span class="label label-' + cls + '">' + esc(statusLabel(c)) + "</span>" +
-                '<span class="ta-conversion-actions">' + actionsHtml(c, canChange, base, open, menu) + "</span></div>" +
-                settings + progress +
+                '<span class="ta-conversion-actions">' + actionsHtml(c, canChange, base, open, menu, viewerBase ? viewerBase + c.id : null) + "</span></div>" +
+                settings + progress + mosaicHtml(c) +
                 (c.error ? '<div class="text-danger">' + esc(c.error) + "</div>" : "") +
                 '<div class="ta-conversion-figures text-muted">' + esc(figures.join(" · ")) + "</div>" +
                 '<div class="ta-conversion-files" data-files="' + c.id + '"></div></div>';
@@ -445,6 +471,10 @@
                     "</td><td>" + outputs + "</td><td>" + esc(notes.join("; ")) + "</td></tr>";
             }).join("") + "</tbody></table></div>";
         if (files.length > RESULTS_SHOWN) html += '<p class="text-muted">And ' + (files.length - RESULTS_SHOWN) + " more: download all to see them.</p>";
+        var mosaicFiles = c.mosaic_files || [];
+        if (mosaicFiles.length) html += '<p class="ta-mosaic-files"><strong>Mosaics:</strong> ' + mosaicFiles.map(function (f) {
+            return '<a href="' + esc(base + c.id + "/download?mosaic=" + encodeURIComponent(f)) + '">' + esc(f) + "</a>";
+        }).join(", ") + "</p>";
         return html;
     }
 
@@ -452,6 +482,7 @@
     function init(ctx) {
         var doc = ctx.doc, fetchFn = ctx.fetchFn, root$ = function (i) { return doc.getElementById(i); };
         var base = ctx.api + "datasets/" + ctx.datasetId + "/conversions/";
+        var viewerBase = ctx.publicUrl ? ctx.publicUrl + "dataset/" + ctx.datasetId + "/conversion/" : null;
         var meta = null, settings = null, saved = false, dataset = null, open = null, built = false, loading = null;
         var fresh = null; // the conversion just started, highlighted for a few seconds
         var editing = null; // the form unfolded: at first only for a dataset without conversions, then once opened
@@ -515,7 +546,7 @@
             var list = (dataset && dataset.conversions) || [];
             root$("ta-convert-count").textContent = list.length || "";
             root$("ta-conversions").innerHTML = listHtml(list, dataset && dataset.can_change, base, open, fresh,
-                dataset && dataset.defaults, menu);
+                dataset && dataset.defaults, menu, viewerBase);
             if (open !== null) loadFiles(open);
         }
 
@@ -678,6 +709,11 @@
                     if (!r.ok) message(esc(core.errorText(r.data, "Could not cancel " + c.name + ".")), "text-danger");
                     return ctx.onChange();
                 });
+            } else if (act === "mosaics") {
+                send(base + id + "/mosaics", "POST", {}).then(function (r) {
+                    if (!r.ok) message(esc(core.errorText(r.data, "Could not build the mosaics of " + c.name + ".")), "text-danger");
+                    return ctx.onChange();
+                });
             } else if (act === "rename") {
                 core.askName(doc, "Rename conversion", c.name).then(function (name) {
                     return name && send(base + id, "PATCH", {name: name});
@@ -703,7 +739,7 @@
 
     var api = {recorded: recorded, settingsIn: settingsIn, formHtml: formHtml, readForm: readForm, formProblem: formProblem, planSettings: planSettings, statusLabel: statusLabel,
                differences: differences, chipsHtml: chipsHtml, markForm: markForm, resetSetting: resetSetting,
-               actionsHtml: actionsHtml, listHtml: listHtml, skipReasons: skipReasons, resultsHtml: resultsHtml, init: init};
+               mosaicHtml: mosaicHtml, actionsHtml: actionsHtml, listHtml: listHtml, skipReasons: skipReasons, resultsHtml: resultsHtml, init: init};
     root.ThermalAnalyzerConversions = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

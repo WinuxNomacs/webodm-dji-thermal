@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from app.plugins import Menu, MountPoint, PluginBase, logger, signals
 
 from . import analyzer_api, converter, datasets
-from .analyzer_pages import dataset_page, datasets_page
+from .analyzer_pages import dataset_page, datasets_page, viewer_page
 from .api import Describe, TaskConvert
 from .page import sdk_page
 
@@ -30,6 +30,7 @@ class Plugin(PluginBase):
         return [
             MountPoint('$', datasets_page(self)),
             MountPoint(r'dataset/(?P<dataset_id>[0-9a-f-]{36})$', dataset_page(self)),
+            MountPoint(r'dataset/(?P<dataset_id>[0-9a-f-]{36})/conversion/(?P<cid>[0-9a-f]{12})$', viewer_page(self)),
             MountPoint('sdk/$', lambda request: sdk_page(request, template)),
         ]
 
@@ -37,7 +38,8 @@ class Plugin(PluginBase):
         return ['main.js']
 
     def build_jsx_components(self):
-        return ['thermal/ThermalTaskButton.jsx']
+        # Leaflet: WebODM's own, for the mosaic viewer (see thermal/Leaflet.js)
+        return ['thermal/ThermalTaskButton.jsx', 'thermal/Leaflet.js']
 
     def api_mount_points(self):
         return [
@@ -53,6 +55,10 @@ class Plugin(PluginBase):
             MountPoint(CONVERSION + '$', analyzer_api.ConversionDetail.as_view()),
             MountPoint(CONVERSION + '/cancel$', analyzer_api.ConversionCancel.as_view()),
             MountPoint(CONVERSION + '/download$', analyzer_api.ConversionDownload.as_view()),
+            MountPoint(CONVERSION + '/mosaics$', analyzer_api.Mosaics.as_view()),
+            MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/tiles/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)\.png$',
+                       analyzer_api.MosaicTile.as_view()),
+            MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/point$', analyzer_api.MosaicPoint.as_view()),
             MountPoint('preferences$', analyzer_api.Preferences.as_view()),
         ]
 

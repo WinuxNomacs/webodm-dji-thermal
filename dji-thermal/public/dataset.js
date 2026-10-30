@@ -244,7 +244,7 @@
         // A link to a tab (#convert, as the mosaic viewer's way back) opens it
         var linked = ((root.location && root.location.hash) || "").replace(/[^a-z]/g, "");
         if (linked && page.querySelector('#ta-tabs a[data-tab="' + linked + '"]')) { tab = linked; tabChosen = true; }
-        var conversions = conversionsModule.init({doc: doc, fetchFn: fetchFn, api: API, csrf: csrf, datasetId: id,
+        var conversions = conversionsModule.init({doc: doc, fetchFn: fetchFn, api: API, publicUrl: publicUrl, csrf: csrf, datasetId: id,
                                                   onChange: function () { return load(); }});
 
         function send(u, method, data) {
@@ -330,7 +330,7 @@
             renderTabs();
 
             if (timer && root.clearTimeout) root.clearTimeout(timer);
-            var converting = (d.conversions || []).some(function (c) { return c.status === "converting"; });
+            var converting = (d.conversions || []).some(function (c) { return c.status === "converting" || c.mosaic_status === "building"; });
             timer = (analyzing || converting) && root.setTimeout ? root.setTimeout(load, POLL_MS) : null;
         }
 

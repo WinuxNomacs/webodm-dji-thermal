@@ -1,7 +1,8 @@
 """
 The Thermal Analyzer's API: a user's thermal datasets (those of every project they can view), creating one in a
 project, uploading its images, its analysis in WebODM's worker, a thumbnail of each file, its conversions (several,
-side by side, see conversions) with their downloads, and the user's saved conversion settings. A dataset is its
+side by side, see conversions) with their downloads, their mosaics on a map (see mosaics: what the viewer shows, its
+tiles and the values at a point) and the user's saved conversion settings. A dataset is its
 holder task's id (see datasets).
 
 A dataset is shared as its project is: viewing the project shows its datasets and conversions and downloads the
@@ -25,7 +26,7 @@ from app.api.tasks import download_file_response, download_file_stream
 from app.models import Project, Task
 from app.security import path_traversal_check
 
-from . import conversions, datasets
+from . import conversions, datasets, mosaics
 
 THUMBNAIL_SIZE = (96, 96)
 OVER_QUOTA = "The project's owner is over their storage quota: free some space first"
@@ -68,8 +69,9 @@ def summary(task, user):
         'analyzed_at': a.get('analyzed_at'),
         'conversion_count': len(jobs),
         'conversions_ready': sum(1 for j in jobs if j['status'] == 'ready'),
-        # A conversion of the dataset running
-        'busy': any(j['status'] == 'converting' for j in jobs),
+        # A conversion of the dataset running, or its mosaics being built
+        'busy': any(j['status'] == 'converting' for j in jobs) or
+        any(mosaics.job(task, cid)['status'] == 'building' for cid in conversions.ids(task)),
         'created_at': task.created_at,
         # The latest of its creation, its analysis and its conversions' starts and finishes
         'last_activity': max(t for t in [task.created_at.isoformat(), a.get('analyzed_at'), job.get('finished_at')]
@@ -95,6 +97,7 @@ def detail(task, user):
 def conversion_summary(task, cid):
     """A conversion as the dataset's Convert tab lists it"""
     record, job, r = conversions.record(task, cid), conversions.job(task, cid), conversions.results(task, cid)
+    mosaic_job = mosaics.job(task, cid)
     settings = record.get('settings') or {}
     count, size = conversions.files_size(task, cid)
     return {
@@ -109,6 +112,12 @@ def conversion_summary(task, cid):
         'error': job.get('error') or '',
         'converted': r.get('converted', 0),
         'skipped': r.get('skipped', 0),
+        # '' before any build
+        'mosaic_status': mosaic_job['status'] if mosaic_job['status'] != 'new' else '',
+        'mosaic_progress': mosaic_job.get('progress') or 0,
+        'mosaic_stage': mosaic_job.get('stage') or {},
+        'mosaic_error': mosaic_job.get('error') or '',
+        'mosaic_files': mosaics.files(task, cid),
         'file_count': count,
         'size': size,
         'created_at': record.get('created_at'),
@@ -321,13 +330,18 @@ class ConversionCancel(DatasetView):
 
 class ConversionDownload(DatasetView):
     def get(self, request, pk, cid):
-        """The conversion's outputs as a zip (streamed as it is made), or one of them (?file=<path in the outputs>)"""
+        """The conversion's outputs and mosaics as a zip (streamed as it is made, the mosaics in mosaics/), or one of
+        them (?file=<path in the outputs>, ?mosaic=<kind>/<file>)"""
         task = get_conversion(request, pk, cid)
         out_dir = conversions.output_path(task, cid)
-        rel = request.query_params.get('file')
-        if rel:
+        mosaic_dir = conversions.path(task, cid, mosaics.MOSAICS_DIR)
+        rel, mosaic = request.query_params.get('file'), request.query_params.get('mosaic')
+        if rel or mosaic:
+            if mosaic and mosaic not in mosaics.files(task, cid):
+                raise NotFound()
+            root = mosaic_dir if mosaic else out_dir
             try:
-                path = path_traversal_check(os.path.join(out_dir, rel), out_dir + os.sep)
+                path = path_traversal_check(os.path.join(root, mosaic or rel), root + os.sep)
             except SuspiciousFileOperation:
                 raise NotFound() from None
             if not os.path.isfile(path):
@@ -337,6 +351,8 @@ class ConversionDownload(DatasetView):
         zs = ZipStream(sized=True)
         for f in conversions.output_files(task, cid):
             zs.add_path(os.path.join(out_dir, f), f)
+        for f in mosaics.files(task, cid):
+            zs.add_path(os.path.join(mosaic_dir, f), mosaics.MOSAICS_DIR + '/' + f)
         name = download_name("{}-{}".format(datasets.name_of(task), conversions.record(task, cid).get('name', '')))
         return download_file_stream(request, zs, 'attachment', download_filename=name + ".zip")
 
@@ -366,3 +382,102 @@ class Preferences(DatasetView):
         """Back to dji-thermal-cli's defaults"""
         conversions.forget_preferences(request.user)
         return Response({'settings': conversions.DEFAULTS, 'saved': False})
+
+
+def viewer(task, cid, user):
+    """What the viewer shows of a conversion's mosaics: the tabs, palettes, frames (and when the first and last were
+    taken, as recorded), and dji-thermal-cli's reports"""
+    built = mosaics.result(task, cid)
+    kinds = built.get('kinds') or {}
+    settings = conversions.record(task, cid).get('settings') or {}
+    palettes = mosaics.viewer_palettes(task, cid) if kinds else []
+    tabs = []
+    for tab, kind, _band in mosaics.TABS:
+        k = kinds.get(kind)
+        if not k:
+            continue
+        stats = k.get('view_angle') if tab == 'view_angle' else k.get('temperature')
+        tabs.append({'tab': tab, 'kind': kind, 'bounds': k.get('bounds'), 'minzoom': k.get('minzoom'),
+                     'maxzoom': k.get('maxzoom'), 'stats': stats if tab != 'source_frame' else None})
+    in_mosaic = set(built.get('frames') or [])
+    times = sorted(f['time'] for f in datasets.analysis(task).get('files') or []
+                   if f.get('path') in in_mosaic and f.get('time'))
+    out = conversion_summary(task, cid)
+    out.update({
+        'dataset_name': datasets.name_of(task), 'unit': built.get('unit') or settings.get('unit') or 'C',
+        'flown': [times[0], times[-1]] if times else [], 'built_at': built.get('built_at'),
+        'stripped': bool(built.get('stripped')), 'frames': built.get('frames') or [], 'tabs': tabs,
+        'kinds': {kind: {key: v for key, v in k.items() if key != 'raster'} for kind, k in kinds.items()},
+        'palettes': palettes, 'default_palette': mosaics.default_palette(task, cid, settings) if kinds else None,
+        'frame_colors': mosaics.encoded(mosaics.frame_colormap()[i] for i in range(mosaics.FRAME_COLORS)),
+        'can_change': user.has_perm('change_project', task.project),
+    })
+    return out
+
+
+def tab_raster(task, cid, tab):
+    found = mosaics.tab_raster(task, cid, tab)
+    if found is None or not os.path.isfile(found[0]):
+        raise NotFound()
+    return found
+
+
+class Mosaics(DatasetView):
+    def get(self, request, pk, cid):
+        """The conversion's mosaics as the viewer shows them"""
+        task = get_conversion(request, pk, cid)
+        return Response(viewer(conversions.check_stale(task, cid), cid, request.user))
+
+    def post(self, request, pk, cid):
+        """Builds (again) the mosaics of a converted conversion"""
+        task = conversions.check_stale(get_conversion(request, pk, cid, 'change_project'), cid)
+        if conversions.job(task, cid)['status'] != 'ready':
+            raise ValidationError({'error': "The images must be converted first"})
+        if mosaics.job(task, cid)['status'] == 'building':
+            raise ValidationError({'error': "The mosaics are already being built"})
+        if datasets.over_quota(task):
+            raise ValidationError({'error': OVER_QUOTA})
+        mosaics.start(task, cid)
+        return Response(conversion_detail(task, cid))
+
+
+class MosaicTile(DatasetView):
+    def get(self, request, pk, cid, tab, z, x, y):
+        """
+        A PNG tile of a viewer tab: temperatures and view angles over rescale=min,max with color_map (one of the
+        viewer's palettes), source frames each in their own colour. The viewer's URL carries the mosaics' build time,
+        so a tile is cached until they are built again.
+        """
+        task = get_conversion(request, pk, cid)
+        tab_raster(task, cid, tab)
+        cmap, low, high = None, 0.0, 1.0
+        if tab != 'source_frame':
+            settings = conversions.record(task, cid).get('settings') or {}
+            try:
+                cmap = mosaics.colormap(task, cid, request.query_params.get('color_map') or
+                                        mosaics.default_palette(task, cid, settings))
+                low, high = (float(v) for v in (request.query_params.get('rescale') or '0,1').split(','))
+            except ValueError as e:
+                raise ValidationError({'error': str(e) if 'color' in str(e) else "Invalid rescale value"}) from None
+            if not high > low:
+                raise ValidationError({'rescale': "The range's maximum must be above its minimum"})
+        content = mosaics.tile(task, cid, tab, int(z), int(x), int(y), cmap, low, high)
+        if content is None:
+            raise NotFound()
+        response = HttpResponse(content, content_type="image/png")
+        response['Cache-Control'] = 'private, max-age=86400'
+        return response
+
+
+class MosaicPoint(DatasetView):
+    def get(self, request, pk, cid, tab):
+        """A viewer tab's values at a point (lon, lat): temperature, source frame and view angle"""
+        task = get_conversion(request, pk, cid)
+        tab_raster(task, cid, tab)
+        try:
+            lon, lat = float(request.query_params.get('lon')), float(request.query_params.get('lat'))
+        except (TypeError, ValueError):
+            raise ValidationError({'error': "lon and lat are required"}) from None
+        if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+            raise ValidationError({'error': "Coordinates out of range"})
+        return Response(mosaics.point(task, cid, tab, lon, lat))

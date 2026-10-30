@@ -479,3 +479,20 @@ conversions; (c) mosaics and the viewer; (d) Create task and the README.
   Tests: `test_analyzer.py` 33 (one converting 3 M4T frames and downloading them), Jest 94. Live check: 12 M4T
   frames converted with emissivity 0.95 (24 files, 8.5 MB), the zip and one file downloaded, defaults saved then put
   back, the plan's settings, the list's 1/1, the dataset deleted.
+- **(c) Mosaics and the viewer** — 2026-10-29, `analyzer-mosaics`. `mosaics.py` (the earlier `thermal_mosaics.py` on
+  dji-thermal-cli 1.9.0: one `make_mosaic` for the harmonized mosaic with the as-converted one from the same layout;
+  a located copy for the map when the location is stripped; `thermal/conversions/<id>/mosaic-job.json`,
+  `mosaics.json`, files in `mosaics/<kind>/`; nothing of a failed or canceled build kept; the tiles and point
+  values with rio-tiler 2.1.2 and WebODM's colour maps plus the images' DJI palettes), the conversion's `mosaics`
+  setting (on by default: built after converting), the API's `mosaics` (the viewer's data, POST to build),
+  `mosaics/<tab>/tiles/<z>/<x>/<y>.png` (cached by the build time in the URL) and `mosaics/<tab>/point`, downloads
+  `?mosaic=` and `mosaics/` in the zip. Front end: a new, slimmer `viewer.js` (tabs, palette and range, colour
+  scale, readout, report, build and cancel; no export or measuring, which are part 2) and the Convert tab's mosaic
+  parts. Leaflet is WebODM's 1.3.1, bundled from `leaflet/dist/leaflet-src.js` by `public/thermal/Leaflet.js` into
+  `build/Leaflet.js` and `.css` (WebODM's plugin webpack makes `leaflet` an external, a global only its map pages
+  have) and loaded through `PluginsAPI.SystemJS` with its format given as AMD (SystemJS guessed another from
+  Leaflet's own wrapper). Fixed on the way: the point readout raised a 500 far from the mosaic (outside its
+  projection's domain): points are checked against the bounds first. Tests: `test_analyzer.py` 38 (one building the
+  mosaics of 6 M4T frames, its tiles, values and downloads), Jest 109. Live check: 12 M4T frames converted with
+  mosaics (12 placed, seams median 0.24 °C, misalignment 0.4 cm), the card's progress and View mosaics, the four
+  tabs over the satellite base layer, the palette and range, the readout, the dataset deleted.
