@@ -882,7 +882,13 @@ goes (the docs are written once, from it); 10 needs no dji-thermal-cli release, 
    problems with what addresses them…", "--replace-above" → "Replace temperatures above". Jest 161; live (GETs
    only): the four findings, both buttons (Normalize ticked, then −80° with Normalize kept), the plan's notes.
 4. The dataset page's steps and empty Worksets: 3, after 2 and 3, which its links point to (`dataset.js`,
-   `dataset.html`).
+   `dataset.html`). Done, `ux-steps`: `dataset.stepsHtml` under the summary, once analyzed: 1 check the problems
+   (done with none, or once a workset exists: warnings may be accepted), 2 a workset (its link puts the WebODM
+   plan's settings in the form), 3 a task (the dataset's own or a workset's, linked on the Dashboard), 4 the map of
+   the first processed task; the first not done in bold. The empty Worksets list says to choose settings (the
+   plan's a good start) for those who can convert. No test changed; Jest 161; live (GETs only): the real dataset
+   (✓ checked, ✓ 2 worksets, ✓ in a task, the map link), and as a new dataset (its worksets and tasks removed from
+   the page's copy): the plan link filled the form (Normalize, −80°) on the Worksets tab.
 5. The Thermal Task panel: 6 and its half of 4 (`thermal/ThermalTaskPanel.jsx`, one webpack rebuild; the workset
    form's side of 6 in `conversions.js`).
 6. The Analyzer list: 12, 13 and its half of 4 (`datasets.js`, `datasets.html`).

@@ -360,6 +360,42 @@
         return {text: settingsWords(text), values: values};
     }
 
+    // The way through an analyzed dataset, under its summary: check, a workset, a task, the map; each step done (✓) or
+    // a link to where it is done, the first not done marked
+    function stepsHtml(d) {
+        var a = d.analysis || {};
+        if (!a.files) return "";
+        var serious = (a.findings || []).filter(function (f) { return f.severity !== "info"; });
+        var errors = serious.filter(function (f) { return f.severity === "error"; }).length;
+        var ready = (d.conversions || []).filter(function (c) { return c.status === "ready"; });
+        var tasks = [];
+        (d.conversions || []).forEach(function (c) { tasks = tasks.concat(c.tasks || []); });
+        if (d.parent && d.parent.images_count) tasks.unshift(d.parent);
+        var processed = tasks.filter(function (t) { return t.status === 40; })[0];
+        var dashboard = function (t) { return "/dashboard/?project_task_open=" + t.project + "&project_task_expanded=" + t.id; };
+        var tabLink = function (t, text, act) {
+            return '<a href="#' + t + '" data-step-tab="' + t + '"' + (act ? ' data-step-act="' + act + '"' : "") + ">" + esc(text) + "</a>";
+        };
+        var steps = [
+            // Checked once a workset is made: its warnings may well be accepted
+            serious.length ? {done: !!ready.length, html: tabLink("problems", (ready.length ? "Checked: " : "Check the problems: ") +
+                [errors ? core.count(errors, "error", "errors") : "", serious.length > errors ? core.count(serious.length - errors, "warning", "warnings") : ""]
+                    .filter(Boolean).join(", "))} : {done: true, html: "Checked: no problems"},
+            ready.length ? {done: true, html: tabLink("convert", core.count(ready.length, "workset", "worksets"))} :
+                {html: "Create a workset, starting from " + (d.can_change && (a.webodm || {}).process_args ?
+                    tabLink("convert", "the WebODM plan's settings", "plan") : "the WebODM plan's settings")},
+            tasks.length ? {done: true, html: '<a href="' + esc(dashboard(tasks[0])) + '">In a task</a>'} :
+                {html: ready.length ? tabLink("convert", "Create a task from a workset") : "Create a task from a workset"},
+            processed ? {html: '<a href="/map/project/' + esc(processed.project) + "/task/" + esc(processed.id) + '/">Measure on the map</a>'} :
+                {html: "Measure on the map, once the task is processed"}
+        ];
+        var current = steps.filter(function (x) { return !x.done; })[0];
+        return '<ol class="ta-steps">' + steps.map(function (x) {
+            return '<li class="' + (x.done ? "ta-step-done" : x === current ? "ta-step-current" : "") + '">' +
+                (x.done ? '<i class="fa fa-check"></i> ' : "") + x.html + "</li>";
+        }).join("") + "</ol>";
+    }
+
     // The Problems tab: the findings, most severe first, each with what addresses it (and a button setting it in the
     // form, canConvert) and the files it names (each a link to the Files tab filtered to it)
     function problemsHtml(a, canConvert) {
@@ -524,6 +560,7 @@
 
             var a = d.analysis || {};
             $("ta-overview").innerHTML = overviewHtml(d);
+            $("ta-steps").innerHTML = stepsHtml(d);
             // Converting needs no analysis: the tabs show as soon as there are images (or conversions)
             $("ta-tabs").hidden = !a.files && !d.file_count && !(d.conversions || []).length;
             // Before the analysis only the Worksets tab has something to show; the page opens on it unless a tab was chosen
@@ -786,6 +823,15 @@
             showTab("files");
         });
 
+        // The steps' links: to a tab, the WebODM plan's settings put in the form on the way
+        $("ta-steps").addEventListener("click", function (e) {
+            var a = e.target.closest ? e.target.closest("a[data-step-tab]") : null;
+            if (!a) return;
+            e.preventDefault();
+            if (a.getAttribute("data-step-act") === "plan") conversions.usePlan();
+            showTab(a.getAttribute("data-step-tab"));
+        });
+
         // A finding's button: its settings in the form, on the Worksets tab
         $("ta-tab-problems").addEventListener("click", function (e) {
             var b = e.target.closest ? e.target.closest("button[data-set]") : null;
@@ -918,7 +964,7 @@
     }
 
     var api = {captureTime: captureTime, median: core.median, overview: overview, summaryRows: summaryRows, duration: duration, overviewHtml: overviewHtml, flagsByFile: flagsByFile,
-               sortRows: core.sortRows, fileRows: fileRows, detailRows: detailRows, viewerSrc: viewerSrc, viewerItems: viewerItems, detailHtml: detailHtml, filesHtml: filesHtml, settingsWords: settingsWords, findingMessage: findingMessage, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
+               sortRows: core.sortRows, fileRows: fileRows, detailRows: detailRows, viewerSrc: viewerSrc, viewerItems: viewerItems, detailHtml: detailHtml, filesHtml: filesHtml, stepsHtml: stepsHtml, settingsWords: settingsWords, findingMessage: findingMessage, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
     root.ThermalAnalyzerDataset = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});
