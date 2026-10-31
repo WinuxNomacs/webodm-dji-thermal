@@ -34,6 +34,9 @@
         {% if status.deploy_dir %}
         <p>{% blocktrans with folder=status.deploy_dir %}The deployment sets {{ env }}={{ folder }}: the SDK is installed there, replacing the one in it.{% endblocktrans %}</p>
         {% endif %}
+        {% if status.unsupported %}
+        <div class="alert alert-info" id="dji-thermal-sdk-unsupported">{{ status.unsupported }}</div>
+        {% else %}
         {% if not status.writable %}
         <div class="alert alert-warning">{% trans 'The SDK folder cannot be written to by WebODM: an upload will fail.' %}</div>
         {% endif %}
@@ -46,6 +49,7 @@
             <button type="submit" class="btn btn-primary" id="dji-thermal-sdk-upload"><i class="fa fa-upload"></i>
                 {% if status.folder %}{% trans 'Update' %}{% else %}{% trans 'Upload' %}{% endif %}</button>
         </form>
+        {% endif %}
 
         {% if status.folder %}
         <hr>
