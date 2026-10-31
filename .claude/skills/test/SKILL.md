@@ -23,4 +23,7 @@ From the repo root, with the dev stack up (`dev/webodm.sh ps`; start it with `de
    suites need the UI mocks first: `docker exec -w /webodm dt-webapp python manage.py test app.tests.test_generate_ui_mocks --noinput`
    (the label must come first).
 
+6. **Workflows** (dji-thermal-cli's, or any repo's `.github/workflows`): `docker run --rm --user "$(id -u):$(id -g)"
+   -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.7 -color=false` in that repo.
+
 A failure is reported with its output. Before calling one pre-existing, check whether it also fails on `main`.
