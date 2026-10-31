@@ -19,7 +19,7 @@ from django.test import Client
 from app.plugins.functions import get_plugin_by_name
 from PIL import Image
 
-from .test_converter import ConverterTestCase, jpegs_in, read_tags
+from .test_converter import ConverterTestCase, jpegs_in
 
 converter = importlib.import_module("coreplugins.dji-thermal.converter")
 sdk = importlib.import_module("coreplugins.dji-thermal.sdk")
@@ -213,9 +213,10 @@ class TestDjisSdk(SdkTestCase):
         self.assertEqual(len(sdk.check()["measured"]), len(sdk.samples(self.uploaded)))
 
         source = sdk.samples(self.uploaded)[0]
-        problem = converter.convert(source, self.path("native.tif"))
-        self.assertEqual(problem, "")
-        self.assertIn("with DJI's Thermal SDK 1.8", read_tags(self.path("native.tif"), "XMP-dtc:Software")["Software"])
+        library = converter.library()
+        with mock.patch.object(library, "process", wraps=library.process) as process:
+            self.assertEqual(converter.convert(source, self.path("native.tif")), "")
+        self.assertEqual(str(process.call_args.args[2].sdk), sdk.current())
         with mock.patch.object(sdk, "current", return_value=None):
             self.assertEqual(converter.convert(source, self.path("port.tif")), "")
         with Image.open(self.path("native.tif")) as a, Image.open(self.path("port.tif")) as b:

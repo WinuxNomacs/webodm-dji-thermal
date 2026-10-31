@@ -229,8 +229,8 @@ shown in WebODM's units (°F when imperial), the same setting as the Analyzer's.
 ## The converted images
 
 Each thermal R-JPEG becomes a single-band 32-bit float TIFF of its temperatures in degrees Celsius, measured with
-the Measurement settings above. It keeps the photo's EXIF and DJI XMP metadata that ODM uses (GPS, altitudes,
-capture time, camera and gimbal angles, RTK accuracy) and is marked as a thermal band (`Camera:BandName` =
+the Measurement settings above. It keeps all of the photo's EXIF and DJI XMP metadata, with what ODM uses (GPS,
+altitudes, capture time, camera and gimbal angles, RTK accuracy), and is marked as a thermal band (`Camera:BandName` =
 `LWIR`), so ODM processes it as thermal. Its XMP also records how it was measured, as dji-thermal-cli's own
 outputs do (namespace `urn:dji-thermal-cli:xmp:1.0`): `Distance`, `DistanceSource` (`rangefinder`, `embedded` or
 `option`), `Emissivity`, `Humidity`, `ReflectedTemperatureC`, `AmbientTemperatureC` and `Software`. The photos

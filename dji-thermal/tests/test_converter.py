@@ -59,7 +59,7 @@ def skip_without(variable):
 
 
 def read_tags(path, *tags):
-    out = subprocess.run(["exiftool", "-config", converter.EXIFTOOL_CONFIG_FILE, "-j", "-n"]
+    out = subprocess.run(["exiftool", "-j", "-n"]
                          + ["-" + t for t in tags] + [path], capture_output=True, text=True, check=True).stdout
     return json.loads(out)[0]
 
@@ -136,68 +136,6 @@ class TestWhatIsConverted(ConverterTestCase):
                 os.remove(source)
 
 
-class TestMetadata(ConverterTestCase):
-    def float_tiff(self, name):
-        path = self.path(name)
-        Image.fromarray(np.full((48, 64), 21.5, dtype=np.float32)).save(path, format="TIFF")
-        return path
-
-    def test_the_exiftool_command_copies_all_the_metadata_names_the_band_lwir_and_adds_the_measurement(self):
-        command = converter.exiftool_command("/in/a.jpg", "/out/a.tif", {"Emissivity": "0.95"})
-        self.assertEqual(command[1:3], ["-config", converter.EXIFTOOL_CONFIG_FILE])
-        self.assertTrue(os.path.isfile(converter.EXIFTOOL_CONFIG_FILE))
-        self.assertIn("-XMP-Camera:BandName=LWIR", command)
-        self.assertIn("-XMP-dtc:Emissivity=0.95", command)
-        self.assertEqual(command[command.index("-TagsFromFile") + 1:command.index("-TagsFromFile") + 3],
-                         ["/in/a.jpg", "-all:all>all:all"])
-        self.assertEqual(command[-2:], ["-overwrite_original", "/out/a.tif"])
-
-    def test_the_measurement_is_written_in_the_tiff_s_xmp(self):
-        measurement = mock.Mock(params={"distance": 29.422, "humidity": 50.0, "emissivity": 0.8999999761581421,
-                                        "reflection": 27.75}, distance_source="rangefinder")
-        source, dest = self.jpeg("DJI_0001_T.JPG", image_source="InfraredCamera"), self.float_tiff("out.tif")
-        self.assertEqual(converter.copy_metadata(source, dest, converter.measurement_tags(measurement)), "")
-        tags = read_tags(dest, "XMP-dtc:all")
-        tags.pop("SourceFile")
-        self.assertEqual(tags, {"Software": LIBRARY, "Distance": 29.422, "Humidity": 50,
-                                "Emissivity": 0.9, "ReflectedTemperatureC": 27.75, "DistanceSource": "rangefinder"})
-
-    def test_the_tiff_gets_the_source_s_gps_and_the_lwir_band_name(self):
-        exif = Image.Exif()
-        exif[0x0110] = "M4T"
-        exif.get_ifd(0x8825).update({1: "N", 2: (42.0, 6.0, 12.48), 3: "W", 4: (71.0, 30.0, 0.0)})
-        source = self.jpeg("DJI_0001_T.JPG", image_source="InfraredCamera", exif=exif)
-        dest = self.float_tiff("out.tif")
-
-        self.assertEqual(converter.copy_metadata(source, dest), "")
-        tags = read_tags(dest, "Model", "GPSLatitude", "GPSLongitude", "XMP-Camera:BandName")
-        self.assertEqual(tags["Model"], "M4T")
-        self.assertAlmostEqual(tags["GPSLatitude"], 42.1034667, places=6)
-        self.assertAlmostEqual(tags["GPSLongitude"], -71.5, places=6)
-        self.assertEqual(tags["BandName"], "LWIR")
-        with Image.open(dest) as im:
-            self.assertEqual(im.mode, "F")
-
-    def test_without_exiftool_the_metadata_is_not_written_and_says_why(self):
-        with mock.patch.object(converter.shutil, "which", return_value=None):
-            self.assertEqual(converter.copy_metadata(self.jpeg("a.jpg"), self.float_tiff("a.tif")),
-                             "exiftool not found")
-
-    def test_an_error_exiftool_reports_is_returned_even_with_exit_code_zero(self):
-        result = subprocess.CompletedProcess([], 0, stdout="    1 image files updated\n",
-                                             stderr="Warning: Sorry, BandName is not defined\n")
-        with mock.patch.object(converter.subprocess, "run", return_value=result):
-            self.assertEqual(converter.copy_metadata(self.jpeg("a.jpg"), self.float_tiff("a.tif")),
-                             "Warning: Sorry, BandName is not defined")
-
-    def test_an_exiftool_that_fails_or_hangs_is_reported(self):
-        failed = subprocess.CompletedProcess([], 1, stdout="", stderr="")
-        with mock.patch.object(converter.subprocess, "run", return_value=failed):
-            self.assertEqual(converter.copy_metadata("a.jpg", "a.tif"), "exiftool exit code 1")
-        with mock.patch.object(converter.subprocess, "run", side_effect=subprocess.TimeoutExpired("exiftool", 60)):
-            self.assertIn("exiftool did not run", converter.copy_metadata("a.jpg", "a.tif"))
-
-
 class TestMeasurementSettings(ConverterTestCase):
     def test_by_default_the_rangefinder_s_distance_and_the_recorded_parameters_are_used(self):
         for values in (None, {}, {"distance": "", "emissivity": "", "humidity": None}):
@@ -237,24 +175,23 @@ class TestMeasurementSettings(ConverterTestCase):
 
 
 class TestFailedConversions(ConverterTestCase):
-    def convert_thermal(self, **patches):
+    def convert_thermal(self, process):
         source = self.jpeg("DJI_0001_T.JPG")
+        library = mock.Mock()
+        library.return_value.process = process
         with mock.patch.object(converter, "is_thermal_rjpeg", return_value=True), \
-                mock.patch.multiple(converter, **patches):
+                mock.patch.object(converter, "settings"), mock.patch.object(converter, "library", library):
             return source, converter.convert(source, self.path("out.tif"))
 
     def test_a_file_that_fails_to_decode_leaves_no_tiff_and_says_why(self):
-        source, reason = self.convert_thermal(measure=mock.Mock(side_effect=ValueError("bad thermal block")))
+        failed = mock.Mock(results=[mock.Mock(ok=False, reason="bad thermal block", outputs=[])])
+        source, reason = self.convert_thermal(mock.Mock(return_value=failed))
         self.assertEqual(reason, "bad thermal block")
         self.assertEqual(os.listdir(self.dir), [os.path.basename(source)])
 
-    def test_a_tiff_whose_metadata_could_not_be_written_is_removed(self):
-        # Without its GPS and band name, ODM could neither place the image nor treat it as thermal
-        temps = np.zeros((48, 64), dtype=np.float32)
-        measurement = mock.Mock(temperature=temps, params={}, distance_source="embedded")
-        source, reason = self.convert_thermal(measure=mock.Mock(return_value=measurement),
-                                              copy_metadata=mock.Mock(return_value="exiftool not found"))
-        self.assertEqual(reason, "the metadata could not be written: exiftool not found")
+    def test_a_library_that_fails_while_writing_leaves_no_tiff_and_no_working_folder(self):
+        source, reason = self.convert_thermal(mock.Mock(side_effect=OSError("disk full")))
+        self.assertEqual(reason, "disk full")
         self.assertEqual(os.listdir(self.dir), [os.path.basename(source)])
 
     def test_a_library_that_does_not_load_converts_nothing_and_says_so(self):
@@ -309,8 +246,8 @@ class TestDjiSampleImages(ConvertedImagesTestCase):
         _, recorded = self.assertConverts(source)
         self.assertGreater(abs(float(np.median(temps)) - float(np.median(recorded))), 0.5)
         tags = read_tags(dest, "XMP-dtc:all")
-        self.assertEqual((tags["Emissivity"], tags["ReflectedTemperatureC"], tags["Distance"], tags["DistanceSource"]),
-                         (0.7, 20, 12, "option"))
+        self.assertEqual((tags["Software"], tags["Emissivity"], tags["ReflectedTemperatureC"], tags["Distance"],
+                          tags["DistanceSource"]), (LIBRARY, 0.7, 20, 12, "option"))
 
     def test_a_value_outside_the_camera_s_range_fails_the_photo_with_the_reason(self):
         source = next(f for f in jpegs_in("DJI_THERMAL_SAMPLES_DIR") if converter.describe(f)["camera"] == "M30T")
@@ -333,10 +270,10 @@ class TestRealFlight(ConvertedImagesTestCase):
                 self.assertEqual(im.mode, "RGB")
 
     def test_a_flight_s_thermal_frames_convert_keeping_the_metadata_odm_reads(self):
-        # exiftool copies only the DJI XMP tags it can write (not ImageSource, the rangefinder's, ...), which
-        # include all those ODM and OpenSfM read for a photo's position and orientation
+        # All those ODM and OpenSfM read for a photo's position and orientation, and DJI's others (ImageSource, the
+        # rangefinder's)
         tags = ["GPSLatitude", "GPSLongitude", "GPSAltitude", "DateTimeOriginal", "Make", "Model", "FocalLength"] + [
-            "XMP-drone-dji:" + t for t in ODM_DJI_TAGS]
+            "XMP-drone-dji:" + t for t in ODM_DJI_TAGS + ("ImageSource", "LRFStatus", "LRFTargetDistance")]
         thermal = [f for f in jpegs_in("DJI_THERMAL_FLIGHT_DIR") if converter.is_thermal_rjpeg(f)]
         for source in thermal[:5]:
             with self.subTest(source=os.path.basename(source)):
