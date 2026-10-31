@@ -96,6 +96,7 @@ def detail(task, user):
     out['conversions'] = [conversion_summary(task, cid) for cid in reversed(conversions.ids(task))]
     # What the conversions' settings are compared against, to list what each one changed
     out['defaults'] = conversions.DEFAULTS
+    out['product_names'] = conversions.PRODUCT_NAMES
     if out['can_change']:
         out['sharing'] = datasets.sharing(task.project)
     return out

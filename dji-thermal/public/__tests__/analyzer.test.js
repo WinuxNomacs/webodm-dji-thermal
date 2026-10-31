@@ -1250,7 +1250,7 @@ describe("a dataset's conversions", () => {
             outputs: ["temp_c:tiff", "pseudo:tiff"]});
         const diffs = conversions.differences(s, DEFAULTS, plan, "F");
         expect(diffs.map(d => [d.key, d.text, d.changed, d.offPlan])).toEqual([
-            ["outputs", "temp_c:tiff, pseudo:tiff", true, false],   // the plan's pseudo names no format, so any one is on it
+            ["outputs", "temp_c TIFF, pseudo TIFF", true, false],   // the plan's pseudo names no format, so any one is on it
             ["emissivity", "emissivity 0.95", true, false],
             ["reflected_temp", "reflected 68 °F", true, false],
             ["normalize", "not normalized", false, true],

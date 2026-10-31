@@ -76,7 +76,8 @@
         var products = (meta.products || []).map(function (p) {
             var on = chosen[p.product] !== undefined;
             return '<div class="ta-output"><label class="checkbox-inline" title="' + esc(p.description) + '"><input type="checkbox" name="output" value="' +
-                esc(p.product) + '"' + (on ? " checked" : "") + "> <code>" + esc(p.product) + "</code></label> " +
+                esc(p.product) + '"' + (on ? " checked" : "") + "> " +
+                (productNames[p.product] ? esc(productNames[p.product]) + " " : "") + "<code>" + esc(p.product) + "</code></label> " +
                 '<select class="form-control input-sm" name="format-' + esc(p.product) + '">' + p.formats.map(function (f) {
                     return '<option value="' + esc(f) + '"' + (chosen[p.product] === f ? " selected" : "") + ">" + esc(f.toUpperCase()) + "</option>";
                 }).join("") + '</select> <span class="text-muted">' + esc(p.description) + "</span></div>";
@@ -106,10 +107,10 @@
         var look = field("Palette", '<select class="form-control input-sm" name="palette"><option value="">Each image\'s own' + esc(ownText) + "</option>" +
                 (meta.palettes || []).map(function (p) {
                     return '<option value="' + esc(p) + '"' + (p === s.palette ? " selected" : "") + ">" + esc(p) + "</option>";
-                }).join("") + "</select>", "The colours of the pseudo outputs.") +
+                }).join("") + "</select>", "Used for the colour outputs.") +
             field("Colour range (" + u + ")", '<div class="ta-inline">' + numberInput("range_min", s.range_min, ' step="any" placeholder="from"') +
                 numberInput("range_max", s.range_max, ' step="any" placeholder="to"') + "</div>",
-                "Both, or neither for each image's own range. Also the range of the gray16 outputs.");
+                "Both, or neither for each image's own range. Also the range of the 16-bit grey outputs.");
 
         var frames = '<div class="checkbox"><label><input type="checkbox" name="normalize"' + (s.normalize ? " checked" : "") +
                 "> Normalize: make the frames' temperatures consistent with each other</label>" +
@@ -231,9 +232,24 @@
         return same(ka, kb) && ka.every(function (k) { return pa[k] === "*" || pb[k] === "*" || pa[k] === pb[k]; });
     }
 
+    // The outputs' names in words, from the server (conversions.PRODUCT_NAMES, with the dataset)
+    var productNames = {};
+    function setProductNames(names) { productNames = names || {}; }
+    var COLOURED = ["pseudo", "rjpeg"];
+
+    // An output ("temp_c:tiff", or a product alone) in words, as conversions.output_text: "°C TIFF", "colour PNG"
+    function outputText(o) {
+        var p = o.split(":");
+        var name = productNames[p[0]] || p[0];
+        return p[0] === "rjpeg" ? name : name + " " + (p[1] ? p[1].toUpperCase() : "images");
+    }
+    function colouredOutputs(s) {
+        return (s.outputs || []).filter(function (o) { return COLOURED.indexOf(o.split(":")[0]) >= 0; });
+    }
+
     // The settings told apart in the summaries: each with its form fields and its text (u: the temperatures' unit symbol)
     var DIFFERENCES = [
-        {key: "outputs", fields: ["output"], same: sameOutputs, text: function (s) { return (s.outputs || []).join(", ") || "no outputs"; }},
+        {key: "outputs", fields: ["output"], same: sameOutputs, text: function (s) { return (s.outputs || []).map(outputText).join(", ") || "no outputs"; }},
         {key: "compression", fields: ["compression"], text: function (s) { return s.compression === "none" ? "no compression" : s.compression + " compression"; }},
         {key: "mosaics", fields: ["mosaics"], text: function (s) { return s.mosaics ? "mosaics" : "no mosaics"; }},
         {key: "distance", fields: ["distance_mode", "distance"], text: function (s) {
@@ -249,7 +265,9 @@
         {key: "unit", fields: ["unit"], text: function (s) { return "files in " + UNIT_LABELS[core.unitOf(s.unit)]; }},
         {key: "normalize", fields: ["normalize"], text: function (s) { return s.normalize ? "normalized" : "not normalized"; }},
         {key: "max_pitch", fields: ["max_pitch"], text: function (s) { return blank(s.max_pitch) ? "all frames" : "pitch ≤ " + num(s.max_pitch) + "°"; }},
-        {key: "palette", fields: ["palette"], text: function (s) { return s.palette ? "palette " + s.palette : "each image's palette"; }},
+        {key: "palette", fields: ["palette"], text: function (s) {
+            return colouredOutputs(s).map(outputText).join(", ") + " in " + (s.palette || "each image's palette");
+        }},
         {key: "range", fields: ["range_min", "range_max"], text: function (s, u) {
             return blank(s.range_min) && blank(s.range_max) ? "each image's range" : "range " + num(s.range_min) + " to " + num(s.range_max) + " " + u;
         }},
@@ -289,6 +307,7 @@
         var u = core.unitSymbol(shown);
         var out = [];
         DIFFERENCES.forEach(function (d) {
+            if (d.key === "palette" && !colouredOutputs(S).length) return;    // only the coloured outputs have one
             var alike = d.same ? function (a, b) { return d.same(a.outputs, b.outputs); } : function (a, b) { return same(valuesOf(d, a), valuesOf(d, b)); };
             var changed = !alike(S, D);
             var offPlan = !!P && !alike(P, D) && !alike(S, P);
@@ -300,13 +319,16 @@
     // The settings the Outputs section holds
     var OUTPUT_KEYS = ["outputs", "compression", "mosaics"];
 
-    // The differences as chips (none: what to say when there are none)
-    function chipsHtml(diffs, none) {
+    // The differences as chips (none: what to say when there are none), with what "≠ plan" means when one is, unless
+    // said already (noLegend)
+    var OFF_PLAN_TITLE = "The WebODM plan: ";
+    function chipsHtml(diffs, none, noLegend) {
         if (!diffs.length) return '<span class="text-muted">' + esc(none) + "</span>";
+        var offPlan = !noLegend && diffs.some(function (d) { return d.offPlan; });
         return '<span class="ta-chips">' + diffs.map(function (d) {
             return '<span class="ta-chip' + (d.changed ? " ta-chip-changed" : "") + (d.offPlan ? " ta-chip-off-plan" : "") + '" data-key="' + d.key + '"' +
-                (d.offPlan ? ' title="The WebODM plan: ' + esc(d.plan) + '"' : "") + ">" + esc(d.text) + "</span>";
-        }).join("") + "</span>";
+                (d.offPlan ? ' title="' + esc(OFF_PLAN_TITLE + d.plan) + '"' : "") + ">" + esc(d.text) + "</span>";
+        }).join("") + (offPlan ? '<span class="ta-chips-legend text-muted">≠ plan: differs from the WebODM plan (hover for its value)</span>' : "") + "</span>";
     }
 
     // The form's fields marked where they change the defaults (with a way back to them) or are off the plan
@@ -322,7 +344,7 @@
             if (diff.offPlan) box.classList.add("ta-off-plan");
             var note = form.ownerDocument.createElement("span");
             note.className = "ta-mark-note";
-            note.innerHTML = (diff.offPlan ? '<span title="The WebODM plan: ' + esc(diff.plan) + '"><i class="fa fa-exclamation-triangle"></i> plan: ' + esc(diff.plan) + "</span> " : "") +
+            note.innerHTML = (diff.offPlan ? '<span title="' + esc(OFF_PLAN_TITLE + diff.plan) + '">≠ plan: ' + esc(diff.plan) + "</span> " : "") +
                 (diff.changed ? '<a href="#" data-reset="' + d.key + '" title="Back to dji-thermal-cli\'s default">default</a>' : "");
             var label = box.querySelector("label, h4");
             if (d.key === "outputs") box.querySelector("h4").appendChild(note);
@@ -453,8 +475,8 @@
     }
 
     // A conversion's actions: the one its state calls for, and the others in its menu (menu: open; viewer: the URL of
-    // its mosaics' page)
-    function actionsHtml(c, canChange, base, menu, viewer) {
+    // its mosaics' page; taskless: in no task yet, so Create task, the next step, is shown beside it)
+    function actionsHtml(c, canChange, base, menu, viewer, taskless) {
         var button = function (act, icon, label, title, cls, aria) {
             return '<button type="button" class="' + (cls || "") + '" data-act="' + act + '"' + (title ? ' title="' + esc(title) + '"' : "") +
                 (aria ? ' aria-label="' + esc(aria + " " + c.name) + '"' : "") + '><i class="fa fa-' + icon + '"></i> ' + esc(label) + "</button>";
@@ -476,13 +498,18 @@
         } else {
             main = button("use", "copy", "Copy settings to form", USE_TITLE, mainCls);
         }
+        var createTask = canChange && ready && !building;
+        var task = function (cls) {
+            return button("task", "plus", "Create task", "A new WebODM task of this workset's temperature TIFFs, in the dataset's project", cls);
+        };
+        if (createTask && taskless) main += " " + task(mainCls);
         if (download && !(ready && !view && !building)) items.push(link(download, "download", "Download all"));
         if (viewer && building) items.push(link(viewer, "map", "Mosaics"));
         if (ready || busy) items.push(button("use", "copy", "Copy settings to form", USE_TITLE));
-        if (canChange && ready && !building) {
+        if (createTask) {
             items.push(button("mosaics", "th", c.mosaic_status === "ready" ? "Build mosaics again" : "Build mosaics",
                 "Place the converted frames side by side, as converted and harmonized"));
-            items.push(button("task", "plus", "Create task", "A new WebODM task of this workset's temperature TIFFs, in the dataset's project"));
+            if (!taskless) items.push(task());
             items.push(button("parent", "file-import", "Use for parent task",
                 "Send this workset's temperature TIFFs to the dataset's own WebODM task, in place of the images sent there before"));
         }
@@ -544,7 +571,8 @@
                 '<div class="text-muted">' + esc(c.description) + "</div>";
             return '<div class="ta-conversion' + (c.id === fresh ? " ta-conversion-new" : "") + '" data-id="' + c.id + '">' +
                 '<div class="ta-conversion-head"><strong>' + esc(c.name) + '</strong> <span class="label label-' + cls + '">' + esc(statusLabel(c)) + "</span>" +
-                '<span class="ta-conversion-actions">' + actionsHtml(c, canChange, base, menu, viewerBase ? viewerBase + c.id : null) + "</span></div>" +
+                '<span class="ta-conversion-actions">' + actionsHtml(c, canChange, base, menu, viewerBase ? viewerBase + c.id : null,
+                    !(c.tasks || []).length && !parentHtml(c, parent, dashboard)) + "</span></div>" +
                 settings + progress + mosaicHtml(c) +
                 (c.error ? '<div class="text-danger">' + esc(c.error) + "</div>" : "") +
                 '<div class="ta-conversion-figures text-muted">' + esc(figures.join(" · ")) + "</div>" +
@@ -672,7 +700,7 @@
                 (editing ? "down" : "right") + '"></i> Workset Creation Settings:</button> ' + chipsHtml(diffs, "dji-thermal-cli's defaults");
             var outputs = form.querySelector('[data-chips="outputs"]');
             if (outputs) {
-                outputs.innerHTML = chipsHtml(diffs.filter(function (d) { return OUTPUT_KEYS.indexOf(d.key) >= 0; }), "the defaults");
+                outputs.innerHTML = chipsHtml(diffs.filter(function (d) { return OUTPUT_KEYS.indexOf(d.key) >= 0; }), "the defaults", true);
             }
             form.hidden = !editing;
             markForm(form, diffs);
@@ -804,6 +832,7 @@
 
         function update(d) {
             dataset = d;
+            setProductNames(d.product_names);
             root$("ta-convert-settings").hidden = !d.can_change;
             root$("ta-convert-plan").hidden = !((d.analysis || {}).webodm || {}).process_args;
             renderList();

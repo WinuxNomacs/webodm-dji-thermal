@@ -112,7 +112,7 @@ name to copy a link to it; adding images marks the analysis out of date until it
 The **Worksets** tab, the first on a dataset's page and the one it opens on, converts the images into a workset
 with dji-thermal-cli's settings (**Create Workset**), in WebODM's worker, with progress and Cancel. **Workset
 Creation Settings:** opens and closes the settings, its chips showing what differs from the defaults either way; the **Outputs** section shows its own when
-closed.
+closed. A chip marked **≠ plan** differs from the WebODM plan's settings (hover for the plan's value).
 
 - **Outputs**: temperature TIFFs in °C, °F or K, pseudo-colour PNGs, gray16, raw counts, DJI R-JPEGs and the others
   dji-thermal-cli writes, and their compression; the palette and colour range of the pictures.
@@ -154,7 +154,8 @@ over WebODM's base layers:
 
 ### A WebODM task from a workset
 
-**Create task**, in a converted workset's menu, makes a WebODM task in the dataset's project from the
+**Create task**, beside **View mosaics** on a converted workset that is in no task yet (in its menu once it is),
+makes a WebODM task in the dataset's project from the
 workset's temperature TIFFs in °C (the `temp_c` TIFF output), without uploading them again:
 
 - It says what stops a task: a workset not finished converting, its location stripped (ODM needs it to place the frames), or
@@ -169,7 +170,7 @@ The workset lists the tasks made from it, each with its status and a link to it 
 dashboard, such a task has a **Thermal dataset** button in its expanded panel, back to the dataset. A task keeps
 its images when the workset or the dataset is deleted (the button then goes).
 
-**Use for parent task**, in the same menu, sends the workset's °C TIFFs to the dataset's own task (see below)
+**Use for parent task**, in the workset's menu, sends the workset's °C TIFFs to the dataset's own task (see below)
 instead of a new one, so one task is processed again and again as you try worksets:
 
 - The TIFFs replace the images sent there before, and what the task processed from them (its orthophoto, models and
