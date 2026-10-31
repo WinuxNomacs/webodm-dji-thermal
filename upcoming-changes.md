@@ -195,11 +195,9 @@
   "Up next: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0. Steps 2–5
   and 3b done (the last, isotherms and the legend, 2026-10-31), and dji-thermal-cli 1.10.0 pinned with the fallback
   to its internal tables dropped (2026-10-31, `pin-cli-1.10.0`). Done.
-- **Linux, Windows and macOS** (the user, 2026-10-31, from `new.md`; details under "Up next: Linux, Windows and
-  macOS" below): the plugin works on every way WebODM is installed, with only the platform tests that are needed;
-  Windows checked from this machine (WSL with Windows at hand); macOS's installer runs WebODM in Docker, so no Mac
-  runs. Before 1.0.0: on a native Windows WebODM the plugin would not load today (`datasets.py` imports `fcntl`, and
-  the React parts need webpack, which native installs lack).
+- **Linux, Windows and macOS** (the user, 2026-10-31, from `new.md`; details under "Done: Linux, Windows and
+  macOS" below): the plugin works on every way WebODM is installed: Docker on all three systems (the macOS
+  installer runs Docker), and the native Windows installer, checked end to end there. Done.
 - **Picture viewer in the Files view** (the user, 2026-10-31, from `new.md`; details under "Up next: Picture
   viewer" below): clicking the picture in the Files view's detail pane opens it in a window on the page, with a
   close button and basic controls, instead of a new tab. Small, after the platform phase.
@@ -555,7 +553,7 @@ setting, under Administration.
 - Live check on :8002: admin sees DJI Thermal under Administration after Plugins and opens the page; a temporary
   user made for it has no link and gets 403 at `/plugins/dji-thermal/`; the user was removed afterwards.
 
-## Up next: Linux, Windows and macOS
+## Done: Linux, Windows and macOS
 
 **The request** (the user, 2026-10-31): "This needs to support Linux, Windows and MacOS. You're currently on WSL with
 access to Windows for any Windows specific tests. I do prefer we limit the need to run platform specific tests on
@@ -631,7 +629,30 @@ layouts, and the UX review checks desktop only.
 `converter-without-exiftool`; `test_converter`, `test_sdk`). The records' lock and every file replacement in
 `portable.py` (`fcntl` or `msvcrt`; `os.replace` tried again for a second on Windows, where a file another
 process has open can't be replaced), its `test_portable` passing on Linux and with the native WebODM's Python 3.9
-on Windows (2026-10-31, `portable-files`; the `test` skill's Windows step).
+on Windows (2026-10-31, `portable-files`; the `test` skill's Windows step). The React parts built into the zip's
+`public/build` by `dev/package.sh` (`ship-build`). Mosaics with `jobs=1` (`mosaic-jobs-windows`, below). The DJI
+Thermal page on an ARM server (`sdk-processor-message`, below). The `release-check` skill's native Windows step.
+
+**Done** (2026-10-31, merged as `platforms-done`): checked on the native Windows WebODM 3.3.2 with the zip of
+these changes, in a project of its own, deleted afterwards, and the plugin removed: no webpack run (the built
+files used), the Thermal Task button on every project, 40 frames of the M4T flight (and 3 RGB photos, left out)
+converted through the panel and processed on the native node (orthophoto 9.8 to 33.3 °C, 212 s); an Analyzer
+dataset of the same frames analyzed, converted with mosaics, shown in the viewer (WebODM's Leaflet from the build),
+a task created from the conversion and processed (269 s). The full Django suite passes (134, the Windows-only test
+skipped); `test_portable` passes on Windows.
+- **Mosaics on Windows**: the first run's mosaics failed ("No frames to mosaic"). dji-thermal-cli started worker
+  processes, which Windows' Celery worker allows (Linux's daemon processes don't), and a started process doesn't
+  have the plugin's site-packages ("No module named 'dji_thermal_cli'"). `mosaics.build` now passes `jobs=1`, as
+  analysis and conversions did. Reinstalling the plugin over a running WebODM keeps the worker on the old code until
+  WebODM restarts (the user restarted it for the check).
+- **The Analyzer task's orthophoto read -76.2 to 57.7 °C** (its frames about 7 to 32 °C), where the Thermal Task's
+  was in range: like the closed October case (an ODM reconstruction, not the plugin), seen here on the native node.
+  Noted, not looked into further.
+- **Apple Silicon**: WebODM's webapp image is built for amd64 and arm64, so Docker on an Apple Silicon Mac runs
+  arm64 Linux. DJI's SDK zip has x64 and x86 libraries only, and dji-thermal-cli's `platform_dirs` maps any other
+  processor to `release_x86`. The DJI Thermal page now says the SDK can't run on that processor and refuses an
+  upload; the built-in port is used (checked in the dev container with the processor patched to aarch64 and
+  arm64). dji-thermal-cli could name ARM itself in its own message (a CLI change, if wanted).
 
 **Seen on the native Windows WebODM 3.3.2** (2026-10-31, the zip of `main` installed through Administration >
 Plugins, then removed):
