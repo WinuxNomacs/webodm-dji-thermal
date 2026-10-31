@@ -68,6 +68,7 @@ class Plugin(PluginBase):
             MountPoint(DATASET + '/analyze$', analyzer_api.DatasetAnalyze.as_view()),
             MountPoint(DATASET + '/cancel$', analyzer_api.DatasetCancel.as_view()),
             MountPoint(DATASET + '/thumbnail$', analyzer_api.DatasetThumbnail.as_view()),
+            MountPoint(DATASET + '/files$', analyzer_api.DatasetFiles.as_view()),
             MountPoint(DATASET + '/conversions$', analyzer_api.ConversionListCreate.as_view()),
             MountPoint(CONVERSION + '$', analyzer_api.ConversionDetail.as_view()),
             MountPoint(CONVERSION + '/cancel$', analyzer_api.ConversionCancel.as_view()),

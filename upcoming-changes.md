@@ -5,6 +5,17 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **the Files tab's detail pane** (the user, 2026-10-31), `files-detail-pane`. Decided (the user): a click
+    on a row selects it (Ctrl/Cmd-click adds or removes, Shift-click a range, a click on the only one selected
+    unselects; Esc and the pane's × too); the pane sits beside the table, sticky while the list scrolls (stacked
+    under 900px). One file: its source as uploaded (`datasets/<id>/files?file=`, `DatasetFiles.get`, inline or with
+    `download=1`), Download, and a table of what the analysis read (`dataset.detailRows`); several: their count and
+    Download as a zip (`DatasetFiles.post`, a form posted with the paths, streamed with zipstream-ng). **Hover for
+    Detail** beside Thumbnails (remembered in the browser): the pane follows the row under the mouse while nothing
+    is selected. Found on the way: the Files table's frame links (`view.frames`) were never set, so rows opened no
+    frame page; the hook is kept (an Open frame button in the pane) for when one exists. Tests: Jest 161,
+    `test_analyzer.py` `TestDatasetFiles` (3). Live check on HomerunObliqueII (GETs and the zip only): hover, a
+    selection kept while hovering, a single download (872 KB), a Shift range of 4 and its zip, Esc.
   - Done: **Workset wording and layout** (the user, 2026-10-31, from `new.md`), `workset-wording-layout`; the
     Harmonized wording agreed with "made to agree on temperature" (so it doesn't suggest other attributes change);
     the WebODM plan's "Convert with these" became "Use these settings" (it fills the form, it doesn't create);

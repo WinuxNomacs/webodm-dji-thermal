@@ -846,6 +846,74 @@ describe("a dataset's page", () => {
         jest.clearAllTimers();    // no more polls into the next test's page
     });
 
+    it("selects files on the Files tab and shows the one selected, or the one under the mouse, in a detail pane", async () => {
+        window.localStorage.removeItem("thermalAnalyzer.hoverDetail");
+        const fetchFn = server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS})});
+        dataset.init(document, fetchFn);
+        await ticks();
+        click(document.querySelector('#ta-tabs a[data-tab="files"]'));
+        const tab = document.getElementById("ta-tab-files");
+        const pane = () => tab.querySelector(".ta-file-detail");
+        const row = p => tab.querySelector('tbody tr[data-path="' + p + '"]');
+        const press = (el, keys) => el.dispatchEvent(new MouseEvent("click", Object.assign({bubbles: true}, keys)));
+        const selected = () => [...tab.querySelectorAll("tbody tr.ta-selected")].map(r => r.getAttribute("data-path"));
+        expect(pane().hidden).toBe(true);
+
+        // Hover for Detail: the pane follows the mouse while nothing is selected
+        row("thermal/a_T.JPG").dispatchEvent(new MouseEvent("mouseover", {bubbles: true}));
+        expect(pane().hidden).toBe(true);
+        tab.querySelector(".ta-files-hover").checked = true;
+        change(tab.querySelector(".ta-files-hover"));
+        expect(window.localStorage.getItem("thermalAnalyzer.hoverDetail")).toBe("1");
+        row("thermal/a_T.JPG").dispatchEvent(new MouseEvent("mouseover", {bubbles: true}));
+        expect(pane().hidden).toBe(false);
+        expect(pane().querySelector(".ta-file-detail-head").textContent).toBe("a_T.JPG");
+        expect(pane().querySelector(".close")).toBeNull();
+        expect(pane().querySelector("img").getAttribute("src")).toBe(URL5 + "/files?file=thermal%2Fa_T.JPG");
+        expect(pane().querySelector(".ta-file-detail-actions a").getAttribute("href")).toBe(URL5 + "/files?file=thermal%2Fa_T.JPG&download=1");
+        expect(pane().querySelector(".ta-file-detail-table").textContent).toContain("Max");
+
+        // A click selects: the pane stays on it, whatever the mouse is over, until it is unselected
+        press(row("thermal/b_T.JPG").querySelector("td:last-child"));
+        expect(selected()).toEqual(["thermal/b_T.JPG"]);
+        row("thermal/a_T.JPG").dispatchEvent(new MouseEvent("mouseover", {bubbles: true}));
+        expect(pane().querySelector(".ta-file-detail-head strong").textContent).toBe("b_T.JPG");
+        expect(pane().querySelector(".close")).not.toBeNull();
+        press(row("thermal/b_T.JPG"));
+        expect(selected()).toEqual([]);
+        row("rgb/a_V.JPG").dispatchEvent(new MouseEvent("mouseover", {bubbles: true}));
+        expect(pane().querySelector(".ta-file-detail-head").textContent).toBe("a_V.JPG");
+
+        // Several: Ctrl/Cmd-click adds, Shift-click a range; the pane counts them and downloads them as a zip
+        press(row("rgb/a_V.JPG"));
+        press(row("thermal/b_T.JPG"), {metaKey: true});
+        expect(selected().sort()).toEqual(["rgb/a_V.JPG", "thermal/b_T.JPG"]);
+        expect(pane().textContent).toContain("2 images selected");
+        press(row("rgb/a_V.JPG"));
+        press(row("thermal/b_T.JPG"), {shiftKey: true});
+        expect(selected()).toEqual(["rgb/a_V.JPG", "thermal/a_T.JPG", "thermal/b_T.JPG"]);
+        const submit = jest.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(function () {
+            this.sent = {action: this.getAttribute("action"), method: this.method,
+                         files: [...this.querySelectorAll('input[name="file"]')].map(i => i.value)};
+            submit.form = this;
+        });
+        click(pane().querySelector('[data-act="download-selected"]'));
+        expect(submit.form.sent).toEqual({action: URL5 + "/files", method: "post", files: ["rgb/a_V.JPG", "thermal/a_T.JPG", "thermal/b_T.JPG"]});
+        submit.mockRestore();
+        document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape"}));
+        expect(selected()).toEqual([]);
+        window.localStorage.removeItem("thermalAnalyzer.hoverDetail");
+        jest.clearAllTimers();
+    });
+
+    it("lists a file's details in the pane, leaving out what it doesn't have", () => {
+        const rows = dataset.detailRows({path: "t/a_T.JPG", kind: "thermal", model: "M4T", serial: "SN1", width: 640, height: 512,
+            size: 1048576, tmax: 50.56, lat: 41.1234567, warnings: ["odd"]}, [{code: "no_gps", message: "No GPS"}]);
+        expect(rows).toEqual([["Kind", "Thermal"], ["Camera", "M4T · SN SN1"], ["Image size", "640 × 512 px"], ["File size", "1.0 MB"],
+            ["Latitude", "41.1234567"], ["Max", "50.6 °C"], ["Warning", "odd"], ["no_gps", "No GPS"]]);
+        expect(dataset.detailHtml(ANALYSIS, [], false, {files: "/f?file="})).toBe("");
+    });
+
     it("shows a problem's file on the Files tab, filtered to it", async () => {
         const fetchFn = server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS})});
         dataset.init(document, fetchFn);
