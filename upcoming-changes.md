@@ -208,7 +208,7 @@
   close button and basic controls, instead of a new tab. Done.
 - **UX review** (the user, 2026-10-31, from `new.md`: "how would you make this ui more intuitive?"; details under
   "Then: UX review" below): a review of every page and control the plugin adds, proposals for the user to choose
-  from, then the chosen ones built.
+  from, then the chosen ones built. Review written; building its six steps.
 - **Documentation** (the user, 2026-10-31, from `new.md`; details under "Then: Documentation" below): the docs
   hosted from this GitHub repo, planned, with quickstart tutorials and screenshots, kept current with every feature
   change. After the UX review, so the screenshots show the reviewed UI.
@@ -769,11 +769,12 @@ anyway for the release: WebODM downloads the zip from the URL in WebODM-Plugins'
 **Decided** (the user, 2026-10-31):
 - Screenshots go in `docs/` (the only images the repo takes; CLAUDE.md's "never commit an image" rule gets that
   exception on the docs branch).
-- They may show the user's own data, but never the GPS or address information of a real picture: no coordinates
-  (the Files tab's and the detail pane's GPS columns, the Inspector's readouts, WebODM's map coordinates) and no
-  place names or addresses. The screenshot script blanks those before each capture, and each screenshot is looked
-  at before it is committed. Still to settle when building: the map pages show the place itself (the basemap under
-  the orthophoto); blank the basemap, or crop to the orthophoto.
+- They may show the user's own data, but a shot that includes a flight's image never shows where it was taken:
+  no coordinates (the Files tab's and the detail pane's GPS columns, the Inspector's readouts, WebODM's map
+  coordinates), no addresses or place names. The script blanks those before each capture, and each screenshot is
+  looked at before it is committed. The map pages show the place through the basemap (street names, houses around
+  the orthophoto), so their shots turn the basemap off (decided by Claude, the user leaving it open: the safe
+  reading). Shots without a flight's image (the DJI Thermal page, empty forms) need nothing blanked.
 - GitHub Pages (`main` `/docs`) once the repo is public.
 
 ## Then: UX review
@@ -847,7 +848,22 @@ above). Proposals, the most useful first; the numbers are for choosing.
 
 Screenshots of each page are kept outside the repo (they show the flight's location).
 
-**Open**: which of 1–13 to build, and in what order.
+**Decided** (the user, 2026-10-31): all 13, in an order Claude chooses, planned around what is left so nothing is
+done twice. So: proposals that change the same code go on one branch; the screenshots and the docs wait for the
+last UX step (Documentation is next, then the release, redone once at the end); each step updates README.md as it
+goes (the docs are written once, from it); 10 needs no dji-thermal-cli release, as 1 replaces that text.
+
+**Steps**, each its own branch, tested (Jest, ESLint, the Django tests where Python changes) and checked live:
+1. The mosaic viewer: 7 (wrapping), 8 and 9 in its subtitle (`viewer.js`, `analyzer.css`).
+2. The Worksets tab's chips and workset cards: 5, 8, 9 (`conversions.js`), and 2 (Create task beside View mosaics,
+   same file).
+3. Problems and the WebODM plan: 1, 11, 10 with them (`dataset.js`; the buttons reuse the form's "Use these
+   settings" path in `conversions.js`).
+4. The dataset page's steps and empty Worksets: 3, after 2 and 3, which its links point to (`dataset.js`,
+   `dataset.html`).
+5. The Thermal Task panel: 6 and its half of 4 (`thermal/ThermalTaskPanel.jsx`, one webpack rebuild; the workset
+   form's side of 6 in `conversions.js`).
+6. The Analyzer list: 12, 13 and its half of 4 (`datasets.js`, `datasets.html`).
 
 ## Up next: Thermal Inspector
 
