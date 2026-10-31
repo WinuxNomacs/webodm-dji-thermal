@@ -137,7 +137,8 @@
 .ta-page .ta-suggestion{ margin-top: 4px; }
 .ta-page .ta-finding-files{ margin-top: 6px; font-size: 12px; }
 .ta-page .ta-finding-files code{ margin-right: 4px; display: inline-block; }
-.ta-page .ta-finding-code{ font-size: 11px; opacity: .6; margin-top: 4px; }
+.ta-page .ta-plan-command{ margin-bottom: 10px; }
+.ta-page .ta-plan-command > summary{ display: list-item; cursor: pointer; font-size: 13px; }
 .ta-page .ta-command{ white-space: pre-wrap; word-break: break-all; }
 .ta-page .ta-command-row{ display: flex; align-items: flex-start; gap: 6px; }
 .ta-page .ta-command-row .ta-command{ flex: 1; margin-bottom: 10px; }

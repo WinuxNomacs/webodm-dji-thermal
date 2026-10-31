@@ -98,10 +98,11 @@ height and the size. A camera's row opens its frames on the Files tab, and each 
   picture in a new tab instead). In the table, Ctrl/Cmd-click adds or removes a file and Shift-click selects a range;
   with several selected, the pane counts them and downloads them as a zip. Clicking the only selected file, its ×
   or Esc unselects. **Hover for Detail** makes the pane follow the file under the mouse while none is selected.
-- **Problems**: what dji-thermal-cli found (errors, warnings, notes), each with what addresses it and the files it
-  names.
-- **WebODM plan**: how well the frames cover the ground, the task options to use (to copy) and the dji-thermal-cli
-  command that prepares the images.
+- **Problems**: what dji-thermal-cli found (errors, warnings, notes), each with what addresses it in the Workset
+  Creation Settings' terms and the files it names (a file's value in its tooltip). Where one setting addresses it
+  (Normalize, frames at or below −80°), a button sets it in the form on the Worksets tab.
+- **WebODM plan**: how well the frames cover the ground, the task options to use (to copy), **Use these settings**
+  for the workset that prepares the images (also as a dji-thermal-cli command, folded), and notes.
 - **Worksets**: see below.
 
 **Add images**, **Analyze again**, **Rename** and **Delete** are on the dataset's page, with a link icon beside its

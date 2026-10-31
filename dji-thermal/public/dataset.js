@@ -302,23 +302,86 @@
             }).join("") + "</tbody></table>";
     }
 
-    // The Problems tab: the findings, most severe first, each with what addresses it and the files it names (each a
-    // link to the Files tab filtered to it)
-    function problemsHtml(a) {
+    // dji-thermal-cli's options, as the Workset Creation Settings name them, for its findings and notes (which are
+    // written for its command line); then its "deg" as degrees
+    var SETTING_NAMES = [
+        [/--(?:mosaic-)?normalize\b/g, "Normalize"],
+        [/--(?:mosaic-)?max-pitch(?: DEG)?/g, "\u201cOnly frames with a gimbal pitch at or below\u201d"],
+        [/--ambient-temp and --reflected-temp/g, "an Ambient and a Reflected temperature"],
+        [/--ambient-temp\b/g, "Ambient temperature"], [/--reflected-temp\b/g, "Reflected temperature"],
+        [/--emissivity\b/g, "Emissivity"], [/--humidity\b/g, "Relative humidity"],
+        [/--distance lrf \(the default\)/g, "Distance to the target, the rangefinder's (the default),"],
+        [/--distance embedded/g, "Distance to the target, Embedded,"], [/--distance METRES/g, "a Distance to the target in metres"],
+        [/--distance\b/g, "Distance to the target"],
+        [/--replace-above\/--replace-above-value \(or --replace-below\/\.\.\.\)/g, "Replace temperatures above (or below), in the settings' Adjustments,"],
+        [/--replace-(above|below) TEMP --replace-(?:above|below)-value TEMP/g, "Replace temperatures $1, in the settings' Adjustments"],
+        [/--range-min\/--range-max/g, "a Colour range"], [/--gimbal-pitch DEG/g, "a Gimbal override (Adjustments)"],
+        [/--strip-location\b/g, "Strip location"],
+        [/(\d) deg C\b/g, "$1 \u00b0C"], [/\bdeg C\b/g, "\u00b0C"], [/(\d) deg\b/g, "$1\u00b0"]
+    ];
+    function settingsWords(text) {
+        return SETTING_NAMES.reduce(function (t, r) { return t.replace(r[0], r[1]); }, text || "");
+    }
+
+    // What addresses the findings the plugin knows, in its words, with the settings a button sets in the form
+    // (dji-thermal-cli's own suggestion, in the settings' words, for the others)
+    var FINDING_FIXES = [
+        {code: /_varies$/, text: "Tick Normalize in the Workset Creation Settings: one ambient and reflected temperature for every " +
+            "frame, and each frame's drift against its neighbours removed.", set: {normalize: true}, label: "Normalize"},
+        {code: /^oblique$/, text: "The mosaics leave them out. For an orthophoto, leave them out of the workset too, as the WebODM " +
+            "plan does: \u201cOnly frames with a gimbal pitch at or below\u201d \u221280\u00b0. Keep them for a 3D model.",
+            set: {max_pitch: -80}, label: "Only frames at or below \u221280\u00b0"},
+        {code: /^temperature_(max|min)_outlier$/, text: "Hot or cold spots such as sun glint: Replace temperatures above (or below), " +
+            "in the settings' Adjustments, blanks or replaces them; a Colour range gives a fixed colour scale."},
+        {code: /^rangefinder_distance$/, text: "The workset measures with the rangefinder's distance (the default). To use the " +
+            "distance recorded in each photo instead, choose Embedded in Distance to the target."},
+        {code: /^rangefinder_invalid$/, text: "Their recorded distance is used instead. If that's wrong, give a Distance to the " +
+            "target in metres."},
+        {code: /^rangefinder_outlier$/, text: "The laser hit something nearer or farther (a roof, a tree, the horizon). To use one " +
+            "distance for every photo, give a Distance to the target in metres."}
+    ];
+    function findingFix(f) {
+        return FINDING_FIXES.filter(function (x) { return x.code.test(f.code); })[0] || null;
+    }
+
+    // A finding's message in the settings' words, without the files and values it lists (shown as the files' links,
+    // the values in their tooltips): {text, values: {path: value}}
+    function findingMessage(f) {
+        var values = {};
+        var text = String(f.message || "").replace(/: ((?:[^\s,;:]+\.jpe?g -?[\d.]+(?: m)?(?:, |(?=;|$)))+)/i, function (all, list) {
+            list.split(", ").forEach(function (item) {
+                var i = item.lastIndexOf(" ", item.slice(-2) === " m" ? item.length - 3 : item.length);
+                values[item.slice(0, i)] = item.slice(i + 1) + (/^temperature_/.test(f.code) ? " \u00b0C" : "");
+            });
+            return "";
+        });
+        var m = /^the embedded object distance is ([\d.]+) m but the rangefinder reads ([\d.]+) m \(median\)/.exec(text);
+        if (m && f.code === "rangefinder_distance") text = "each photo records an object distance of " + m[1] + " m, but its rangefinder read " + m[2] + " m (median)";
+        return {text: settingsWords(text), values: values};
+    }
+
+    // The Problems tab: the findings, most severe first, each with what addresses it (and a button setting it in the
+    // form, canConvert) and the files it names (each a link to the Files tab filtered to it)
+    function problemsHtml(a, canConvert) {
         var findings = a.findings || [];
         if (!findings.length) return '<p class="text-success ta-none"><i class="fa fa-check"></i> dji-thermal-cli found no problems in this dataset.</p>';
         return findings.map(function (f) {
             var cls = {error: "danger", warning: "warning", info: "info"}[f.severity] || "default";
             var files = f.files || [];
+            var message = findingMessage(f), fix = findingFix(f);
             var listed = files.slice(0, FILES_SHOWN).map(function (p) {
-                return '<a href="#files" data-file="' + esc(p) + '" title="Show it on the Files tab"><code>' + esc(p) + "</code></a>";
+                var name = p.split("/").pop(), value = message.values[name] || message.values[p];
+                return '<a href="#files" data-file="' + esc(p) + '" title="' + (value ? esc(value) + ": " : "") + 'Show it on the Files tab"><code>' + esc(p) + "</code></a>";
             }).join(" ");
             if (files.length > FILES_SHOWN) listed += ' <span class="text-muted">and ' + (files.length - FILES_SHOWN) + " more</span>";
-            return '<div class="ta-finding alert alert-' + cls + '">' +
-                '<div><span class="label label-' + cls + '">' + esc(core.severityLabel(f.severity)) + "</span> " + esc(f.message) + "</div>" +
-                (f.suggestion ? '<div class="ta-suggestion"><i class="fa fa-lightbulb"></i> ' + esc(f.suggestion) + "</div>" : "") +
+            var suggestion = fix ? fix.text : settingsWords(f.suggestion);
+            var button = fix && fix.set && canConvert ? ' <button type="button" class="btn btn-default btn-xs" data-set="' + esc(JSON.stringify(fix.set)) +
+                '" data-label="' + esc(fix.label) + '" title="Set it in the Workset Creation Settings, on the Worksets tab"><i class="fa fa-magic"></i> ' +
+                esc(fix.label) + "</button>" : "";
+            return '<div class="ta-finding alert alert-' + cls + '" title="' + esc(f.code) + '">' +
+                '<div><span class="label label-' + cls + '">' + esc(core.severityLabel(f.severity)) + "</span> " + esc(message.text) + "</div>" +
+                (suggestion ? '<div class="ta-suggestion"><i class="fa fa-lightbulb"></i> ' + esc(suggestion) + button + "</div>" : "") +
                 (files.length ? '<div class="ta-finding-files">' + listed + "</div>" : "") +
-                '<div class="ta-finding-code">' + esc(f.code) + "</div>" +
                 "</div>";
         }).join("");
     }
@@ -362,9 +425,9 @@
             "<p>Create a workset with these settings before processing the frames." +
             (p.process_args && canConvert ? ' <button type="button" class="btn btn-primary btn-xs" id="ta-plan-convert" title="Open the Worksets tab with these settings">' +
                 '<i class="fa fa-magic"></i> Use these settings</button>' : "") + "</p>" +
-            '<div class="ta-command-row"><pre class="ta-command">' + esc(p.process_command || "") + "</pre>" +
-            (p.process_command ? copy("the command", p.process_command) : "") + "</div>" +
-            ((p.notes || []).length ? "<h4>Notes</h4><ul>" + p.notes.map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("") + "</ul>" : "");
+            (p.process_command ? '<details class="ta-plan-command"><summary>As a dji-thermal-cli command</summary><div class="ta-command-row"><pre class="ta-command">' +
+                esc(p.process_command) + "</pre>" + copy("the command", p.process_command) + "</div></details>" : "") +
+            ((p.notes || []).length ? "<h4>Notes</h4><ul>" + p.notes.map(function (n) { return "<li>" + esc(settingsWords(n)) + "</li>"; }).join("") + "</ul>" : "");
     }
 
     function sharingHtml(s) {
@@ -477,7 +540,7 @@
                 var key = [d.analyzed_at, a.files.length].join("|");
                 if (key !== filesKey) renderFiles();
                 filesKey = key;
-                $("ta-tab-problems").innerHTML = problemsHtml(a);
+                $("ta-tab-problems").innerHTML = problemsHtml(a, d.can_change);
                 $("ta-tab-webodm").innerHTML = planHtml(a, d.can_change);
             } else {
                 ["files", "problems", "webodm"].forEach(function (t) { $("ta-tab-" + t).innerHTML = ""; });
@@ -723,6 +786,15 @@
             showTab("files");
         });
 
+        // A finding's button: its settings in the form, on the Worksets tab
+        $("ta-tab-problems").addEventListener("click", function (e) {
+            var b = e.target.closest ? e.target.closest("button[data-set]") : null;
+            if (b && conversions.useSettings(JSON.parse(b.getAttribute("data-set")), b.getAttribute("data-label"))) {
+                showTab("convert");
+                if ($("ta-convert-settings").scrollIntoView) $("ta-convert-settings").scrollIntoView();
+            }
+        });
+
         $("ta-tab-webodm").addEventListener("click", function (e) {
             if (!e.target.closest) return;
             var button = e.target.closest("button[data-copy]");
@@ -846,7 +918,7 @@
     }
 
     var api = {captureTime: captureTime, median: core.median, overview: overview, summaryRows: summaryRows, duration: duration, overviewHtml: overviewHtml, flagsByFile: flagsByFile,
-               sortRows: core.sortRows, fileRows: fileRows, detailRows: detailRows, viewerSrc: viewerSrc, viewerItems: viewerItems, detailHtml: detailHtml, filesHtml: filesHtml, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
+               sortRows: core.sortRows, fileRows: fileRows, detailRows: detailRows, viewerSrc: viewerSrc, viewerItems: viewerItems, detailHtml: detailHtml, filesHtml: filesHtml, settingsWords: settingsWords, findingMessage: findingMessage, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
     root.ThermalAnalyzerDataset = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

@@ -926,6 +926,16 @@
             return true;
         }
 
+        // Settings from a finding on the Problems tab ({field: value}; what: their name), the rest of the form kept
+        function useSettings(changes, what) {
+            if (!meta) return false;
+            settings = Object.assign(readForm(root$("ta-convert-form")), changes);
+            editing = true;
+            renderForm();
+            message("Set in the form: " + esc(what) + ". Create Workset when the settings are ready.", "text-muted");
+            return true;
+        }
+
         root$("ta-convert-plan").addEventListener("click", usePlan);
 
         root$("ta-convert-reset").addEventListener("click", function () {
@@ -1026,7 +1036,7 @@
             }
         });
 
-        return {update: update, usePlan: usePlan};
+        return {update: update, usePlan: usePlan, useSettings: useSettings};
     }
 
     var api = {recorded: recorded, settingsIn: settingsIn, formHtml: formHtml, readForm: readForm, formProblem: formProblem, planSettings: planSettings, statusLabel: statusLabel,
