@@ -150,6 +150,10 @@
     section's caret drawn by the plugin (WebODM hid the browser's). Jest 122; live check on HomerunObliqueII (read
     only): the tabs Worksets, Files, Problems, WebODM plan, opened on Worksets; no console error.
 
+- **Thermal Inspector** (the user, 2026-10-30): the earlier Pixel Inspector ported as a control on WebODM's 2D map,
+  for thermal orthophotos, with the palette and unit shared with the Analyzer; in five steps (details under
+  "Up next: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0.
+
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
   (CHANGELOG, README, the zip rebuilt by `dev/package.sh` on the merge, its new sha256, the `release-check` skill);
@@ -158,8 +162,6 @@
 
 **Later**
 - **Thermal Analyzer, part 2** — measurements (spot, line, area), comparisons and frame views (below).
-- **Pixel Inspector** — the map control (value under the cursor, region statistics), with its point and region
-  endpoints served by the plugin (below).
 - **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
   the earlier "Folder conversion" item (below).
 - **macOS**: the dev setup and checks run on macOS, at the very end.
@@ -497,6 +499,56 @@ setting, under Administration.
 - Live check on :8002: admin sees DJI Thermal under Administration after Plugins and opens the page; a temporary
   user made for it has no link and gets 403 at `/plugins/dji-thermal/`; the user was removed afterwards.
 
+## Up next: Thermal Inspector
+
+**The request** (the user, 2026-10-30): "The thermal inspector is not showing on the 2d orthomosaics for any of the
+tasks for the First Project." Not a bug: the earlier plugin's Pixel Inspector (shown as "Thermal Inspector") was
+never ported, it was planned for after the Analyzer (below). WebODM's own map works and shows its Thermal layer on
+the three tasks of First Project (each a single `lwir` band with alpha). Moved to Up next, "thermal inspector next".
+
+**Builds on**: the earlier control (about 3,000 lines of JavaScript, 3,700 of Jest tests): the value under the
+cursor, pinned points, region statistics, isotherms, a legend, image adjustment. It used three things of the fork
+WebODM 3.3.2 lacks: the `point` and `region-stats` endpoints, the highlight colormaps (`hl_<mode>_<color>`) and the
+`thermal_correction` tile parameter. WebODM 3.3.2 has the map hooks it needs (`PluginsAPI.Map.willAddControls`,
+`handleClick`); the Analyzer's mosaics already draw tiles in any palette (`mosaics.rendered`).
+
+**Decided** (the user, 2026-10-30):
+- **Included**: the temperature under the cursor, pinned points, region statistics, isotherms and the legend, and
+  **choosing the thermal layer's palette among every supported one** (DJI's and WebODM's). Not ported: the
+  temperature correction (it needs WebODM's tiler).
+- **Thermal layers only**: the control shows only when the map has a thermal orthophoto (an `lwir` band).
+- **Pins and regions kept in the browser**, per viewer, for the same tasks, as before.
+- **One unit for everything, WebODM's**: the inspector, the Analyzer and WebODM's own map share WebODM's unit
+  setting (`unit_system`, kept in the browser; metric is °C, imperial °F), defaulting to WebODM's default (metric);
+  changing it anywhere changes it everywhere. **Kelvin is dropped** from the Analyzer. The unit a user saved in the
+  Analyzer becomes WebODM's setting once, in their browser, then is removed.
+- **One palette for everything**: the Analyzer's preferred palette is the thermal map's palette, and choosing one
+  on the map saves it as the preference.
+- **DJI's palettes come from dji-thermal-cli**, which ships them as its own rebuilt tables (`tsdk/data`), so every
+  thermal task offers them, with or without its frames. The CLI gets a public function for them first, released
+  there, and the plugin pins that version (rather than reading the CLI's internal `tsdk.tables`).
+
+**Steps** (each on its own branch, tested and merged):
+1. **dji-thermal-cli**: a public function giving DJI's palettes without a frame ({name: 256 RGB colours}, the iirp
+   tables its palettes come from), tests, a `release/X.Y.0` branch (a minor version). The user pushes and tags;
+   once it is on PyPI the plugin pins it, and the Analyzer's palettes can come from it too (no longer only from a
+   workset's frames).
+2. **The unit and palette shared**: the Analyzer's unit choice writes WebODM's `unit_system` and follows its change
+   event (`onUnitSystemChanged`); °C and °F only; the saved unit migrated once and removed; the palette preference
+   read and saved by the map through the existing `display` endpoint.
+3. **The control, the value under the cursor, pins and the palette**: the plugin's own endpoints for a task the
+   user can view (the orthophoto's value at a point; its tiles drawn in any palette and range); a control through
+   `willAddControls` on maps with a thermal orthophoto; the palette chosen switches the thermal layer's tiles to
+   the plugin's, keeping WebODM's layer panel (opacity, range) working; pins with CSV export.
+4. **Region statistics**: rectangle, circle and polygon; minimum, maximum, mean, percentiles, histogram, the
+   hottest and coldest pixels marked; CSV; read at native resolution up to a size limit; the task's crop respected.
+5. **Isotherms and the legend**: above, below or between limits, drawn by the plugin's tiles; the colour bar of the
+   palette and range in the shared unit.
+
+**Tests**: the Jest tests ported (rewritten without Enzyme, which this repo doesn't have), Django tests of the
+endpoints on the flight's orthophoto (`DT_FLIGHT_DIR`), the CLI's own tests for its function; live checks on
+First Project's three tasks (read only, thumbnails blocked).
+
 ## Later: Server-folder datasets
 
 The earlier plugin converts a folder on the server (overrides for the measurement parameters, the camera's own
@@ -541,6 +593,7 @@ What has to change, all within the plugin rules (no change to WebODM):
 
 Phases, in order: **part 1** (datasets in holder tasks, conversions, mosaics on the map; see "1. Thermal Analyzer, part 1"), **part 2**
 (measurements, comparisons, frame views), **Pixel Inspector** (the map control and its endpoints).
+The Pixel Inspector moved ahead, as the Thermal Inspector (2026-10-30, "Up next: Thermal Inspector" above).
 
 Decided (the user, 2026-10-29):
 - **The Analyzer's page is at the root of WebODM's menu** (`main_menu`, every user), as the plugin's primary UI;
