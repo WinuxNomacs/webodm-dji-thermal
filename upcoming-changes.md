@@ -618,8 +618,9 @@ layouts, and the UX review checks desktop only.
 
 **Proposed steps**:
 1. **The code made portable** (Linux tests as now): the lock (`msvcrt` on Windows), the converter on
-   `process()` (no exiftool, the same on every system), the `os.replace` cases, the React parts rewritten in plain
-   JavaScript (the user's choice). Each Windows branch small and in one place, so Linux runs cover the rest.
+   `process()` (no exiftool, the same on every system), the `os.replace` cases, the React parts built by
+   `dev/package.sh` into the zip's `public/build` (the user's choice). Each Windows branch small and in one place,
+   so Linux runs cover the rest.
 2. **Windows checks from this machine**: the tests of what differs (the lock, `os.replace`, the SDK's Windows
    library) with Windows' Python; then the plugin's zip installed in a native WebODM as a user would, with a Thermal
    Task and an Analyzer dataset, as the release check does on Linux.
@@ -652,15 +653,16 @@ Plugins, then removed):
   Windows' firewall blocks connections from WSL, so the check went through a reverse tunnel (Windows' Python
   connecting out to WSL), stopped afterwards.
 
-**Open again** (the user, 2026-10-31, asked why the rewrite is needed; the answer above): the Thermal Task panel
+**Decided** (the user, 2026-10-31): **ship the build**. Asked why the rewrite was needed (the answer below), the
+user chose the built files in the zip over the rewrite. The Thermal Task panel
 embeds WebODM's own `NewTaskPanel` (name, node, options and presets, map preview, review), which only webpack can
 import, and WebODM has no hook to convert photos uploaded through its own button. So: ship `public/build` in the
 zip (built by `dev/package.sh` in the dev container; WebODM skips webpack when it is there, as its core plugins run
 on the native installer), or a plain-JavaScript rewrite with a smaller form of our own (proposed: ship the build).
 
 **Decided** (the user, 2026-10-31): the plugin supports Docker (all three systems), the native Windows installer and
-the macOS installer (Docker); the React parts are rewritten in plain JavaScript (reopened, see above); a native Windows WebODM is used for
-the checks.
+the macOS installer (Docker); the React parts ship built in the zip (first a rewrite, changed, see above); a
+native Windows WebODM is used for the checks.
 
 Also decided (the user, 2026-10-31): the converter on `process()`, exiftool dropped; `dtc:Software` stays as the
 CLI writes it (no CLI change); the Windows checks use the install in `C:\WebODM` (unused), which the user upgraded
@@ -689,9 +691,9 @@ colours, no library), opened by clicking the picture:
 - Jest for the zoom and the order; checked live on the user's data.
 
 **Open** (for the user):
-- What the viewer shows for a photo (RGB): the original file at full size (proposed; a 20 MP JPEG takes a moment
-  to load), or the 1280-pixel copy. For a thermal frame, the palette picture (as the pane shows it).
-- Previous and next in the viewer (proposed), or one picture only.
+none. Decided (the user, 2026-10-31): a photo is shown from the original file at full size (its load time is
+expected), opening at the zoom that fits it in the viewer, with a control to go back to that fit; a thermal frame
+shows the palette picture; previous and next included.
 
 ## Then: Documentation
 
