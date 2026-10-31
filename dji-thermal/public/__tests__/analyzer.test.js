@@ -1489,9 +1489,37 @@ describe("a dataset's conversions", () => {
         expect(list.innerHTML).toContain("/conversions/9/download");
         expect(list.innerHTML).not.toContain('data-act="delete"');
 
-        click(list.querySelector('button[data-act="files"]'));
+        // Files: out of the menu, a toggle in the workset's box, collapsed at first
+        expect(list.querySelector('.dropdown-menu [data-act="files"]')).toBeNull();
+        const toggle = () => list.querySelector('.ta-conversion-files-head button[data-act="files"]');
+        expect(toggle().getAttribute("aria-expanded")).toBe("false");
+        expect(list.querySelector('[data-files="9"]').hidden).toBe(true);
+        expect(list.querySelector(".ta-conversion-tasks, .ta-conversion-task").compareDocumentPosition(toggle()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        click(toggle());
         await flush();
+        expect(toggle().getAttribute("aria-expanded")).toBe("true");
+        expect(list.querySelector('[data-files="9"]').hidden).toBe(false);
         expect(list.querySelector('[data-files="9"]').innerHTML).toContain("a.tiff");
+        expect(JSON.parse(window.localStorage.getItem("dji-thermal-analyzer:files-shown:5"))).toEqual([9]);
+        click(toggle());
+        expect(list.querySelector('[data-files="9"]').hidden).toBe(true);
+        expect(window.localStorage.getItem("dji-thermal-analyzer:files-shown:5")).toBeNull();
+    });
+
+    it("sorts a workset's files by image or result, ascending or descending", () => {
+        const c = Object.assign({}, CONVERSION, {results: {files: [
+            {path: "b_T.JPG", ok: true, outputs: ["b.tiff"], notes: []},
+            {path: "c_T.JPG", ok: false, reason: "not thermal", outputs: [], notes: []},
+            {path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []}]}});
+        const order = view => {
+            document.body.innerHTML = conversions.resultsHtml(c, "/x/", view);
+            return [...document.querySelectorAll(".ta-results tbody tr td:first-child")].map(td => td.textContent);
+        };
+        expect(order()).toEqual(["a_T.JPG", "b_T.JPG", "c_T.JPG"]);
+        expect(order({sort: "path", desc: true})).toEqual(["c_T.JPG", "b_T.JPG", "a_T.JPG"]);
+        expect(order({sort: "result", desc: true})).toEqual(["c_T.JPG", "b_T.JPG", "a_T.JPG"]);
+        expect([...document.querySelectorAll(".ta-results th")].map(th => th.getAttribute("data-sort"))).toEqual(["path", "result", null, null]);
+        expect(document.querySelector('.ta-results th[data-sort="result"] .fa-caret-down')).not.toBeNull();
     });
 });
 
@@ -1517,24 +1545,24 @@ describe("a conversion's mosaics on the dataset page", () => {
     it("links a conversion with mosaics to its viewer, and offers to build them", () => {
         const viewerUrl = "/plugins/dji-thermal/dataset/5/conversion/9";
         const el = document.createElement("div");
-        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready"}), true, C9.replace(/9$/, ""), null, null, viewerUrl);
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready"}), true, C9.replace(/9$/, ""), null, viewerUrl);
         expect(el.firstChild.textContent).toContain("View mosaics");
         expect(el.firstChild.getAttribute("href")).toBe(viewerUrl);
         expect(el.querySelector(".dropdown-menu").textContent).toContain("Download all");
         expect(el.querySelector('[data-act="mosaics"]').textContent).toContain("Build mosaics again");
 
-        el.innerHTML = conversions.actionsHtml(CONVERSION, true, C9.replace(/9$/, ""), null, null, viewerUrl);
+        el.innerHTML = conversions.actionsHtml(CONVERSION, true, C9.replace(/9$/, ""), null, viewerUrl);
         expect(el.firstChild.textContent).toContain("Download all");
         expect(el.querySelector('[data-act="mosaics"]').textContent.trim()).toBe("Build mosaics");
 
-        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "building"}), true, C9.replace(/9$/, ""), null, null, viewerUrl);
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "building"}), true, C9.replace(/9$/, ""), null, viewerUrl);
         expect(el.firstChild.getAttribute("data-act")).toBe("cancel");
         expect(el.firstChild.getAttribute("title")).toBe("Stop building the mosaics");
         expect(el.querySelector('[data-act="mosaics"]')).toBe(null);
         expect(el.querySelector('a[href="' + viewerUrl + '"]').textContent).toContain("Mosaics");
 
         // Who cannot change the dataset can look, not build
-        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready"}), false, C9.replace(/9$/, ""), null, null, viewerUrl);
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready"}), false, C9.replace(/9$/, ""), null, viewerUrl);
         expect(el.firstChild.textContent).toContain("View mosaics");
         expect(el.querySelector('[data-act="mosaics"]')).toBe(null);
     });
@@ -1604,11 +1632,11 @@ describe("a task made from a conversion", () => {
 
     it("is offered in a finished conversion's menu to those who can change the dataset", () => {
         const el = document.createElement("div");
-        el.innerHTML = conversions.actionsHtml(CONVERSION, true, C9.replace(/9$/, ""), null, null, null);
+        el.innerHTML = conversions.actionsHtml(CONVERSION, true, C9.replace(/9$/, ""), null, null);
         expect(el.querySelector('[data-act="task"]').textContent).toContain("Create task");
-        el.innerHTML = conversions.actionsHtml(CONVERSION, false, C9.replace(/9$/, ""), null, null, null);
+        el.innerHTML = conversions.actionsHtml(CONVERSION, false, C9.replace(/9$/, ""), null, null);
         expect(el.querySelector('[data-act="task"]')).toBe(null);
-        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {status: "converting"}), true, C9.replace(/9$/, ""), null, null, null);
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {status: "converting"}), true, C9.replace(/9$/, ""), null, null);
         expect(el.querySelector('[data-act="task"]')).toBe(null);
     });
 
@@ -1750,7 +1778,7 @@ describe("a task made from a conversion", () => {
 
     it("calls the action that fills the form Copy settings to form", () => {
         const el = document.createElement("div");
-        el.innerHTML = conversions.actionsHtml(CONVERSION, true, C9.replace(/9$/, ""), null, null, null);
+        el.innerHTML = conversions.actionsHtml(CONVERSION, true, C9.replace(/9$/, ""), null, null);
         expect(el.querySelector('[data-act="use"]').textContent).toContain("Copy settings to form");
     });
 });

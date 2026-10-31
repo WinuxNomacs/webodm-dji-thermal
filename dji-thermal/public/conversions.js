@@ -454,7 +454,7 @@
 
     // A conversion's actions: the one its state calls for, and the others in its menu (menu: open; viewer: the URL of
     // its mosaics' page)
-    function actionsHtml(c, canChange, base, open, menu, viewer) {
+    function actionsHtml(c, canChange, base, menu, viewer) {
         var button = function (act, icon, label, title, cls, aria) {
             return '<button type="button" class="' + (cls || "") + '" data-act="' + act + '"' + (title ? ' title="' + esc(title) + '"' : "") +
                 (aria ? ' aria-label="' + esc(aria + " " + c.name) + '"' : "") + '><i class="fa fa-' + icon + '"></i> ' + esc(label) + "</button>";
@@ -478,7 +478,6 @@
         }
         if (download && !(ready && !view && !building)) items.push(link(download, "download", "Download all"));
         if (viewer && building) items.push(link(viewer, "map", "Mosaics"));
-        items.push(button("files", "list", open === c.id ? "Hide files" : "Files"));
         if (ready || busy) items.push(button("use", "copy", "Copy settings to form", USE_TITLE));
         if (canChange && ready && !building) {
             items.push(button("mosaics", "th", c.mosaic_status === "ready" ? "Build mosaics again" : "Build mosaics",
@@ -499,11 +498,34 @@
             }).join("") + "</ul></span>";
     }
 
-    // The dataset's conversions, newest first (base: their API's URL; defaults: what their settings are compared
-    // against; menu: the conversion whose menu is open; viewerBase: their mosaics' pages, followed by their id;
+    // The worksets whose Files are shown on a dataset's page, kept in the browser (none at first)
+    var FILES_PREFIX = "dji-thermal-analyzer:files-shown:";
+    function shownFiles(storage, datasetId) {
+        try {
+            var v = JSON.parse((storage && storage.getItem(FILES_PREFIX + datasetId)) || "[]");
+            return Array.isArray(v) ? v : [];
+        } catch (e) { return []; }
+    }
+    function keepShownFiles(storage, datasetId, ids) {
+        try {
+            if (ids.length) storage.setItem(FILES_PREFIX + datasetId, JSON.stringify(ids));
+            else storage.removeItem(FILES_PREFIX + datasetId);
+        } catch (e) { /* this page only */ }
+    }
+
+    // A workset's Files: a toggle over its table of what it wrote for each image
+    function filesToggleHtml(c, shown) {
+        return '<div class="ta-conversion-files-head"><button type="button" class="ta-collapse" data-act="files" aria-expanded="' + shown +
+            '" title="' + (shown ? "Hide the files" : "Show what it wrote for each image") + '"><i class="fa fa-caret-' + (shown ? "down" : "right") +
+            '"></i> Files</button></div>';
+    }
+
+    // The dataset's conversions, newest first (base: their API's URL; open: the ids of those whose files are shown;
+    // defaults: what their settings are compared against; menu: the conversion whose menu is open; viewerBase: their mosaics' pages, followed by their id;
     // dashboard: WebODM's dashboard, where their tasks are; parent: the dataset's own task)
     function listHtml(conversions, canChange, base, open, fresh, defaults, menu, viewerBase, dashboard, parent) {
         if (!conversions.length) return '<p class="text-muted ta-none">No worksets yet.</p>';
+        open = open || [];
         return conversions.map(function (c) {
             var cls = {ready: "success", failed: "danger", canceled: "default", converting: "info"}[c.status] || "default";
             var figures = [];
@@ -522,12 +544,13 @@
                 '<div class="text-muted">' + esc(c.description) + "</div>";
             return '<div class="ta-conversion' + (c.id === fresh ? " ta-conversion-new" : "") + '" data-id="' + c.id + '">' +
                 '<div class="ta-conversion-head"><strong>' + esc(c.name) + '</strong> <span class="label label-' + cls + '">' + esc(statusLabel(c)) + "</span>" +
-                '<span class="ta-conversion-actions">' + actionsHtml(c, canChange, base, open, menu, viewerBase ? viewerBase + c.id : null) + "</span></div>" +
+                '<span class="ta-conversion-actions">' + actionsHtml(c, canChange, base, menu, viewerBase ? viewerBase + c.id : null) + "</span></div>" +
                 settings + progress + mosaicHtml(c) +
                 (c.error ? '<div class="text-danger">' + esc(c.error) + "</div>" : "") +
                 '<div class="ta-conversion-figures text-muted">' + esc(figures.join(" · ")) + "</div>" +
                 parentHtml(c, parent, dashboard) + tasksHtml(c, dashboard) + '<div class="ta-conversion-task" data-task="' + c.id + '"></div>' +
-                '<div class="ta-conversion-files" data-files="' + c.id + '"></div></div>';
+                filesToggleHtml(c, open.indexOf(c.id) >= 0) +
+                '<div class="ta-conversion-files" data-files="' + c.id + '"' + (open.indexOf(c.id) >= 0 ? "" : " hidden") + "></div></div>";
         }).join("");
     }
 
@@ -542,8 +565,12 @@
         return Object.keys(counts).map(function (r) { return [r, counts[r]]; }).sort(function (a, b) { return b[1] - a[1]; });
     }
 
-    // What a conversion wrote for each image, with each output's download
-    function resultsHtml(c, base) {
+    var RESULT_COLUMNS = [{key: "path", label: "Image"}, {key: "result", label: "Result"}, {label: "Outputs"}, {label: "Notes"}];
+
+    // What a conversion wrote for each image, with each output's download, sorted (view: {sort: a sortable
+    // RESULT_COLUMNS key, desc}; by image, ascending, at first)
+    function resultsHtml(c, base, view) {
+        view = view || {};
         var r = c.results || {};
         var files = r.files || [];
         if (!files.length) return '<p class="text-muted">' + (c.status === "canceled" ? "Canceled before it finished: no results were kept." : "No results.") + "</p>";
@@ -559,8 +586,16 @@
         if (reasons.length) html += '<p class="ta-skip-reasons">Skipped: ' + reasons.map(function (r) {
             return esc(r[0]) + " (" + r[1] + ")";
         }).join(", ") + ".</p>";
-        html += '<div class="ta-table-scroll"><table class="table table-condensed ta-results"><thead><tr><th>Image</th><th>Result</th><th>Outputs</th><th>Notes</th></tr></thead><tbody>' +
-            files.slice(0, RESULTS_SHOWN).map(function (f) {
+        var sort = view.sort || "path";
+        var rows = core.sortRows(files.map(function (f) {
+            return Object.assign({}, f, {result: f.ok ? "Converted" : "Skipped: " + (f.reason || "")});
+        }), sort, !!view.desc);
+        html += '<div class="ta-table-scroll"><table class="table table-condensed ta-results"><thead><tr>' + RESULT_COLUMNS.map(function (col) {
+            if (!col.key) return "<th>" + esc(col.label) + "</th>";
+            var arrow = sort === col.key ? ' <i class="fa fa-caret-' + (view.desc ? "down" : "up") + '"></i>' : "";
+            return '<th data-sort="' + col.key + '" title="Sort by ' + esc(col.label.toLowerCase()) + '">' + esc(col.label) + arrow + "</th>";
+        }).join("") + "</tr></thead><tbody>" +
+            rows.slice(0, RESULTS_SHOWN).map(function (f) {
                 var outputs = (f.outputs || []).map(function (o) {
                     return '<a href="' + esc(base + c.id + "/download?file=" + encodeURIComponent(o)) + '">' + esc(o.split("/").pop()) + "</a>";
                 }).join("<br>");
@@ -583,7 +618,10 @@
         var doc = ctx.doc, fetchFn = ctx.fetchFn, root$ = function (i) { return doc.getElementById(i); };
         var base = ctx.api + "datasets/" + ctx.datasetId + "/conversions/";
         var viewerBase = ctx.publicUrl ? ctx.publicUrl + "dataset/" + ctx.datasetId + "/conversion/" : null;
-        var meta = null, settings = null, saved = false, dataset = null, open = null, built = false, loading = null;
+        var meta = null, settings = null, saved = false, dataset = null, built = false, loading = null;
+        var storage = ctx.storage !== undefined ? ctx.storage : root.localStorage;
+        var open = shownFiles(storage, ctx.datasetId);    // the worksets whose Files are shown, kept in the browser
+        var results = {}, sorts = {};                     // each one's files as loaded, and how its table is sorted
         var fresh = null; // the conversion just started, highlighted for a few seconds
         var editing = null; // the form unfolded: at first only for a dataset without conversions, then once opened
         var menu = null;    // the conversion whose menu is open
@@ -631,7 +669,7 @@
             // Open or closed, the settings show what differs from the defaults; so does the Outputs section closed
             root$("ta-convert-summary").innerHTML = '<button type="button" class="ta-collapse" data-act="edit" aria-expanded="' + !!editing +
                 '" aria-controls="ta-convert-form" title="' + (editing ? "Hide the settings" : "Show the settings") + '"><i class="fa fa-caret-' +
-                (editing ? "down" : "right") + '"></i> Settings:</button> ' + chipsHtml(diffs, "dji-thermal-cli's defaults");
+                (editing ? "down" : "right") + '"></i> Workset Creation Settings:</button> ' + chipsHtml(diffs, "dji-thermal-cli's defaults");
             var outputs = form.querySelector('[data-chips="outputs"]');
             if (outputs) {
                 outputs.innerHTML = chipsHtml(diffs.filter(function (d) { return OUTPUT_KEYS.indexOf(d.key) >= 0; }), "the defaults");
@@ -656,7 +694,7 @@
             if (el && task.info && el.querySelector('[name="task-name"]')) task.draft = readTaskForm(el, task.info).draft;
             root$("ta-conversions").innerHTML = listHtml(list, dataset && dataset.can_change, base, open, fresh,
                 dataset && dataset.defaults, menu, viewerBase, ctx.dashboard, dataset && dataset.parent);
-            if (open !== null) loadFiles(open);
+            open.forEach(function (id) { renderFiles(id); loadFiles(id); });
             renderTask();
         }
 
@@ -738,10 +776,17 @@
             });
         }
 
+        function renderFiles(id) {
+            var el = panel.querySelector('[data-files="' + id + '"]');
+            if (el && results[id]) el.innerHTML = resultsHtml(results[id], base, sorts[id]);
+            else if (el) el.innerHTML = '<p class="text-muted">Loading…</p>';
+        }
+
         function loadFiles(id) {
             return fetchFn(base + id, {credentials: "same-origin"}).then(core.readJson).then(function (r) {
-                var el = panel.querySelector('[data-files="' + id + '"]');
-                if (el && r.ok) el.innerHTML = resultsHtml(r.data, base);
+                if (!r.ok) return;
+                results[id] = r.data;
+                renderFiles(id);
             });
         }
 
@@ -868,6 +913,14 @@
         });
 
         root$("ta-conversions").addEventListener("click", function (e) {
+            var th = e.target.closest ? e.target.closest(".ta-results th[data-sort]") : null;
+            if (th) {
+                var files = th.closest("[data-files]").getAttribute("data-files");
+                var sid = ((dataset && dataset.conversions) || []).map(function (x) { return x.id; }).filter(function (x) { return String(x) === files; })[0];
+                var key = th.getAttribute("data-sort"), before = sorts[sid] || {sort: "path"};
+                sorts[sid] = {sort: key, desc: before.sort === key ? !before.desc : false};
+                return renderFiles(sid);
+            }
             var btn = e.target.closest ? e.target.closest("button[data-act]") : null;
             if (!btn) return;
             var attr = btn.closest(".ta-conversion").getAttribute("data-id");
@@ -898,10 +951,11 @@
                 editing = true;
                 renderForm();
                 message("The form has " + esc(c.name) + "'s settings with the WebODM plan's: <code>" + esc(task.info.process_args.join(" ")) +
-                    "</code>. Convert, then create the task from the new workset.", "text-muted");
+                    "</code>. Create the workset, then create the task from it.", "text-muted");
                 if (root$("ta-convert-settings").scrollIntoView) root$("ta-convert-settings").scrollIntoView();
             } else if (act === "files") {
-                open = open === id ? null : id;
+                open = open.indexOf(id) >= 0 ? open.filter(function (x) { return x !== id; }) : open.concat([id]);
+                keepShownFiles(storage, ctx.datasetId, open);
                 renderList();
             } else if (act === "parent") {
                 useForParent(c);
@@ -935,7 +989,8 @@
                 }).then(function (r) {
                     if (!r) return;
                     if (!r.ok) return message(esc(core.errorText(r.data, "Could not delete the workset.")), "text-danger");
-                    if (open === id) open = null;
+                    open = open.filter(function (x) { return x !== id; });
+                    keepShownFiles(storage, ctx.datasetId, open);
                     if (task && task.id === id) task = null;
                     return ctx.onChange();
                 });

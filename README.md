@@ -101,8 +101,8 @@ name to copy a link to it; adding images marks the analysis out of date until it
 ### Worksets
 
 The **Worksets** tab, the first on a dataset's page and the one it opens on, converts the images into a workset
-with dji-thermal-cli's settings, in WebODM's worker, with progress and Cancel. **Settings:** opens and closes the
-settings, its chips showing what differs from the defaults either way; the **Outputs** section shows its own when
+with dji-thermal-cli's settings (**Create Workset**), in WebODM's worker, with progress and Cancel. **Workset
+Creation Settings:** opens and closes the settings, its chips showing what differs from the defaults either way; the **Outputs** section shows its own when
 closed.
 
 - **Outputs**: temperature TIFFs in °C, °F or K, pseudo-colour PNGs, gray16, raw counts, DJI R-JPEGs and the others
@@ -116,15 +116,18 @@ closed.
   menu, fills in that workset's; **Save as my defaults** keeps your settings for new worksets (**Reset to defaults**
   goes back to dji-thermal-cli's).
 
-Each workset is kept beside the others, with what it changed from the defaults, its files (each image's outputs
-and why any was skipped), **Download all** (a zip) or each file, and **Rename** and **Delete** in its menu. DJI's own
+Each workset is kept beside the others, with what it changed from the defaults, its **Files** (a table, closed at
+first and remembered in your browser, of each image's outputs and why any was skipped, sortable by image or result),
+**Download all** (a zip) or each file, and **Rename** and **Delete** in its menu. DJI's own
 SDK measures them when an administrator has installed it.
 
 ### Mosaics
 
 After converting (on by default in the settings, or **Build mosaics** from a workset's menu), dji-thermal-cli
 places the frames side by side from their positions and angles, with no WebODM task needed: as converted, and
-harmonized (normalized, each frame's offset against its neighbours removed). **View mosaics** shows them on a map
+harmonized (the frames made to agree on temperature: one ambient and reflected temperature for every frame, and
+each frame shifted to match its neighbours where they overlap, removing the camera's drift between its
+self-calibrations). **View mosaics** shows them on a map
 over WebODM's base layers:
 
 - a tab for each mosaic (**Mosaic**, as converted, and **Harmonized**), **Source frame** (the mosaic with a black and

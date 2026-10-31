@@ -14,8 +14,11 @@
                       view_angle: "View angle"};
     var TAB_HINTS = {
         as_converted: "Each pixel is one frame's own temperature, as the frames were converted.",
-        harmonized: "Normalized: one ambient and reflected temperature for every frame, and each frame's offset against " +
-            "its neighbours removed (camera drift between recalibrations).",
+        harmonized: "Harmonized: the frames made to agree on temperature. The camera drifts a little between its " +
+            "self-calibrations, so overlapping frames of the same ground can read a degree or two apart. Here every frame " +
+            "uses the same ambient and reflected temperature, and each is shifted to match its neighbours where they " +
+            "overlap. Compared with the Mosaic tab: no seams or patches from drift; the temperatures may sit slightly " +
+            "higher or lower overall.",
         source_frame: "Where each frame was placed: the mosaic, with a line where one frame meets the next (each pixel " +
             "comes from the frame that saw it closest to straight down).",
         view_angle: "How far from straight down each pixel was seen, in degrees."

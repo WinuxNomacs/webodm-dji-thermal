@@ -5,7 +5,12 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
-  - **Workset wording and layout** (the user, 2026-10-31, from `new.md`), one branch, to plan before building:
+  - Done: **Workset wording and layout** (the user, 2026-10-31, from `new.md`), `workset-wording-layout`; the
+    Harmonized wording agreed with "made to agree on temperature" (so it doesn't suggest other attributes change);
+    the WebODM plan's "Convert with these" became "Use these settings" (it fills the form, it doesn't create);
+    `analyzer_core.sortRows` (moved from `dataset.js`) sorts both the Files tab and a workset's Files (Image and
+    Result; Outputs and Notes not). Jest 159; live check on HomerunObliqueII (GETs only, a fresh browser profile):
+    the new labels, Files collapsed then open and kept across a reload, sorting both ways, the new Harmonized note:
     1. The Convert form's button **Convert** becomes **Create Workset** (`public/conversions.js`; also the
        messages that say "Convert", e.g. the WebODM plan's "Convert with these" and the task hint "Convert, then
        create the task from the new workset", reworded to match).
@@ -22,8 +27,7 @@
        each is shifted to match its neighbours where they overlap. Compared with the Mosaic tab: no seams or patches
        from drift; the temperatures may sit slightly higher or lower overall."
     Decided (the user, 2026-10-31): the Files table starts collapsed (its state kept per workset in the browser),
-    and its column headers sort ascending/descending where sensible. Open: the Harmonized wording (the draft above,
-    with the user).
+    and its column headers sort ascending/descending where sensible.
   - Done: **bug, the Thermal Inspector's palettes didn't match the Analyzer's** (the user, 2026-10-31),
     `inspector-dji-palettes`: the inspector listed only WebODM's colour maps. It now lists the Analyzer's list (DJI's
     palettes as "DJI *name*", then WebODM's colour maps) and draws DJI's with the plugin's own tiles (step 3b below).
