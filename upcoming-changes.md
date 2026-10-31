@@ -207,8 +207,8 @@
   viewer" below): clicking the picture in the Files view's detail pane opens it in a window on the page, with a
   close button and basic controls, instead of a new tab. Done.
 - **UX review** (the user, 2026-10-31, from `new.md`: "how would you make this ui more intuitive?"; details under
-  "Then: UX review" below): a review of every page and control the plugin adds, proposals for the user to choose
-  from, then the chosen ones built. Review written; building its six steps.
+  "Done: UX review" below): a review of every page and control the plugin adds, proposals for the user to choose
+  from, then the chosen ones built. Done: the review, all 13 proposals in six steps, and a bug it found.
 - **Documentation** (the user, 2026-10-31, from `new.md`; details under "Then: Documentation" below): the docs
   hosted from this GitHub repo, planned, with quickstart tutorials and screenshots, kept current with every feature
   change. After the UX review, so the screenshots show the reviewed UI.
@@ -777,7 +777,7 @@ anyway for the release: WebODM downloads the zip from the URL in WebODM-Plugins'
   reading). Shots without a flight's image (the DJI Thermal page, empty forms) need nothing blanked.
 - GitHub Pages (`main` `/docs`) once the repo is public.
 
-## Then: UX review
+## Done: UX review
 
 **The request** (the user, 2026-10-31): "Using your expert ux designer skills, how would you make this ui more
 intuitive?"
@@ -899,7 +899,13 @@ goes (the docs are written once, from it); 10 needs no dji-thermal-cli release, 
    beside each measurement parameter…" (3 strings) and "shows the recorded values once an analysis running…"
    (2 strings). Jest 161 (measurement 11); JSX rebuilt in the dev container; live: the panel for 6 M4T photos (only
    `describe`, no task), the workset form's fields in the same order.
-6. The Analyzer list: 12, 13 and its half of 4 (`datasets.js`, `datasets.html`).
+6. The Analyzer list: 12, 13 and its half of 4 (`datasets.js`, `datasets.html`). Done, `ux-analyzer-list`: the
+   Worksets column reads "2" when all are ready, else "1 of 2 ready"; New Dataset says it is for checking a flight
+   first and points to Thermal Task for a task straight away, as does the empty list; "The DJI thermal photos of a
+   flight (the _T.JPG files)". Test changed (expected text only): `analyzer.test.js`, "filters the list by the
+   search…", "1/2" → "1 of 2 ready". Jest 161; live (GETs only): the row, the dialog, the list shown empty.
+
+All six steps done (2026-10-31). The Documentation phase is next; its screenshots show this UI.
 
 ## Up next: Thermal Inspector
 

@@ -33,6 +33,8 @@
     <div class="ta-dialog" id="ta-new-dialog" hidden>
         <div class="ta-dialog-inner theme-secondary">
             <h4>New thermal dataset</h4>
+            <p class="text-muted">To check a flight before processing it. For a task straight away, use <strong>Thermal Task</strong> on a
+                project on the Dashboard.</p>
             <div class="form-group">
                 <label for="ta-new-name">Name</label>
                 <input type="text" id="ta-new-name" class="form-control input-sm" maxlength="238">
@@ -48,7 +50,7 @@
                     <input type="file" id="ta-new-files" multiple accept=".jpg,.jpeg,image/jpeg" hidden></label>
                 <label class="btn btn-default btn-sm ta-pick"><i class="fa fa-folder-open"></i> Choose a folder
                     <input type="file" id="ta-new-dir" webkitdirectory hidden></label>
-                <p class="help-block" id="ta-new-chosen">The R-JPEGs of a flight (the _T.JPG files). Visible images can be included: they are listed, not analyzed.</p>
+                <p class="help-block" id="ta-new-chosen">The DJI thermal photos of a flight (the _T.JPG files). Visible photos can be included: they are listed, not analyzed.</p>
             </div>
             <div class="ta-upload-progress" id="ta-new-progress" hidden>
                 <div class="progress"><div class="progress-bar" role="progressbar" style="width: 0%;"></div></div>
