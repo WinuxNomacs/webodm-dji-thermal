@@ -551,7 +551,8 @@
     // defaults: what their settings are compared against; menu: the conversion whose menu is open; viewerBase: their mosaics' pages, followed by their id;
     // dashboard: WebODM's dashboard, where their tasks are; parent: the dataset's own task)
     function listHtml(conversions, canChange, base, open, fresh, defaults, menu, viewerBase, dashboard, parent) {
-        if (!conversions.length) return '<p class="text-muted ta-none">No worksets yet.</p>';
+        if (!conversions.length) return '<p class="text-muted ta-none">No worksets yet' + (canChange ? ": choose the settings above (the WebODM plan's " +
+            "are a good start), then Create Workset." : ".") + "</p>";
         open = open || [];
         return conversions.map(function (c) {
             var cls = {ready: "success", failed: "danger", canceled: "default", converting: "info"}[c.status] || "default";

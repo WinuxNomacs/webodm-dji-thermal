@@ -138,6 +138,13 @@
 .ta-page .ta-finding-files{ margin-top: 6px; font-size: 12px; }
 .ta-page .ta-finding-files code{ margin-right: 4px; display: inline-block; }
 .ta-page .ta-plan-command{ margin-bottom: 10px; }
+.ta-page .ta-steps{ display: flex; flex-wrap: wrap; gap: 4px 0; list-style: none; padding: 0; margin: 10px 0 4px; font-size: 13px; counter-reset: ta-step; }
+.ta-page .ta-steps li{ counter-increment: ta-step; opacity: .7; }
+.ta-page .ta-steps li:before{ content: counter(ta-step) ". "; opacity: .7; }
+.ta-page .ta-steps li + li:not(:first-child){ margin-left: 8px; padding-left: 14px; position: relative; }
+.ta-page .ta-steps li + li:after{ content: "\2192"; position: absolute; left: -2px; opacity: .5; }
+.ta-page .ta-steps .ta-step-done .fa-check{ color: #27ae60; }
+.ta-page .ta-steps .ta-step-current{ opacity: 1; font-weight: bold; }
 .ta-page .ta-plan-command > summary{ display: list-item; cursor: pointer; font-size: 13px; }
 .ta-page .ta-command{ white-space: pre-wrap; word-break: break-all; }
 .ta-page .ta-command-row{ display: flex; align-items: flex-start; gap: 6px; }
