@@ -629,8 +629,30 @@ layouts, and the UX review checks desktop only.
 process has open can't be replaced), its `test_portable` passing on Linux and with the native WebODM's Python 3.9
 on Windows (2026-10-31, `portable-files`; the `test` skill's Windows step).
 
+**Seen on the native Windows WebODM 3.3.2** (2026-10-31, the zip of `main` installed through Administration >
+Plugins, then removed):
+- WebODM logged "Running webpack for dji-thermal" then "webpack-cli is not installed, plugin will not work"; the
+  dashboard has no Thermal Task button (404 for `build/ThermalTaskButton.js` and `.css`). The mosaic viewer's map
+  needs `build/Leaflet.js` the same way.
+- Everything else loads: the plugin registers, dji-thermal-cli 1.10.0 with numpy and Pillow install from pip's
+  Windows wheels, the Thermal Analyzer and DJI Thermal pages open (the built-in port reported).
+- **A WebODM bug on Windows**: after pip succeeds, `pyutils.requirements_installed` puts the packages' folder on
+  PYTHONPATH with `:` (Windows uses `;`), sees none of them, logs "Failed to install requirements.txt" and writes no
+  `install_md5`, so every start of WebODM runs pip again (and needs the internet). It hits every plugin with
+  requirements. The plugin can work around it in its own `check_requirements` (write `install_md5` when its pinned
+  packages are in its site-packages); the fix itself belongs in WebODM (`os.pathsep`), the user's to raise.
+- The native app logs in by itself (no login form); its server answers only on Windows' 127.0.0.1:29800, and
+  Windows' firewall blocks connections from WSL, so the check went through a reverse tunnel (Windows' Python
+  connecting out to WSL), stopped afterwards.
+
+**Open again** (the user, 2026-10-31, asked why the rewrite is needed; the answer above): the Thermal Task panel
+embeds WebODM's own `NewTaskPanel` (name, node, options and presets, map preview, review), which only webpack can
+import, and WebODM has no hook to convert photos uploaded through its own button. So: ship `public/build` in the
+zip (built by `dev/package.sh` in the dev container; WebODM skips webpack when it is there, as its core plugins run
+on the native installer), or a plain-JavaScript rewrite with a smaller form of our own (proposed: ship the build).
+
 **Decided** (the user, 2026-10-31): the plugin supports Docker (all three systems), the native Windows installer and
-the macOS installer (Docker); the React parts are rewritten in plain JavaScript; a native Windows WebODM is used for
+the macOS installer (Docker); the React parts are rewritten in plain JavaScript (reopened, see above); a native Windows WebODM is used for
 the checks.
 
 Also decided (the user, 2026-10-31): the converter on `process()`, exiftool dropped; `dtc:Software` stays as the
