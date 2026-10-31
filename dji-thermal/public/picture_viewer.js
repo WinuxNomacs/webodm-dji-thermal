@@ -37,7 +37,7 @@
         var before = doc.activeElement;
         var overflow = doc.documentElement.style.overflow;
         var el = doc.createElement("div");
-        el.className = "ta-viewer";
+        el.className = "ta-picture";
         el.setAttribute("role", "dialog");
         el.setAttribute("aria-modal", "true");
         el.setAttribute("aria-label", "Picture viewer");
@@ -45,19 +45,19 @@
         var button = function (act, title, inner) {
             return '<button type="button" class="btn btn-default btn-sm" data-act="' + act + '" title="' + title + '" aria-label="' + title + '">' + inner + "</button>";
         };
-        el.innerHTML = '<div class="ta-viewer-bar theme-secondary">' +
-            '<span class="ta-viewer-nav">' + button("prev", "Previous picture (←)", '<i class="fa fa-chevron-left"></i>') +
-            '<span class="ta-viewer-count"></span>' + button("next", "Next picture (→)", '<i class="fa fa-chevron-right"></i>') + "</span>" +
-            '<strong class="ta-viewer-name"></strong>' +
-            '<span class="ta-viewer-tools">' + button("zoom-out", "Zoom out (−)", '<i class="fa fa-search-minus"></i>') +
-            '<span class="ta-viewer-zoom"></span>' + button("zoom-in", "Zoom in (+)", '<i class="fa fa-search-plus"></i>') +
+        el.innerHTML = '<div class="ta-picture-bar theme-secondary">' +
+            '<span class="ta-picture-nav">' + button("prev", "Previous picture (←)", '<i class="fa fa-chevron-left"></i>') +
+            '<span class="ta-picture-count"></span>' + button("next", "Next picture (→)", '<i class="fa fa-chevron-right"></i>') + "</span>" +
+            '<strong class="ta-picture-name"></strong>' +
+            '<span class="ta-picture-tools">' + button("zoom-out", "Zoom out (−)", '<i class="fa fa-search-minus"></i>') +
+            '<span class="ta-picture-zoom"></span>' + button("zoom-in", "Zoom in (+)", '<i class="fa fa-search-plus"></i>') +
             button("fit", "Fit to the window (0)", "Fit") + button("actual", "Actual size, 100% (1)", "1:1") +
-            '<a class="btn btn-default btn-sm ta-viewer-download" title="Download the file as uploaded" aria-label="Download"><i class="fa fa-download"></i></a>' +
+            '<a class="btn btn-default btn-sm ta-picture-download" title="Download the file as uploaded" aria-label="Download"><i class="fa fa-download"></i></a>' +
             button("close", "Close (Esc)", "&times;") + "</span></div>" +
-            '<div class="ta-viewer-stage"><div class="ta-viewer-msg"></div></div>';
+            '<div class="ta-picture-stage"><div class="ta-picture-msg"></div></div>';
         doc.body.appendChild(el);      // not in the page's own layer, which WebODM's menus are above
         doc.documentElement.style.overflow = "hidden";
-        var stage = el.querySelector(".ta-viewer-stage"), msg = el.querySelector(".ta-viewer-msg");
+        var stage = el.querySelector(".ta-picture-stage"), msg = el.querySelector(".ta-picture-msg");
         var img = null, pic = null, view = null, fitted = true, drag = null;
 
         function box() { return {w: stage.clientWidth || 1, h: stage.clientHeight || 1}; }
@@ -65,10 +65,10 @@
         function draw() {
             var zoomable = !!pic;
             [].forEach.call(el.querySelectorAll('[data-act="zoom-out"], [data-act="zoom-in"], [data-act="fit"], [data-act="actual"]'), function (b) { b.disabled = !zoomable; });
-            el.querySelector(".ta-viewer-zoom").textContent = zoomable ? Math.round(view.scale * 100) + "%" : "";
+            el.querySelector(".ta-picture-zoom").textContent = zoomable ? Math.round(view.scale * 100) + "%" : "";
             if (!zoomable) return;
             img.style.transform = "translate(" + view.x + "px, " + view.y + "px) scale(" + view.scale + ")";
-            img.classList.toggle("ta-viewer-pixels", view.scale > 1);
+            img.classList.toggle("ta-picture-pixels", view.scale > 1);
         }
 
         function fit() {
@@ -92,7 +92,7 @@
             if (img && img.parentNode) img.parentNode.removeChild(img);
             pic = null;
             img = doc.createElement("img");
-            img.className = "ta-viewer-img";
+            img.className = "ta-picture-img";
             img.alt = item.name;
             img.draggable = false;
             img.hidden = true;
@@ -113,13 +113,13 @@
             };
             stage.insertBefore(img, msg);
             img.src = item.src;
-            el.querySelector(".ta-viewer-count").textContent = (i + 1) + " of " + items.length;
-            var name = el.querySelector(".ta-viewer-name");
+            el.querySelector(".ta-picture-count").textContent = (i + 1) + " of " + items.length;
+            var name = el.querySelector(".ta-picture-name");
             name.textContent = item.name;
             name.title = item.path || item.name;
             el.querySelector('[data-act="prev"]').disabled = i === 0;
             el.querySelector('[data-act="next"]').disabled = i === items.length - 1;
-            el.querySelector(".ta-viewer-download").href = item.download;
+            el.querySelector(".ta-picture-download").href = item.download;
             draw();
             if (opts.onShow) opts.onShow(i);
         }
@@ -175,7 +175,7 @@
             var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
             if (!drag.moved && Math.abs(dx) < DRAG_PX && Math.abs(dy) < DRAG_PX) return;
             drag.moved = true;
-            stage.classList.add("ta-viewer-dragging");
+            stage.classList.add("ta-picture-dragging");
             if (!pic) return;
             view = {scale: drag.view.scale, x: drag.view.x + dx, y: drag.view.y + dy};
             fitted = false;
@@ -185,7 +185,7 @@
             if (!drag || drag.id !== e.pointerId) return;
             var clicked = !drag.moved && !drag.onPicture && e.type === "pointerup";
             drag = null;
-            stage.classList.remove("ta-viewer-dragging");
+            stage.classList.remove("ta-picture-dragging");
             if (clicked) close();
         };
         stage.addEventListener("pointerup", endDrag);

@@ -5,6 +5,11 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **bug, the mosaic viewer's page drawn over WebODM's menus** (found in the UX review, 2026-10-31),
+    `fix-picture-viewer-classes`: the picture viewer's `.ta-viewer` rule (fixed, z-index 100000) also matched the
+    mosaic viewer page's root (`ta-page ta-viewer`). The picture viewer's classes are now `ta-picture*`
+    (`picture_viewer.js`, `analyzer.css`). Jest 161; live: the mosaic viewer page laid out again, the picture viewer
+    rechecked (zoom, 1:1, the wheel, a drag, Fit, ← →, Esc, a click beside it, a photo refitted on resize).
   - Done: **the Files tab's detail pane** (the user, 2026-10-31), `files-detail-pane`. Decided (the user): a click
     on a row selects it (Ctrl/Cmd-click adds or removes, Shift-click a range, a click on the only one selected
     unselects; Esc and the pane's × too); the pane sits beside the table, sticky while the list scrolls (stacked

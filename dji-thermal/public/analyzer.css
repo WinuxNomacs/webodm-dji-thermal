@@ -28,21 +28,21 @@
 .ta-page .ta-dialog-inner h4{ margin-top: 0; }
 .ta-page .ta-dialog-actions{ display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 /* The picture viewer (picture_viewer.js): a bar, then the picture on a dark stage; on the page's body, above WebODM's
-   menus (its top bar is at z-index 99999), so not under .ta-page */
-.ta-viewer{ position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 100000; display: flex; flex-direction: column; outline: none; }
-.ta-viewer-bar{ display: flex; align-items: center; gap: 10px; padding: 6px 10px; flex-wrap: wrap; box-shadow: 0 1px 4px rgba(0, 0, 0, .3); }
-.ta-viewer-nav, .ta-viewer-tools{ display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-.ta-viewer-tools{ margin-left: auto; }
-.ta-viewer-count{ font-size: 12px; min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
-.ta-viewer-zoom{ font-size: 12px; min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
-.ta-viewer-name{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 120px; }
-.ta-viewer-tools [data-act="close"]{ font-size: 18px; line-height: 1; padding: 3px 9px 5px; }
-.ta-viewer-stage{ position: relative; flex: 1 1 auto; overflow: hidden; background: rgba(20, 20, 20, .97); cursor: grab; touch-action: none; }
-.ta-viewer-stage.ta-viewer-dragging{ cursor: grabbing; }
-.ta-viewer-img{ position: absolute; top: 0; left: 0; max-width: none; transform-origin: 0 0; user-select: none; }
-.ta-viewer-img.ta-viewer-pixels{ image-rendering: pixelated; }
-.ta-viewer-msg{ position: absolute; top: 50%; left: 0; right: 0; text-align: center; color: #ddd; transform: translateY(-50%); }
-.ta-viewer-msg[hidden], .ta-viewer-img[hidden]{ display: none; }
+   menus (its top bar is at z-index 99999), so not under .ta-page; .ta-picture, as .ta-viewer is the mosaic viewer page */
+.ta-picture{ position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 100000; display: flex; flex-direction: column; outline: none; }
+.ta-picture-bar{ display: flex; align-items: center; gap: 10px; padding: 6px 10px; flex-wrap: wrap; box-shadow: 0 1px 4px rgba(0, 0, 0, .3); }
+.ta-picture-nav, .ta-picture-tools{ display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.ta-picture-tools{ margin-left: auto; }
+.ta-picture-count{ font-size: 12px; min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
+.ta-picture-zoom{ font-size: 12px; min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+.ta-picture-name{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 120px; }
+.ta-picture-tools [data-act="close"]{ font-size: 18px; line-height: 1; padding: 3px 9px 5px; }
+.ta-picture-stage{ position: relative; flex: 1 1 auto; overflow: hidden; background: rgba(20, 20, 20, .97); cursor: grab; touch-action: none; }
+.ta-picture-stage.ta-picture-dragging{ cursor: grabbing; }
+.ta-picture-img{ position: absolute; top: 0; left: 0; max-width: none; transform-origin: 0 0; user-select: none; }
+.ta-picture-img.ta-picture-pixels{ image-rendering: pixelated; }
+.ta-picture-msg{ position: absolute; top: 50%; left: 0; right: 0; text-align: center; color: #ddd; transform: translateY(-50%); }
+.ta-picture-msg[hidden], .ta-picture-img[hidden]{ display: none; }
 .ta-page .ta-file-detail a[data-act="view-picture"]{ cursor: zoom-in; }
 .ta-page .ta-upload-progress{ margin: 8px 0; font-size: 13px; }
 .ta-page .ta-upload-progress .progress{ margin-bottom: 4px; }
