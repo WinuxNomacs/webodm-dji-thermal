@@ -16,6 +16,8 @@ import shutil
 import tempfile
 import zipfile
 
+from . import portable
+
 ENV = 'DJI_THERMAL_SDK_DIR'
 INFO_FILE = 'dji-thermal-sdk.json'      # beside an installed SDK: its version, and where it came from
 LICENSE_FILE = 'License.txt'
@@ -211,9 +213,9 @@ def _replace(target, stage):
     try:
         for name in os.listdir(target):
             if not name.startswith((STAGING_PREFIX, OLD_PREFIX)):
-                os.replace(os.path.join(target, name), os.path.join(old, name))
+                portable.replace(os.path.join(target, name), os.path.join(old, name))
         for name in os.listdir(stage):
-            os.replace(os.path.join(stage, name), os.path.join(target, name))
+            portable.replace(os.path.join(stage, name), os.path.join(target, name))
     finally:
         shutil.rmtree(old, ignore_errors=True)
 

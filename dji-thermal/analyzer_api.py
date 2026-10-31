@@ -28,7 +28,7 @@ from app.api.tasks import download_file_response, download_file_stream
 from app.models import Project, Task
 from app.security import path_traversal_check
 
-from . import conversion_tasks, conversions, converter, datasets, mosaics
+from . import conversion_tasks, conversions, converter, datasets, mosaics, portable
 
 THUMBNAIL_SIZE = (96, 96)
 LARGE_SIZE = (1280, 1280)      # the Files tab's detail pane (?size=large): a frame at its own size, up to this
@@ -383,7 +383,10 @@ def palette_thumbnail(task, path, palette, size=THUMBNAIL_SIZE):
     os.makedirs(os.path.dirname(cached), exist_ok=True)
     with open(cached + '.part', 'wb') as f:
         f.write(out.getvalue())
-    os.replace(cached + '.part', cached)
+    try:
+        portable.replace(cached + '.part', cached)
+    except OSError:     # the cached copy is held open: it is the same picture
+        os.remove(cached + '.part')
     return out.getvalue()
 
 

@@ -621,7 +621,10 @@ layouts, and the UX review checks desktop only.
    without a Mac.
 
 **Progress**: the converter on `process()`, exiftool and `exiftool_camera.config` gone (2026-10-31,
-`converter-without-exiftool`; `test_converter`, `test_sdk`).
+`converter-without-exiftool`; `test_converter`, `test_sdk`). The records' lock and every file replacement in
+`portable.py` (`fcntl` or `msvcrt`; `os.replace` tried again for a second on Windows, where a file another
+process has open can't be replaced), its `test_portable` passing on Linux and with the native WebODM's Python 3.9
+on Windows (2026-10-31, `portable-files`; the `test` skill's Windows step).
 
 **Decided** (the user, 2026-10-31): the plugin supports Docker (all three systems), the native Windows installer and
 the macOS installer (Docker); the React parts are rewritten in plain JavaScript; a native Windows WebODM is used for

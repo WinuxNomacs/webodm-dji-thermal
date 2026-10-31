@@ -18,7 +18,6 @@ job stops at its next progress write.
 """
 
 import datetime
-import fcntl
 import json
 import logging
 import os
@@ -31,6 +30,8 @@ from guardian.shortcuts import get_groups_with_perms, get_objects_for_user, get_
 
 from app.models import Project, Task
 from app.security import path_traversal_check
+
+from . import portable
 
 TAG = '.dji-thermal-dataset'        # WebODM's task list hides tags starting with "."
 NAME_PREFIX = 'Thermal dataset: '
@@ -89,7 +90,7 @@ def write_json(path, value):
     part = '{}.{}.part'.format(path, uuid.uuid4().hex[:8])
     with open(part, 'w') as f:
         json.dump(value, f)
-    os.replace(part, path)
+    portable.replace(part, path)
 
 
 @contextmanager
@@ -99,14 +100,11 @@ def locked(task):
     :raises Gone: the dataset's folder is not there (its task was deleted)
     """
     try:
-        lock = open(data_path(task, LOCK_FILE), 'a')        # noqa: SIM115 - closed below
+        lock = open(data_path(task, LOCK_FILE), 'a+')       # noqa: SIM115 - closed below
     except FileNotFoundError:
         raise Gone() from None
-    try:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with lock, portable.exclusive(lock):
         yield
-    finally:
-        lock.close()
 
 
 # Who sees what: as the projects API lists them (rest_framework_guardian's ObjectPermissionsFilter), viewing a
