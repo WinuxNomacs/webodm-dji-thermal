@@ -6,15 +6,15 @@
     var esc = function (t) { return core.escapeHtml(t); };
 
     var STATUS_LABELS = {converting: "Converting", ready: "Converted", failed: "Failed", canceled: "Canceled"};
-    var DISTANCE_MODES = [["lrf", "The rangefinder's, where it measured (else embedded)"], ["embedded", "Embedded in each image"],
-                          ["fixed", "Fixed"]];
+    // As the Thermal Task panel names them (thermal/MeasurementSettings.jsx), in its order
+    var DISTANCE_MODES = [["lrf", "Laser rangefinder, else as recorded"], ["embedded", "As recorded"], ["fixed", "Set for all photos"]];
     var UNIT_LABELS = {C: "°C", F: "°F", K: "K"};
     // The measurement parameters with the analysis' column of each image's recorded value (Celsius for temperatures)
     var MEASUREMENTS = [
-        {key: "humidity", label: "Relative humidity", unit: "%", hint: "humidity", digits: 0},
         {key: "emissivity", label: "Emissivity", hint: "emissivity", digits: 2, step: "0.01"},
         {key: "reflected_temp", label: "Reflected temperature", hint: "reflection", temperature: true},
-        {key: "ambient_temp", label: "Ambient temperature", hint: "ambient", temperature: true}
+        {key: "ambient_temp", label: "Ambient temperature", hint: "ambient", temperature: true},
+        {key: "humidity", label: "Relative humidity", unit: "%", hint: "humidity", digits: 0}
     ];
     var GIMBAL = [["gimbal_yaw", "Yaw"], ["gimbal_pitch", "Pitch"], ["gimbal_roll", "Roll"]];
     var RESULTS_SHOWN = 500;   // files listed in a conversion's results
@@ -59,7 +59,7 @@
     }
 
     function recordedText(v, digits, unit) {
-        return blank(v) ? "not recorded" : "recorded " + core.formatNumber(v, digits === undefined ? 1 : digits, unit || "");
+        return blank(v) ? "Not recorded" : "Recorded: " + core.formatNumber(v, digits === undefined ? 1 : digits, unit || "");
     }
 
     // The settings form, its temperatures in the user's unit. meta: {products, palettes}; rec: recorded(analysis), in °C
@@ -84,20 +84,21 @@
         }).join("");
 
         var fixed = typeof s.distance === "number";
-        var distanceHelp = "Embedded " + (blank(rec.distance) ? "not recorded" : core.formatNumber(rec.distance, 1, " m")) +
-            ", rangefinder " + (blank(rec.lrf) ? "not recorded" : core.formatNumber(rec.lrf, 1, " m")) + " (medians)";
-        var measurement = field("Distance to the target",
+        var distanceHelp = recordedText(rec.distance, 1, " m") + "; laser rangefinder: " +
+            (blank(rec.lrf) ? "none" : core.formatNumber(rec.lrf, 1, " m")) + " (medians)";
+        var distance = field("Distance to the target",
             '<div class="ta-inline"><select class="form-control input-sm" name="distance_mode">' + DISTANCE_MODES.map(function (m) {
                 var sel = fixed ? m[0] === "fixed" : m[0] === s.distance;
                 return '<option value="' + m[0] + '"' + (sel ? " selected" : "") + ">" + esc(m[1]) + "</option>";
             }).join("") + "</select>" + numberInput("distance", fixed ? s.distance : "", ' step="0.1" min="0.1" placeholder="m"' + (fixed ? "" : " hidden")) +
-            "</div>", esc(distanceHelp)) +
-            MEASUREMENTS.map(function (m) {
+            "</div>", esc(distanceHelp));
+        var measurement = MEASUREMENTS.map(function (m) {
                 var hint = m.temperature ? core.convertTemp(rec[m.hint], "C") : rec[m.hint];
                 var label = m.label + (m.temperature ? " (" + u + ")" : m.unit ? " (" + m.unit + ")" : "");
-                return field(label, numberInput(m.key, s[m.key], ' step="' + (m.step || "any") + '" placeholder="each image\'s own"'),
+                var placeholder = blank(hint) ? "As recorded" : "As recorded (" + core.formatNumber(hint, m.digits === undefined ? 1 : m.digits) + ")";
+                return field(label, numberInput(m.key, s[m.key], ' step="' + (m.step || "any") + '" placeholder="' + esc(placeholder) + '"'),
                     esc(recordedText(hint, m.digits, m.temperature ? " " + u : m.unit ? " " + m.unit : "")));
-            }).join("") +
+            }).join("") + distance +
             field("Unit of the files", '<select class="form-control input-sm" name="unit">' + ["C", "F", "K"].map(function (k) {
                 return '<option value="' + k + '"' + (k === unit ? " selected" : "") + ">" + UNIT_LABELS[k] + "</option>";
             }).join("") + "</select>", "What the temperature TIFFs are written in. The temperatures here are in yours (" + esc(u) + ").");
@@ -142,7 +143,7 @@
             "> Mosaics: the frames placed side by side, as converted and harmonized, to see on a map</label>" +
             '<span class="help-block">Built after converting, from the frames\' positions and angles (no WebODM task needed).</span></div>' +
             "</details>" +
-            '<details class="ta-section" open><summary><h4>Measurement</h4></summary><p class="text-muted">Empty keeps each image\'s own value.</p>' + measurement + "</details>" +
+            '<details class="ta-section" open><summary><h4>Measurement</h4></summary><p class="text-muted">Left empty, each photo keeps the value its camera recorded.</p>' + measurement + "</details>" +
             '<details class="ta-section" open><summary><h4>Frames</h4></summary>' + frames + "</details>" +
             '<details class="ta-section"' + (!blank(s.gimbal_yaw) || !blank(s.gimbal_pitch) || !blank(s.gimbal_roll) || !blank(s.replace_above) ||
                 !blank(s.replace_below) || s.strip_location ? " open" : "") + '><summary><h4>Adjustments</h4></summary>' + adjust + "</details>";
@@ -254,7 +255,7 @@
         {key: "mosaics", fields: ["mosaics"], text: function (s) { return s.mosaics ? "mosaics" : "no mosaics"; }},
         {key: "distance", fields: ["distance_mode", "distance"], text: function (s) {
             return typeof s.distance === "number" ? "distance " + num(s.distance, 1) + " m" :
-                s.distance === "embedded" ? "embedded distance" : s.distance === "" ? "distance not given" : "rangefinder distance";
+                s.distance === "embedded" ? "recorded distance" : s.distance === "" ? "distance not given" : "rangefinder distance";
         }}
     ].concat(MEASUREMENTS.map(function (m) {
         var name = m.label.replace(/ temperature$/, "").replace(/^Relative /, "").toLowerCase();

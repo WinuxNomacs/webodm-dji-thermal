@@ -37,14 +37,15 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
 
 1. In a project on the dashboard, press **Thermal Task** and pick the flight's photos, all of them if you like, and a
    GCP file if you have one. The plugin finds the thermal R-JPEGs among them by their content; the RGB photos taken
-   with them are ignored and not uploaded.
+   with them are ignored and not uploaded. (To check the flight first or compare settings, the panel points to the
+   Thermal Analyzer.) The Workset Creation Settings ask the same values in the same order and words.
 2. **Measurement**: the values the temperatures are computed with. Each field shows the value the camera recorded
    and the range the camera accepts; left empty, every photo keeps its own recorded value.
    - **Temperature unit** of the values you enter: Celsius, Fahrenheit or Kelvin, by default WebODM's units (°F
      when imperial, else °C). The task's images are always in degrees Celsius.
    - **Emissivity**, **reflected temperature**, **ambient temperature** (the H20T and XT S do not use it, and the
      form says so) and **relative humidity**.
-   - **Distance** to the subject: by default each photo's laser rangefinder distance where it has a valid one
+   - **Distance to the target**: by default each photo's laser rangefinder distance where it has a valid one
      (each photo of the M4T flight checked has one; DJI's sample images have none), else the distance the camera
      recorded (usually 5 m, whatever the flight height). Or the recorded distance, or one distance for all photos.
      With the rangefinder's distance, the temperatures differ slightly from DJI's own apps, which use the recorded

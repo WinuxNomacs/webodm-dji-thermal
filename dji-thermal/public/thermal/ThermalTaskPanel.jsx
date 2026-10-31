@@ -169,7 +169,8 @@ export default class ThermalTaskPanel extends React.Component {
         let text = interpolate(_("%(count)s thermal photos."), {count: photos.length});
         if (unsupported.length) text += " " + interpolate(_("%(count)s photos of a camera this plugin cannot convert are left out."), {count: unsupported.length});
         if (others) text += " " + interpolate(_("%(count)s other files (RGB photos, ...) are ignored."), {count: others});
-        return <p>{text}</p>;
+        return <p>{text} <span className="text-muted">{_("To check the flight first or compare settings, use the")}{" "}
+            <a href="/plugins/dji-thermal/">{_("Thermal Analyzer")}</a>.</span></p>;
     }
 
     renderProgress(){

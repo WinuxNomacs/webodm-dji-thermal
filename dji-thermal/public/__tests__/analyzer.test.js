@@ -1164,10 +1164,10 @@ describe("a dataset's conversions", () => {
         // The files in kelvin: the form is still in the user's unit
         document.body.innerHTML = '<div id="f">' + conversions.formHtml(Object.assign({}, DEFAULTS, {unit: "K"}), PREFERENCES, rec) + "</div>";
         const html = document.getElementById("f").innerHTML;
-        expect(html).toContain("Embedded 5.0 m, rangefinder 20.7 m");
+        expect(html).toContain("Recorded: 5.0 m; laser rangefinder: 20.7 m");
         expect(html).toContain("Reflected temperature (°F)");
-        expect(html).toContain("recorded 68.0 °F");      // 20 °C
-        expect(html).toContain("recorded 0.91");
+        expect(html).toContain("Recorded: 68.0 °F");      // 20 °C
+        expect(html).toContain("Recorded: 0.91");
         expect(html).toContain("Relative humidity (%)");
         expect(html).toContain("Colour range (°F)");
         expect(document.querySelector('[name="unit"]').value).toBe("K");
@@ -1339,11 +1339,11 @@ describe("a dataset's conversions", () => {
         const fetchFn = server({[URL5]: [analyzing, Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: []})]});
         dataset.init(document, fetchFn);
         await ticks();
-        expect(form().innerHTML).toContain("Embedded not recorded");
+        expect(form().innerHTML).toContain("Not recorded; laser rangefinder: none");
         input("humidity").value = "55";
         jest.runOnlyPendingTimers();
         await ticks();
-        expect(form().innerHTML).toContain("Embedded 5.0 m");
+        expect(form().innerHTML).toContain("Recorded: 5.0 m");
         expect(input("humidity").value).toBe("55");
     });
 
