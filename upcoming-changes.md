@@ -203,6 +203,9 @@
 - **UX review** (the user, 2026-10-31, from `new.md`: "how would you make this ui more intuitive?"; details under
   "Then: UX review" below): a review of every page and control the plugin adds, proposals for the user to choose
   from, then the chosen ones built.
+- **Documentation** (the user, 2026-10-31, from `new.md`; details under "Then: Documentation" below): the docs
+  hosted from this GitHub repo, planned, with quickstart tutorials and screenshots, kept current with every feature
+  change. After the UX review, so the screenshots show the reviewed UI.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -635,6 +638,46 @@ CLI writes it (no CLI change); the Windows checks use the install in `C:\WebODM`
 to 3.3.2.
 
 **Open**: none.
+
+## Then: Documentation
+
+**The request** (the user, 2026-10-31): "Plan to setup the github repo to host the documentation." and "Plan out
+the documentation. We'll also want to provide quickstart tutorials with screenshots and then maintain the
+documentation as feature changes require going forward."
+
+**Builds on**: README.md (the plugin's public page today: what it does, installing, using it, the converted images,
+the outside services); the `live-check` skill's Playwright scripts (the same login and pages, for screenshots).
+
+**Where things stand** (checked 2026-10-31): the repo is private, with no GitHub Pages and no wiki. GitHub Pages on
+a private repo needs a paid plan; on a public repo it is free, as are its Actions minutes. The repo has to be public
+anyway for the release: WebODM downloads the zip from the URL in WebODM-Plugins' `directory.json`.
+
+**Proposed**:
+1. **Hosting**: a `docs/` folder of Markdown on `main`, which GitHub shows as pages with no build at all; GitHub
+   Pages ("Deploy from a branch", `main` `/docs`) turned on once the repo is public, giving a site with no workflow
+   of ours (GitHub runs its own Pages build, free on a public repo). README stays the short public page and links to
+   the docs.
+2. **Contents**:
+   - Quickstarts, each one task end to end with a screenshot per step: a thermal orthophoto from a DJI flight (Thermal
+     Task), checking a flight before processing (Thermal Analyzer: upload, analyze, Files, Problems, WebODM plan), a
+     workset and its mosaic viewer, measuring on the map (Thermal Inspector: point, region, isotherms, legend).
+   - Guides: measurement settings (emissivity, distance, reflected and ambient temperature: what each changes), the
+     palettes, DJI's own SDK (the DJI Thermal page), the Docker and native Windows installs.
+   - Reference: the converted images (from README), the HTTP API the plugin adds, troubleshooting (the messages a
+     user can meet and what to do), cameras supported.
+3. **Screenshots made by a script**: a Playwright script (`dev/`, beside the live checks) that logs in to the dev
+   WebODM, opens each page in a set state and saves the screenshots the docs use, at one window size. Rerun after a
+   UI change, so a screenshot is never out of date by hand. A `docs` skill with the steps.
+4. **Kept current**: a rule in CLAUDE.md, as for README: a change to what the user sees updates the docs and reruns
+   the screenshots on the same branch.
+
+**Open** (for the user):
+- Screenshots are images in the repo, which CLAUDE.md's "never commit an image" rule forbids (it was written for
+  the test images and DJI's files): allow them in `docs/` only?
+- Which data the screenshots show: a flight of yours (its location visible on the map, and in the coordinates the
+  Inspector and Files show), DJI's sample images (no GPS; DJI's licence on them to check), or a flight you're happy
+  to publish.
+- Pages once public (proposed), or the Markdown in `docs/` only.
 
 ## Then: UX review
 
