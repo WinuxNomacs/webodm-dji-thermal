@@ -667,9 +667,9 @@ Plugins, then removed):
   requirements. The plugin can work around it in its own `check_requirements` (write `install_md5` when its pinned
   packages are in its site-packages); the fix itself belongs in WebODM. `os.pathsep` alone isn't enough: the
   native installer's Python has a `python._pth`, which makes it ignore PYTHONPATH. The fix is `pip freeze --path
-  <site-packages>` (tested on the native Windows Python and in Docker). The user is submitting it to WebODM
-  (2026-10-31: branch `fix-plugin-requirements-pathsep` on their fork, one line, no test changes) and asked to go
-  on as if it is accepted: **no workaround in the plugin**.
+  <site-packages>` (tested on the native Windows Python and in Docker). The user submitted it to WebODM as
+  [PR #2046](https://github.com/WebODM/WebODM/pull/2046) (one line, no test changes), merged by the maintainer on
+  2026-10-31: **no workaround in the plugin**; WebODM releases after 3.3.2 write `install_md5` on native Windows.
 - The native app logs in by itself (no login form); its server answers only on Windows' 127.0.0.1:29800, and
   Windows' firewall blocks connections from WSL, so the check went through a reverse tunnel (Windows' Python
   connecting out to WSL), stopped afterwards.
