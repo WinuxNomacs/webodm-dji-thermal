@@ -793,7 +793,61 @@ on the map, the DJI Thermal page under Administration.
 2. **The user chooses** which to build; the chosen ones become steps here, each on its branch, tested and checked
    live.
 
-**Open**: none until the review is written.
+**The review** (2026-10-31): every page walked through in a headless browser at 1440×900 on HomerunObliqueII, read
+only. It found one bug, fixed first (the mosaic viewer page drawn over WebODM's menus, `fix-picture-viewer-classes`
+above). Proposals, the most useful first; the numbers are for choosing.
+
+*Larger changes*
+1. **Problems and the WebODM plan speak in command-line flags.** Every suggestion on the Problems tab is
+   dji-thermal-cli's, e.g. "--mosaic-normalize (uses the flight median) or set one value with --ambient-temp and
+   --reflected-temp", "--mosaic-max-pitch DEG to include them", "deg C". So are the plan's Notes. A WebODM user has
+   no command line and has to work out which setting each flag is. Proposed: for the findings the plugin knows (by
+   code: `ambient_temp_varies`, `oblique`, `temperature_max_outlier`, `rangefinder_distance`, `rangefinder_invalid`,
+   …), the plugin's own wording naming the setting on the Worksets tab ("Tick Normalize in Workset Creation
+   Settings"), with a button that sets it in the form. Findings it doesn't know keep the CLI's text. The code under
+   each finding (`ambient_temp_varies`) moves into a tooltip. The plan's command line stays, folded under "As a
+   command". The CLI's own wording stays: its users need the flags.
+2. **The step after a workset is hidden.** A converted workset shows View mosaics; **Create task** and **Use for
+   parent task**, the way to an orthophoto, are in its ⋯ menu with Rename and Delete. Proposed: a workset with no
+   task shows **Create task** as a button beside View mosaics; Use for parent task stays in the menu.
+3. **No path through the dataset page.** The page opens on the Worksets tab with the creation form at the top, but
+   a first-time user should look at Problems and the WebODM plan before choosing settings. Proposed: a line of steps
+   under the summary, each a link with its state: "1 Check: 2 warnings → 2 Create a workset (the plan's settings
+   are recommended) → 3 Create a task → 4 Measure on the map". While there are no worksets, **Use the WebODM plan's
+   settings** is the main button and the form says so.
+4. **Two ways in, no signpost.** The Dashboard's Thermal Task and the Thermal Analyzer both turn DJI photos into a
+   task, and neither says when to use the other. Proposed: one line in each: the Thermal Task panel says "To check
+   the flight first or compare settings, use the Thermal Analyzer"; the Analyzer's New Dataset dialog and its empty
+   list say "For a task straight away, use Thermal Task on the Dashboard".
+5. **The ⚠ chips read as errors.** On the Worksets tab the settings' chips (temp_c:tiff, pseudo:png ⚠, not
+   normalized ⚠, all frames ⚠) are orange with a warning sign where a setting differs from the WebODM plan, with
+   that meaning only in a tooltip. On a new dataset the defaults show three warnings. Proposed: a neutral chip
+   marked "≠ plan", and one line after them: "≠ plan: differs from the WebODM plan (hover for its value)".
+6. **The same measurement fields, asked two ways.** The Thermal Task panel asks unit, emissivity, reflected,
+   ambient, humidity, distance; the Workset Creation Settings ask distance, humidity, emissivity, reflected,
+   ambient, then the unit of the files, with other labels ("Distance" / "Distance to the target") and other hints
+   ("As recorded (0.91)" in the field / "each image's own" in the field and "recorded 0.91" under it). Proposed:
+   one order, labels and hint style for both.
+
+*Quick fixes*
+7. **Numbers broken mid-number in the mosaic viewer's panel**: "95% under 2. / 04 °C", "the groun / d plane", a
+   file name split as "…_T.JP / G" (`.ta-viewer .ta-viewer-values td { word-break: break-all }`). Wrap at spaces,
+   and break a long word only when it doesn't fit (`overflow-wrap: anywhere`).
+8. **Format codes shown as they are**: "temp_c:tiff, pseudo:png" in the chips, "temp_c tiff, pseudo png" in the
+   mosaic viewer's subtitle. In words: "°C TIFFs, colour PNGs".
+9. **Two palettes, unexplained**: a workset reads "palette ironred", its mosaics open in DJI arctic (the
+   Preferences palette). The workset's palette colours its PNGs only: say "colour PNGs in ironred".
+10. **A note that reads as cut off**: "--distance lrf (the default) measures with the rangefinder's" (the CLI's
+    wording, meaning its distance). Gone with 1; otherwise reworded in dji-thermal-cli's next release.
+11. **File names twice** in the "unusual maximum temperature" warning: in its sentence (with values) and again as
+    chips. Keep the chips (they open the files) and the values in their tooltips.
+12. **Jargon in New Dataset**: "The R-JPEGs of a flight (the _T.JPG files)" → "DJI thermal photos (the _T.JPG
+    files)".
+13. **The Analyzer list's Worksets column** reads "2/2": "2" when all are ready, "1 of 2 ready" otherwise.
+
+Screenshots of each page are kept outside the repo (they show the flight's location).
+
+**Open**: which of 1–13 to build, and in what order.
 
 ## Up next: Thermal Inspector
 
