@@ -13,13 +13,21 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
   no changes to WebODM itself.
 - **Python 3.9 and Django 2.2** (WebODM 3.3.2, numpy 1.26.2, Pillow 11.3.0): Ruff targets py39. WebODM installs a
   plugin's `requirements.txt` with `pip install -U --target`, dependencies included, so it pins numpy and Pillow
-  to WebODM's own versions.
+  to WebODM's own versions. It does so when it loads the plugin and the file's md5 changed; pip leaves an old
+  version's `.dist-info` behind, which `Plugin.check_requirements` removes.
+- **Linux, Windows and macOS**: WebODM runs in Docker (the plugin's Python in its Linux container) or from its
+  native installers (the plugin's Python on Windows or macOS). No POSIX-only module at import time, no tool only
+  WebODM's Docker image has (exiftool) without a fallback; Mac checks only for what differs on macOS (plan:
+  "Up next: Linux, Windows and macOS").
 - **Temperatures come from [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/)** (pure Python, AGPL),
-  a separate package; a change it needs is made and released there first.
+  a separate package; a change it needs is made and released there first (its `RELEASING.md`: a `release/X.Y.Z`
+  branch and its local checks; pushing its `main` runs nothing, its `vX.Y.Z` tag runs CI on three systems, then
+  publishes to TestPyPI and PyPI), then pinned here exactly.
 - **What applies to AI-assisted work here is the user's call**: the WebODM-Plugins guidance ("never add tests")
   and the WebODM maintainer's wishes for PRs to WebODM are raised with the user, not applied on their own. The
   plugin keeps its own tests, outside the zip.
-- **Never push and never tag.** Nothing is published by a push yet (no CI). A release: Claude prepares a
+- **Never push and never tag.** Nothing is published by a push: the repo has no GitHub workflows, and gets none
+  without the user's say (Actions minutes). A release: Claude prepares a
   `release/X.Y.Z` branch (manifest version, `CHANGELOG.md`, `README.md`), builds the zip with `dev/package.sh`
   (`dist/dji-thermal-X.Y.Z.zip` and its sha256), runs the `release-check` skill and merges; the user tags `vX.Y.Z`,
   attaches the zip to the GitHub release and adds `{url, sha256}` to WebODM-Plugins' `directory.json`.
@@ -59,4 +67,7 @@ The `test`, `live-check` and `release-check` skills in `.claude/skills` have the
   After changing `thermal/`, rebuild in the dev container:
   `docker exec -w /webodm/coreplugins/dji-thermal/public dt-webapp webpack-cli`.
 - Ruff: `.venv/bin/ruff check .`
-- Live checks: headless Playwright (Node) against http://localhost:8002 with a dev account from the user.
+- Live checks: headless Playwright (Node) against http://localhost:8002 with a dev account from the user, read
+  only unless the check must write (the `live-check` skill).
+- After changing `requirements.txt`, reload the dev server (touch `dji-thermal/plugin.py`) and check the version it
+  installed in `app/media/plugins/dji-thermal/site-packages` (in `dt-webapp`).
