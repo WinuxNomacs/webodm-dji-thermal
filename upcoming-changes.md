@@ -5,6 +5,18 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - **The WebODM plan tab, usable without a command line** (the user, 2026-10-31), `plan-presets`. WebODM's task
+    options dialog (a task's Options > Edit) lists options by their ODM name, in collapsible sections, so the names
+    are right; what's missing is where to find them. Decided (the user):
+    - **The section above each option's name**, in small grey text ("Input & Preprocessing › Multispectral";
+      only the section when WebODM shows no subsections, as for Orthophoto), from WebODM 3.3.2's
+      `EditPresetDialog.jsx` (`OPTION_GROUP_MAP`) for the options the plan can suggest; a line under the heading
+      says how to reach the dialog. The same in the workset's Create task table.
+    - **Save as a WebODM preset**: a panel like Create task's, with a name (default "DJI Thermal: *dataset*") and
+      the plan's options as tickboxes (recommended ticked), plus WebODM's own Default preset's options
+      (`auto-boundary`, `dsm`; read from WebODM, not copied), ticked, so picking the preset loses nothing. Saved
+      with WebODM's presets API (`/api/presets/`). When the user already owns a preset of that name: asked, then
+      replaced (no duplicates).
   - Done: **bug, the mosaic viewer's page drawn over WebODM's menus** (found in the UX review, 2026-10-31),
     `fix-picture-viewer-classes`: the picture viewer's `.ta-viewer` rule (fixed, z-index 100000) also matched the
     mosaic viewer page's root (`ta-page ta-viewer`). The picture viewer's classes are now `ta-picture*`
