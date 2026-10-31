@@ -14,6 +14,17 @@ TASK = r'projects/(?P<project_pk>\d+)/tasks/(?P<pk>[^/.]+)'
 
 
 class Plugin(PluginBase):
+    def check_requirements(self):
+        # After WebODM installs the requirements: the old versions' metadata pip leaves (see converter)
+        super().check_requirements()
+        try:
+            removed = converter.remove_stale_metadata(self.get_python_packages_path(), self.get_path("requirements.txt"))
+        except OSError as e:
+            logger.warning("DJI Thermal: could not tidy its packages' metadata: {}".format(e))
+            return
+        if removed:
+            logger.info("DJI Thermal: removed the metadata of versions no longer pinned: {}".format(", ".join(removed)))
+
     def enable(self):
         ok, message = converter.decoder_status()
         if ok:

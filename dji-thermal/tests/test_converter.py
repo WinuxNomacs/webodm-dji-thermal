@@ -353,3 +353,44 @@ class TestRealFlight(ConvertedImagesTestCase):
                         self.assertAlmostEqual(after[tag], value, delta=1e-9, msg=tag)
                     else:
                         self.assertEqual(after[tag], value, tag)
+
+
+class TestStaleMetadata(unittest.TestCase):
+    """WebODM's pip --target leaves an upgraded package's old metadata, which the plugin removes"""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.packages = os.path.join(self.dir, "site-packages")
+        self.requirements = os.path.join(self.dir, "requirements.txt")
+        with open(self.requirements, "w") as f:
+            f.write("dji-thermal-cli==1.10.0\nnumpy==1.26.2\nPillow == 11.3.0  # WebODM's\n")
+
+    def installed(self, *names):
+        for name in names:
+            os.makedirs(os.path.join(self.packages, name))
+
+    def test_the_versions_no_longer_pinned_are_removed_beside_the_pinned_one(self):
+        self.installed("dji_thermal_cli", "dji_thermal_cli-1.9.0.dist-info", "dji_thermal_cli-1.10.0.dist-info",
+                       "pillow-11.3.0.dist-info", "PIL", "numpy-1.26.2.dist-info", "numpy-1.25.0.dist-info",
+                       "rasterio-1.0.dist-info")
+        removed = converter.remove_stale_metadata(self.packages, self.requirements)
+        self.assertEqual(sorted(removed), ["dji_thermal_cli-1.9.0.dist-info", "numpy-1.25.0.dist-info"])
+        self.assertEqual(sorted(os.listdir(self.packages)),
+                         ["PIL", "dji_thermal_cli", "dji_thermal_cli-1.10.0.dist-info", "numpy-1.26.2.dist-info",
+                          "pillow-11.3.0.dist-info", "rasterio-1.0.dist-info"])
+
+    def test_nothing_is_removed_until_the_pinned_version_is_installed(self):
+        self.installed("dji_thermal_cli-1.9.0.dist-info")
+        self.assertEqual(converter.remove_stale_metadata(self.packages, self.requirements), [])
+        self.assertEqual(os.listdir(self.packages), ["dji_thermal_cli-1.9.0.dist-info"])
+        shutil.rmtree(self.packages)
+        self.assertEqual(converter.remove_stale_metadata(self.packages, self.requirements), [])
+
+    def test_the_plugin_tidies_its_packages_after_webodm_installs_them(self):
+        plugin = get_plugin_by_name("dji-thermal", only_active=False)
+        with mock.patch.object(type(plugin).__mro__[1], "check_requirements") as install, \
+                mock.patch.object(converter, "remove_stale_metadata", return_value=[]) as tidy:
+            plugin.check_requirements()
+        install.assert_called_once()
+        tidy.assert_called_once_with(plugin.get_python_packages_path(), plugin.get_path("requirements.txt"))

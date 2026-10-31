@@ -21,8 +21,9 @@
        ground can read a degree or two apart. Here every frame uses the same ambient and reflected temperature, and
        each is shifted to match its neighbours where they overlap. Compared with the Mosaic tab: no seams or patches
        from drift; the temperatures may sit slightly higher or lower overall."
-    Open: whether the Files table starts collapsed (proposed: collapsed, its state kept per workset in the browser);
-    the Harmonized wording.
+    Decided (the user, 2026-10-31): the Files table starts collapsed (its state kept per workset in the browser),
+    and its column headers sort ascending/descending where sensible. Open: the Harmonized wording (the draft above,
+    with the user).
   - Done: **bug, the Thermal Inspector's palettes didn't match the Analyzer's** (the user, 2026-10-31),
     `inspector-dji-palettes`: the inspector listed only WebODM's colour maps. It now lists the Analyzer's list (DJI's
     palettes as "DJI *name*", then WebODM's colour maps) and draws DJI's with the plugin's own tiles (step 3b below).
@@ -638,12 +639,13 @@ Released as 1.10.0 (the user, 2026-10-31: 1.9.2, never published, folded in; pub
 which now runs CI first, see below); the plugin pins it and `converter.palette_luts` is the library's alone
 (`pin-cli-1.10.0`; Django 135 on 1.10.0, live check on HomerunObliqueII: DJI palettes and isotherms drawn).
 
-**Open** (2026-10-31): WebODM installs a plugin's requirements with `pip install -U --target`, which leaves the old
-version's `dji_thermal_cli-X.dist-info` beside the new one when the pin changes; the library reads its version from
-that metadata, so after an upgrade `dji-thermal-cli 1.9.0` would still be named in converted TIFFs' Software tag,
-the reports and the SDK page (the code itself is the new one). Seen on the dev server, fixed there by removing the
-stale folder. Proposed: the plugin removes `dji_thermal_cli-*.dist-info` folders other than the pinned version's in
-its own site-packages when it loads (or the CLI reads its version without that metadata); for the user to decide.
+**Fixed** (2026-10-31, the user agreed to the plugin doing it): WebODM installs a plugin's requirements with `pip
+install -U --target`, which leaves the old version's `dji_thermal_cli-X.dist-info` beside the new one when the pin
+changes; the library reads its version from that metadata, so after an upgrade the old version would be named in
+converted TIFFs' Software tag, the reports and the SDK page. `Plugin.check_requirements` now calls
+`converter.remove_stale_metadata` after WebODM's install: in its own site-packages, the metadata of any package
+`requirements.txt` pins at another version, once the pinned version is installed (`stale-package-metadata`; tests in
+`test_converter.py`, `TestStaleMetadata`; on the dev server a planted 1.9.0 folder was removed on reload).
 
 **Tests**: the Jest tests ported (rewritten without Enzyme, which this repo doesn't have), Django tests of the
 endpoints on the flight's orthophoto (`DT_FLIGHT_DIR`), the CLI's own tests for its function; live checks on
