@@ -245,8 +245,10 @@ superusers only), shows which of the two is in use and changes it:
 
 - **Upload** the [DJI Thermal SDK](https://www.dji.com/downloads/softwares/dji-thermal-sdk) zip as DJI's site gives
   it (version 1.8; another version is refused). The plugin keeps only the libraries for the server (Linux x64 in
-  WebODM's Docker install), DJI's `License.txt` and one sample image per camera, and checks the SDK measures those
-  samples before using it. DJI's license terms apply to the SDK; the plugin does not include it.
+  WebODM's Docker install, Windows x64 in its native Windows install), DJI's `License.txt` and one sample image per
+  camera, and checks the SDK measures those samples before using it. DJI's license terms apply to the SDK; the
+  plugin does not include it. DJI builds the SDK for x64 and x86 processors only: on an ARM server, such as WebODM
+  in Docker on an Apple Silicon Mac, the page says so and the built-in port is used.
 - **Update** replaces it with a newer zip, **Check** measures the samples again, **Remove** goes back to the
   built-in port.
 - **At deployment**, `DJI_THERMAL_SDK_DIR` on WebODM's webapp container can name a folder for the SDK (an

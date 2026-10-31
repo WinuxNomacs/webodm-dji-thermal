@@ -190,11 +190,12 @@ def build(task, cid, write_progress):
 
     write_progress(0, now=True)
     kind_dirs = {kind: os.path.join(out_dir, MOSAICS_DIR, kind) for kind, _ in KINDS}
-    # The harmonized mosaic, and the as converted one from the same layout (aligned once). In a Celery worker, whose
-    # processes cannot start processes, dji-thermal-cli reads the frames in this process
+    # The harmonized mosaic, and the as converted one from the same layout (aligned once). jobs=1: dji-thermal-cli
+    # reads the frames in this process. On Linux a Celery worker's processes cannot start processes of their own; on
+    # Windows they can, but a process started there doesn't have the plugin's site-packages and fails to import it.
     harmonized = dtc.make_mosaic(root, kind_dirs['harmonized'], settings,
                                  dtc.MosaicOptions(max_pitch=max_pitch, normalize=True, units=(unit,)),
-                                 compression=args['compression'], progress=progress,
+                                 compression=args['compression'], jobs=1, progress=progress,
                                  as_converted_dir=kind_dirs['as_converted'])
     reports = {'as_converted': harmonized.as_converted, 'harmonized': harmonized}
     kinds, frames = {}, []

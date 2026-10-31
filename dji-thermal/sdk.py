@@ -12,6 +12,7 @@ replaces the SDK in place.
 import datetime
 import json
 import os
+import platform
 import shutil
 import tempfile
 import zipfile
@@ -27,6 +28,9 @@ DATASET_PREFIX = 'dataset/'
 MAX_EXTRACTED_BYTES = 512 * 1024 * 1024
 STAGING_PREFIX = '.staging-'
 OLD_PREFIX = '.old-'
+# The processors DJI's libraries are built for (x64 and x86): none for ARM, which an Apple Silicon Mac's Docker runs
+# WebODM on
+SDK_MACHINES = ('x86_64', 'amd64', 'x86', 'i386', 'i686')
 
 
 class SdkError(ValueError):
@@ -90,9 +94,19 @@ def samples(folder):
     return sorted(os.path.join(d, n) for n in os.listdir(d) if n.lower().endswith(('.jpg', '.jpeg')))
 
 
+def unsupported_machine():
+    """Why DJI's SDK can't run on this server's processor, or ''"""
+    machine = platform.machine()
+    if machine.lower() in SDK_MACHINES:
+        return ''
+    return ("DJI's Thermal SDK has no libraries for this server's processor ({}), only for x64 and x86: temperatures "
+            "come from the built-in port, which gives the same results").format(machine or "unknown")
+
+
 def status():
     """What the plugin's page shows: {'source': 'builtin', 'deployment' or 'upload', 'folder', 'info' (from the
-    install: version, revisions, zip, when, by whom), 'problem', 'deploy_dir', 'writable'}"""
+    install: version, revisions, zip, when, by whom), 'problem', 'deploy_dir', 'writable', 'unsupported' (see
+    unsupported_machine)}"""
     from .converter import library
     dtc = library()
     result = {'source': 'builtin', 'folder': None, 'info': {}, 'problem': '', 'deploy_dir': deploy_dir(),
@@ -107,6 +121,7 @@ def status():
     target = target_dir()
     probe = target if os.path.isdir(target) else os.path.dirname(target)
     result['writable'] = os.access(probe, os.W_OK)
+    result['unsupported'] = unsupported_machine()
     return result
 
 
@@ -142,6 +157,8 @@ def _members(names):
     one folder around everything.
     :raises SdkError: not DJI's SDK, or no libraries for this system
     """
+    if unsupported_machine():
+        raise SdkError(unsupported_machine())
     lib_names = [n for n in names if LIB_PREFIX in n]
     if not lib_names:
         raise SdkError("This is not DJI's Thermal SDK: the zip has no {}".format(LIB_PREFIX))
