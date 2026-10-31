@@ -36,6 +36,12 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
   attaches the zip to the GitHub release and adds `{url, sha256}` to WebODM-Plugins' `directory.json`.
 - **`README.md` is the plugin's public page**: every feature change updates it on the same branch (what the
   plugin does, installing, using it, the outside services it calls).
+- **`docs/` is the plugin's documentation** (Markdown, served by GitHub Pages from `main` `/docs` once the repo is
+  public): quickstarts with screenshots, guides, reference. A change to what a user sees updates the page that
+  describes it and retakes its screenshots on the same branch (the `docs` skill). The screenshots
+  (`docs/images/*.png`, made by `dev/screenshots.js`) are the only images the repo takes: they never show where a
+  flight was (no coordinates, addresses or basemap), nor a camera's serial number, and each is looked at before
+  it is committed.
 - Planned in `upcoming-changes.md`; new requests arrive in `new.md` (untracked).
 
 ## Dev environment
@@ -57,11 +63,11 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
 
 ## Tests and checks
 
-The `test`, `live-check` and `release-check` skills in `.claude/skills` have the steps.
+The `test`, `live-check`, `release-check` and `docs` skills in `.claude/skills` have the steps.
 
 - Django: `docker exec -w /webodm dt-webapp python manage.py test --noinput coreplugins.dji-thermal.tests.test_converter coreplugins.dji-thermal.tests.test_api coreplugins.dji-thermal.tests.test_sdk coreplugins.dji-thermal.tests.test_analyzer coreplugins.dji-thermal.tests.test_inspector coreplugins.dji-thermal.tests.test_portable`. The tests'
   images come from `DT_SAMPLES_DIR` and `DT_FLIGHT_DIR`, DJI's SDK zip from `DT_SDK_ZIP` (`.env`, untracked);
-  never commit an image or DJI's files. Each run installs `requirements.txt` afresh in WebODM's test media
+  never commit an image (but the docs' screenshots) or DJI's files. Each run installs `requirements.txt` afresh in WebODM's test media
   folder, so the tests use the pinned dji-thermal-cli. One run
   at a time: every run uses the same test database.
 - Jest: `npm test` at the repo root (jsdom, babel-jest; Babel's settings in `package.json`). ESLint: `npm run lint

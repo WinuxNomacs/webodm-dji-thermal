@@ -209,9 +209,9 @@
 - **UX review** (the user, 2026-10-31, from `new.md`: "how would you make this ui more intuitive?"; details under
   "Done: UX review" below): a review of every page and control the plugin adds, proposals for the user to choose
   from, then the chosen ones built. Done: the review, all 13 proposals in six steps, and a bug it found.
-- **Documentation** (the user, 2026-10-31, from `new.md`; details under "Then: Documentation" below): the docs
-  hosted from this GitHub repo, planned, with quickstart tutorials and screenshots, kept current with every feature
-  change. After the UX review, so the screenshots show the reviewed UI.
+- **Documentation** (the user, 2026-10-31, from `new.md`; details under "Done: Documentation" below): the docs
+  hosted from this GitHub repo, with quickstart tutorials and screenshots, kept current with every feature change.
+  Done; GitHub Pages is turned on by the user once the repo is public.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -734,7 +734,7 @@ of 327 fitted (186%), zoom in, 1:1, the wheel (the point under the mouse kept), 
 disabled at the first, the selection following), Esc and a click beside the picture closing it; a 4032x3024 photo of
 the M4T flight served to the browser only (fitted at 32%, refitted when the window shrank).
 
-## Then: Documentation
+## Done: Documentation
 
 **The request** (the user, 2026-10-31): "Plan to setup the github repo to host the documentation." and "Plan out
 the documentation. We'll also want to provide quickstart tutorials with screenshots and then maintain the
@@ -776,6 +776,21 @@ anyway for the release: WebODM downloads the zip from the URL in WebODM-Plugins'
   the orthophoto), so their shots turn the basemap off (decided by Claude, the user leaving it open: the safe
   reading). Shots without a flight's image (the DJI Thermal page, empty forms) need nothing blanked.
 - GitHub Pages (`main` `/docs`) once the repo is public.
+
+**Done** (2026-10-31, `docs`):
+- `docs/`: `index.md`; quickstarts `quickstart-thermal-task.md`, `quickstart-analyzer.md`, `quickstart-worksets.md`,
+  `quickstart-inspector.md`; guides `installing.md`, `measurement.md`, `palettes.md`, `dji-sdk.md`; reference
+  `converted-images.md`, `troubleshooting.md`, `api.md`; `_config.yml` for Pages (Jekyll, primer theme). Plain
+  Markdown that reads on github.com too (no definition lists).
+- `dev/screenshots.js` (16 shots in `docs/images`, 2.6 MB), read only on the dev WebODM: GETs, the login, `describe`
+  and an Inspector region's statistics only; every request beyond WebODM aborted (no basemap); the detail pane's
+  latitude and longitude and the camera's serial number (also not for publishing, decided by Claude) hidden; a page
+  showing a number with 5+ decimals refused. Every shot looked at. Settings from `.env` or the environment.
+- The `docs` skill; CLAUDE.md: the docs rule (a change a user sees updates its page and screenshots) and the image
+  exception for `docs/images`; README links the docs. Found on the way: README's Installing still said a release
+  zip needs WebODM's webpack and that only Docker was checked; corrected.
+- Left for the user: GitHub Pages (Settings > Pages, `main` `/docs`) once the repo is public; the site will be
+  https://winuxnomacs.github.io/webodm-dji-thermal/.
 
 ## Done: UX review
 
