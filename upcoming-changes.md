@@ -564,19 +564,35 @@ JavaScript everywhere: no platform tests. What differs, found by reading the cod
   Windows the plugin fails to import** (no `fcntl`), so nothing of it works. Needs a lock that works on Windows
   (`msvcrt.locking`) with `fcntl` kept on Linux and macOS.
 - `converter.exiftool_command` runs `exiftool` to copy the R-JPEG's metadata into the TIFF; WebODM's Docker image
-  installs it, a native install may not have it. To find out what the native installers ship; if not there, the
+  installs it (on every system, the user confirmed), a native install may not have it. To find out what the native installers ship; if not there, the
   plugin needs another way (dji-thermal-cli writes its TIFFs' EXIF/XMP itself, `tiffout`), or says so on the SDK
   page.
 - DJI's own SDK (`sdk.py`): its zip has Linux and Windows libraries, none for macOS; dji-thermal-cli picks the
-  folder (`native.bindings.platform_dirs`). On macOS the SDK page should say it can't be used there (the built-in
-  port is used, as without it).
+  folder (`native.bindings.platform_dirs`). On macOS the SDK page says there is no known DJI SDK for macOS (the
+  built-in port is used, as without it): agreed by the user, 2026-10-31.
 - Paths: zip members and stored paths use `/`, files are read with `os.path`; `os.replace` over a file another
   process has open fails on Windows (thumbnail cache, SDK install, records). To check where it can happen.
 - dji-thermal-cli is pure Python and tested on all three systems by its own release workflow.
+- **The React parts** (`public/thermal/*.jsx`: the Thermal Task button and dialog) are built by WebODM's webpack
+  when the plugin loads (`app/plugins/functions.build_plugins`), skipped when `public/build` exists. WebODM-Plugins'
+  guidance says webpack is not available on native installs; then the log says "webpack-cli is not installed, plugin
+  will not work" and the Thermal Task button is missing. The release zip has no `public/build` (`dev/package.sh`
+  takes committed files only). Either the zip ships the built files (built against WebODM's version, so rebuilt for
+  each release), or those parts move to plain JavaScript like the rest of `public/`.
+
+**What WebODM says** (read 2026-10-31): the plugin guide and WebODM-Plugins' guidance say nothing about supporting
+several systems; the only platform notes are the dev setup (native Windows when no JSX is needed, otherwise Docker)
+and that webpack is missing on native installs. WebODM's own loader handles Windows (`npm.cmd`, `webpack-cli.cmd`),
+and its docs recommend the native installers on Windows and macOS, so a directory plugin reaches all three. The
+guidance asks for responsive UI ("work on mobile as well as desktop"); WebODM itself sets a mobile viewport and uses
+Bootstrap 3 (the menu folds under 768px), with small-screen rules in a few of its own views (task list, edit form,
+paginator, 3D view). The user (2026-10-31): no phone-width work unless WebODM supports mobile, and then to know how
+far; so the plugin keeps to what Bootstrap gives (nothing breaks or overflows under 768px), with no phone-specific
+layouts, and the UX review checks desktop only.
 
 **Proposed steps**:
 1. **The code made portable** (Linux tests as now): the lock, exiftool's absence handled, the SDK page on macOS, the
-   `os.replace` cases. Each OS branch small and in one place, so Linux runs cover the rest.
+   `os.replace` cases, the React parts working without webpack. Each OS branch small and in one place, so Linux runs cover the rest.
 2. **Windows checks from this machine**: the tests of what differs on Windows (the lock, exiftool's absence, the
    SDK's Windows libraries and the `os.replace` cases) run with Windows' Python through WSL, outside WebODM; and,
    if a native Windows WebODM can be installed here, the plugin installed in it as a user would, with a Thermal Task
@@ -592,6 +608,8 @@ JavaScript everywhere: no platform tests. What differs, found by reading the cod
   sold on webodm.org), or whether step 2 stays with the Windows Python checks only.
 - Whether exiftool-less native installs get the CLI's own metadata writing (preferred, if it keeps every tag ODM
   reads) or a message.
+- For the React parts on native installs: ship the built files in the zip, or rewrite them in plain JavaScript
+  (proposed: plain JavaScript, so nothing depends on the WebODM version the files were built against).
 
 ## Then: UX review
 
@@ -604,7 +622,7 @@ on the map, the DJI Thermal page under Administration.
 
 **Proposed**:
 1. **Review**: each page walked through in a browser on the user's data, as a first-time user with a flight to
-   process would (upload, analyze, convert, process, inspect), at desktop and phone widths; what is unclear, hidden,
+   process would (upload, analyze, convert, process, inspect), at desktop width (the user: no phone layouts); what is unclear, hidden,
    inconsistent with WebODM or the other pages, or takes more steps than needed. Written up as ranked proposals,
    each with what changes and why, screenshots and mockups, sorted into quick fixes and larger changes.
 2. **The user chooses** which to build; the chosen ones become steps here, each on its branch, tested and checked
