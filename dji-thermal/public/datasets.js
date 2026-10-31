@@ -33,12 +33,12 @@
         return '<span class="' + cls + '"' + (d.error ? ' title="' + core.escapeHtml(d.error) + '"' : "") + ">" + label + "</span>";
     }
 
-    // Ready of all its conversions, as 2/3
+    // Its worksets: their number when all are ready, else "1 of 3 ready"
     function conversionsCell(d) {
         if (!d.conversion_count) return "";
         var ready = d.conversions_ready || 0;
-        return '<span class="' + (ready === d.conversion_count ? "text-success" : "") + '" title="' + core.count(ready, "workset", "worksets") +
-            " ready of " + d.conversion_count + '">' + ready + "/" + d.conversion_count + "</span>";
+        return ready === d.conversion_count ? '<span class="text-success" title="' + core.count(ready, "workset", "worksets") + ', all ready">' + ready + "</span>" :
+            "<span>" + ready + " of " + d.conversion_count + " ready</span>";
     }
 
     // What each column sorts by; null (nothing to sort by, as before an analysis) goes last either way
@@ -160,7 +160,8 @@
             });
             if (!shown.length) {
                 table.hidden = true;
-                message.textContent = !datasets.length ? "No datasets yet. Use New Dataset to analyze a flight's thermal images." :
+                message.textContent = !datasets.length ? "No datasets yet. Use New Dataset to check a flight's thermal photos; for a task straight away, " +
+                    "use Thermal Task on a project on the Dashboard." :
                     search.value.trim() ? "No datasets match the search." : "No datasets in this project.";
             } else {
                 message.textContent = "";
@@ -290,7 +291,7 @@
             $("ta-new-name").value = "";
             $("ta-new-files").value = "";
             $("ta-new-dir").value = "";
-            $("ta-new-chosen").textContent = "The R-JPEGs of a flight (the _T.JPG files). Visible images can be included: they are listed, not analyzed.";
+            $("ta-new-chosen").textContent = "The DJI thermal photos of a flight (the _T.JPG files). Visible photos can be included: they are listed, not analyzed.";
             $("ta-new-progress").hidden = true;
             if (filter.value && projects.some(function (p) { return String(p.id) === filter.value; })) $("ta-new-project").value = filter.value;
             setError("");

@@ -448,7 +448,7 @@ describe("datasets list", () => {
         expect(names()).toEqual(["Yard", "Roof"]);
         const created = document.querySelector("th[data-sort=created]");
         expect(created.getAttribute("aria-sort")).toBe("descending");
-        expect(document.querySelector("#ta-body tr").textContent).toContain("1/2");
+        expect(document.querySelector("#ta-body tr").textContent).toContain("1 of 2 ready");
 
         const name = document.querySelector("th[data-sort=name]");
         click(name);

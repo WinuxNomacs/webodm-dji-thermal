@@ -62,7 +62,7 @@ OpenStreetMap's Nominatim; the Thermal Task does not, as the plugin calls no out
 ## The Thermal Analyzer
 
 **Thermal Analyzer**, in WebODM's menu, lists the thermal datasets of every project you can view, with their
-analysis and worksets at a glance.
+analysis and worksets at a glance (how many worksets, or how many of them are ready while some are not).
 
 **Preferences** (the gear beside the Thermal Analyzer's heading):
 
