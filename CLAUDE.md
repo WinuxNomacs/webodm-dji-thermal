@@ -15,9 +15,10 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
   plugin's `requirements.txt` with `pip install -U --target`, dependencies included, so it pins numpy and Pillow
   to WebODM's own versions. It does so when it loads the plugin and the file's md5 changed; pip leaves an old
   version's `.dist-info` behind, which `Plugin.check_requirements` removes.
-- **Linux, Windows and macOS**: WebODM runs in Docker (the plugin's Python in its Linux container) or from its
-  native installers (the plugin's Python on Windows or macOS). No POSIX-only module at import time, no tool only
-  WebODM's Docker image has (exiftool) without a fallback; Mac checks only for what differs on macOS (plan:
+- **Linux, Windows and macOS**: WebODM runs in Docker on all three (the plugin's Python in its Linux container; the
+  macOS installer is a manager for Docker) or from its native Windows installer (the plugin's Python on Windows,
+  with no node, npm or webpack). So: no POSIX-only module at import time, no outside tool (exiftool: dji-thermal-cli
+  writes the TIFFs' metadata), no JSX built by webpack (plain JavaScript in `public/`), and no Mac runs (plan:
   "Up next: Linux, Windows and macOS").
 - **Temperatures come from [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/)** (pure Python, AGPL),
   a separate package; a change it needs is made and released there first (its `RELEASING.md`: a `release/X.Y.Z`

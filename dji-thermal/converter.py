@@ -15,8 +15,8 @@ import math
 import os
 import re
 import shutil
-import subprocess
 import sys
+import tempfile
 from contextlib import contextmanager
 
 from PIL import Image
@@ -24,14 +24,6 @@ from PIL import Image
 logger = logging.getLogger('app.logger')
 
 PLUGIN_NAME = 'dji-thermal'
-
-# ODM decides that an image is thermal from its XMP tag Camera:BandName being "LWIR" (opendm/photo.py)
-THERMAL_BAND_NAME = 'LWIR'
-
-# exiftool does not know the XMP "Camera" namespace and cannot write a tag it does not define: this config
-# file defines it
-EXIFTOOL_CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'exiftool_camera.config')
-EXIFTOOL_TIMEOUT = 60
 
 JPEG_EXTENSIONS = ('.jpg', '.jpeg')
 
@@ -44,11 +36,6 @@ UNITS = ('C', 'F', 'K')
 # The library's measurement parameter names (in a Measurement's .params, and describe()) to the Settings fields
 PARAM_FIELDS = {'distance': 'distance', 'humidity': 'humidity', 'emissivity': 'emissivity',
                 'reflection': 'reflected_temp', 'ambient_temp': 'ambient_temp'}
-
-# The XMP tags (namespace dtc, see exiftool_camera.config) for the parameters a temperature image was measured
-# with, as dji-thermal-cli's own outputs name them
-MEASUREMENT_TAGS = {'distance': 'Distance', 'humidity': 'Humidity', 'emissivity': 'Emissivity',
-                    'reflection': 'ReflectedTemperatureC', 'ambient_temp': 'AmbientTemperatureC'}
 
 
 def site_packages_path():
@@ -228,85 +215,30 @@ def describe(path):
             'ranges': {PARAM_FIELDS[key]: list(ranges[key]) for key in used}}
 
 
-def measurement_tags(measurement, native=False):
-    """
-    The XMP tags (name: value) recording how measurement was made, as dji-thermal-cli's own outputs do.
-    :param native: measured with DJI's own SDK, not the built-in port
-    """
-    dtc = library()
-    software = 'dji-thermal-cli {}'.format(dtc.__version__)
-    if native:
-        software += " with DJI's Thermal SDK {}".format(dtc.native.SDK_VERSION)
-    tags = {'Software': software}
-    for key, name in MEASUREMENT_TAGS.items():
-        if measurement.params.get(key) is not None:
-            tags[name] = '{:.4f}'.format(float(measurement.params[key])).rstrip('0').rstrip('.')
-    tags['DistanceSource'] = measurement.distance_source
-    return tags
-
-
-def exiftool_command(source_path, dest_path, dtc_tags=None):
-    """
-    The exiftool command that gives the converted file (dest_path) the metadata of its R-JPEG (source_path),
-    marks it as thermal and adds dtc_tags (name: value, see measurement_tags). Of DJI's XMP tags, exiftool copies
-    those it can write, which include all ODM and OpenSfM read (position, altitudes, camera and gimbal angles, RTK
-    accuracy); the rest (ImageSource, the rangefinder's) are left out.
-    """
-    return ([shutil.which('exiftool') or 'exiftool',
-             '-config', EXIFTOOL_CONFIG_FILE,
-             '-TagsFromFile', source_path, '-all:all>all:all',
-             '-XMP-Camera:BandName={}'.format(THERMAL_BAND_NAME)]
-            + ['-XMP-dtc:{}={}'.format(name, value) for name, value in (dtc_tags or {}).items()]
-            + ['-overwrite_original', dest_path])
-
-
-def copy_metadata(source_path, dest_path, dtc_tags=None):
-    """
-    Copies the metadata of source_path onto dest_path and marks it as thermal (see exiftool_command).
-    :return: '' if it was all written, or why not
-    """
-    if not shutil.which('exiftool'):
-        return "exiftool not found"
-
-    try:
-        result = subprocess.run(exiftool_command(source_path, dest_path, dtc_tags), check=False, capture_output=True,
-                                text=True, timeout=EXIFTOOL_TIMEOUT)
-    except Exception as e:  # noqa: BLE001 - reported as the metadata not written
-        return "exiftool did not run: {}".format(str(e))
-
-    # exiftool reports "1 image files updated" even when it could not write a tag: look at what it said
-    output = (result.stdout or '') + (result.stderr or '')
-    problems = [line for line in output.splitlines()
-                if line.startswith('Error') or 'Sorry' in line or "Can't find table" in line
-                or 'is not defined' in line]
-    if result.returncode != 0 or problems:
-        return "; ".join(problems) or "exiftool exit code {}".format(result.returncode)
-    return ''
-
-
 def convert(source_path, dest_path, measurement_settings=None):
     """
     Writes the temperature TIFF of the R-JPEG source_path to dest_path, measured with measurement_settings (see
     measure); source_path is left as it is. dest_path appears only once it is complete, with its metadata.
+    dji-thermal-cli writes it (process, its temp_c TIFF): the R-JPEG's EXIF kept as it is (GPS, camera, maker
+    notes), its XMP with Camera:BandName = LWIR added (ODM treats the image as thermal from it, opendm/photo.py)
+    and the measurement recorded (namespace dtc). Uncompressed, the simplest TIFF for every reader.
     :return: '' if converted, or why not (the file is not a DJI thermal image, or failed to convert)
     """
     if not is_thermal_rjpeg(source_path):
         return "not a DJI thermal image"
 
-    part_path = dest_path + '.part'
+    # Written in a folder beside dest_path, then moved into place
+    work = tempfile.mkdtemp(prefix='.dji-thermal-', dir=os.path.dirname(os.path.abspath(dest_path)))
     try:
-        # A float32 array is one band of mode F (32-bit floating point) pixels
-        measurement_settings = measurement_settings or settings()
-        measurement = measure(source_path, measurement_settings)
-        Image.fromarray(measurement.temperature).save(part_path, format='TIFF')
-        problem = copy_metadata(source_path, part_path,
-                                measurement_tags(measurement, native=measurement_settings.sdk is not None))
-        if problem:
-            raise RuntimeError("the metadata could not be written: {}".format(problem))
-        os.replace(part_path, dest_path)
+        report = library().process(source_path, work, measurement_settings or settings(),
+                                   outputs=('temp_c:tiff',), compression='none', jobs=1)
+        result = report.results[0] if report.results else None
+        if result is None or not result.ok or not result.outputs:
+            raise RuntimeError(result.reason if result else "not converted")
+        os.replace(str(result.outputs[0]), dest_path)
     except Exception as e:  # noqa: BLE001 - one bad file must never stop an upload
         logger.warning("DJI thermal conversion failed for {}: {}".format(source_path, str(e)))
-        if os.path.exists(part_path):
-            os.remove(part_path)
         return str(e) or type(e).__name__
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
     return ''

@@ -620,6 +620,9 @@ layouts, and the UX review checks desktop only.
 3. **macOS**: no Mac runs (Docker, as on Linux). Apple Silicon checked from WebODM's image manifest, if possible
    without a Mac.
 
+**Progress**: the converter on `process()`, exiftool and `exiftool_camera.config` gone (2026-10-31,
+`converter-without-exiftool`; `test_converter`, `test_sdk`).
+
 **Decided** (the user, 2026-10-31): the plugin supports Docker (all three systems), the native Windows installer and
 the macOS installer (Docker); the React parts are rewritten in plain JavaScript; a native Windows WebODM is used for
 the checks.
