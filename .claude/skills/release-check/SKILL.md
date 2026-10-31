@@ -35,5 +35,12 @@ and committed.
    with the mounted copy), move `.dji-thermal-mounted` back to `dji-thermal`, then `dev/webodm.sh up -d
    --force-recreate webapp worker` without `DT_PLUGIN_DIR` to mount `dji-thermal/` again.
 
+7. **Native Windows** (WebODM's Windows installer runs the plugin's Python on Windows, without webpack): in a native
+   Windows WebODM (the machine's details are in memory), the same zip installed through Administration > Plugins,
+   and step 5's checks run there (the Thermal Task processed, the Analyzer's dataset converted with mosaics and the
+   viewer). The app logs in by itself and answers only on Windows' own 127.0.0.1, so a check from WSL goes through a
+   reverse tunnel (a Python script on Windows connecting out to WSL); stop it afterwards, and remove the plugin and
+   the project the check made.
+
 Then merge the release branch into `main` and tell the user: the zip and its sha256, the tag to make
 (`vX.Y.Z`), where to attach the zip (the GitHub release), and the `directory.json` entry for WebODM-Plugins.
