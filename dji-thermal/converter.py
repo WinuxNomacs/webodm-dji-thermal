@@ -21,6 +21,8 @@ from contextlib import contextmanager
 
 from PIL import Image
 
+from . import portable
+
 logger = logging.getLogger('app.logger')
 
 PLUGIN_NAME = 'dji-thermal'
@@ -235,7 +237,7 @@ def convert(source_path, dest_path, measurement_settings=None):
         result = report.results[0] if report.results else None
         if result is None or not result.ok or not result.outputs:
             raise RuntimeError(result.reason if result else "not converted")
-        os.replace(str(result.outputs[0]), dest_path)
+        portable.replace(str(result.outputs[0]), dest_path)
     except Exception as e:  # noqa: BLE001 - one bad file must never stop an upload
         logger.warning("DJI thermal conversion failed for {}: {}".format(source_path, str(e)))
         return str(e) or type(e).__name__
