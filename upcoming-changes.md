@@ -200,6 +200,9 @@
   Windows checked from this machine (WSL with Windows at hand); macOS's installer runs WebODM in Docker, so no Mac
   runs. Before 1.0.0: on a native Windows WebODM the plugin would not load today (`datasets.py` imports `fcntl`, and
   the React parts need webpack, which native installs lack).
+- **Picture viewer in the Files view** (the user, 2026-10-31, from `new.md`; details under "Up next: Picture
+  viewer" below): clicking the picture in the Files view's detail pane opens it in a window on the page, with a
+  close button and basic controls, instead of a new tab. Small, after the platform phase.
 - **UX review** (the user, 2026-10-31, from `new.md`: "how would you make this ui more intuitive?"; details under
   "Then: UX review" below): a review of every page and control the plugin adds, proposals for the user to choose
   from, then the chosen ones built.
@@ -664,6 +667,31 @@ CLI writes it (no CLI change); the Windows checks use the install in `C:\WebODM`
 to 3.3.2.
 
 **Open**: none.
+
+## Up next: Picture viewer
+
+**The request** (the user, 2026-10-31): "On the Files view, when the user clicks the image in the detail pane to
+view the full image; pop open an inscreen window with a close button and basic image controls instead of opening
+in a new tab/window"
+
+**Builds on**: the Files view's detail pane (a dataset's page, Files tab: `dataset.js` `detailHtml`). Its picture
+is a link, opened in a new tab, to `thumbnail?size=large`: a thermal frame drawn in the user's DJI palette at its
+own size (640x512 on the M4T), a photo as a JPEG of at most 1280x1280. The original file is at `files?file=`
+(Download gives it).
+
+**Proposed**: a viewer drawn over the page (plain JavaScript and CSS in the Analyzer's pages, WebODM's theme
+colours, no library), opened by clicking the picture:
+- the picture fitted to the window, with zoom in, zoom out, fit and 100% buttons, the mouse wheel zooming where
+  it points, dragging to pan;
+- the file's name, previous and next (the table's order, as the pane's selection uses), and Download (the
+  original);
+- closed by its close button, Escape or a click outside the picture; the arrow keys go to the previous and next.
+- Jest for the zoom and the order; checked live on the user's data.
+
+**Open** (for the user):
+- What the viewer shows for a photo (RGB): the original file at full size (proposed; a 20 MP JPEG takes a moment
+  to load), or the 1280-pixel copy. For a thermal frame, the palette picture (as the pane shows it).
+- Previous and next in the viewer (proposed), or one picture only.
 
 ## Then: Documentation
 
