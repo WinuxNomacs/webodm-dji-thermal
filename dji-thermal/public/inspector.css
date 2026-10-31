@@ -1,0 +1,27 @@
+/* The Thermal Inspector on WebODM's 2D map (inspector.js) */
+.dt-inspector .dt-inspector-button { font-size: 16px; }
+.dt-inspector.open .dt-inspector-button { background-color: #f4f4f4; color: #d9534f; }
+.dt-inspector-panel {
+    position: absolute; right: 36px; top: 0; width: 280px; max-height: 70vh; overflow-y: auto;
+    padding: 8px 10px; background: #fff; border-radius: 4px; box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+    font-size: 13px; line-height: 1.4; cursor: default;
+}
+.dt-inspector-panel[hidden] { display: none; }
+.dt-inspector-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.dt-inspector .dt-inspector-head a.dt-inspector-close { width: auto; height: auto; line-height: 1; border: 0; background: none; }
+.dt-inspector-modes { margin-bottom: 6px; }
+.dt-inspector .dt-inspector-panel a { display: inline; width: auto; height: auto; line-height: inherit; border: 0;
+    background: none; text-align: left; }
+.dt-inspector-readout { min-height: 22px; margin-bottom: 6px; }
+.dt-inspector-temp { font-size: 16px; font-weight: bold; }
+.dt-inspector-label { display: block; font-weight: normal; margin-bottom: 6px; }
+.dt-inspector-section { border-top: 1px solid #ddd; padding-top: 6px; }
+.dt-inspector-pins { margin: 4px 0; }
+.dt-inspector-pins td { padding: 2px 4px !important; vertical-align: middle !important; }
+.dt-inspector-hint { font-size: 12px; margin-top: 2px; }
+.dt-inspector-actions { margin-top: 2px; }
+.dt-inspector-cursor {
+    position: absolute; z-index: 1000; pointer-events: none; padding: 1px 5px; border-radius: 3px;
+    background: rgba(0, 0, 0, 0.75); color: #fff; font-size: 12px; white-space: nowrap;
+}
+.leaflet-tooltip.dt-inspector-tip { padding: 1px 4px; font-size: 11px; }

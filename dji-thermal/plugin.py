@@ -3,13 +3,14 @@ from django.utils.translation import gettext_lazy as _
 
 from app.plugins import Menu, MountPoint, PluginBase, logger, signals
 
-from . import analyzer_api, converter, datasets
+from . import analyzer_api, converter, datasets, inspector_api
 from .analyzer_pages import dataset_page, datasets_page, viewer_page
 from .api import Describe, TaskConvert
 from .page import sdk_page
 
 DATASET = r'datasets/(?P<pk>[0-9a-f-]{36})'
 CONVERSION = DATASET + r'/conversions/(?P<cid>[0-9a-f]{12})'
+TASK = r'projects/(?P<project_pk>\d+)/tasks/(?P<pk>[^/.]+)'
 
 
 class Plugin(PluginBase):
@@ -35,7 +36,7 @@ class Plugin(PluginBase):
         ]
 
     def include_js_files(self):
-        return ['main.js']
+        return ['main.js', 'inspector.js']
 
     def build_jsx_components(self):
         # Leaflet: WebODM's own, for the mosaic viewer (see thermal/Leaflet.js)
@@ -44,6 +45,8 @@ class Plugin(PluginBase):
     def api_mount_points(self):
         return [
             MountPoint('describe$', Describe.as_view()),
+            MountPoint(TASK + '/inspector/point$', inspector_api.InspectorPoint.as_view()),
+            MountPoint(TASK + '/inspector/region$', inspector_api.InspectorRegion.as_view()),
             MountPoint(r'projects/(?P<project_pk>\d+)/tasks/(?P<pk>[^/.]+)/convert$', TaskConvert.as_view()),
             MountPoint('datasets$', analyzer_api.DatasetListCreate.as_view()),
             MountPoint(DATASET + '$', analyzer_api.DatasetDetail.as_view()),

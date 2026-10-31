@@ -529,7 +529,8 @@ WebODM 3.3.2 lacks: the `point` and `region-stats` endpoints, the highlight colo
   there, and the plugin pins that version (rather than reading the CLI's internal `tsdk.tables`).
 
 **Steps** (each on its own branch, tested and merged):
-1. **dji-thermal-cli**: a public function giving DJI's palettes without a frame ({name: 256 RGB colours}, the iirp
+1. **dji-thermal-cli** (merged in its `main` 2026-10-30, `palette-luts`, as `palette_luts()`, with a test against a
+   flight frame; its release waits: see below): a public function giving DJI's palettes without a frame ({name: 256 RGB colours}, the iirp
    tables its palettes come from), tests, a `release/X.Y.0` branch (a minor version). The user pushes and tags;
    once it is on PyPI the plugin pins it, and the Analyzer's palettes can come from it too (no longer only from a
    workset's frames).
@@ -548,10 +549,26 @@ WebODM 3.3.2 lacks: the `point` and `region-stats` endpoints, the highlight colo
    user can view (the orthophoto's value at a point; its tiles drawn in any palette and range); a control through
    `willAddControls` on maps with a thermal orthophoto; the palette chosen switches the thermal layer's tiles to
    the plugin's, keeping WebODM's layer panel (opacity, range) working; pins with CSV export.
+   **Done, with WebODM's colour maps** (2026-10-30, `inspector-core`): DJI's palettes need the plugin's own tiles
+   and the CLI's `palette_luts` (step 1: merged in dji-thermal-cli's `main`, not yet released), so they follow as
+   step 3b. Built: `inspector.py` (`thermal_orthophoto`, `point`, `region`: rasterio on the orthophoto, its alpha
+   band, the task's crop; WebODM 3.3.2's rio-tiler 2.1 lacks the reader the earlier control used),
+   `inspector_api.py` (`projects/<id>/tasks/<id>/inspector/point` and `/region`, WebODM's `TaskNestedView`: viewers
+   of the task, or a public task), `public/inspector.js` (a plain script like the viewer, added by `main.js` through
+   `willAddControls` with WebODM's Leaflet; the readout, pins in `localStorage`, the palette applied to each
+   thermal layer as it is added and followed through its tile URL, so a colour map chosen in WebODM's layer panel
+   is saved too; clicks while pinning taken from WebODM's popup with `PluginsAPI.Map.onHandleClick`),
+   `public/inspector.css`. Tests: `tests/test_inspector.py` (an orthophoto they write, UTM, known values: 7),
+   `__tests__/inspector.test.js` (8) and `main.test.js`. Live check on HomerunObliqueII's task map (the preference PUT
+   intercepted): 30.41 °C under the cursor, two pins (33.77 and 50.36 °C) with no WebODM popup, jet chosen and drawn.
 4. **Region statistics**: rectangle, circle and polygon; minimum, maximum, mean, percentiles, histogram, the
    hottest and coldest pixels marked; CSV; read at native resolution up to a size limit; the task's crop respected.
 5. **Isotherms and the legend**: above, below or between limits, drawn by the plugin's tiles; the colour bar of the
    palette and range in the shared unit.
+
+**Open** (2026-10-30): dji-thermal-cli's `test_process_writes_r_jpegs_with_the_parameters_used` (flight data)
+fails on its `main` before `palette-luts` too (the R-JPEG copy's picture differs from the pseudo output by 7.2 on
+average, the test allows 4); its release checks need it passing, so it is raised with the user, not fixed here.
 
 **Tests**: the Jest tests ported (rewritten without Enzyme, which this repo doesn't have), Django tests of the
 endpoints on the flight's orthophoto (`DT_FLIGHT_DIR`), the CLI's own tests for its function; live checks on

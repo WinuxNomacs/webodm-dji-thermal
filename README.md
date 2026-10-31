@@ -9,6 +9,8 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
   is, the problems found, the WebODM options to use), converts them with every dji-thermal-cli setting (several
   worksets side by side), places the frames into mosaics shown on a map, and makes a WebODM task from the
   workset you choose.
+- **Thermal Inspector**, on WebODM's 2D map of a task with a thermal orthophoto: the temperature under the cursor,
+  pinned points, and the map's palette.
 
 Temperatures are computed with [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/), a pure-Python
 implementation of DJI's Thermal SDK: no native library and no outside service. An administrator can have DJI's own
@@ -182,6 +184,22 @@ the owner is over it); a task made from a workset counts its own images too. The
 project is deleted. Deleting the dataset deletes its task too, unless a workset was sent to it: the task is then
 kept as an ordinary WebODM task (named without "Thermal dataset:") with those images and what it processed.
 Temperatures are shown in the unit of your preferences (see above).
+
+## The Thermal Inspector
+
+On WebODM's 2D map of a task whose orthophoto holds temperatures (a single thermal band, as ODM makes from the
+Thermal Task's images or a workset's), a thermometer button opens the Thermal Inspector:
+
+- **Hover**: the temperature under the cursor, beside it and in the panel; outside the task's crop, outside the
+  orthophoto and where it has no data it says so.
+- **Pin**: a click pins the point with its temperature, labelled P1, P2…, shown on the map instead of WebODM's
+  popup. The pins are listed in the panel (click one to go to it), can be hidden and shown together, removed, and
+  downloaded as CSV (latitude, longitude, temperature). They are kept in your browser for the same tasks.
+- **Palette**: the thermal layer's colour map. It is your palette everywhere: the Analyzer's preference, saved when
+  you choose one here or in WebODM's own layer panel, and the one the map opens in.
+
+Temperatures are read from the orthophoto on the server (the plugin's own API, for those who can view the task) and
+shown in WebODM's units (°F when imperial), the same setting as the Analyzer's.
 
 ## The converted images
 
