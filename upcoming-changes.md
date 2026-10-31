@@ -872,7 +872,15 @@ goes (the docs are written once, from it); 10 needs no dji-thermal-cli release, 
    `test_analyzer` 58; live (GETs only): both worksets, the settings open, a workset shown taskless (its tasks
    removed from the page's copy of the response) with Create task beside View mosaics.
 3. Problems and the WebODM plan: 1, 11, 10 with them (`dataset.js`; the buttons reuse the form's "Use these
-   settings" path in `conversions.js`).
+   settings" path in `conversions.js`). Done, `ux-problems`: `dataset.SETTING_NAMES` turns dji-thermal-cli's options
+   into the settings' names (and "deg C" into °C) in findings and plan notes; `FINDING_FIXES` gives the plugin's own
+   advice for `*_varies`, `oblique`, `temperature_max/min_outlier`, `rangefinder_distance/_invalid/_outlier`, with a
+   button for the two one setting fixes (Normalize; frames at or below −80°: `conversions.useSettings`, the rest of
+   the form kept, the Worksets tab opened); a message's list of files and values is dropped (the values in the
+   file links' tooltips); the rangefinder note reworded; the code in the finding's tooltip; the plan's command
+   folded under "As a dji-thermal-cli command". Test changed (expected text only): `analyzer.test.js`, "shows the
+   problems with what addresses them…", "--replace-above" → "Replace temperatures above". Jest 161; live (GETs
+   only): the four findings, both buttons (Normalize ticked, then −80° with Normalize kept), the plan's notes.
 4. The dataset page's steps and empty Worksets: 3, after 2 and 3, which its links point to (`dataset.js`,
    `dataset.html`).
 5. The Thermal Task panel: 6 and its half of 4 (`thermal/ThermalTaskPanel.jsx`, one webpack rebuild; the workset

@@ -775,7 +775,7 @@ describe("a dataset's page", () => {
     it("shows the problems with what addresses them, and the WebODM plan", () => {
         const problems = dataset.problemsHtml(ANALYSIS);
         expect(problems).toContain("alert-warning");
-        expect(problems).toContain("--replace-above");
+        expect(problems).toContain("Replace temperatures above");
         expect(problems).toContain("<code>thermal/b_T.JPG</code>");
         expect(dataset.problemsHtml({findings: []})).toMatch(/no problems/);
 
