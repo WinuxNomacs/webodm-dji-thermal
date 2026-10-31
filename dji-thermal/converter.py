@@ -9,6 +9,7 @@ Nothing here raises on a bad file: a file that is not a thermal R-JPEG, or does 
 left as it is, so one problem image never stops the rest of an upload.
 """
 
+import functools
 import logging
 import math
 import os
@@ -71,6 +72,20 @@ def library():
     with _plugin_packages():
         import dji_thermal_cli
     return dji_thermal_cli
+
+
+@functools.lru_cache(maxsize=1)
+def palette_luts():
+    """DJI's palettes by name (as the library's PALETTES), each a uint8 (256, 3) RGB table, without a frame: the
+    library's palette_luts(), or with a library before it (1.9) the built-in tables it reads them from"""
+    dtc = library()
+    if hasattr(dtc, 'palette_luts'):
+        return dtc.palette_luts()
+    import numpy as np
+    with _plugin_packages():
+        from dji_thermal_cli.tsdk import iirp_isp, tables
+    lut = iirp_isp.pseudo_color_lut(tables.load())           # (3, palettes, 256)
+    return {name: np.ascontiguousarray(lut[:, i, :].T) for i, name in enumerate(dtc.PALETTES)}
 
 
 def decoder_status():

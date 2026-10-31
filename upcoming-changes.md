@@ -5,6 +5,9 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **bug, the Thermal Inspector's palettes didn't match the Analyzer's** (the user, 2026-10-31),
+    `inspector-dji-palettes`: the inspector listed only WebODM's colour maps. It now lists the Analyzer's list (DJI's
+    palettes as "DJI *name*", then WebODM's colour maps) and draws DJI's with the plugin's own tiles (step 3b below).
   - Done: the dataset page's summary as a table (2026-10-30, `dataset-summary-table`): a row per camera and one for
     all of them, the temperatures as a bar on the dataset's scale with the median frame mean, GPS coverage, capture
     span and duration, height range, size; a row opens the camera's frames on the Files tab, a figure opens them
@@ -153,7 +156,8 @@
 - **Thermal Inspector** (the user, 2026-10-30): the earlier Pixel Inspector ported as a control on WebODM's 2D map,
   for thermal orthophotos, with the palette and unit shared with the Analyzer; in five steps (details under
   "Up next: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0. Steps 2–4
-  done; left: step 5 (isotherms and the legend), and DJI's palettes on the map (3b) once dji-thermal-cli is released.
+  and 3b (DJI's palettes on the map) done; left: step 5 (isotherms and the legend), and pinning dji-thermal-cli
+  1.10.0 once released, dropping the fallback to its internal tables.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -528,6 +532,9 @@ WebODM 3.3.2 lacks: the `point` and `region-stats` endpoints, the highlight colo
 - **DJI's palettes come from dji-thermal-cli**, which ships them as its own rebuilt tables (`tsdk/data`), so every
   thermal task offers them, with or without its frames. The CLI gets a public function for them first, released
   there, and the plugin pins that version (rather than reading the CLI's internal `tsdk.tables`).
+  Changed (the user, 2026-10-31, when the palette lists' mismatch was reported as a bug): until that release is
+  pinned, the plugin uses `palette_luts()` when the installed CLI has it, else the same built-in tables 1.9.0 holds
+  (`tsdk.iirp_isp.pseudo_color_lut(tsdk.tables.load())`, what `palette_luts()` calls); the fallback goes with the pin.
 
 **Steps** (each on its own branch, tested and merged):
 1. **dji-thermal-cli** (merged in its `main` 2026-10-30, `palette-luts`, as `palette_luts()`, with a test against a
@@ -573,6 +580,19 @@ WebODM 3.3.2 lacks: the `point` and `region-stats` endpoints, the highlight colo
    `__tests__/regions.test.js` (8, on real Leaflet), `inspector.test.js` (10). Live check on HomerunObliqueII's
    map (read only; the regions removed afterwards): a rectangle (84,376 pixels, 11.48–53.99 °C, mean 30.32 °C), a
    circle and a polygon partly off the orthophoto, kept across a reload, no WebODM popup.
+3b. **DJI's palettes on the map**: **Done** (2026-10-31, `inspector-dji-palettes`, a bug the user reported):
+   `converter.palette_luts` (the CLI's, or 1.9.0's built-in tables, above), `inspector.tile` and
+   `inspector/tiles/<z>/<x>/<y>` (`InspectorTiles`: the orthophoto's first band as WebODM's map draws it, bilinear,
+   over `rescale`, `size` 256 or 512, the crop with `crop=1`, no data from the alpha band; `?palette=` one of DJI's).
+   `inspector.js`: the Analyzer's list (`paletteOptions`, the same as `analyzer_core`'s, now exported); a DJI palette
+   moves the layer's URL to the plugin's tiles and a colour map back to WebODM's (`withPalette`), range kept. WebODM's
+   layer panel rebuilds the URL from its own colour map and range: a range change keeps the user's palette (DJI's
+   too), a colour map chosen there is saved, one of WebODM's not in the list (rdylgn, spectral…) is drawn but not
+   saved and shown in the inspector's list. Fixed on the way: a range change in WebODM's panel used to reset the
+   palette to the one that panel showed. Tests: `test_inspector.py` (11: the tables, the tiles' colours, alpha, crop,
+   512, refusals), `inspector.test.js` (13). Live check on HomerunObliqueII's map (preference PUTs intercepted):
+   19 palettes listed as the Analyzer's, DJI hotiron drawn by the plugin's tiles (200s), viridis chosen in WebODM's
+   panel saved and back on WebODM's tiles, spectral drawn and not saved.
 5. **Isotherms and the legend**: above, below or between limits, drawn by the plugin's tiles; the colour bar of the
    palette and range in the shared unit.
 

@@ -3,12 +3,15 @@ The Thermal Inspector's reads of a task's thermal orthophoto: tests on an orthop
 known temperatures (no image of anyone's).
 """
 import importlib
+import io
 import json
 import os
 import shutil
 
+import morecantile
 import numpy as np
 import rasterio
+from PIL import Image
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import GEOSGeometry
 from rasterio.transform import from_origin
@@ -20,6 +23,8 @@ from app.models import Project, Task
 from app.tests.classes import BootTestCase
 
 inspector = importlib.import_module("coreplugins.dji-thermal.inspector")
+converter = importlib.import_module("coreplugins.dji-thermal.converter")
+conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
 
 WIDTH, HEIGHT, PIXEL = 100, 80, 0.5
 ORIGIN = (400000.0, 4660000.0)     # UTM 16N, near Chicago
@@ -140,6 +145,60 @@ class TestInspector(BootTestCase):
         self.assertEqual(self.region({'type': 'Point', 'coordinates': [0, 0]}).status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.region("roof").status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.region(square(20, 10, 29, 19), bins=0).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def tile(self, col, row, zoom=18, task=None, **params):
+        """The map tile holding a pixel's centre, and where that centre is in it (x, y)"""
+        lon, lat = lonlat(col, row)
+        tms = morecantile.tms.get('WebMercatorQuad')
+        t = tms.tile(lon, lat, zoom)
+        bounds, (mx, my) = tms.xy_bounds(t), tms.xy(lon, lat)
+        size = int(params.get('size', 256))
+        url = self.url(task or self.task, "tiles/{}/{}/{}".format(t.z + (size == 512), t.x, t.y))
+        at = (int((mx - bounds.left) / (bounds.right - bounds.left) * size),
+              int((bounds.top - my) / (bounds.top - bounds.bottom) * size))
+        return self.client.get(url, params), at
+
+    def test_djis_palettes_are_the_librarys_colour_tables(self):
+        luts = converter.palette_luts()
+        self.assertEqual(list(luts), conversions.palettes())
+        for lut in luts.values():
+            self.assertEqual((lut.shape, lut.dtype), ((256, 3), np.uint8))
+        np.testing.assert_array_equal(luts['whitehot'][[0, 255]], [[0, 0, 0], [255, 255, 255]])
+        np.testing.assert_array_equal(luts['blackhot'][[0, 255]], [[255, 255, 255], [0, 0, 0]])
+
+    def test_a_tile_draws_the_temperatures_over_the_range_in_a_dji_palette(self):
+        res, (x, y) = self.tile(50, 40, palette='whitehot', rescale='0,200')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res['Content-Type'], 'image/png')
+        im = np.array(Image.open(io.BytesIO(res.content)).convert('RGBA'))
+        expected = (50 + 0.25 * 40) / 200 * 255
+        self.assertEqual(im[y, x, 3], 255)
+        self.assertLess(abs(int(im[y, x, 0]) - expected), 4)
+        self.assertEqual(len(set(im[y, x, :3])), 1)
+        # Without data (the alpha band), transparent; in a tile of 512 pixels, the same place
+        res, (x, y) = self.tile(3, 40, palette='whitehot', rescale='0,200')
+        self.assertEqual(np.array(Image.open(io.BytesIO(res.content)).convert('RGBA'))[y, x, 3], 0)
+        res, (x, y) = self.tile(50, 40, palette='ironred', rescale='0,200', size=512)
+        im = np.array(Image.open(io.BytesIO(res.content)).convert('RGBA'))
+        self.assertEqual(im.shape, (512, 512, 4))
+        np.testing.assert_allclose(im[y, x, :3], converter.palette_luts()['ironred'][round(expected)], atol=8)
+
+    def test_a_tile_keeps_to_the_tasks_crop_when_asked(self):
+        self.crop(40, 30, 60, 50)
+        res, (x, y) = self.tile(70, 40, palette='whitehot', rescale='0,200', crop='1')
+        self.assertEqual(np.array(Image.open(io.BytesIO(res.content)).convert('RGBA'))[y, x, 3], 0)
+        res, (x, y) = self.tile(70, 40, palette='whitehot', rescale='0,200')
+        self.assertEqual(np.array(Image.open(io.BytesIO(res.content)).convert('RGBA'))[y, x, 3], 255)
+
+    def test_a_tile_needs_a_dji_palette_and_a_range_on_the_orthophoto(self):
+        self.assertEqual(self.tile(50, 40, palette='magma')[0].status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.tile(50, 40, palette='whitehot', rescale='10')[0].status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.tile(50, 40, palette='whitehot', rescale='5,5')[0].status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.tile(50, 40, palette='whitehot', size=300)[0].status_code, status.HTTP_400_BAD_REQUEST)
+        far = self.client.get(self.url(self.task, "tiles/18/0/0"), {'palette': 'whitehot'})
+        self.assertEqual(far.status_code, status.HTTP_404_NOT_FOUND)
+        rgb = self.thermal_task(bands=('red', 'green'))
+        self.assertEqual(self.tile(50, 40, task=rgb, palette='whitehot')[0].status_code, status.HTTP_404_NOT_FOUND)
 
     def test_only_who_can_view_the_task_reads_it(self):
         other = APIClient()

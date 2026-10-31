@@ -106,6 +106,25 @@ describe("the Thermal Inspector", () => {
         expect(inspector.withColorMap("/t/{z}/{x}/{y}.png", "dji_ironred")).toBe("/t/{z}/{x}/{y}.png?color_map=dji_ironred");
     });
 
+    it("draws DJI's palettes with the plugin's tiles and WebODM's colour maps with WebODM's", () => {
+        const dji = inspector.withPalette(TILES, "ironred", DISPLAY);
+        expect(dji).toBe("/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/tiles/{z}/{x}/{y}.png" +
+                         "?formula=Celsius&bands=L&rescale=10,40&palette=ironred");
+        expect(inspector.paletteOf(dji)).toBe("ironred");
+        expect(inspector.thermalLayer(tileLayer(dji, THERMAL_TASK))).toMatchObject({project: "2", task: "abc-1"});
+        const back = inspector.withPalette(dji, "jet", DISPLAY);
+        expect(back).toBe(TILES.replace("color_map=magma&", "") + "&color_map=jet");
+        expect(inspector.paletteOf(back)).toBe("jet");
+    });
+
+    it("lists the palettes as the Analyzer does: DJI's, then WebODM's", () => {
+        expect(inspector.paletteOptions(DISPLAY)).toEqual([["ironred", "DJI ironred"], ["inferno", "inferno"],
+                                                           ["magma", "magma"], ["jet", "jet"]]);
+        const core = require("../analyzer_core.js");
+        const both = {palettes: ["whitehot", "ironred"], colormaps: ["inferno", "gray"]};
+        expect(inspector.paletteOptions(both)).toEqual(core.paletteOptions(both));
+    });
+
     it("reads the temperature where the cursor rests, beside it and in the panel", async () => {
         jest.useFakeTimers();
         const map = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
@@ -147,34 +166,64 @@ describe("the Thermal Inspector", () => {
         expect(window.localStorage.getItem(key)).toBe(null);
     });
 
+    // WebODM's layer panel: the URL rebuilt from the layer's path, its own colour map and range (LayersControlLayer)
+    const panelSets = (layer, colorMap, rescale) => layer.setUrl(layer._url.replace(/\?.*$/, "") +
+        "?color_map=" + colorMap + "&formula=Celsius&bands=L&rescale=" + rescale + "&size=512&crop=1", true);
+
     it("opens with the user's palette and saves the one chosen, in its panel or WebODM's", async () => {
         const layer = tileLayer(TILES, THERMAL_TASK);
         const map = fakeMap([layer]);
         const {ins, saved, panel} = start(map, {"GET /api/plugins/dji-thermal/display": Object.assign({}, DISPLAY, {palette: "inferno"})});
         await ins.ready;
-        expect(inspector.colorMapOf(layer._url)).toBe("inferno");
+        expect(inspector.paletteOf(layer._url)).toBe("inferno");
         ins.open();
         const select = panel().querySelector('[data-act="palette"]');
-        expect([].map.call(select.options, o => o.value)).toEqual(["inferno", "magma", "jet"]);
+        expect([].map.call(select.options, o => o.value)).toEqual(["ironred", "inferno", "magma", "jet"]);
+        expect([].map.call(select.options, o => o.textContent)).toEqual(["DJI ironred", "inferno", "magma", "jet"]);
         select.value = "jet";
         select.dispatchEvent(new Event("change", {bubbles: true}));
-        expect(inspector.colorMapOf(layer._url)).toBe("jet");
+        expect(inspector.paletteOf(layer._url)).toBe("jet");
         expect(saved).toEqual(["jet"]);
-        // WebODM's layer panel sets the URL: a colour map chosen there is the user's; a range alone changes nothing
-        layer.setUrl(inspector.withColorMap(layer._url, "magma"));
-        expect(saved).toEqual(["jet", "magma"]);
-        layer.setUrl(layer._url.replace("rescale=10,40", "rescale=12,30"));
-        expect(saved).toEqual(["jet", "magma"]);
+        // WebODM's panel still shows magma: a range set there keeps jet; a colour map chosen there is the user's
+        panelSets(layer, "magma", "12,30");
+        expect(inspector.paletteOf(layer._url)).toBe("jet");
+        expect(layer._url).toContain("rescale=12,30");
+        expect(saved).toEqual(["jet"]);
+        panelSets(layer, "inferno", "12,30");
+        expect(inspector.paletteOf(layer._url)).toBe("inferno");
+        expect(saved).toEqual(["jet", "inferno"]);
         // A thermal layer added later is drawn in it
         const later = tileLayer(TILES.replace("abc-1", "abc-3"), THERMAL_TASK);
         map.add(later);
-        expect(inspector.colorMapOf(later._url)).toBe("magma");
+        expect(inspector.paletteOf(later._url)).toBe("inferno");
     });
 
-    it("keeps the layer's own palette when the user has none WebODM draws", async () => {
+    it("draws the layer in one of DJI's palettes with the plugin's tiles, through WebODM's range changes", async () => {
         const layer = tileLayer(TILES, THERMAL_TASK);
         const map = fakeMap([layer]);
-        const {ins, saved} = start(map, {"GET /api/plugins/dji-thermal/display": Object.assign({}, DISPLAY, {palette: "ironred"})});
+        const {ins, saved, panel} = start(map, {"GET /api/plugins/dji-thermal/display": Object.assign({}, DISPLAY, {palette: "ironred"})});
+        await ins.ready;
+        expect(layer._url).toContain("/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/tiles/");
+        expect(inspector.paletteOf(layer._url)).toBe("ironred");
+        ins.open();
+        expect(panel().querySelector('[data-act="palette"]').value).toBe("ironred");
+        panelSets(layer, "magma", "15,35");
+        expect(layer._url).toBe("/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/tiles/{z}/{x}/{y}.png" +
+                                "?formula=Celsius&bands=L&rescale=15,35&size=512&crop=1&palette=ironred");
+        panelSets(layer, "jet", "15,35");
+        expect(layer._url).toMatch(/^\/api\/projects\/2\/tasks\/abc-1\/orthophoto\/tiles\/.*color_map=jet/);
+        expect(saved).toEqual(["jet"]);
+        // One of WebODM's other colour maps is drawn, not saved, and shown in the list
+        panelSets(layer, "rdylgn", "15,35");
+        expect(inspector.paletteOf(layer._url)).toBe("rdylgn");
+        expect(saved).toEqual(["jet"]);
+        expect(panel().querySelector('[data-act="palette"]').value).toBe("rdylgn");
+    });
+
+    it("keeps the layer's own palette when the user's is not one offered", async () => {
+        const layer = tileLayer(TILES, THERMAL_TASK);
+        const map = fakeMap([layer]);
+        const {ins, saved} = start(map, {"GET /api/plugins/dji-thermal/display": Object.assign({}, DISPLAY, {palette: "gone"})});
         await ins.ready;
         expect(inspector.colorMapOf(layer._url)).toBe("magma");
         expect(ins.state.palette).toBe("magma");

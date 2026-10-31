@@ -149,6 +149,39 @@ def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS):
     return out
 
 
+def tile(task, z, x, y, lut, low, high, size=256, crop=False):
+    """
+    A tile of the thermal orthophoto as WebODM's map draws it (its first band, bilinear, over low..high °C, within the
+    task's crop when crop), in a colour table (256 RGB colours), as PNG bytes; None outside the orthophoto. Where it
+    has no data comes from its alpha band.
+    """
+    from rio_tiler.errors import TileOutsideBounds
+    from rio_tiler.io import COGReader
+
+    from app.api.tiler import get_zoom_safe
+    from app.geoutils import geom_transform_wkt_bbox
+    from app.raster_utils import ZOOM_EXTRA_LEVELS
+
+    if size == 512:     # as WebODM's map asks for them: a tile of the zoom level above
+        z -= 1
+    with COGReader(thermal_orthophoto(task)) as src:
+        if not src.tile_exists(z, x, y):
+            return None
+        minzoom, maxzoom = get_zoom_safe(src)
+        if z < minzoom - ZOOM_EXTRA_LEVELS or z > maxzoom + ZOOM_EXTRA_LEVELS:
+            return None
+        vrt_options = None
+        if crop and _crop(task) is not None:
+            cutline, _bounds = geom_transform_wkt_bbox(task.crop, src.dataset)
+            vrt_options = {'cutline': cutline}
+        try:
+            data = src.tile(x, y, z, indexes=(1,), tilesize=size, resampling_method="bilinear", vrt_options=vrt_options)
+        except TileOutsideBounds:
+            return None
+    cmap = {i: (int(c[0]), int(c[1]), int(c[2]), 255) for i, c in enumerate(lut)}
+    return data.post_process(in_range=((low, high),)).render(img_format='PNG', colormap=cmap)
+
+
 def _valid(src, window, out_shape=None):
     """Where the orthophoto has data in a window: its alpha band (as WebODM writes it), else GDAL's mask"""
     from rasterio.enums import ColorInterp

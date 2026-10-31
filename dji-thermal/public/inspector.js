@@ -15,7 +15,10 @@
     var SQ_FT_PER_SQ_M = 10.7639104;
     var Regions = root.ThermalRegions || (typeof require !== "undefined" ? require("./regions.js") : null);
     var META = root.Symbol ? root.Symbol["for"]("meta") : "meta";      // where WebODM's map keeps a layer's metadata
-    var TILE_URL = /\/api\/projects\/(\d+)\/tasks\/([^/]+)\/orthophoto\/tiles\//;
+    // A thermal layer's tiles: WebODM's, or the plugin's in one of DJI's palettes
+    var TILE_URL = /\/api\/(?:plugins\/dji-thermal\/)?projects\/(\d+)\/tasks\/([^/]+)\/(?:orthophoto|inspector)\/tiles\//;
+    var WEBODM_TILES = /\/api\/projects\/(\d+\/tasks\/[^/]+)\/orthophoto\/tiles\//;
+    var PLUGIN_TILES = /\/api\/plugins\/dji-thermal\/projects\/(\d+\/tasks\/[^/]+)\/inspector\/tiles\//;
     var REASONS = {excluded: "Outside the task's crop", outside_raster: "Outside the orthophoto", nodata: "No data here",
                    too_few_points: "A polygon needs three corners", self_intersecting: "The polygon's edges cross",
                    no_area: "The polygon has no area"};
@@ -91,20 +94,34 @@
         return inspectorUrl(t, "point") + "?lon=" + Number(latlng.lng).toFixed(8) + "&lat=" + Number(latlng.lat).toFixed(8);
     }
 
-    // A tile URL with its colour map changed, its other parameters kept
-    function withColorMap(url, name) {
+    // A tile URL with one parameter set (or removed, with no value), its others kept
+    function withParam(url, key, value) {
         var q = url.indexOf("?");
         var base = q === -1 ? url : url.slice(0, q);
         var params = (q === -1 ? "" : url.slice(q + 1)).split("&").filter(function (p) {
-            return p && p.split("=")[0] !== "color_map";
+            return p && p.split("=")[0] !== key;
         });
-        params.push("color_map=" + encodeURIComponent(name));
-        return base + "?" + params.join("&");
+        if (value) params.push(key + "=" + encodeURIComponent(value));
+        return base + (params.length ? "?" + params.join("&") : "");
     }
-    function colorMapOf(url) {
-        var m = /[?&]color_map=([^&]*)/.exec(url || "");
+    function withColorMap(url, name) { return withParam(url, "color_map", name); }
+    function paramOf(url, key) {
+        var m = new RegExp("[?&]" + key + "=([^&]*)").exec(url || "");
         return m ? decodeURIComponent(m[1]) : "";
     }
+    function colorMapOf(url) { return paramOf(url, "color_map"); }
+
+    // A thermal layer's tile URL in a palette: one of DJI's (display.palettes) drawn by the plugin's tiles, one of
+    // WebODM's colour maps by WebODM's; the range, size and crop kept
+    function withPalette(url, name, display) {
+        if (((display && display.palettes) || []).indexOf(name) !== -1) {
+            url = url.replace(WEBODM_TILES, API + "projects/$1/inspector/tiles/");
+            return withParam(withParam(url, "color_map", ""), "palette", name);
+        }
+        url = url.replace(PLUGIN_TILES, "/api/projects/$1/orthophoto/tiles/");
+        return withColorMap(withParam(url, "palette", ""), name);
+    }
+    function paletteOf(url) { return PLUGIN_TILES.test(url || "") ? paramOf(url, "palette") : colorMapOf(url); }
 
     // Pins: {id, label, lat, lng, temperature (°C) or null, reason}, remembered in the browser for the same tasks;
     // regions likewise: {id, label, shape, geometry (GeoJSON, lon/lat), circle ({lat, lng, radius}) for circles,
@@ -232,16 +249,20 @@
             '<button type="button" class="btn btn-default btn-xs" data-act="clear"><i class="fa fa-trash"></i> Remove all</button></div>';
     }
 
-    // The palettes to choose from ({palettes: DJI's, colormaps: WebODM's}, as the display API gives them): those WebODM
-    // draws the layer in
+    // The palettes to choose from ({palettes: DJI's, colormaps: WebODM's}, as the display API gives them): DJI's, then
+    // WebODM's colour maps, as [value, label], as the Analyzer's Preferences list them
     function paletteOptions(display) {
-        return (display && display.colormaps) || [];
+        return ((display && display.palettes) || []).map(function (p) { return [p, "DJI " + p]; })
+            .concat(((display && display.colormaps) || []).map(function (c) { return [c, c]; }));
     }
+    function paletteNames(display) { return paletteOptions(display).map(function (o) { return o[0]; }); }
 
     function panelHtml(state) {
         var unit = userUnit();
         var options = paletteOptions(state.display);
         var current = state.palette;
+        // One of WebODM's other colour maps, chosen in its layer panel
+        if (current && options.length && !options.some(function (o) { return o[0] === current; })) options = options.concat([[current, current]]);
         return '<div class="dt-inspector-head"><strong><i class="fa fa-thermometer-half"></i> Thermal Inspector</strong>' +
             '<a href="javascript:void(0)" class="dt-inspector-close" data-act="close" title="Close"><i class="fa fa-times"></i></a></div>' +
             '<div class="btn-group btn-group-xs dt-inspector-modes">' +
@@ -255,8 +276,8 @@
             (state.notice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.notice) + "</div>" : "") +
             '<div class="dt-inspector-readout">' + readoutHtml(state.readout, unit) + "</div>" +
             (options.length ? '<label class="dt-inspector-label">Palette <select class="form-control input-sm" data-act="palette">' +
-                options.map(function (p) {
-                    return '<option value="' + escapeHtml(p) + '"' + (p === current ? " selected" : "") + ">" + escapeHtml(p) + "</option>";
+                options.map(function (o) {
+                    return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === current ? " selected" : "") + ">" + escapeHtml(o[1]) + "</option>";
                 }).join("") + "</select></label>" : "") +
             '<div class="dt-inspector-section"><strong>Pinned points</strong>' + pinsHtml(state.pins, unit, state.pinsVisible) + "</div>" +
             '<div class="dt-inspector-section"><strong>Regions</strong>' + regionsHtml(state, unit) + "</div>";
@@ -468,28 +489,38 @@
             return true;
         }
 
-        // The thermal layers' palette: the user's preference when it is one WebODM draws, applied as each layer comes
+        // The thermal layers' palette: the user's preference, applied as each layer comes
         function applyPalette(t) {
-            if (!state.palette || colorMapOf(t.layer._url) === state.palette) return;
+            if (!state.palette) return;
+            var url = withPalette(t.layer._url, state.palette, state.display);
+            if (url === t.layer._url) return;
             applying = true;
-            t.layer.setUrl(withColorMap(t.layer._url, state.palette), true);
+            t.layer.setUrl(url, true);
             if (t.layer._removeAllTiles) t.layer._removeAllTiles();
             if (t.layer.redraw) t.layer.redraw();
             applying = false;
         }
 
-        // A palette chosen in WebODM's layer panel is the user's too: it follows the tile URL
+        // WebODM's layer panel sets the URL from its own colour map (its list shows what it was given) and range: a
+        // colour map chosen there is the user's (saved when it is one of the palettes offered, else drawn on this page
+        // only); a range alone keeps the user's palette, DJI's too
         function watch(t) {
             if (t.layer.__dtWatched) return;
             t.layer.__dtWatched = true;
+            t.layer.__dtPanelMap = colorMapOf(t.layer._url);
             var setUrl = t.layer.setUrl;
             t.layer.setUrl = function (url) {
-                var result = setUrl.apply(this, arguments);
-                var chosen = colorMapOf(url);
-                if (!applying && chosen && chosen !== state.palette && paletteOptions(state.display).indexOf(chosen) !== -1) {
-                    choosePalette(chosen, t.layer);
+                var args = Array.prototype.slice.call(arguments);
+                if (!applying) {
+                    var chosen = colorMapOf(url);
+                    if (chosen && chosen !== t.layer.__dtPanelMap) {
+                        t.layer.__dtPanelMap = chosen;
+                        if (paletteNames(state.display).indexOf(chosen) !== -1) choosePalette(chosen, t.layer);
+                        else showPalette(chosen, t.layer);
+                    }
+                    if (state.palette) args[0] = withPalette(url, state.palette, state.display);
                 }
-                return result;
+                return setUrl.apply(this, args);
             };
         }
 
@@ -500,10 +531,14 @@
             applyPalette(t);
         }
 
-        function choosePalette(name, except) {
+        function showPalette(name, except) {
             state.palette = name;
             thermalLayers(map).forEach(function (t) { if (t.layer !== except) applyPalette(t); });
             render();
+        }
+
+        function choosePalette(name, except) {
+            showPalette(name, except);
             (deps.save || function (palette) {
                 return fetchFn(API + "display", {method: "PUT", credentials: "same-origin",
                     headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken(doc)},
@@ -608,12 +643,12 @@
             if (!r.ok) return;
             state.display = r.data;
             var preferred = r.data.palette;
-            if (preferred && paletteOptions(r.data).indexOf(preferred) !== -1) {
+            if (preferred && paletteNames(r.data).indexOf(preferred) !== -1) {
                 state.palette = preferred;
                 thermalLayers(map).forEach(applyPalette);
             } else {
                 var shown = thermalLayers(map)[0];
-                state.palette = shown ? colorMapOf(shown.layer._url) : "";
+                state.palette = shown ? paletteOf(shown.layer._url) : "";
             }
             render();
         }, function () {});
@@ -634,6 +669,7 @@
 
     var api = {userUnit: userUnit, formatTemp: formatTemp, thermalLayer: thermalLayer, thermalLayers: thermalLayers,
                thermalLayerAt: thermalLayerAt, pointUrl: pointUrl, withColorMap: withColorMap, colorMapOf: colorMapOf,
+               withPalette: withPalette, paletteOf: paletteOf, paletteOptions: paletteOptions,
                pinsKey: pinsKey, regionsKey: regionsKey, loadPins: loadPins, savePins: savePins, pinsCsv: pinsCsv,
                regionsCsv: regionsCsv, statisticsHtml: statisticsHtml, readoutHtml: readoutHtml,
                panelHtml: panelHtml, hasThermal: hasThermal, create: create};

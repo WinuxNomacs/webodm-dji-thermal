@@ -1,10 +1,14 @@
-"""The Thermal Inspector's API: a task's thermal orthophoto read at a point and over a region (see inspector.py)"""
+"""The Thermal Inspector's API: a task's thermal orthophoto read at a point and over a region, and drawn in DJI's
+palettes (see inspector.py)"""
+import math
+
+from django.http import HttpResponse
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 
 from app.api.tasks import TaskNestedView
 
-from . import inspector
+from . import converter, inspector
 
 
 class InspectorView(TaskNestedView):
@@ -27,6 +31,27 @@ class InspectorPoint(InspectorView):
         if not (-180 <= lon <= 180 and -90 <= lat <= 90):
             raise ValidationError({'error': "Coordinates out of range"})
         return Response(inspector.point(task, lon, lat))
+
+
+class InspectorTiles(InspectorView):
+    def get(self, request, pk=None, project_pk=None, z="", x="", y=""):
+        """A tile of the thermal orthophoto in one of DJI's palettes (?palette=), with the parameters of WebODM's
+        tiles the map keeps: rescale (°C), size (256 or 512) and crop"""
+        task = self.thermal_task(request, pk)
+        lut = converter.palette_luts().get(request.query_params.get('palette') or '')
+        if lut is None:
+            raise ValidationError({'error': "Not one of DJI's palettes"})
+        try:
+            low, high = (float(v) for v in (request.query_params.get('rescale') or '0,255').split(','))
+            size = int(request.query_params.get('size') or 256)
+        except ValueError:
+            raise ValidationError({'error': "Invalid rescale or size"}) from None
+        if size not in (256, 512) or not (math.isfinite(low) and math.isfinite(high)) or low == high:
+            raise ValidationError({'error': "Invalid rescale or size"})
+        png = inspector.tile(task, int(z), int(x), int(y), lut, low, high, size, request.query_params.get('crop') == '1')
+        if png is None:
+            raise NotFound({'error': "Outside of bounds"})
+        return HttpResponse(png, content_type='image/png')
 
 
 class InspectorRegion(InspectorView):
