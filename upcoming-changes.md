@@ -198,9 +198,9 @@
 - **Linux, Windows and macOS** (the user, 2026-10-31, from `new.md`; details under "Done: Linux, Windows and
   macOS" below): the plugin works on every way WebODM is installed: Docker on all three systems (the macOS
   installer runs Docker), and the native Windows installer, checked end to end there. Done.
-- **Picture viewer in the Files view** (the user, 2026-10-31, from `new.md`; details under "Up next: Picture
+- **Picture viewer in the Files view** (the user, 2026-10-31, from `new.md`; details under "Done: Picture
   viewer" below): clicking the picture in the Files view's detail pane opens it in a window on the page, with a
-  close button and basic controls, instead of a new tab. Small, after the platform phase.
+  close button and basic controls, instead of a new tab. Done.
 - **UX review** (the user, 2026-10-31, from `new.md`: "how would you make this ui more intuitive?"; details under
   "Then: UX review" below): a review of every page and control the plugin adds, proposals for the user to choose
   from, then the chosen ones built.
@@ -691,7 +691,7 @@ to 3.3.2.
 
 **Open**: none.
 
-## Up next: Picture viewer
+## Done: Picture viewer
 
 **The request** (the user, 2026-10-31): "On the Files view, when the user clicks the image in the detail pane to
 view the full image; pop open an inscreen window with a close button and basic image controls instead of opening
@@ -715,6 +715,19 @@ colours, no library), opened by clicking the picture:
 none. Decided (the user, 2026-10-31): a photo is shown from the original file at full size (its load time is
 expected), opening at the zoom that fits it in the viewer, with a control to go back to that fit; a thermal frame
 shows the palette picture; previous and next included.
+
+**Built** (2026-10-31, `picture-viewer`): `public/picture_viewer.js` (`ThermalPictureViewer.open`, with the zoom's
+sums as plain functions: `fitView`, `zoomLimits`, `zoomAt`, `wheelFactor`), opened from `dataset.js` (`viewerSrc`,
+`viewerItems`, `viewPicture`), its styles in `analyzer.css`. As proposed, plus: **Fit** and **1:1** buttons, the
+zoom shown in percent, a double click zooming in where it points (to 100% at least) and back to the fit, the keys
++, −, 0 and 1; zoomed beyond 100% the pixels are drawn square (a thermal frame's pixels show); the file shown
+becomes the selected one, its row scrolled to, so closing leaves the table on it; Ctrl/Cmd-click on the picture still
+opens it in a new tab. The viewer is on the page's body, above WebODM's top bar (z-index 99999), which covered it
+inside the page. Tests: no new ones (the user's rule: tests are added only after asking); Jest 161 and ESLint pass,
+`test_analyzer` (58). Live check on HomerunObliqueII (GETs only, no thumbnail added to the cache): opened at frame 2
+of 327 fitted (186%), zoom in, 1:1, the wheel (the point under the mouse kept), a drag, Fit, → and ← (Previous
+disabled at the first, the selection following), Esc and a click beside the picture closing it; a 4032x3024 photo of
+the M4T flight served to the browser only (fitted at 32%, refitted when the window shrank).
 
 ## Then: Documentation
 

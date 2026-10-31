@@ -3,6 +3,7 @@
 (function (root) {
     var core = root.ThermalAnalyzerCore || (typeof require !== "undefined" ? require("./analyzer_core") : null);
     var conversionsModule = root.ThermalAnalyzerConversions || (typeof require !== "undefined" ? require("./conversions") : null);
+    var pictureViewer = root.ThermalPictureViewer || (typeof require !== "undefined" ? require("./picture_viewer") : null);
     var esc = function (t) { return core.escapeHtml(t); };
     var POLL_MS = 2000;
     var FILES_SHOWN = 12;     // files listed under a problem before "and N more"
@@ -257,6 +258,20 @@
         return rows.filter(function (row) { return row[1] !== "" && row[1] !== null && row[1] !== undefined; });
     }
 
+    // What the picture viewer shows of a file: a thermal frame in the user's preferred DJI palette (as the detail pane
+    // draws it), any other image as uploaded, at its own size (urls as detailHtml's)
+    function viewerSrc(r, urls) {
+        if (r.kind !== "thermal") return urls.files + encodeURIComponent(r.path);
+        return urls.picture + "?size=large&" + (urls.palette ? "palette=" + encodeURIComponent(urls.palette) + "&" : "") + "file=" + encodeURIComponent(r.path);
+    }
+
+    // The picture viewer's pictures: the images among the files the table shows, in its order
+    function viewerItems(a, view, urls) {
+        return fileRows(a, view).filter(function (r) { return core.isImage({name: r.path}); }).map(function (r) {
+            return {name: r.path.split("/").pop(), path: r.path, src: viewerSrc(r, urls), download: urls.files + encodeURIComponent(r.path) + "&download=1"};
+        });
+    }
+
     // The detail pane of the files selected, or of the one under the mouse (urls: {files: the source file's URL
     // without the file, picture: the thumbnail URL, frames: the frame page or null, palette: the user's preferred DJI
     // palette or ""}); "" when there is none. A thermal frame is drawn in that palette (the server draws it in its own
@@ -277,7 +292,8 @@
         var picture = urls.picture + "?size=large&" + (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file=" + encodeURIComponent(r.path);
         var frame = urls.frames && r.kind === "thermal" ? urls.frames + "?frame=" + encodeURIComponent(r.path) : null;
         return '<div class="ta-file-detail-head"><strong title="' + esc(r.path) + '">' + esc(r.path.split("/").pop()) + "</strong>" + close + "</div>" +
-            (core.isImage({name: r.path}) ? '<a href="' + esc(picture) + '" target="_blank" rel="noopener" title="Open the picture"><img class="ta-file-detail-img" alt="" src="' +
+            (core.isImage({name: r.path}) ? '<a href="' + esc(viewerSrc(r, urls)) + '" target="_blank" rel="noopener" data-act="view-picture" data-path="' + esc(r.path) +
+                '" title="View the picture"><img class="ta-file-detail-img" alt="" src="' +
                 esc(picture) + '"></a>' : "") +
             '<div class="ta-file-detail-actions"><a class="btn btn-primary btn-xs" href="' + esc(src + "&download=1") + '"><i class="fa fa-download"></i> Download</a>' +
             (frame ? ' <a class="btn btn-default btn-xs" href="' + esc(frame) + '"><i class="fa fa-th-large"></i> Open frame</a>' : "") + "</div>" +
@@ -487,12 +503,15 @@
         }
 
         // The detail pane: the files selected, else (with Hover for Detail) the one under the mouse
+        function detailUrls() {
+            return {files: url + "/files?file=", picture: url + "/thumbnail", palette: palette || "", frames: view.frames || null};
+        }
+
         function renderDetail() {
             var pane = page.querySelector(".ta-file-detail");
             if (!pane) return;
             var paths = view.selected.length ? view.selected : view.hover && hovered ? [hovered] : [];
-            var html = detailHtml(dataset.analysis, paths, view.selected.length > 0,
-                                  {files: url + "/files?file=", picture: url + "/thumbnail", palette: palette || "", frames: view.frames || null});
+            var html = detailHtml(dataset.analysis, paths, view.selected.length > 0, detailUrls());
             pane.hidden = !html;
             if (pane.innerHTML !== html) pane.innerHTML = html;
         }
@@ -524,6 +543,22 @@
             }
             anchor = path;
             selectionChanged();
+        }
+
+        // The picture viewer, opened at a file's picture: the file shown is the one selected, its row scrolled to
+        function viewPicture(path) {
+            var items = viewerItems(dataset.analysis, view, detailUrls());
+            var index = items.map(function (it) { return it.path; }).indexOf(path);
+            if (index < 0) return;
+            pictureViewer.open(doc, {items: items, index: index, onShow: function (i) {
+                var shown = items[i].path;
+                anchor = shown;
+                if (view.selected.length === 1 && view.selected[0] === shown) return;
+                view.selected = [shown];
+                selectionChanged();
+                var tr = [].filter.call(page.querySelectorAll(".ta-files tbody tr[data-path]"), function (row) { return row.getAttribute("data-path") === shown; })[0];
+                if (tr && tr.scrollIntoView) tr.scrollIntoView({block: "nearest"});
+            }});
         }
 
         // The selected files as a zip: a form posted, so the browser downloads it however many there are
@@ -593,6 +628,12 @@
                 return selectionChanged();
             }
             if (e.target.closest('[data-act="download-selected"]')) return downloadSelected();
+            // The detail pane's picture opens the viewer (Ctrl/Cmd-click, or the middle button, still opens a tab)
+            var picture = e.target.closest('[data-act="view-picture"]');
+            if (picture && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button)) {
+                e.preventDefault();
+                return viewPicture(picture.getAttribute("data-path"));
+            }
             // A click on a row (not on its name's link) selects it
             var tr = e.target.closest(".ta-files tbody tr[data-path]");
             if (tr && !e.target.closest("a")) select(tr.getAttribute("data-path"), e);
@@ -805,7 +846,7 @@
     }
 
     var api = {captureTime: captureTime, median: core.median, overview: overview, summaryRows: summaryRows, duration: duration, overviewHtml: overviewHtml, flagsByFile: flagsByFile,
-               sortRows: core.sortRows, fileRows: fileRows, detailRows: detailRows, detailHtml: detailHtml, filesHtml: filesHtml, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
+               sortRows: core.sortRows, fileRows: fileRows, detailRows: detailRows, viewerSrc: viewerSrc, viewerItems: viewerItems, detailHtml: detailHtml, filesHtml: filesHtml, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
     root.ThermalAnalyzerDataset = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

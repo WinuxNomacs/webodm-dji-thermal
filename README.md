@@ -91,7 +91,11 @@ height and the size. A camera's row opens its frames on the Files tab, and each 
   problems, sorted by any column, with thumbnails if you like (in your preferred DJI palette, if you chose one).
   Click a file to open a detail pane beside the table: its picture (a thermal frame drawn from its temperatures in
   your preferred DJI palette, else in the one it was shot in) and everything the analysis read from it (camera, position, gimbal, temperatures, measurement
-  parameters, warnings), with **Download** (the file as uploaded). Ctrl/Cmd-click adds or removes a file and Shift-click selects a range;
+  parameters, warnings), with **Download** (the file as uploaded). Click the picture to view it over the page: a
+  thermal frame in the same palette, a photo as uploaded at its own size, fitted to the window, with zoom (the
+  buttons, the mouse wheel where it points, a double click), **Fit** and **1:1**, dragging to pan, the previous and
+  next images in the table's order (also ← and →), Download, and × or Esc to close (Ctrl/Cmd-click opens the
+  picture in a new tab instead). In the table, Ctrl/Cmd-click adds or removes a file and Shift-click selects a range;
   with several selected, the pane counts them and downloads them as a zip. Clicking the only selected file, its ×
   or Esc unselects. **Hover for Detail** makes the pane follow the file under the mouse while none is selected.
 - **Problems**: what dji-thermal-cli found (errors, warnings, notes), each with what addresses it and the files it
