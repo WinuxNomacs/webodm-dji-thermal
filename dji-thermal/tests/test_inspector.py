@@ -146,14 +146,14 @@ class TestInspector(BootTestCase):
         self.assertEqual(self.region("roof").status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.region(square(20, 10, 29, 19), bins=0).status_code, status.HTTP_400_BAD_REQUEST)
 
-    def tile(self, col, row, zoom=18, task=None, **params):
-        """The map tile holding a pixel's centre, and where that centre is in it (x, y)"""
+    def tile(self, col, row, zoom=18, task=None, what="tiles", **params):
+        """The map tile holding a pixel's centre (of the thermal layer, or what), and where that centre is in it (x, y)"""
         lon, lat = lonlat(col, row)
         tms = morecantile.tms.get('WebMercatorQuad')
         t = tms.tile(lon, lat, zoom)
         bounds, (mx, my) = tms.xy_bounds(t), tms.xy(lon, lat)
         size = int(params.get('size', 256))
-        url = self.url(task or self.task, "tiles/{}/{}/{}".format(t.z + (size == 512), t.x, t.y))
+        url = self.url(task or self.task, "{}/{}/{}/{}".format(what, t.z + (size == 512), t.x, t.y))
         at = (int((mx - bounds.left) / (bounds.right - bounds.left) * size),
               int((bounds.top - my) / (bounds.top - bounds.bottom) * size))
         return self.client.get(url, params), at
@@ -199,6 +199,45 @@ class TestInspector(BootTestCase):
         self.assertEqual(far.status_code, status.HTTP_404_NOT_FOUND)
         rgb = self.thermal_task(bands=('red', 'green'))
         self.assertEqual(self.tile(50, 40, task=rgb, palette='whitehot')[0].status_code, status.HTTP_404_NOT_FOUND)
+
+    def isotherm(self, col, row, **params):
+        """The isotherm tile's colour at a pixel's centre (RGBA)"""
+        res, (x, y) = self.tile(col, row, what="isotherm", **params)
+        self.assertEqual((res.status_code, res['Content-Type']), (status.HTTP_200_OK, 'image/png'))
+        return tuple(np.array(Image.open(io.BytesIO(res.content)).convert('RGBA'))[y, x])
+
+    def test_an_isotherm_paints_the_temperatures_above_below_or_between_its_limits(self):
+        # (50, 40) is at 60 °C
+        self.assertEqual(self.isotherm(50, 40, low=55, color='e53935'), (0xe5, 0x39, 0x35, 255))
+        self.assertEqual(self.isotherm(50, 40, low=65, color='e53935')[3], 0)
+        self.assertEqual(self.isotherm(50, 40, high=65, color='1E88E5'), (0x1e, 0x88, 0xe5, 255))
+        self.assertEqual(self.isotherm(50, 40, high=55, color='1e88e5')[3], 0)
+        self.assertEqual(self.isotherm(50, 40, low=58, high=62, color='43a047', size=512), (0x43, 0xa0, 0x47, 255))
+        self.assertEqual(self.isotherm(50, 40, low=62, high=70, color='43a047')[3], 0)
+        # Not where the orthophoto has no data (its alpha band), nor outside the crop when asked
+        self.assertEqual(self.isotherm(3, 40, high=1000, color='e53935')[3], 0)
+        self.crop(40, 30, 60, 50)
+        self.assertEqual(self.isotherm(70, 40, low=0, color='e53935', crop='1')[3], 0)
+        self.assertEqual(self.isotherm(70, 40, low=0, color='e53935')[3], 255)
+
+    def test_an_isotherm_needs_limits_in_order_and_a_colour(self):
+        for params in ({'color': 'e53935'}, {'low': 30, 'high': 20, 'color': 'e53935'}, {'low': 'inf', 'color': 'e53935'},
+                       {'low': 'x', 'color': 'e53935'}, {'low': 30}, {'low': 30, 'color': 'red'},
+                       {'low': 30, 'color': 'e53935', 'size': 300}):
+            self.assertEqual(self.tile(50, 40, what="isotherm", **params)[0].status_code, status.HTTP_400_BAD_REQUEST, params)
+        far = self.client.get(self.url(self.task, "isotherm/18/0/0"), {'low': 30, 'color': 'e53935'})
+        self.assertEqual(far.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_the_legend_has_the_colours_of_djis_palettes_and_webodms_colour_maps(self):
+        res = self.client.get(self.url(self.task, "palette"), {'name': 'whitehot'})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        colors = res.data['color_map']
+        self.assertEqual((len(colors), colors[0], colors[-1]), (256, 0x000000ff, 0xffffffff))
+        res = self.client.get(self.url(self.task, "palette"), {'name': 'rdylgn'})       # in WebODM's panel only
+        self.assertEqual((res.status_code, len(res.data['color_map'])), (status.HTTP_200_OK, 256))
+        for name in ('nope', '../magma', ''):
+            self.assertEqual(self.client.get(self.url(self.task, "palette"), {'name': name}).status_code,
+                             status.HTTP_404_NOT_FOUND, name)
 
     def test_only_who_can_view_the_task_reads_it(self):
         other = APIClient()

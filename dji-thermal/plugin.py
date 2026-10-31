@@ -36,7 +36,7 @@ class Plugin(PluginBase):
         ]
 
     def include_js_files(self):
-        return ['main.js', 'regions.js', 'inspector.js']
+        return ['main.js', 'scale.js', 'regions.js', 'inspector.js']
 
     def build_jsx_components(self):
         # Leaflet: WebODM's own, for the mosaic viewer (see thermal/Leaflet.js)
@@ -48,6 +48,8 @@ class Plugin(PluginBase):
             MountPoint(TASK + '/inspector/point$', inspector_api.InspectorPoint.as_view()),
             MountPoint(TASK + '/inspector/region$', inspector_api.InspectorRegion.as_view()),
             MountPoint(TASK + r'/inspector/tiles/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)$', inspector_api.InspectorTiles.as_view()),
+            MountPoint(TASK + r'/inspector/isotherm/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)$', inspector_api.InspectorIsotherm.as_view()),
+            MountPoint(TASK + '/inspector/palette$', inspector_api.InspectorPalette.as_view()),
             MountPoint(r'projects/(?P<project_pk>\d+)/tasks/(?P<pk>[^/.]+)/convert$', TaskConvert.as_view()),
             MountPoint('datasets$', analyzer_api.DatasetListCreate.as_view()),
             MountPoint(DATASET + '$', analyzer_api.DatasetDetail.as_view()),

@@ -5,6 +5,8 @@
 // WebODM's own, from the plugin's build (thermal/Leaflet.js).
 (function (root) {
     var core = root.ThermalAnalyzerCore || (typeof require !== "undefined" ? require("./analyzer_core") : null);
+    var scale = root.ThermalScale || (typeof require !== "undefined" ? require("./scale") : null);
+    var gradientCss = scale.gradientCss, scaleTicks = scale.scaleTicks;
     var esc = function (t) { return core.escapeHtml(t); };
     var POLL_MS = 2000;
     var HOVER_MS = 120;         // the readout asks for the point the cursor rests on, not every point it crosses
@@ -54,37 +56,6 @@
     // A tab's range as shown: a temperature's in the user's unit
     function shownRange(tab, range, unit) {
         return isTemperature(tab) ? range.map(function (x) { return core.convertTemp(x, unit); }) : range.slice();
-    }
-
-    function colorCss(encoded) {
-        var c = encoded >>> 0;
-        return "rgb(" + ((c >>> 24) & 255) + "," + ((c >>> 16) & 255) + "," + ((c >>> 8) & 255) + ")";
-    }
-
-    // A palette as a CSS gradient, from 16 of its colours
-    function gradientCss(encoded) {
-        if (!encoded || !encoded.length) return "";
-        var stops = [];
-        for (var i = 0; i < 16; i++) stops.push(colorCss(encoded[Math.round(i * (encoded.length - 1) / 15)]));
-        return "linear-gradient(to right, " + stops.join(", ") + ")";
-    }
-
-    // Round values to mark on a colour scale from lo to hi (as shown), about count of them: each with its label and
-    // where it sits on the scale (0 to 1)
-    function scaleTicks(lo, hi, count) {
-        if (!(hi > lo)) return [];
-        var rough = (hi - lo) / (count || 5), mag = Math.pow(10, Math.floor(Math.log10(rough)));
-        // The round step nearest the rough one (as a ratio)
-        var m = [1, 2, 2.5, 5, 10].reduce(function (best, x) {
-            return Math.abs(Math.log(x * mag / rough)) < Math.abs(Math.log(best * mag / rough)) ? x : best;
-        }), step = m * mag;
-        var digits = Math.max(0, -Math.floor(Math.log10(step) + 1e-9) + (m === 2.5 ? 1 : 0));
-        var out = [];
-        for (var i = Math.ceil(lo / step - 1e-9); i <= Math.floor(hi / step + 1e-9); i++) {
-            var value = i * step || 0;   // not -0
-            out.push({value: value, label: value.toFixed(digits).replace(/^-(0\.?0*)$/, "$1"), at: (value - lo) / (hi - lo)});
-        }
-        return out;
     }
 
     // A colour scale: the palette's gradient over the range shown ([lo, hi]), marked with round values

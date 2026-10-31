@@ -1,7 +1,8 @@
 // The Thermal Inspector: a control on WebODM's 2D map for thermal orthophotos (a single lwir band). The temperature
 // under the cursor, points pinned with theirs and regions drawn with their statistics (both kept in the browser, for
-// the same tasks; regions drawn by regions.js), and the thermal layer's palette, which is the user's everywhere (the
-// Analyzer's preference). Temperatures come from the plugin's API
+// the same tasks; regions drawn by regions.js), isotherms (the temperatures above, below or between limits painted
+// over the thermal layers, also kept in the browser), the thermal layer's palette, which is the user's everywhere (the
+// Analyzer's preference), and a legend of its palette and range (scale.js). Temperatures come from the plugin's API
 // (inspector_api.py) in °C and are shown in WebODM's units (°F when imperial). main.js adds it through
 // PluginsAPI.Map.willAddControls, with WebODM's own Leaflet.
 (function (root) {
@@ -10,10 +11,15 @@
     var DRAWN_CLICK_MS = 500;       // the click Leaflet fires after a rectangle or circle is dragged is part of it
     var PINS_PREFIX = "dji-thermal-inspector:pins:";
     var REGIONS_PREFIX = "dji-thermal-inspector:regions:";
+    var ISOTHERM_PREFIX = "dji-thermal-inspector:isotherm:";
+    var LEGEND_KEY = "dji-thermal-inspector:legend";
+    var ISOTHERM_MODES = {off: "Off", above: "Above", below: "Below", between: "Between"};
+    var ISOTHERM_COLORS = {red: "e53935", orange: "fb8c00", yellow: "fdd835", green: "43a047", blue: "1e88e5", magenta: "d81b60"};
     var SHAPES = {rectangle: "far fa-square", circle: "far fa-circle", polygon: "fa fa-draw-polygon"};
     var SHAPE_NAMES = {rectangle: "Rectangle", circle: "Circle", polygon: "Polygon"};
     var SQ_FT_PER_SQ_M = 10.7639104;
     var Regions = root.ThermalRegions || (typeof require !== "undefined" ? require("./regions.js") : null);
+    var Scale = root.ThermalScale || (typeof require !== "undefined" ? require("./scale.js") : null);
     var META = root.Symbol ? root.Symbol["for"]("meta") : "meta";      // where WebODM's map keeps a layer's metadata
     // A thermal layer's tiles: WebODM's, or the plugin's in one of DJI's palettes
     var TILE_URL = /\/api\/(?:plugins\/dji-thermal\/)?projects\/(\d+)\/tasks\/([^/]+)\/(?:orthophoto|inspector)\/tiles\//;
@@ -54,6 +60,9 @@
         unit = unit || userUnit();
         return (unit === "F" ? celsius * 1.8 : celsius).toFixed(2) + " °" + unit;
     }
+    // A temperature typed in the user's unit, in °C (to a millionth: no 30.999999999999996 in a tile URL)
+    function typedTemp(value, unit) { return Math.round(((unit || userUnit()) === "F" ? (value - 32) / 1.8 : value) * 1e6) / 1e6; }
+    function roundShown(celsius, unit) { return Math.round(shownTemp(celsius, unit) * 10) / 10; }
     function formatArea(m2, unit) {
         var imperial = (unit || userUnit()) === "F";
         var v = imperial ? m2 * SQ_FT_PER_SQ_M : m2;
@@ -71,12 +80,13 @@
         return {project: m[1], task: m[2], layer: layer};
     }
 
-    // The thermal orthophotos on the map, shown, topmost last (as WebODM finds the layer a click is on)
-    function thermalLayers(map) {
+    // The thermal orthophotos on the map, shown (or hidden in WebODM's layer panel too, with hidden), topmost last (as
+    // WebODM finds the layer a click is on)
+    function thermalLayers(map, hidden) {
         var found = [];
         Object.keys(map._layers || {}).forEach(function (k) {
             var t = thermalLayer(map._layers[k]);
-            if (t && map.hasLayer(t.layer) && !(t.layer.isHidden && t.layer.isHidden())) found.push(t);
+            if (t && map.hasLayer(t.layer) && (hidden || !(t.layer.isHidden && t.layer.isHidden()))) found.push(t);
         });
         return found.sort(function (a, b) { return ((a.layer.options || {}).zIndex || 0) - ((b.layer.options || {}).zIndex || 0); });
     }
@@ -122,6 +132,86 @@
         return withColorMap(withParam(url, "palette", ""), name);
     }
     function paletteOf(url) { return PLUGIN_TILES.test(url || "") ? paramOf(url, "palette") : colorMapOf(url); }
+    // The range (°C) a thermal layer is drawn over, [lo, hi], or null
+    function rangeOf(url) {
+        var p = paramOf(url, "rescale").split(",").map(parseFloat);
+        return p.length === 2 && isFinite(p[0]) && isFinite(p[1]) && p[0] < p[1] ? p : null;
+    }
+
+    // Isotherms: {mode: off, above, below or between, low and high (°C, as the mode uses them), color (a name of
+    // ISOTHERM_COLORS)}, remembered in the browser for the same tasks
+    function isothermKey(tasks) { return ISOTHERM_PREFIX + tasks.slice().sort().join(","); }
+    function validIsotherm(iso) {
+        if (!iso || !ISOTHERM_MODES[iso.mode] || iso.mode === "off" || !ISOTHERM_COLORS[iso.color]) return false;
+        var low = iso.mode !== "below", high = iso.mode !== "above";
+        if (low && !(typeof iso.low === "number" && isFinite(iso.low))) return false;
+        if (high && !(typeof iso.high === "number" && isFinite(iso.high))) return false;
+        return !(low && high) || iso.low <= iso.high;
+    }
+    function loadIsotherm(storage, key) {
+        var iso;
+        try { iso = JSON.parse(storage.getItem(key) || "null"); } catch (e) { iso = null; }
+        return validIsotherm(iso) ? iso : {mode: "off", color: "red"};
+    }
+    function saveIsotherm(storage, key, iso) {
+        try {
+            if (validIsotherm(iso)) storage.setItem(key, JSON.stringify(iso));
+            else storage.removeItem(key);
+        } catch (e) { /* kept for this page only */ }
+    }
+    // Limits to start a mode from, within the range the layer shows (°C)
+    function defaultIsotherm(mode, range, color, unit) {
+        var lo = range ? range[0] : 0, hi = range ? range[1] : 40;
+        var at = function (f) { return typedTemp(roundShown(lo + (hi - lo) * f, unit), unit); };
+        var iso = {mode: mode, color: color || "red"};
+        if (mode === "above" || mode === "between") iso.low = at(mode === "above" ? 0.7 : 0.3);
+        if (mode === "below" || mode === "between") iso.high = at(mode === "below" ? 0.3 : 0.7);
+        return iso;
+    }
+    // The tiles of a thermal layer's isotherm (its URL either WebODM's or the plugin's), its size and crop kept
+    function isothermUrl(url, iso) {
+        var m = TILE_URL.exec(url || "");
+        if (!m || !validIsotherm(iso)) return "";
+        var q = url.indexOf("?"), rest = url.slice(m.index + m[0].length, q === -1 ? url.length : q).replace(/\.(png|jpe?g|webp)$/, "");
+        var params = [];
+        if (paramOf(url, "size")) params.push("size=" + encodeURIComponent(paramOf(url, "size")));
+        if (paramOf(url, "crop") === "1") params.push("crop=1");
+        if (iso.mode !== "below") params.push("low=" + iso.low);
+        if (iso.mode !== "above") params.push("high=" + iso.high);
+        params.push("color=" + ISOTHERM_COLORS[iso.color]);
+        return API + "projects/" + m[1] + "/tasks/" + m[2] + "/inspector/isotherm/" + rest + "?" + params.join("&");
+    }
+    function describeIsotherm(iso, unit) {
+        if (!validIsotherm(iso)) return "";
+        if (iso.mode === "above") return "Above " + formatTemp(iso.low, unit);
+        if (iso.mode === "below") return "Below " + formatTemp(iso.high, unit);
+        return "Between " + formatTemp(iso.low, unit) + " and " + formatTemp(iso.high, unit);
+    }
+
+    // The legend: the palette's colours (encoded, as the palette API gives them) over the range (°C), marked in the
+    // user's unit, with the part an isotherm paints
+    function legendHtml(colors, range, label, unit, iso) {
+        if (!colors || !colors.length || !range) return "";
+        unit = unit || userUnit();
+        var lo = shownTemp(range[0], unit), hi = shownTemp(range[1], unit);
+        var ticks = Scale.scaleTicks(lo, hi, 4).map(function (t) {
+            var end = t.at < 0.1 ? " dt-tick-start" : t.at > 0.9 ? " dt-tick-end" : "";
+            return '<span class="dt-tick' + end + '" style="left: ' + (t.at * 100).toFixed(1) + '%;">' + escapeHtml(t.label) + "</span>";
+        }).join("");
+        var mark = "";
+        if (validIsotherm(iso)) {
+            var from = iso.mode === "below" ? range[0] : Math.max(iso.low, range[0]);
+            var to = iso.mode === "above" ? range[1] : Math.min(iso.high, range[1]);
+            if (to > from || (to === from && iso.mode === "between")) {
+                mark = '<div class="dt-legend-isotherm" title="' + escapeHtml(describeIsotherm(iso, unit)) + '" style="left: ' +
+                    ((from - range[0]) / (range[1] - range[0]) * 100).toFixed(1) + "%; width: " +
+                    ((to - from) / (range[1] - range[0]) * 100).toFixed(1) + "%; border-color: #" + ISOTHERM_COLORS[iso.color] + ';"></div>';
+            }
+        }
+        return '<div class="dt-legend-title">' + escapeHtml(label) + ' <span class="text-muted">°' + unit + "</span></div>" +
+            '<div class="dt-legend-bar" style="background: ' + Scale.gradientCss(colors) + ';">' + mark + "</div>" +
+            '<div class="dt-legend-ticks">' + ticks + "</div>";
+    }
 
     // Pins: {id, label, lat, lng, temperature (°C) or null, reason}, remembered in the browser for the same tasks;
     // regions likewise: {id, label, shape, geometry (GeoJSON, lon/lat), circle ({lat, lng, radius}) for circles,
@@ -257,6 +347,23 @@
     }
     function paletteNames(display) { return paletteOptions(display).map(function (o) { return o[0]; }); }
 
+    function isothermHtml(iso, unit) {
+        var input = function (key, value) {
+            return '<input type="number" step="0.1" class="form-control input-sm" data-act="isotherm-' + key + '" value="' +
+                (typeof value === "number" ? roundShown(value, unit) : "") + '">';
+        };
+        var limits = iso.mode === "off" ? "" : '<div class="dt-inspector-isotherm-limits">' +
+            (iso.mode !== "below" ? input("low", iso.low) : "") + (iso.mode === "between" ? '<span class="text-muted">to</span>' : "") +
+            (iso.mode !== "above" ? input("high", iso.high) : "") + '<span class="text-muted">°' + unit + "</span>" +
+            '<select class="form-control input-sm" data-act="isotherm-color" title="Colour">' + Object.keys(ISOTHERM_COLORS).map(function (c) {
+                return '<option value="' + c + '"' + (c === iso.color ? " selected" : "") + ">" + c + "</option>";
+            }).join("") + "</select></div>";
+        return '<div class="dt-inspector-isotherm"><select class="form-control input-sm" data-act="isotherm-mode">' +
+            Object.keys(ISOTHERM_MODES).map(function (m) {
+                return '<option value="' + m + '"' + (m === iso.mode ? " selected" : "") + ">" + ISOTHERM_MODES[m] + "</option>";
+            }).join("") + "</select>" + limits + "</div>";
+    }
+
     function panelHtml(state) {
         var unit = userUnit();
         var options = paletteOptions(state.display);
@@ -279,6 +386,10 @@
                 options.map(function (o) {
                     return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === current ? " selected" : "") + ">" + escapeHtml(o[1]) + "</option>";
                 }).join("") + "</select></label>" : "") +
+            '<label class="dt-inspector-label dt-inspector-check"><input type="checkbox" data-act="legend"' + (state.legendVisible ? " checked" : "") +
+            "> Legend on the map</label>" +
+            '<div class="dt-inspector-section"><strong>Isotherm</strong>' + isothermHtml(state.isotherm, unit) +
+            (state.isothermNotice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.isothermNotice) + "</div>" : "") + "</div>" +
             '<div class="dt-inspector-section"><strong>Pinned points</strong>' + pinsHtml(state.pins, unit, state.pinsVisible) + "</div>" +
             '<div class="dt-inspector-section"><strong>Regions</strong>' + regionsHtml(state, unit) + "</div>";
     }
@@ -303,12 +414,14 @@
         var storage = deps.storage || root.localStorage;
         var plugins = deps.pluginsApi || root.PluginsAPI;
         var tasks = (args.tiles || []).map(function (t) { return t.meta && t.meta.task && t.meta.task.id; }).filter(Boolean);
-        var key = pinsKey(tasks), rkey = regionsKey(tasks);
+        var key = pinsKey(tasks), rkey = regionsKey(tasks), ikey = isothermKey(tasks);
         var regions = loadPins(storage, rkey).filter(function (r) { return r && r.geometry && SHAPES[r.shape]; });
         var state = {open: false, mode: "hover", readout: null, pins: loadPins(storage, key), pinsVisible: true,
                      regions: regions, regionsVisible: true, shown: regions.length ? regions[regions.length - 1].id : null,
-                     notice: "", display: null, palette: ""};
-        var container, panel, cursor, pinLayer, regionLayer, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
+                     notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
+                     legendVisible: legendShown()};
+        var container, panel, cursor, pinLayer, regionLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
+        var overlays = [], colors = {};     // the isotherm's layer over each thermal layer; each palette's colours
 
         function render() {
             if (!state.open) { panel.hidden = true; return; }
@@ -317,6 +430,88 @@
             // Within the map, above its bottom controls
             var room = map.getContainer().clientHeight - container.offsetTop - 60;
             if (room > 0) panel.style.maxHeight = Math.max(160, room) + "px";
+        }
+
+        function legendShown() {
+            try { return storage.getItem(LEGEND_KEY) !== "0"; } catch (e) { return true; }
+        }
+
+        // -- isotherms and the legend ------------------------------------------------------------------------------
+
+        // An isotherm layer over each thermal layer on the map, hidden with it
+        function drawIsotherms() {
+            var wanted = validIsotherm(state.isotherm) ? thermalLayers(map, true) : [];
+            overlays = overlays.filter(function (o) {
+                var kept = wanted.some(function (t) { return t.layer === o.layer; });
+                if (!kept) map.removeLayer(o.overlay);
+                return kept;
+            });
+            wanted.forEach(function (t) {
+                var url = isothermUrl(t.layer._url, state.isotherm);
+                var o = overlays.filter(function (x) { return x.layer === t.layer; })[0];
+                if (!o) {
+                    // The thermal layer's tiling as Leaflet set it up (detectRetina already applied)
+                    var options = assign({}, t.layer.options, {opacity: 1, detectRetina: false, zIndex: ((t.layer.options || {}).zIndex || 0) + 1});
+                    o = {layer: t.layer, overlay: L.tileLayer(url, options)};
+                    overlays.push(o);
+                    o.overlay.addTo(map);
+                } else if (o.overlay._url !== url) o.overlay.setUrl(url);
+                var c = o.overlay.getContainer && o.overlay.getContainer();
+                if (c) c.style.display = t.layer.isHidden && t.layer.isHidden() ? "none" : "";
+            });
+        }
+
+        // The legend of the topmost thermal layer shown: its palette (its colours asked for once) and range
+        function renderLegend() {
+            if (!legend) return;
+            var layers = thermalLayers(map), t = layers[layers.length - 1];
+            var range = t && rangeOf(t.layer._url), name = t && paletteOf(t.layer._url);
+            if (!state.legendVisible || !range || !name) { legend.hidden = true; return; }
+            if (colors[name] === undefined) {
+                colors[name] = null;
+                fetchFn(inspectorUrl(t, "palette") + "?name=" + encodeURIComponent(name), {credentials: "same-origin"}).then(readJson).then(function (r) {
+                    colors[name] = r.ok && r.data.color_map ? r.data.color_map : false;
+                    renderLegend();
+                }, function () { colors[name] = false; });
+            }
+            if (!colors[name]) { legend.hidden = true; return; }
+            var label = ((state.display && state.display.palettes) || []).indexOf(name) !== -1 ? "DJI " + name : name;
+            legend.innerHTML = legendHtml(colors[name], range, label, userUnit(), state.isotherm);
+            legend.hidden = false;
+        }
+
+        function isothermChanged(iso) {
+            state.isotherm = iso;
+            state.isothermNotice = "";
+            saveIsotherm(storage, ikey, iso);
+            drawIsotherms();
+            renderLegend();
+            render();
+        }
+
+        // A change in the isotherm's part of the panel: limits typed in the user's unit
+        function isothermInput(what, value) {
+            var iso = assign({}, state.isotherm), unit = userUnit();
+            var layers = thermalLayers(map), t = layers[layers.length - 1];
+            if (what === "color") iso.color = value;
+            else if (what === "mode") {
+                if (value === "off") return isothermChanged({mode: "off", color: iso.color});
+                var range = t && rangeOf(t.layer._url);
+                var start = defaultIsotherm(value, range, iso.color, unit);
+                iso = assign(start, {low: typeof iso.low === "number" && value !== "below" ? iso.low : start.low,
+                                     high: typeof iso.high === "number" && value !== "above" ? iso.high : start.high});
+                if (value === "above") delete iso.high;
+                if (value === "below") delete iso.low;
+                // A lower limit kept, the upper one at least the top of the range
+                if (value === "between" && !(iso.low <= iso.high)) iso.high = Math.max(iso.low, range ? typedTemp(roundShown(range[1], unit), unit) : iso.low);
+                iso.mode = value;
+            } else {
+                var typed = parseFloat(value);
+                if (!isFinite(typed)) { state.isothermNotice = "Enter a temperature"; return render(); }
+                iso[what] = typedTemp(typed, unit);
+            }
+            if (!validIsotherm(iso)) { state.isothermNotice = "The lower limit must not be above the upper one"; return render(); }
+            isothermChanged(iso);
         }
 
         // A reading changes only the readout, so the panel's buttons stay as they are while used
@@ -520,8 +715,21 @@
                     }
                     if (state.palette) args[0] = withPalette(url, state.palette, state.display);
                 }
-                return setUrl.apply(this, args);
+                var out = setUrl.apply(this, args);
+                drawIsotherms();
+                renderLegend();
+                return out;
             };
+            ["show", "hide"].forEach(function (name) {
+                var original = t.layer[name];
+                if (typeof original !== "function") return;
+                t.layer[name] = function () {
+                    var out = original.apply(this, arguments);
+                    drawIsotherms();
+                    renderLegend();
+                    return out;
+                };
+            });
         }
 
         function onLayerAdd(e) {
@@ -529,6 +737,14 @@
             if (!t) return;
             watch(t);
             applyPalette(t);
+            drawIsotherms();
+            renderLegend();
+        }
+
+        function onLayerRemove(e) {
+            if (!thermalLayer(e.layer)) return;
+            drawIsotherms();
+            renderLegend();
         }
 
         function showPalette(name, except) {
@@ -586,7 +802,13 @@
         }
 
         function onPanelChange(e) {
-            if (e.target.getAttribute("data-act") === "palette") choosePalette(e.target.value);
+            var what = e.target.getAttribute("data-act") || "";
+            if (what === "palette") choosePalette(e.target.value);
+            else if (what === "legend") {
+                state.legendVisible = e.target.checked;
+                try { storage.setItem(LEGEND_KEY, state.legendVisible ? "1" : "0"); } catch (err) { /* this page only */ }
+                renderLegend();
+            } else if (what.indexOf("isotherm-") === 0) isothermInput(what.slice("isotherm-".length), e.target.value);
         }
 
         function open() {
@@ -604,7 +826,7 @@
             render();
         }
 
-        function onUnits() { drawPins(); drawRegions(); render(); }
+        function onUnits() { drawPins(); drawRegions(); renderLegend(); render(); }
 
         var Control = L.Control.extend({
             options: {position: "topright"},
@@ -625,6 +847,18 @@
         });
         var control = new Control();
         map.addControl(control);
+        // Top left: WebODM's own buttons sit over the bottom corners
+        var LegendControl = L.Control.extend({
+            options: {position: "topleft"},
+            onAdd: function () {
+                legend = L.DomUtil.create("div", "leaflet-control dt-legend");
+                legend.hidden = true;
+                L.DomEvent.disableClickPropagation(legend);
+                L.DomEvent.disableScrollPropagation(legend);
+                return legend;
+            }
+        });
+        map.addControl(new LegendControl());
         cursor = L.DomUtil.create("div", "dt-inspector-cursor", map.getContainer());
         cursor.style.display = "none";
         regionLayer = L.layerGroup().addTo(map);
@@ -634,7 +868,9 @@
         map.on("mousemove", onMove);
         map.on("mouseout", onOut);
         map.on("layeradd", onLayerAdd);
-        thermalLayers(map).forEach(function (t) { watch(t); });
+        map.on("layerremove", onLayerRemove);
+        thermalLayers(map, true).forEach(function (t) { watch(t); });
+        drawIsotherms();
         if (plugins && plugins.Map && plugins.Map.onHandleClick) plugins.Map.onHandleClick(onClick);
         doc.addEventListener("onUnitSystemChanged", onUnits);
 
@@ -650,13 +886,15 @@
                 var shown = thermalLayers(map)[0];
                 state.palette = shown ? paletteOf(shown.layer._url) : "";
             }
+            renderLegend();
             render();
         }, function () {});
 
         // A region drawn before its statistics came (the page left) is read again
         state.regions.forEach(function (r) { if (!r.statistics && !r.reason) measure(r); });
 
-        return {control: control, state: state, open: open, close: close, ready: ready, click: onClick, setMode: setMode};
+        return {control: control, state: state, open: open, close: close, ready: ready, click: onClick, setMode: setMode,
+                legend: function () { return legend; }, overlays: function () { return overlays; }};
     }
 
     // Added to a map only when it shows a thermal orthophoto
@@ -669,7 +907,9 @@
 
     var api = {userUnit: userUnit, formatTemp: formatTemp, thermalLayer: thermalLayer, thermalLayers: thermalLayers,
                thermalLayerAt: thermalLayerAt, pointUrl: pointUrl, withColorMap: withColorMap, colorMapOf: colorMapOf,
-               withPalette: withPalette, paletteOf: paletteOf, paletteOptions: paletteOptions,
+               withPalette: withPalette, paletteOf: paletteOf, paletteOptions: paletteOptions, rangeOf: rangeOf,
+               isothermKey: isothermKey, validIsotherm: validIsotherm, loadIsotherm: loadIsotherm, defaultIsotherm: defaultIsotherm,
+               isothermUrl: isothermUrl, describeIsotherm: describeIsotherm, legendHtml: legendHtml,
                pinsKey: pinsKey, regionsKey: regionsKey, loadPins: loadPins, savePins: savePins, pinsCsv: pinsCsv,
                regionsCsv: regionsCsv, statisticsHtml: statisticsHtml, readoutHtml: readoutHtml,
                panelHtml: panelHtml, hasThermal: hasThermal, create: create};

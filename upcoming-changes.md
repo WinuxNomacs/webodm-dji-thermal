@@ -155,9 +155,9 @@
 
 - **Thermal Inspector** (the user, 2026-10-30): the earlier Pixel Inspector ported as a control on WebODM's 2D map,
   for thermal orthophotos, with the palette and unit shared with the Analyzer; in five steps (details under
-  "Up next: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0. Steps 2–4
-  and 3b (DJI's palettes on the map) done; left: step 5 (isotherms and the legend), and pinning dji-thermal-cli
-  1.10.0 once released, dropping the fallback to its internal tables.
+  "Up next: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0. Steps 2–5
+  and 3b done (the last, isotherms and the legend, 2026-10-31); left: pinning dji-thermal-cli 1.10.0 once released
+  (its failing test fixed in its `main`), dropping the fallback to its internal tables.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -595,10 +595,28 @@ WebODM 3.3.2 lacks: the `point` and `region-stats` endpoints, the highlight colo
    panel saved and back on WebODM's tiles, spectral drawn and not saved.
 5. **Isotherms and the legend**: above, below or between limits, drawn by the plugin's tiles; the colour bar of the
    palette and range in the shared unit.
+   **Done** (2026-10-31, `inspector-isotherms-legend`): `inspector.isotherm` and `inspector/isotherm/<z>/<x>/<y>`
+   (`InspectorIsotherm`: `low` and/or `high` in °C, `color` RRGGBB, the thermal tiles' size and crop; reads the tile
+   as `inspector.tile` does, both through `_tile_data`), `inspector/palette?name=` (`InspectorPalette`: a palette's
+   256 colours, DJI's or any of WebODM's colour maps, encoded as WebODM's tiler gives them). `public/scale.js`
+   (`ThermalScale`: the viewer's colour-scale gradient and round ticks, moved out of `viewer.js` for both).
+   `inspector.js`: the Isotherm section (Off, Above, Below, Between; limits typed in the user's unit, kept in °C;
+   six colours; started within the layer's range; kept in `localStorage` per tasks), an overlay layer over each
+   thermal layer with its tiling and hidden with it (WebODM's `hide`/`show` followed); the legend control at the top
+   left (WebODM's buttons cover the bottom corners) for the topmost thermal layer shown: palette, range from its
+   URL, ticks in the user's unit, the isotherm's part outlined in its colour; "Legend on the map" remembered.
+   Tests: `test_inspector.py` (14: the isotherm's colours, alpha and crop, its refusals, the palette's colours),
+   `inspector.test.js` (18). Live check on HomerunObliqueII's map (preference PUTs intercepted; a fresh browser
+   profile, so nothing kept): the legend of the saved palette (DJI arctic, 10–50 °C); above 40 °C painted in red,
+   then 40–45 °C in blue over DJI hotiron, isotherm tiles all 200s; in imperial the legend in °F (60–120) and the
+   limits 104 and 113 °F; the legend hidden; Off removed the overlay; no console errors.
 
-**Open** (2026-10-30): dji-thermal-cli's `test_process_writes_r_jpegs_with_the_parameters_used` (flight data)
-fails on its `main` before `palette-luts` too (the R-JPEG copy's picture differs from the pseudo output by 7.2 on
-average, the test allows 4); its release checks need it passing, so it is raised with the user, not fixed here.
+**Fixed** (2026-10-31, the user: "we should definitely fix the cli"): dji-thermal-cli's
+`test_process_writes_r_jpegs_with_the_parameters_used` (flight data) failed on its `main` before `palette-luts` too:
+the R-JPEG copy's picture is exactly Pillow's JPEG of the pseudo output (quality 92, 4:2:0), but the test held it
+within 4 of the uncompressed output, and on the flight's first frame compression alone loses 7.2. The test now
+compares with that JPEG (`fix-rjpeg-picture-test`, merged in its `main`; its full suite: 1191 passed, 10 skipped).
+Its release (with `palette_luts()`) is the user's call; then the plugin pins it and drops the fallback.
 
 **Tests**: the Jest tests ported (rewritten without Enzyme, which this repo doesn't have), Django tests of the
 endpoints on the flight's orthophoto (`DT_FLIGHT_DIR`), the CLI's own tests for its function; live checks on
