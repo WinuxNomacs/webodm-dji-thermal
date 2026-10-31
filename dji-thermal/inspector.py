@@ -155,6 +155,41 @@ def tile(task, z, x, y, lut, low, high, size=256, crop=False):
     task's crop when crop), in a colour table (256 RGB colours), as PNG bytes; None outside the orthophoto. Where it
     has no data comes from its alpha band.
     """
+    data = _tile_data(task, z, x, y, size, crop)
+    if data is None:
+        return None
+    cmap = {i: (int(c[0]), int(c[1]), int(c[2]), 255) for i, c in enumerate(lut)}
+    return data.post_process(in_range=((low, high),)).render(img_format='PNG', colormap=cmap)
+
+
+def isotherm(task, z, x, y, low, high, rgb, size=256, crop=False):
+    """
+    A tile over the thermal orthophoto's (as tile reads it) painting in rgb the temperatures at or above low and at or
+    below high (°C; either may be None), transparent elsewhere, as PNG bytes; None outside the orthophoto
+    """
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    data = _tile_data(task, z, x, y, size, crop)
+    if data is None:
+        return None
+    values = data.data[0].astype(np.float64)
+    inside = (data.mask > 0) & np.isfinite(values)
+    if low is not None:
+        inside &= values >= low
+    if high is not None:
+        inside &= values <= high
+    out = np.zeros(values.shape + (4,), dtype=np.uint8)
+    out[inside] = tuple(rgb) + (255,)
+    buf = io.BytesIO()
+    Image.fromarray(out, 'RGBA').save(buf, 'PNG')
+    return buf.getvalue()
+
+
+def _tile_data(task, z, x, y, size, crop):
+    """A tile of the thermal orthophoto's first band as WebODM's map reads it (rio-tiler's ImageData), None outside it"""
     from rio_tiler.errors import TileOutsideBounds
     from rio_tiler.io import COGReader
 
@@ -175,11 +210,9 @@ def tile(task, z, x, y, lut, low, high, size=256, crop=False):
             cutline, _bounds = geom_transform_wkt_bbox(task.crop, src.dataset)
             vrt_options = {'cutline': cutline}
         try:
-            data = src.tile(x, y, z, indexes=(1,), tilesize=size, resampling_method="bilinear", vrt_options=vrt_options)
+            return src.tile(x, y, z, indexes=(1,), tilesize=size, resampling_method="bilinear", vrt_options=vrt_options)
         except TileOutsideBounds:
             return None
-    cmap = {i: (int(c[0]), int(c[1]), int(c[2]), 255) for i, c in enumerate(lut)}
-    return data.post_process(in_range=((low, high),)).render(img_format='PNG', colormap=cmap)
 
 
 def _valid(src, window, out_shape=None):

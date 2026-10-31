@@ -24,6 +24,10 @@ function fakeLeaflet() {
     L.DomUtil = {create(tag, cls, parent) { const el = document.createElement(tag); el.className = cls; if (parent) parent.appendChild(el); return el; }};
     L.DomEvent = {disableClickPropagation() {}, disableScrollPropagation() {}};
     L.Control = {extend(proto) { return function () { Object.assign(this, proto); }; }};
+    L.tileLayer = (url, options) => {
+        const container = document.createElement("div");
+        return layer({_url: url, options, setUrl(u) { this._url = u; }, getContainer() { return container; }});
+    };
     return L;
 }
 
@@ -40,6 +44,7 @@ function fakeMap(layers) {
         addControl(c) { map.controls.push(c); el.appendChild(c.onAdd(map)); },
         latLngToContainerPoint() { return {x: 10, y: 20}; },
         panTo(ll) { map.panned = ll; },
+        removeLayer(l) { map.added = map.added.filter(x => x !== l); const k = Object.keys(map._layers).find(i => map._layers[i] === l); if (k !== undefined) { delete map._layers[k]; map.fire("layerremove", {layer: l}); } },
         add(l) { map._layers[Object.keys(map._layers).length] = l; map.fire("layeradd", {layer: l}); }
     };
     (layers || []).forEach(l => { map._layers[Object.keys(map._layers).length] = l; });
@@ -300,5 +305,119 @@ describe("the Thermal Inspector's regions", () => {
         ins.open();
         expect(panel().querySelector(".dt-inspector-shown").textContent).toContain("Outside the task's crop");
         map.remove();
+    });
+});
+
+describe("the Thermal Inspector's isotherms and legend", () => {
+    const PALETTE = "GET /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/palette";
+    const INFERNO = Array.from({length: 256}, (_, i) => ((i << 24) | (0 << 16) | ((255 - i) << 8) | 255) >>> 0);
+    const change = (el, value) => {
+        if (el.type === "checkbox") el.checked = value; else el.value = value;
+        el.dispatchEvent(new Event("change", {bubbles: true}));
+    };
+
+    it("paints the temperatures above, below or between limits with the plugin's tiles, keeping the layer's size and crop", () => {
+        const url = "/api/projects/2/tasks/abc-1/orthophoto/tiles/{z}/{x}/{y}?formula=Celsius&bands=L&rescale=10,40&size=512&crop=1&color_map=magma";
+        const base = "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/isotherm/{z}/{x}/{y}?size=512&crop=1&";
+        expect(inspector.isothermUrl(url, {mode: "above", low: 30, color: "red"})).toBe(base + "low=30&color=e53935");
+        expect(inspector.isothermUrl(url, {mode: "below", high: 12.5, color: "blue"})).toBe(base + "high=12.5&color=1e88e5");
+        expect(inspector.isothermUrl(url, {mode: "between", low: 20, high: 30, color: "green"})).toBe(base + "low=20&high=30&color=43a047");
+        const dji = inspector.withPalette(url, "ironred", DISPLAY);
+        expect(inspector.isothermUrl(dji, {mode: "above", low: 30, color: "red"})).toBe(base + "low=30&color=e53935");
+        expect(inspector.isothermUrl(TILES, {mode: "above", low: 30, color: "red"})).toBe(
+            "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/isotherm/{z}/{x}/{y}?low=30&color=e53935");
+        expect(inspector.isothermUrl(url, {mode: "between", low: 30, high: 20, color: "red"})).toBe("");
+        expect(inspector.isothermUrl(url, {mode: "off", color: "red"})).toBe("");
+        expect(inspector.validIsotherm({mode: "above", low: NaN, color: "red"})).toBe(false);
+        expect(inspector.validIsotherm({mode: "above", low: 1, color: "pink"})).toBe(false);
+    });
+
+    it("starts limits within the layer's range, rounded in the user's unit", () => {
+        expect(inspector.defaultIsotherm("above", [10, 40], "red", "C")).toEqual({mode: "above", color: "red", low: 31});
+        expect(inspector.defaultIsotherm("between", [10, 40], "red", "C")).toEqual({mode: "between", color: "red", low: 19, high: 31});
+        const f = inspector.defaultIsotherm("below", [10, 40], "red", "F");
+        expect(f.high).toBe(19);                                // 30% of 50..104 °F is 66.2 °F
+    });
+
+    it("draws a legend of the palette and range in the user's unit, with the isotherm's part marked", () => {
+        const html = inspector.legendHtml(INFERNO, [10, 40], "DJI ironred", "C", {mode: "above", low: 32.5, color: "red"});
+        document.body.innerHTML = html;
+        expect(document.querySelector(".dt-legend-title").textContent).toBe("DJI ironred °C");
+        expect(document.querySelector(".dt-legend-bar").style.background).toMatch(/linear-gradient/);
+        expect([...document.querySelectorAll(".dt-tick")].map(t => t.textContent)).toEqual(["10", "20", "30", "40"]);
+        const mark = document.querySelector(".dt-legend-isotherm");
+        expect([mark.style.left, mark.style.width]).toEqual(["75%", "25%"]);
+        expect(mark.title).toBe("Above 32.50 °C");
+        document.body.innerHTML = inspector.legendHtml(INFERNO, [10, 40], "magma", "F", {mode: "below", high: 0, color: "red"});
+        expect([...document.querySelectorAll(".dt-tick")].map(t => t.textContent)).toEqual(["50", "60", "70", "80", "90", "100"]);
+        expect(document.querySelector(".dt-legend-isotherm")).toBeNull();      // below the range: nothing painted
+        expect(inspector.legendHtml(INFERNO, null, "magma", "C", null)).toBe("");
+    });
+
+    it("draws the isotherm over the thermal layer, hidden with it, kept in the browser for the same tasks", async () => {
+        window.localStorage.setItem("unit_system", "imperial");
+        const layer = tileLayer(TILES, THERMAL_TASK, {tileSize: 512, bounds: "b"});
+        layer.isHidden = function () { return !!this.hiddenNow; };
+        layer.hide = function () { this.hiddenNow = true; };
+        layer.show = function () { this.hiddenNow = false; };
+        const map = fakeMap([layer]);
+        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}});
+        await ins.ready;
+        ins.open();
+        change(panel().querySelector('[data-act="isotherm-mode"]'), "above");
+        expect(ins.state.isotherm).toEqual({mode: "above", color: "red", low: 31});      // 87.8 °F
+        change(panel().querySelector('[data-act="isotherm-low"]'), "95");
+        expect(ins.state.isotherm.low).toBe(35);
+        const overlay = ins.overlays()[0].overlay;
+        expect(map.added).toContain(overlay);
+        expect(overlay._url).toBe("/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/isotherm/{z}/{x}/{y}?low=35&color=e53935");
+        expect(overlay.options).toMatchObject({tileSize: 512, bounds: "b", zIndex: 2, opacity: 1});
+        change(panel().querySelector('[data-act="isotherm-color"]'), "blue");
+        expect(overlay._url).toMatch(/color=1e88e5$/);
+        layer.hide();
+        expect(overlay.getContainer().style.display).toBe("none");
+        layer.show();
+        expect(overlay.getContainer().style.display).toBe("");
+        change(panel().querySelector('[data-act="isotherm-mode"]'), "between");
+        expect([ins.state.isotherm.low, ins.state.isotherm.high]).toEqual([35, 40]);       // up to the range's top
+        change(panel().querySelector('[data-act="isotherm-high"]'), "80");                // below the lower limit
+        expect(panel().textContent).toContain("The lower limit must not be above the upper one");
+        expect(ins.state.isotherm.mode).toBe("between");
+        const saved = JSON.parse(window.localStorage.getItem(inspector.isothermKey(["abc-1"])));
+        expect(saved.color).toBe("blue");
+
+        // Another page of the same task
+        const map2 = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
+        const again = start(map2, {[PALETTE]: {name: "magma", color_map: INFERNO}});
+        expect(again.ins.state.isotherm).toEqual(saved);
+        expect(map2.added).toContain(again.ins.overlays()[0].overlay);
+        again.ins.open();
+        change(again.panel().querySelector('[data-act="isotherm-mode"]'), "off");
+        expect(again.ins.overlays()).toEqual([]);
+        expect(map2.added.some(l => /isotherm/.test(l._url || ""))).toBe(false);
+        expect(window.localStorage.getItem(inspector.isothermKey(["abc-1"]))).toBeNull();
+    });
+
+    it("shows the legend of the thermal layer's palette and range, following WebODM's range, unless the user hides it", async () => {
+        const layer = tileLayer(TILES, THERMAL_TASK);
+        const map = fakeMap([layer]);
+        const {ins, fetchFn, panel} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}});
+        await ins.ready;
+        await flush();
+        const legend = ins.legend();
+        expect(legend.hidden).toBe(false);
+        expect(legend.querySelector(".dt-legend-title").textContent).toBe("magma °C");
+        expect([...legend.querySelectorAll(".dt-tick")].map(t => t.textContent)).toEqual(["10", "20", "30", "40"]);
+        layer.setUrl(TILES.replace("rescale=10,40", "rescale=0,100"));       // WebODM's panel
+        expect([...legend.querySelectorAll(".dt-tick")].map(t => t.textContent)).toEqual(["0", "25", "50", "75", "100"]);
+        expect(fetchFn.mock.calls.filter(c => c[0].indexOf("/palette?") !== -1).length).toBe(1);   // asked for once
+        ins.open();
+        change(panel().querySelector('[data-act="legend"]'), false);
+        expect(legend.hidden).toBe(true);
+        expect(window.localStorage.getItem("dji-thermal-inspector:legend")).toBe("0");
+        const map2 = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
+        const again = start(map2, {[PALETTE]: {name: "magma", color_map: INFERNO}});
+        await again.ins.ready;
+        expect(again.ins.legend().hidden).toBe(true);
     });
 });

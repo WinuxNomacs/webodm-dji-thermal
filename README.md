@@ -10,7 +10,7 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
   worksets side by side), places the frames into mosaics shown on a map, and makes a WebODM task from the
   workset you choose.
 - **Thermal Inspector**, on WebODM's 2D map of a task with a thermal orthophoto: the temperature under the cursor,
-  pinned points, the statistics of regions drawn on it, and the map's palette.
+  pinned points, the statistics of regions drawn on it, isotherms, the map's palette and its legend.
 
 Temperatures are computed with [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/), a pure-Python
 implementation of DJI's Thermal SDK: no native library and no outside service. An administrator can have DJI's own
@@ -208,6 +208,12 @@ Thermal Task's images or a workset's), a thermometer button opens the Thermal In
   Analyzer's preference, saved when you choose one here or in WebODM's own layer panel, and the one the map opens
   in. WebODM's layer panel lists only its own colour maps; one it has that the Analyzer doesn't is drawn but not
   saved.
+- **Legend**: a colour bar of the thermal layer's palette over its range, marked in your unit, at the map's top
+  left; it follows the palette and range, and "Legend on the map" hides it. With several thermal tasks on the map,
+  it is the topmost one's.
+- **Isotherm**: paints the temperatures above, below or between limits (typed in your unit) in a colour of six,
+  over each thermal layer, hidden with it, within the task's crop; the legend marks the part painted. Kept in your
+  browser for the same tasks; Off removes it.
 
 Temperatures are read from the orthophoto on the server (the plugin's own API, for those who can view the task) and
 shown in WebODM's units (°F when imperial), the same setting as the Analyzer's.
