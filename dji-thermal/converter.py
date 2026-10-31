@@ -13,6 +13,7 @@ import functools
 import logging
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -54,6 +55,39 @@ def site_packages_path():
     """Where WebODM installs the plugin's requirements.txt"""
     from app.plugins.functions import get_plugins_persistent_path
     return get_plugins_persistent_path(PLUGIN_NAME, 'site-packages')
+
+
+def remove_stale_metadata(path, requirements):
+    """
+    Removes the metadata (name-version.dist-info) of the versions requirements.txt no longer pins from site-packages
+    at path, where the pinned version is installed. WebODM installs a plugin's requirements with pip's --target,
+    which replaces a package's code on an upgrade but leaves the old version's metadata beside the new one; packages
+    read their version from it (dji-thermal-cli's __version__, written in the converted images), and would name the
+    old one. Returns the folders removed.
+    """
+    def canonical(name):
+        return re.sub(r'[-_.]+', '-', name).lower()
+
+    pinned = {}
+    with open(requirements) as f:
+        for line in f:
+            m = re.match(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;#]+)', line)
+            if m:
+                pinned[canonical(m.group(1))] = m.group(2)
+    found = {}
+    for entry in os.listdir(path) if os.path.isdir(path) else []:
+        m = re.match(r'(.+)-([^-]+)\.dist-info$', entry)
+        if m and canonical(m.group(1)) in pinned:
+            found.setdefault(canonical(m.group(1)), []).append((m.group(2), entry))
+    removed = []
+    for name, entries in found.items():
+        if not any(version == pinned[name] for version, _entry in entries):
+            continue        # the pinned version isn't installed (yet): left as it is
+        for version, entry in entries:
+            if version != pinned[name]:
+                shutil.rmtree(os.path.join(path, entry), ignore_errors=True)
+                removed.append(entry)
+    return removed
 
 
 @contextmanager
