@@ -197,8 +197,9 @@
   to its internal tables dropped (2026-10-31, `pin-cli-1.10.0`). Done.
 - **Linux, Windows and macOS** (the user, 2026-10-31, from `new.md`; details under "Up next: Linux, Windows and
   macOS" below): the plugin works on every way WebODM is installed, with only the platform tests that are needed;
-  Windows checked from this machine (WSL with Windows at hand), the Mac as rarely as possible. Before 1.0.0: on a
-  native Windows WebODM the plugin would not load today (`datasets.py` imports `fcntl`).
+  Windows checked from this machine (WSL with Windows at hand); macOS's installer runs WebODM in Docker, so no Mac
+  runs. Before 1.0.0: on a native Windows WebODM the plugin would not load today (`datasets.py` imports `fcntl`, and
+  the React parts need webpack, which native installs lack).
 - **UX review** (the user, 2026-10-31, from `new.md`: "how would you make this ui more intuitive?"; details under
   "Then: UX review" below): a review of every page and control the plugin adds, proposals for the user to choose
   from, then the chosen ones built.
@@ -213,8 +214,6 @@
 - **Thermal Analyzer, part 2** — measurements (spot, line, area), comparisons and frame views (below).
 - **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
   the earlier "Folder conversion" item (below).
-- **macOS**: the dev setup and checks run on macOS, at the very end (narrowed by "Linux, Windows and macOS" above:
-  only what differs on macOS).
 
 **Done**
 - **Release 1.0.0** — 2026-10-30, `release/1.0.0` (details below).
@@ -511,7 +510,8 @@ replaced, its changes carried over.
   `{url, sha256}` added to `directory.json` by a PR (the user's).
 - **Not experimental**: the manifest's `experimental` is false from 1.0.0 (the directory's guidance marks plugins
   experimental unless the author asks otherwise).
-- **macOS checks after 1.0.0**, at the very end.
+- **macOS checks after 1.0.0**, at the very end (since dropped: macOS's installer runs WebODM in Docker, see "Up
+  next: Linux, Windows and macOS").
 
 **Built** (2026-10-30, `release/1.0.0`): manifest 1.0.0, not experimental, its description naming the Thermal Task
 and the Analyzer; `CHANGELOG.md`; README's Installing (no longer "in development"); `DISTANCE_MODES` in
@@ -590,26 +590,45 @@ paginator, 3D view). The user (2026-10-31): no phone-width work unless WebODM su
 far; so the plugin keeps to what Bootstrap gives (nothing breaks or overflows under 768px), with no phone-specific
 layouts, and the UX review checks desktop only.
 
+**Found on 2026-10-31, after the first answers**:
+- **The macOS installer runs WebODM in Docker** (webodm.org's FAQ: "simply a manager program to help you setup
+  WebODM with docker"). On a Mac the plugin's Python is always in WebODM's Linux container: **nothing in the plugin
+  is macOS-specific**, and no Mac run is needed. The SDK page needs no macOS message (DJI's Linux library is used in
+  the container). Only Docker on Apple Silicon is left to check: if WebODM's image runs as arm64 there, DJI's x64
+  library can't load, and dji-thermal-cli's `platform_dirs` would look for `release_x86` (to check, and say so on
+  the SDK page).
+- **The Windows installer runs natively** (WebODM_Setup.exe, free, on WebODM's GitHub releases). This machine has
+  one installed already, WebODM 3.2.7 in `C:\WebODM` (stopped, with projects of its own). It has no node, npm or
+  webpack (so the React parts can't build), and exiftool only inside ODX (`apps/ODX/SuperBuild/install/bin`), not
+  on WebODM's PATH.
+- **exiftool isn't needed.** dji-thermal-cli's public `process()` (with `outputs=("temp_c:tiff",)`) writes the same
+  float32 TIFF, with no exiftool and no CLI change: the R-JPEG's EXIF block kept byte for byte (GPS, Exif IFD, maker
+  notes), DJI's whole XMP packet with `Camera:BandName` = `LWIR` added, and the same `dtc:` tags the plugin writes
+  (Software, Distance, DistanceSource, Humidity, Emissivity, ReflectedTemperatureC, AmbientTemperatureC). It keeps
+  more than exiftool does: exiftool drops the DJI XMP tags it can't write (ImageSource, the rangefinder's). The one
+  difference: its `dtc:Software` doesn't say "with DJI's Thermal SDK x" when DJI's SDK measured (a small CLI change,
+  if wanted). `converter.convert` then calls `process()` on the one file and moves its `<stem>_temp_c.tiff` into
+  place; `copy_metadata`, `exiftool_command` and `exiftool_camera.config` go.
+
 **Proposed steps**:
-1. **The code made portable** (Linux tests as now): the lock, exiftool's absence handled, the SDK page on macOS, the
-   `os.replace` cases, the React parts working without webpack. Each OS branch small and in one place, so Linux runs cover the rest.
-2. **Windows checks from this machine**: the tests of what differs on Windows (the lock, exiftool's absence, the
-   SDK's Windows libraries and the `os.replace` cases) run with Windows' Python through WSL, outside WebODM; and,
-   if a native Windows WebODM can be installed here, the plugin installed in it as a user would, with a Thermal Task
-   and an Analyzer dataset, as the release check does on Linux.
-3. **macOS**: no Mac run for code shared with Linux (POSIX: the same lock, paths and files). A Mac run only where
-   macOS differs: the SDK page's message and exiftool on the native installer, once, before the release that adds
-   this support. A checklist the user runs on their MacBook in a few minutes.
+1. **The code made portable** (Linux tests as now): the lock (`msvcrt` on Windows), the converter on
+   `process()` (no exiftool, the same on every system), the `os.replace` cases, the React parts rewritten in plain
+   JavaScript (the user's choice). Each Windows branch small and in one place, so Linux runs cover the rest.
+2. **Windows checks from this machine**: the tests of what differs (the lock, `os.replace`, the SDK's Windows
+   library) with Windows' Python; then the plugin's zip installed in a native WebODM as a user would, with a Thermal
+   Task and an Analyzer dataset, as the release check does on Linux.
+3. **macOS**: no Mac runs (Docker, as on Linux). Apple Silicon checked from WebODM's image manifest, if possible
+   without a Mac.
+
+**Decided** (the user, 2026-10-31): the plugin supports Docker (all three systems), the native Windows installer and
+the macOS installer (Docker); the React parts are rewritten in plain JavaScript; a native Windows WebODM is used for
+the checks.
 
 **Open** (for the user):
-- Which installs the plugin supports: Docker on all three systems, WebODM's native Windows installer, its native
-  macOS installer (proposed: all of them).
-- Whether a native Windows WebODM can be installed on this machine for step 2 (WebODM's native installers are
-  sold on webodm.org), or whether step 2 stays with the Windows Python checks only.
-- Whether exiftool-less native installs get the CLI's own metadata writing (preferred, if it keeps every tag ODM
-  reads) or a message.
-- For the React parts on native installs: ship the built files in the zip, or rewrite them in plain JavaScript
-  (proposed: plain JavaScript, so nothing depends on the WebODM version the files were built against).
+- The converter on `process()` instead of exiftool (proposed), and whether `dtc:Software` should name DJI's SDK when
+  it measured (a dji-thermal-cli change and release first).
+- Which native Windows WebODM to check in: the existing 3.2.7 in `C:\WebODM` (its own projects; upgrading it to
+  3.3.2 with the installer touches them), or a second install beside it.
 
 ## Then: UX review
 
