@@ -471,6 +471,26 @@
         return "Building the mosaics" + (stage ? ": " + stage : "") + "…";
     }
 
+    // Where WebODM's task options dialog (a task's Options > Edit) lists the ODM options the plugin suggests: the
+    // section, and the subsection when the section shows them (WebODM 3.3.2's EditPresetDialog.jsx, OPTION_GROUP_MAP)
+    var WEBODM_SECTIONS = {
+        "radiometric-calibration": "Input & Preprocessing › Multispectral",
+        "auto-boundary": "Bounds & Cropping",
+        "feature-quality": "Structure From Motion › Feature Extraction",
+        "min-num-features": "Structure From Motion › Feature Extraction",
+        "gps-accuracy": "Structure From Motion › Georeferencing",
+        "skip-3dmodel": "Meshing",
+        "dsm": "Digital Elevation Models › Outputs",
+        "orthophoto-resolution": "Orthophoto",
+        "fast-orthophoto": "Orthophoto"
+    };
+
+    // An ODM option's name, with its section in WebODM's dialog above it when known
+    function optionHtml(name) {
+        var section = WEBODM_SECTIONS[name];
+        return (section ? '<span class="ta-option-section">' + escapeHtml(section) + "</span>" : "") + "<code>" + escapeHtml(name) + "</code>";
+    }
+
     var api = {
         escapeHtml: escapeHtml, formatBytes: formatBytes, formatDate: formatDate, formatNumber: formatNumber,
         statusLabel: statusLabel, severityLabel: severityLabel, kindLabel: kindLabel, uploadName: uploadName,
@@ -479,7 +499,8 @@
         formatTemp: formatTemp, formatDelta: formatDelta, stageText: stageText, mosaicLabel: mosaicLabel,
         batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName,
         preferences: preferences, setPreferences: setPreferences, editPreferences: editPreferences, bindPreferences: bindPreferences,
-        setUserUnit: setUserUnit, savePalette: savePalette, migrateUnit: migrateUnit, paletteOptions: paletteOptions, sortRows: sortRows
+        setUserUnit: setUserUnit, savePalette: savePalette, migrateUnit: migrateUnit, paletteOptions: paletteOptions, sortRows: sortRows,
+        optionHtml: optionHtml
     };
     root.ThermalAnalyzerCore = api;
     if (root.document && root.fetch) {

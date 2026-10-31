@@ -5,7 +5,12 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
-  - **The WebODM plan tab, usable without a command line** (the user, 2026-10-31), `plan-presets`. WebODM's task
+  - Done: **The WebODM plan tab, usable without a command line** (the user, 2026-10-31), `plan-presets`. Code:
+    `analyzer_core.optionHtml` (the sections), `conversions.optionsFormHtml` / `readOptions` (Create task's
+    tickboxes, shared), `dataset.js` (`presetOptions`, `presetHtml`, `readPresetForm`, the panel); docs: the
+    Analyzer quickstart, screenshots `dataset-plan` and `dataset-preset`. Jest 161 (no tests added); live check on
+    HomerunObliqueII: a preset saved, saved again with a box unticked (asked, replaced, still one), then deleted
+    (10 presets before and after). WebODM's task
     options dialog (a task's Options > Edit) lists options by their ODM name, in collapsible sections, so the names
     are right; what's missing is where to find them. Decided (the user):
     - **The section above each option's name**, in small grey text ("Input & Preprocessing › Multispectral";
