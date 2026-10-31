@@ -28,10 +28,8 @@ export function fromCelsius(celsius, unit){
     return unit === "F" ? celsius * 9 / 5 + 32 : celsius;
 }
 
-// The unit of the user's display preferences (the plugin's display API) when they chose one, else of WebODM's unit
-// system (Units.js's unitSystem())
-export function defaultUnit(system, preferred){
-    if (UNITS[preferred]) return preferred;
+// The user's unit, WebODM's (Units.js's unitSystem()): Fahrenheit when imperial, else Celsius
+export function defaultUnit(system){
     return system && system.temperatureUnit(0).abbr === UNITS.F ? "F" : "C";
 }
 

@@ -24,7 +24,7 @@ import shutil
 import time
 from pathlib import Path
 
-from . import converter, datasets
+from . import conversions, converter, datasets
 from .analysis import PROGRESS_INTERVAL, Canceled, clean
 
 # The mosaics built: (kind, normalized)
@@ -45,7 +45,7 @@ DEFAULT_MAX_PITCH = -80.0
 REPORT_DETAIL = ('pairs_detail', 'frames', 'per_frame')
 
 # The colour maps of WebODM's tiler offered beside DJI's palettes
-VIEWER_COLORMAPS = ('inferno', 'magma', 'plasma', 'viridis', 'hot', 'jet', 'rainbow', 'gray', 'gray_r')
+VIEWER_COLORMAPS = conversions.COLORMAPS
 DJI_PREFIX = 'dji_'
 SEAM_COLORS = ((0, 0, 0), (255, 255, 255))   # the source frame tab's lines: a pixel of each, either side of a seam
 TILE_SIZE = 256
@@ -345,8 +345,10 @@ def colormap(task, cid, name):
 
 
 def default_palette(task, cid, settings, preferred=None):
-    """The user's preferred palette, else the conversion's own, else the flight's (as dji-thermal-cli's preview used
-    it), each when the frames hold it; else inferno"""
+    """The user's preferred palette (one of WebODM's, or DJI's when the frames hold it), else the conversion's own,
+    else the flight's (as dji-thermal-cli's preview used it), each when the frames hold it; else inferno"""
+    if preferred in VIEWER_COLORMAPS:
+        return preferred
     dji = palettes_of(task, cid)
     kinds = result(task, cid).get('kinds') or {}
     for name in (preferred, settings.get('palette'), (kinds.get('as_converted') or {}).get('palette')):

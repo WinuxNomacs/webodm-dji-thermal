@@ -147,15 +147,36 @@ describe("analyzer core", () => {
         window.localStorage.clear();
     });
 
-    it("shows temperatures in the unit of the user's preferences, whatever WebODM's units are", () => {
-        window.localStorage.setItem("unit_system", "imperial");
-        core.setPreferences({unit: "K", palette: "ironred", palettes: ["ironred"]});
-        expect(core.preferences()).toEqual({unit: "K", palette: "ironred"});
-        expect(core.formatTemp(21.5, "C")).toBe("294.65 K");
-        core.setPreferences({unit: "C"});
-        expect(core.formatTemp(70.7, "F")).toBe("21.50 °C");
-        core.setPreferences(null);
+    it("changes WebODM's units with the user's unit and tells the page, as WebODM's own selector does", () => {
+        const heard = [];
+        const listener = e => heard.push(e.detail);
+        document.addEventListener("onUnitSystemChanged", listener);
+        core.setUserUnit("F");
+        expect(window.localStorage.getItem("unit_system")).toBe("imperial");
+        expect(core.formatTemp(21.5, "C")).toBe("70.70 °F");
+        core.setUserUnit("C");
+        expect(core.userUnit()).toBe("C");
+        expect(heard).toEqual(["imperial", "metric"]);
+        document.removeEventListener("onUnitSystemChanged", listener);
+        window.localStorage.clear();
+    });
+
+    it("makes a unit saved in the preferences before WebODM's, once, saving them again without it", async () => {
+        const saved = [];
+        const fetchFn = jest.fn((url, opts) => {
+            saved.push(JSON.parse(opts.body));
+            return jsonResponse(Object.assign({unit: null}, JSON.parse(opts.body)));
+        });
+        core.setPreferences({unit: "F", palette: "ironred"});
+        expect(await core.migrateUnit(fetchFn, "/api/plugins/dji-thermal/", "tok")).toBe(true);
         expect(core.userUnit()).toBe("F");
+        expect(saved).toEqual([{palette: "ironred"}]);
+        expect(core.preferences()).toEqual({unit: null, palette: "ironred"});
+        expect(await core.migrateUnit(fetchFn, "/api/plugins/dji-thermal/", "tok")).toBe(false);
+        core.setPreferences({unit: "K", palette: null});
+        await core.migrateUnit(fetchFn, "/api/plugins/dji-thermal/", "tok");
+        expect(core.userUnit()).toBe("C");
+        core.setPreferences(null);
         window.localStorage.clear();
     });
 
@@ -300,26 +321,27 @@ describe("the pages' dialog", () => {
         expect(await beside).toBe(false);
     });
 
-    it("edits the preferences: the unit and DJI palette, saved for the user", async () => {
+    it("edits the preferences: the unit as WebODM's, and the palette of DJI's or WebODM's, saved for the user", async () => {
         const saved = [];
         const fetchFn = jest.fn((url, opts) => {
-            if (opts && opts.method === "PUT") { saved.push(JSON.parse(opts.body)); return jsonResponse(Object.assign({palettes: []}, JSON.parse(opts.body))); }
-            return jsonResponse({unit: null, palette: "ironred", palettes: ["whitehot", "ironred"]});
+            if (opts && opts.method === "PUT") { saved.push(JSON.parse(opts.body)); return jsonResponse(Object.assign({unit: null, palettes: []}, JSON.parse(opts.body))); }
+            return jsonResponse({unit: null, palette: "ironred", palettes: ["whitehot", "ironred"], colormaps: ["magma"]});
         });
         let edited = core.editPreferences(document, fetchFn, "/api/plugins/dji-thermal/", "tok");
         await flush();
         expect(shown().querySelector("h4").textContent).toBe("Preferences");
         const [unit, palette] = shown().querySelectorAll("select");
-        expect([].map.call(unit.options, o => o.value)).toEqual(["", "C", "F", "K"]);
-        expect(unit.options[0].textContent).toBe("As WebODM's units (°C)");
+        expect([].map.call(unit.options, o => o.value)).toEqual(["C", "F"]);
+        expect(unit.value).toBe("C");
         expect(palette.value).toBe("ironred");
-        expect([].map.call(palette.options, o => o.textContent)).toEqual(["Each image's own", "whitehot", "ironred"]);
+        expect([].map.call(palette.options, o => o.textContent)).toEqual(["Each image's own", "DJI whitehot", "DJI ironred", "magma"]);
         unit.value = "F";
-        palette.value = "";
+        palette.value = "magma";
         click(button("Save"));
-        expect(await edited).toEqual({unit: "F", palette: null});
-        expect(saved).toEqual([{unit: "F", palette: null}]);
+        expect(await edited).toEqual({unit: null, palette: "magma"});
+        expect(saved).toEqual([{palette: "magma"}]);
         expect(fetchFn.mock.calls[1][1].headers["X-CSRFToken"]).toBe("tok");
+        expect(window.localStorage.getItem("unit_system")).toBe("imperial");
         expect(core.userUnit()).toBe("F");
 
         edited = core.editPreferences(document, fetchFn, "/api/plugins/dji-thermal/", "tok");
@@ -328,6 +350,7 @@ describe("the pages' dialog", () => {
         expect(await edited).toBe(null);
         expect(saved.length).toBe(1);
         core.setPreferences(null);
+        window.localStorage.clear();
     });
 
     it("asks for a new name, Enter renaming, and gives nothing back for the same name or a blank one", async () => {
@@ -1859,7 +1882,8 @@ describe("the mosaic viewer", () => {
         window.localStorage.setItem("unit_system", "imperial");
         const L = fakeLeaflet();
         const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
-                                [C9 + "/mosaics/harmonized/point?lon=10.0005&lat=45.0005"]: {valid: true, temperature: 30, frame: "b_T.JPG", view_angle: 2}});
+                                [C9 + "/mosaics/harmonized/point?lon=10.0005&lat=45.0005"]: {valid: true, temperature: 30, frame: "b_T.JPG", view_angle: 2},
+                                "PUT /api/plugins/dji-thermal/display": (u, o) => jsonResponse(Object.assign({unit: null}, JSON.parse(o.body)))});
         await start(fetchFn, L, [{label: "Streets", url: "https://s/{z}/{x}/{y}.png"}]);
         await ticks();
         expect($("ta-viewer-main").hidden).toBe(false);
@@ -1883,6 +1907,9 @@ describe("the mosaic viewer", () => {
         $("ta-viewer-palette").value = "inferno";
         change($("ta-viewer-palette"));
         expect(t.url).toContain("color_map=inferno");
+        // A temperature palette chosen is the user's, everywhere
+        const put = fetchFn.mock.calls.filter(c => c[1] && c[1].method === "PUT");
+        expect(put.map(c => JSON.parse(c[1].body))).toEqual([{palette: "inferno"}]);
         $("ta-viewer-min").value = "32";
         $("ta-viewer-max").value = "212";
         change($("ta-viewer-max"));

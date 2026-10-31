@@ -523,28 +523,34 @@ def forget_preferences(user):
     preferences_store(user).del_key(PREFERENCES_KEY)
 
 
-# The user's display preferences: the unit temperatures are shown in throughout the UI (None: WebODM's units, °F
-# when imperial) and DJI's palette pictures are drawn in where the frames hold it (None: each picture's own)
+# The user's display preferences: the palette temperatures are drawn in throughout the UI and on WebODM's map (None:
+# each picture's own where the frames hold one, else WebODM's default), one of DJI's or of WebODM's colour maps. The
+# unit is WebODM's own (its unit_system, kept in the browser); a unit saved here before it was is handed to the page
+# once ('unit') to become WebODM's, then dropped by the page saving the preferences again.
+
+COLORMAPS = ('inferno', 'magma', 'plasma', 'viridis', 'hot', 'jet', 'rainbow', 'gray', 'gray_r')   # WebODM's
+
+
+def display_palettes():
+    return palettes() + list(COLORMAPS)
+
 
 def display(user):
-    """{'unit': 'C', 'F', 'K' or None, 'palette': one of palettes() or None}; what is no longer valid is None"""
+    """{'unit': a unit saved before (C, F or K) or None, 'palette': one of display_palettes() or None}"""
     saved = preferences_store(user).get_json(DISPLAY_KEY, None)
     saved = saved if isinstance(saved, dict) else {}
     return {'unit': saved.get('unit') if saved.get('unit') in UNITS else None,
-            'palette': saved.get('palette') if saved.get('palette') in palettes() else None}
+            'palette': saved.get('palette') if saved.get('palette') in display_palettes() else None}
 
 
 def parse_display(raw):
     """Display preferences from the API (blank: None) and {field: message} for what is not valid"""
     raw = raw if isinstance(raw, dict) else {}
     out, errors = {}, {}
-    unit, palette = raw.get('unit'), raw.get('palette')
-    out['unit'] = None if blank(unit) else unit
-    if out['unit'] is not None and out['unit'] not in UNITS:
-        errors['unit'] = "Must be C, F or K"
+    palette = raw.get('palette')
     out['palette'] = None if blank(palette) else palette
-    if out['palette'] is not None and out['palette'] not in palettes():
-        errors['palette'] = "Not one of dji-thermal-cli's palettes"
+    if out['palette'] is not None and out['palette'] not in display_palettes():
+        errors['palette'] = "Not one of DJI's palettes or WebODM's colour maps"
     return out, errors
 
 

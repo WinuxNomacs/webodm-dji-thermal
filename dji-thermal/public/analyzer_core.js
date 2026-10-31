@@ -36,14 +36,15 @@
     }
 
     // Temperatures: a conversion's values are in the unit its files were written in (C, F or K); they are shown, and
-    // typed, in the user's own: the unit of their display preferences, else Fahrenheit with WebODM's imperial units
-    // (its unit_system, kept in the browser), else Celsius
+    // typed, in the user's own: WebODM's units (its unit_system, kept in the browser), Fahrenheit when imperial, else
+    // Celsius. It is one setting for the Analyzer, the Thermal Inspector and WebODM's own pages.
     var UNIT_SYMBOLS = {C: "°C", F: "°F", K: "K"};
     var UNIT_SCALE = {C: 1, F: 1.8, K: 1};
     var UNIT_ZERO = {C: 0, F: 32, K: 273.15};   // 0 °C in each unit
 
     // The user's display preferences ({unit, palette}, null for not chosen), as the page was given them
-    // (analyzer_pages.common, in #ta-display)
+    // (analyzer_pages.common, in #ta-display). The unit is one saved before WebODM's units were the user's unit: it
+    // becomes WebODM's once (migrateUnit)
     var display = readDisplay();
     function readDisplay() {
         var el = root.document && root.document.getElementById("ta-display");
@@ -56,12 +57,18 @@
 
     function unitOf(u) { return UNIT_SYMBOLS[u] ? u : "C"; }
     function userUnit() {
-        return UNIT_SYMBOLS[display.unit] ? display.unit : userUnitOfWebODM();
-    }
-    function userUnitOfWebODM() {
         var system;
         try { system = root.localStorage && root.localStorage.getItem("unit_system"); } catch (e) { system = null; }
         return system === "imperial" ? "F" : "C";
+    }
+    // The user's unit changed (C or F), as WebODM's unit selector does it: saved in the browser, and announced to
+    // the page's listeners (onUnitSystemChanged); other tabs hear of it through the storage event
+    function setUserUnit(u) {
+        var system = u === "F" ? "imperial" : "metric";
+        try { root.localStorage.setItem("unit_system", system); } catch (e) { return; }
+        if (root.document && typeof root.CustomEvent === "function") {
+            root.document.dispatchEvent(new root.CustomEvent("onUnitSystemChanged", {detail: system}));
+        }
     }
     function unitSymbol(u) { return UNIT_SYMBOLS[unitOf(u)]; }
 
@@ -343,40 +350,74 @@
             });
     }
 
-    // The Preferences dialog (the gear on each page): the unit and DJI palette used throughout the Analyzer, saved for
-    // the user (api: the plugin's API URL). Resolves to the preferences saved, or null when dismissed or not saved.
+    // The display preferences saved for the user (api: the plugin's API URL): resolves to them
+    function saveDisplay(fetchFn, api, csrf, body) {
+        return fetchFn(api + "display", {method: "PUT", credentials: "same-origin",
+            headers: {"Content-Type": "application/json", "X-CSRFToken": csrf}, body: JSON.stringify(body)})
+            .then(readJson).then(function (r) {
+                if (!r.ok) throw new Error(errorText(r.data, "Could not save the preferences"));
+                setPreferences(r.data);
+                return preferences();
+            });
+    }
+
+    // The palette chosen anywhere (the viewer, the map) is the user's: saved as their preference
+    function savePalette(fetchFn, api, csrf, palette) {
+        return saveDisplay(fetchFn, api, csrf, {palette: palette || null});
+    }
+
+    // A unit saved in the preferences before WebODM's units were the user's unit becomes WebODM's (Kelvin: metric),
+    // and the preferences are saved again without it. Resolves to true when there was one.
+    function migrateUnit(fetchFn, api, csrf) {
+        if (!display.unit) return Promise.resolve(false);
+        setUserUnit(display.unit === "F" ? "F" : "C");
+        return saveDisplay(fetchFn, api, csrf, {palette: display.palette}).then(function () { return true; },
+                                                                                  function () { return true; });
+    }
+
+    // The palettes the preferences offer: DJI's, then WebODM's colour maps, as [value, label]
+    function paletteOptions(data) {
+        return (data.palettes || []).map(function (p) { return [p, "DJI " + p]; })
+            .concat((data.colormaps || []).map(function (p) { return [p, p]; }));
+    }
+
+    // The Preferences dialog (the gear on each page): the unit (WebODM's own) and the palette used throughout the
+    // Analyzer and on WebODM's map. Resolves to the preferences saved, or null when dismissed or not saved.
     function editPreferences(doc, fetchFn, api, csrf) {
         return fetchFn(api + "display", {credentials: "same-origin"}).then(readJson).then(function (r) {
             if (!r.ok) throw new Error(errorText(r.data, "Could not read the preferences"));
             return dialog(doc, {title: "Preferences", selects: [
-                {name: "unit", label: "Temperature unit", value: r.data.unit || "",
-                 options: [["", "As WebODM's units (" + UNIT_SYMBOLS[userUnitOfWebODM()] + ")"], ["C", "Celsius (°C)"], ["F", "Fahrenheit (°F)"], ["K", "Kelvin (K)"]],
-                 help: "Temperatures are shown and typed in it, whatever unit an image or workset holds."},
-                {name: "palette", label: "DJI palette", value: r.data.palette || "",
-                 options: [["", "Each image's own"]].concat((r.data.palettes || []).map(function (p) { return [p, p]; })),
-                 help: "Where the frames hold it: the viewer's temperature mosaics, new worksets and the Files tab's thumbnails."}
+                {name: "unit", label: "Temperature unit", value: userUnit(),
+                 options: [["C", "Celsius (°C), with WebODM's metric units"], ["F", "Fahrenheit (°F), with WebODM's imperial units"]],
+                 help: "The same setting as WebODM's units: changing it here changes it on WebODM's map, and back."},
+                {name: "palette", label: "Palette", value: r.data.palette || "",
+                 options: [["", "Each image's own"]].concat(paletteOptions(r.data)),
+                 help: "Temperatures are drawn in it: the viewer's mosaics and WebODM's map; DJI's also new worksets and the Files tab's thumbnails."}
             ], buttons: [{label: "Cancel", value: false}, {label: "Save", value: true, style: "primary"}]});
         }).then(function (d) {
             if (d.button !== true) return null;
-            var body = {unit: d.selects.unit || null, palette: d.selects.palette || null};
-            return fetchFn(api + "display", {method: "PUT", credentials: "same-origin",
-                headers: {"Content-Type": "application/json", "X-CSRFToken": csrf}, body: JSON.stringify(body)})
-                .then(readJson).then(function (r) {
-                    if (!r.ok) throw new Error(errorText(r.data, "Could not save the preferences"));
-                    setPreferences(r.data);
-                    return preferences();
-                });
+            setUserUnit(d.selects.unit);
+            return saveDisplay(fetchFn, api, csrf, {palette: d.selects.palette || null});
         });
     }
 
-    // The gear (#ta-prefs) of a page: the dialog, then the page drawn again in the preferences saved
+    // The gear (#ta-prefs) of a page: the dialog, then the page drawn again in the preferences saved; the same when
+    // the unit changes in another tab. A unit saved before becomes WebODM's first.
     function bindPreferences(doc, win) {
-        var button = doc.getElementById("ta-prefs");
         var page = doc.querySelector(".ta-page");
-        if (!button || !page) return;
+        if (!page) return;
+        var csrf = (page.querySelector("input[name=csrfmiddlewaretoken]") || {}).value;
+        var api = page.getAttribute("data-api");
+        migrateUnit(win.fetch.bind(win), api, csrf);
+        if (win.addEventListener) {
+            win.addEventListener("storage", function (e) {
+                if (e.key === "unit_system") win.location.reload();
+            });
+        }
+        var button = doc.getElementById("ta-prefs");
+        if (!button) return;
         button.addEventListener("click", function () {
-            var csrf = (page.querySelector("input[name=csrfmiddlewaretoken]") || {}).value;
-            editPreferences(doc, win.fetch.bind(win), page.getAttribute("data-api"), csrf).then(function (saved) {
+            editPreferences(doc, win.fetch.bind(win), api, csrf).then(function (saved) {
                 if (saved) win.location.reload();
             }, function (e) {
                 dialog(doc, {title: "Preferences", text: e.message});
@@ -424,7 +465,8 @@
         unitOf: unitOf, userUnit: userUnit, unitSymbol: unitSymbol, convertTemp: convertTemp, convertDelta: convertDelta,
         formatTemp: formatTemp, formatDelta: formatDelta, stageText: stageText, mosaicLabel: mosaicLabel,
         batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName,
-        preferences: preferences, setPreferences: setPreferences, editPreferences: editPreferences, bindPreferences: bindPreferences
+        preferences: preferences, setPreferences: setPreferences, editPreferences: editPreferences, bindPreferences: bindPreferences,
+        setUserUnit: setUserUnit, savePalette: savePalette, migrateUnit: migrateUnit
     };
     root.ThermalAnalyzerCore = api;
     if (root.document && root.fetch) {

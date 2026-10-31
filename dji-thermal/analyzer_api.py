@@ -482,7 +482,8 @@ class Preferences(DatasetView):
         saved = conversions.preferences(request.user)
         settings = dict(saved if saved is not None else conversions.DEFAULTS)
         # New conversions start with the preferred palette when the saved defaults keep each image's own
-        settings['palette'] = settings.get('palette') or conversions.display(request.user)['palette']
+        preferred = conversions.display(request.user)['palette']
+        settings['palette'] = settings.get('palette') or (preferred if preferred in conversions.palettes() else None)
         return Response({
             'settings': settings,
             'saved': saved is not None,
@@ -508,15 +509,16 @@ class Preferences(DatasetView):
 
 class Display(DatasetView):
     def get(self, request):
-        """The user's display preferences (see conversions.display) and DJI's palettes to choose from"""
-        return Response(dict(conversions.display(request.user), palettes=conversions.palettes()))
+        """The user's display preferences (see conversions.display), DJI's palettes and WebODM's colour maps"""
+        return Response(dict(conversions.display(request.user), palettes=conversions.palettes(),
+                             colormaps=conversions.COLORMAPS))
 
     def put(self, request):
         value, errors = conversions.parse_display(request.data)
         if errors:
             raise ValidationError(errors)
         conversions.save_display(request.user, value)
-        return Response(dict(value, palettes=conversions.palettes()))
+        return Response(dict(value, unit=None, palettes=conversions.palettes(), colormaps=conversions.COLORMAPS))
 
 
 def viewer(task, cid, user):

@@ -38,8 +38,8 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
    with them are ignored and not uploaded.
 2. **Measurement**: the values the temperatures are computed with. Each field shows the value the camera recorded
    and the range the camera accepts; left empty, every photo keeps its own recorded value.
-   - **Temperature unit** of the values you enter: Celsius, Fahrenheit or Kelvin, by default the unit of your
-     Thermal Analyzer preferences, else WebODM's unit system. The task's images are always in degrees Celsius.
+   - **Temperature unit** of the values you enter: Celsius, Fahrenheit or Kelvin, by default WebODM's units (°F
+     when imperial, else °C). The task's images are always in degrees Celsius.
    - **Emissivity**, **reflected temperature**, **ambient temperature** (the H20T and XT S do not use it, and the
      form says so) and **relative humidity**.
    - **Distance** to the subject: by default each photo's laser rangefinder distance where it has a valid one
@@ -61,14 +61,16 @@ OpenStreetMap's Nominatim; the Thermal Task does not, as the plugin calls no out
 **Thermal Analyzer**, in WebODM's menu, lists the thermal datasets of every project you can view, with their
 analysis and worksets at a glance.
 
-**Preferences** (the gear beside the Thermal Analyzer's heading) are kept for your WebODM account:
+**Preferences** (the gear beside the Thermal Analyzer's heading):
 
-- **Temperature unit**: °C, °F or K, used throughout the Analyzer and the Thermal Task whatever unit an image or
-  workset holds; by default WebODM's unit system (°F when imperial, else °C).
-- **DJI palette**, where the frames hold it: the mosaics' temperature tabs open in it, new worksets start with it
-  (unless your saved defaults have a palette of their own), and the Files tab's thumbnails of thermal frames are
-  drawn in it, from their temperatures, on the server (the first view of a large dataset takes a while; they are
-  kept with the dataset). By default each image's own.
+- **Temperature unit**: °C or °F, used throughout the Analyzer and the Thermal Task whatever unit an image or
+  workset holds. It is WebODM's own units setting (the Metric/Imperial selector on its map, kept in your browser):
+  changing it in either place changes it in both, °F with imperial lengths.
+- **Palette**, kept for your WebODM account: one of DJI's palettes or of WebODM's colour maps, and also the palette
+  chosen on a mosaic's temperature tab. The mosaics' temperature tabs open in it (DJI's where the frames hold it).
+  A DJI palette is also where new worksets start (unless your saved defaults have a palette of their own) and how
+  the Files tab's thumbnails of thermal frames are drawn, from their temperatures, on the server (the first view of
+  a large dataset takes a while; they are kept with the dataset). By default each image's own.
 
 ### A dataset and its analysis
 
