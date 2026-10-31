@@ -16,16 +16,18 @@ Temperatures are computed with [dji-thermal-cli](https://pypi.org/project/dji-th
 implementation of DJI's Thermal SDK: no native library and no outside service. An administrator can have DJI's own
 SDK compute them instead (see [DJI's own Thermal SDK](#djis-own-thermal-sdk)).
 
+**[The documentation](docs/index.md)** has quickstarts with screenshots for each of these, guides (measurement
+settings, palettes, installing, DJI's SDK), troubleshooting and the plugin's API.
+
 ## Installing
 
-WebODM 3.3.2 or later. Checked on WebODM's Docker install.
+WebODM 3.3.2 or later, in Docker (Linux, Windows, macOS) or from its native Windows installer; checked on both.
 
-- **From WebODM's plugin list**: Administration > Plugins, find DJI Thermal, install it. WebODM installs without
-  webpack (the native ones) get the copy the plugin list builds for them.
+- **From WebODM's plugin list**: Administration > Plugins, find DJI Thermal, install it.
 - **From a release**: download `dji-thermal-X.Y.Z.zip` from this repository's
   [releases](https://github.com/WinuxNomacs/webodm-dji-thermal/releases) (its sha256 is given there), then
-  Administration > Plugins > **Load Plugin (.zip)**. The plugin's scripts are then built by WebODM's webpack,
-  which the Docker install has.
+  Administration > Plugins > **Load Plugin (.zip)**. The zip holds the plugin's scripts built, so WebODM needs no
+  webpack of its own (its native Windows install has none).
 
 WebODM installs the plugin's requirements in the plugin's own folder: dji-thermal-cli, with numpy and Pillow at
 WebODM's own versions. Restart WebODM if it asks you to.
@@ -276,7 +278,8 @@ checked on a real flight; the others on DJI's Thermal SDK sample images only.
 
 ## Developing
 
-`CLAUDE.md` describes the dev environment (WebODM in Docker on port 8002, `dev/webodm.sh`) and the checks.
+`CLAUDE.md` describes the dev environment (WebODM in Docker on port 8002, `dev/webodm.sh`) and the checks. `dev/screenshots.js`
+takes the documentation's screenshots from it.
 
 The plugin's parts: `converter.py` (R-JPEG to TIFF), `api.py` (its API, under `/api/plugins/dji-thermal/`: `describe` a
 photo's camera, recorded values and ranges; `projects/<id>/tasks/<id>/convert` one photo into a partial task, with

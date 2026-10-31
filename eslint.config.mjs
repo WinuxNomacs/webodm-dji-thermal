@@ -37,7 +37,7 @@ export default [
         languageOptions: {ecmaVersion: 2022, sourceType: "module", globals: {...globals.browser, ...globals.node, ...globals.jest}},
     },
     {
-        files: ["tools/**/*.js"],
+        files: ["dev/**/*.js"],
         ...js.configs.recommended,
         languageOptions: {ecmaVersion: 2022, sourceType: "commonjs", globals: {...globals.browser, ...globals.node, ...globals.jest}},
     },
