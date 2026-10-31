@@ -203,8 +203,11 @@ Thermal Task's images or a workset's), a thermometer button opens the Thermal In
   resolution, and the panel says so. Regions are listed (click one to go to it, or its chart icon for its
   statistics), can be hidden, removed and downloaded as CSV (a row of statistics per region, with the hottest and
   coldest pixels' positions), and are kept in your browser for the same tasks.
-- **Palette**: the thermal layer's colour map. It is your palette everywhere: the Analyzer's preference, saved when
-  you choose one here or in WebODM's own layer panel, and the one the map opens in.
+- **Palette**: the thermal layer's palette, from the same list as the Analyzer's: DJI's palettes (drawn by the
+  plugin, over the range set in WebODM's layer panel) and WebODM's colour maps. It is your palette everywhere: the
+  Analyzer's preference, saved when you choose one here or in WebODM's own layer panel, and the one the map opens
+  in. WebODM's layer panel lists only its own colour maps; one it has that the Analyzer doesn't is drawn but not
+  saved.
 
 Temperatures are read from the orthophoto on the server (the plugin's own API, for those who can view the task) and
 shown in WebODM's units (°F when imperial), the same setting as the Analyzer's.

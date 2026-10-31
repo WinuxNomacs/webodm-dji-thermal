@@ -466,7 +466,7 @@
         formatTemp: formatTemp, formatDelta: formatDelta, stageText: stageText, mosaicLabel: mosaicLabel,
         batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName,
         preferences: preferences, setPreferences: setPreferences, editPreferences: editPreferences, bindPreferences: bindPreferences,
-        setUserUnit: setUserUnit, savePalette: savePalette, migrateUnit: migrateUnit
+        setUserUnit: setUserUnit, savePalette: savePalette, migrateUnit: migrateUnit, paletteOptions: paletteOptions
     };
     root.ThermalAnalyzerCore = api;
     if (root.document && root.fetch) {

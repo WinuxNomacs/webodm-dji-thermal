@@ -47,6 +47,7 @@ class Plugin(PluginBase):
             MountPoint('describe$', Describe.as_view()),
             MountPoint(TASK + '/inspector/point$', inspector_api.InspectorPoint.as_view()),
             MountPoint(TASK + '/inspector/region$', inspector_api.InspectorRegion.as_view()),
+            MountPoint(TASK + r'/inspector/tiles/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)$', inspector_api.InspectorTiles.as_view()),
             MountPoint(r'projects/(?P<project_pk>\d+)/tasks/(?P<pk>[^/.]+)/convert$', TaskConvert.as_view()),
             MountPoint('datasets$', analyzer_api.DatasetListCreate.as_view()),
             MountPoint(DATASET + '$', analyzer_api.DatasetDetail.as_view()),
