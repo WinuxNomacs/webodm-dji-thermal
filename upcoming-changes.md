@@ -16,6 +16,9 @@
     frame page; the hook is kept (an Open frame button in the pane) for when one exists. Tests: Jest 161,
     `test_analyzer.py` `TestDatasetFiles` (3). Live check on HomerunObliqueII (GETs and the zip only): hover, a
     selection kept while hovering, a single download (872 KB), a Shift range of 4 and its zip, Esc.
+    Then (the user, 2026-10-31, `detail-pane-palette`): the pane shows the palette picture, not DJI's embedded one:
+    `thumbnail?size=large` (the frame's own size, cached beside the thumbnails), in the user's DJI palette, or the
+    frame's own when theirs is one of WebODM's; Download still gives the file as uploaded.
   - Done: **Workset wording and layout** (the user, 2026-10-31, from `new.md`), `workset-wording-layout`; the
     Harmonized wording agreed with "made to agree on temperature" (so it doesn't suggest other attributes change);
     the WebODM plan's "Convert with these" became "Use these settings" (it fills the form, it doesn't create);

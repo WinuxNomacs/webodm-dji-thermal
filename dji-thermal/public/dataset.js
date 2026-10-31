@@ -258,7 +258,9 @@
     }
 
     // The detail pane of the files selected, or of the one under the mouse (urls: {files: the source file's URL
-    // without the file, frames: the frame page or null}); "" when there is none
+    // without the file, picture: the thumbnail URL, frames: the frame page or null, palette: the user's preferred DJI
+    // palette or ""}); "" when there is none. A thermal frame is drawn in that palette (the server draws it in its own
+    // when it isn't one of DJI's).
     function detailHtml(a, paths, selected, urls) {
         if (!paths.length) return "";
         var close = selected ? '<button type="button" class="close" data-act="detail-close" title="Unselect" aria-label="Unselect">&times;</button>' : "";
@@ -271,10 +273,12 @@
         var r = (a.files || []).filter(function (f) { return f.path === paths[0]; })[0];
         if (!r) return "";
         var src = urls.files + encodeURIComponent(r.path);
+        var palette = urls.palette;
+        var picture = urls.picture + "?size=large&" + (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file=" + encodeURIComponent(r.path);
         var frame = urls.frames && r.kind === "thermal" ? urls.frames + "?frame=" + encodeURIComponent(r.path) : null;
         return '<div class="ta-file-detail-head"><strong title="' + esc(r.path) + '">' + esc(r.path.split("/").pop()) + "</strong>" + close + "</div>" +
-            (core.isImage({name: r.path}) ? '<a href="' + esc(src) + '" target="_blank" rel="noopener" title="Open the image"><img class="ta-file-detail-img" alt="" src="' +
-                esc(src) + '"></a>' : "") +
+            (core.isImage({name: r.path}) ? '<a href="' + esc(picture) + '" target="_blank" rel="noopener" title="Open the picture"><img class="ta-file-detail-img" alt="" src="' +
+                esc(picture) + '"></a>' : "") +
             '<div class="ta-file-detail-actions"><a class="btn btn-primary btn-xs" href="' + esc(src + "&download=1") + '"><i class="fa fa-download"></i> Download</a>' +
             (frame ? ' <a class="btn btn-default btn-xs" href="' + esc(frame) + '"><i class="fa fa-th-large"></i> Open frame</a>' : "") + "</div>" +
             '<table class="table table-condensed ta-file-detail-table"><tbody>' + detailRows(r, flagsByFile(a.findings)[r.path]).map(function (row) {
@@ -487,7 +491,8 @@
             var pane = page.querySelector(".ta-file-detail");
             if (!pane) return;
             var paths = view.selected.length ? view.selected : view.hover && hovered ? [hovered] : [];
-            var html = detailHtml(dataset.analysis, paths, view.selected.length > 0, {files: url + "/files?file=", frames: view.frames || null});
+            var html = detailHtml(dataset.analysis, paths, view.selected.length > 0,
+                                  {files: url + "/files?file=", picture: url + "/thumbnail", palette: palette || "", frames: view.frames || null});
             pane.hidden = !html;
             if (pane.innerHTML !== html) pane.innerHTML = html;
         }

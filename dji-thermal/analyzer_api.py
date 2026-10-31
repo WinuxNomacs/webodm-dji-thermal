@@ -31,6 +31,7 @@ from app.security import path_traversal_check
 from . import conversion_tasks, conversions, converter, datasets, mosaics
 
 THUMBNAIL_SIZE = (96, 96)
+LARGE_SIZE = (1280, 1280)      # the Files tab's detail pane (?size=large): a frame at its own size, up to this
 THUMBNAILS_DIR = 'thumbnails'
 OVER_QUOTA = "The project's owner is over their storage quota: free some space first"
 
@@ -318,24 +319,29 @@ class DatasetFiles(DatasetView):
 class DatasetThumbnail(DatasetView):
     def get(self, request, pk):
         """A small JPEG of one of the files its analysis lists (?file=), for the Files tab: its embedded picture, or a
-        thermal frame's temperatures in one of DJI's palettes (?palette=, the user's preferred), cached in the dataset"""
+        thermal frame's temperatures in one of DJI's palettes (?palette=, the user's preferred), cached in the dataset;
+        with ?size=large, at the file's own size (up to LARGE_SIZE), for the detail pane"""
         from PIL import Image
         task = get_dataset(request, pk)
         rel = request.query_params.get('file') or ""
         kinds = file_kinds(task)
         path = dataset_file(task, rel, kinds)
         palette = request.query_params.get('palette') or ""
+        size = LARGE_SIZE if request.query_params.get('size') == 'large' else THUMBNAIL_SIZE
+        if size == LARGE_SIZE and palette not in conversions.palettes():
+            # The detail pane draws a frame in the palette it was shot in when the user's isn't one of DJI's
+            palette = next((r.get('palette') for r in datasets.analysis(task).get('files') or [] if r.get('path') == rel), "") or ""
         if kinds[rel] == 'thermal' and palette in conversions.palettes():
-            data = palette_thumbnail(task, path, palette)
+            data = palette_thumbnail(task, path, palette, size)
             if data:
                 return thumbnail_response(data)
         out = io.BytesIO()
         try:
             with Image.open(path) as im:
                 # The JPEG decoder scales down while reading: a few milliseconds a frame
-                im.draft('RGB', THUMBNAIL_SIZE)
+                im.draft('RGB', size)
                 im = im.convert('RGB')
-                im.thumbnail(THUMBNAIL_SIZE)
+                im.thumbnail(size)
                 im.save(out, 'JPEG', quality=75)
         except FileNotFoundError:
             raise NotFound({'error': "The file is not on the server any more"}) from None
@@ -350,14 +356,17 @@ def thumbnail_response(data):
     return response
 
 
-def palette_thumbnail(task, path, palette):
-    """A thermal frame's thumbnail in a DJI palette, as JPEG bytes, kept in the dataset's thumbnails/<palette>/ by
-    the file's path, size and time; None when the frame cannot be drawn (its embedded picture is shown instead)"""
+def palette_thumbnail(task, path, palette, size=THUMBNAIL_SIZE):
+    """A thermal frame's thumbnail (up to size) in a DJI palette, as JPEG bytes, kept in the dataset's
+    thumbnails/<palette>/ by the file's path, size and time; None when the frame cannot be drawn (its embedded picture
+    is shown instead)"""
     try:
         st = os.stat(path)
     except OSError:
         return None
     key = hashlib.sha1("{}|{}|{}".format(path, st.st_size, st.st_mtime_ns).encode()).hexdigest()
+    if size != THUMBNAIL_SIZE:
+        key += "-{}x{}".format(*size)
     cached = datasets.data_path(task, THUMBNAILS_DIR, palette, key + '.jpg')
     try:
         with open(cached, 'rb') as f:
@@ -368,9 +377,9 @@ def palette_thumbnail(task, path, palette):
         im = converter.palette_picture(path, palette)
     except Exception:  # noqa: BLE001 - any frame the library cannot draw falls back to its embedded picture
         return None
-    im.thumbnail(THUMBNAIL_SIZE)
+    im.thumbnail(size)
     out = io.BytesIO()
-    im.save(out, 'JPEG', quality=75)
+    im.save(out, 'JPEG', quality=75 if size == THUMBNAIL_SIZE else 90)
     os.makedirs(os.path.dirname(cached), exist_ok=True)
     with open(cached + '.part', 'wb') as f:
         f.write(out.getvalue())
