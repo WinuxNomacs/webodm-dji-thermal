@@ -90,8 +90,26 @@
 .ta-page .ta-files-hint{ font-size: 12px; margin: 0 0 6px; }
 .ta-page .ta-files td.ta-thumb{ padding: 1px 4px; width: 52px; }
 .ta-page .ta-thumb img{ display: block; max-width: 48px; max-height: 40px; }
-.ta-page .ta-files-linked tbody tr[data-href]{ cursor: pointer; }
-.ta-page .ta-files-linked tbody tr[data-href]:hover td{ background: rgba(0, 0, 0, .04); }
+.ta-page .ta-files tbody tr[data-path]{ cursor: pointer; }
+.ta-page .ta-files tbody tr[data-path]:hover td{ background: rgba(0, 0, 0, .04); }
+.ta-page .ta-files tbody tr.ta-selected td, .ta-page .ta-files tbody tr.ta-selected:hover td{ background: #d9edf7; }
+/* The Files tab's detail pane, beside the table, in view while the list scrolls */
+.ta-page .ta-files-layout{ display: flex; align-items: flex-start; gap: 12px; }
+.ta-page .ta-files-table{ flex: 1 1 auto; min-width: 0; }
+.ta-page .ta-file-detail{ flex: 0 0 340px; position: sticky; top: 8px; max-height: calc(100vh - 16px); overflow-y: auto;
+    padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px; background: #fff; }
+.ta-page .ta-file-detail[hidden]{ display: none; }
+.ta-page .ta-file-detail-head{ display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 6px;
+    word-break: break-all; }
+.ta-page .ta-file-detail-head .close{ float: none; }
+.ta-page .ta-file-detail-img{ display: block; width: 100%; height: auto; margin-bottom: 6px; background: #f4f4f4; }
+.ta-page .ta-file-detail-actions{ margin-bottom: 6px; }
+.ta-page .ta-file-detail-table{ font-size: 12px; margin-bottom: 0; }
+.ta-page .ta-file-detail-table th{ font-weight: normal; color: #777; white-space: nowrap; width: 1%; }
+@media (max-width: 900px){
+    .ta-page .ta-files-layout{ flex-direction: column; }
+    .ta-page .ta-file-detail{ position: static; flex-basis: auto; width: 100%; max-height: none; }
+}
 .ta-page .ta-table-scroll{ overflow-x: auto; }
 .ta-page .ta-files th[data-sort]{ cursor: pointer; white-space: nowrap; }
 .ta-page .ta-files td{ white-space: nowrap; font-size: 12px; }

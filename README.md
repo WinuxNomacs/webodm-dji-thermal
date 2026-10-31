@@ -89,6 +89,11 @@ height and the size. A camera's row opens its frames on the Files tab, and each 
 - **Files**: every file with its capture time, height, gimbal pitch, temperatures, distance (recorded and the
   rangefinder's) and emissivity, and the problems that name it; filtered by name, by kind or to those with
   problems, sorted by any column, with thumbnails if you like (in your preferred DJI palette, if you chose one).
+  Click a file to open a detail pane beside the table: the file as uploaded (for a thermal R-JPEG, the picture DJI
+  embedded in it) and everything the analysis read from it (camera, position, gimbal, temperatures, measurement
+  parameters, warnings), with **Download**. Ctrl/Cmd-click adds or removes a file and Shift-click selects a range;
+  with several selected, the pane counts them and downloads them as a zip. Clicking the only selected file, its ×
+  or Esc unselects. **Hover for Detail** makes the pane follow the file under the mouse while none is selected.
 - **Problems**: what dji-thermal-cli found (errors, warnings, notes), each with what addresses it and the files it
   names.
 - **WebODM plan**: how well the frames cover the ground, the task options to use (to copy) and the dji-thermal-cli

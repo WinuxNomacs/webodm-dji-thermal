@@ -269,6 +269,52 @@ class DatasetCancel(DatasetView):
         return Response(detail(task, request.user))
 
 
+def file_kinds(task):
+    """{path: kind} of the files a dataset's analysis lists"""
+    return {r.get('path'): r.get('kind') for r in datasets.analysis(task).get('files') or []}
+
+
+def dataset_file(task, rel, kinds):
+    """
+    The path of one of the files a dataset's analysis lists (kinds: file_kinds)
+    :raises NotFound: not one of them
+    """
+    if not rel or rel not in kinds:
+        raise NotFound({'error': "Not a file of this dataset"})
+    root = datasets.images_path(task)
+    try:
+        return path_traversal_check(root + '/' + rel, root)
+    except SuspiciousFileOperation:
+        raise NotFound({'error': "Not a file of this dataset"}) from None
+
+
+class DatasetFiles(DatasetView):
+    def get(self, request, pk):
+        """One of the dataset's files as uploaded (?file=), shown in the page, or downloaded with ?download=1"""
+        task = get_dataset(request, pk)
+        path = dataset_file(task, request.query_params.get('file') or "", file_kinds(task))
+        if not os.path.isfile(path):
+            raise NotFound({'error': "The file is not on the server any more"})
+        return download_file_response(request, path, 'attachment' if request.query_params.get('download') else 'inline')
+
+    def post(self, request, pk):
+        """Several of the dataset's files as uploaded (file=, repeated: a form the page submits), as a zip streamed as
+        it is made, each at its path in the dataset"""
+        task = get_dataset(request, pk)
+        rels = request.data.getlist('file') if hasattr(request.data, 'getlist') else request.data.get('file') or []
+        rels = list(dict.fromkeys(rels if isinstance(rels, list) else [rels]))
+        if not rels:
+            raise ValidationError({'error': "No files chosen"})
+        kinds = file_kinds(task)
+        paths = [(dataset_file(task, rel, kinds), rel) for rel in rels]
+        zs = ZipStream(sized=True)
+        for path, rel in paths:
+            if os.path.isfile(path):
+                zs.add_path(path, rel)
+        name = download_name("{}-images".format(datasets.name_of(task)))
+        return download_file_stream(request, zs, 'attachment', download_filename=name + ".zip")
+
+
 class DatasetThumbnail(DatasetView):
     def get(self, request, pk):
         """A small JPEG of one of the files its analysis lists (?file=), for the Files tab: its embedded picture, or a
@@ -276,14 +322,8 @@ class DatasetThumbnail(DatasetView):
         from PIL import Image
         task = get_dataset(request, pk)
         rel = request.query_params.get('file') or ""
-        kinds = {r.get('path'): r.get('kind') for r in datasets.analysis(task).get('files') or []}
-        if not rel or rel not in kinds:
-            raise NotFound({'error': "Not a file of this dataset"})
-        root = datasets.images_path(task)
-        try:
-            path = path_traversal_check(root + '/' + rel, root)
-        except SuspiciousFileOperation:
-            raise NotFound({'error': "Not a file of this dataset"}) from None
+        kinds = file_kinds(task)
+        path = dataset_file(task, rel, kinds)
         palette = request.query_params.get('palette') or ""
         if kinds[rel] == 'thermal' and palette in conversions.palettes():
             data = palette_thumbnail(task, path, palette)

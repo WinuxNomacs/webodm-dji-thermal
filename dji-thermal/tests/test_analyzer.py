@@ -255,6 +255,48 @@ class TestAnalysis(AnalyzerTestCase):
                          status.HTTP_404_NOT_FOUND)
 
 
+class TestDatasetFiles(AnalyzerTestCase):
+    """The Files tab's detail pane: a file as uploaded, shown or downloaded, and several as a zip"""
+
+    def setUp(self):
+        super().setUp()
+        self.task = self.create()
+        self.assertEqual(self.upload(self.task, [jpeg("a.jpg"), jpeg("b.jpg")], paths=["a.jpg", "sub/b.jpg"]).data["saved"], 2)
+        datasets.update_job(self.task, status="analyzing", run_id="run")
+        datasets.finish_job(self.task, "run", {"files": [{"path": "a.jpg", "kind": "not_thermal"},
+                                                         {"path": "sub/b.jpg", "kind": "not_thermal"}]})
+        self.url = "{}/{}/files".format(API, self.task.id)
+
+    def source(self, rel):
+        with open(os.path.join(datasets.images_path(self.task), rel), "rb") as f:
+            return f.read()
+
+    def test_a_file_is_shown_or_downloaded_as_uploaded(self):
+        res = self.client.get(self.url, {"file": "sub/b.jpg"})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(b"".join(res.streaming_content) if res.streaming else res.content, self.source("sub/b.jpg"))
+        self.assertTrue(res["Content-Disposition"].startswith("inline"))
+        res = self.client.get(self.url, {"file": "a.jpg", "download": "1"})
+        self.assertTrue(res["Content-Disposition"].startswith("attachment"))
+
+    def test_several_files_download_as_a_zip_at_their_paths(self):
+        res = self.client.post(self.url, {"file": ["a.jpg", "sub/b.jpg", "a.jpg"]})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn(".zip", res["Content-Disposition"])
+        with zipfile.ZipFile(io.BytesIO(b"".join(res.streaming_content))) as z:
+            self.assertEqual(sorted(z.namelist()), ["a.jpg", "sub/b.jpg"])
+            self.assertEqual(z.read("sub/b.jpg"), self.source("sub/b.jpg"))
+        self.assertEqual(self.client.post(self.url, {}).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_only_the_datasets_files_for_who_can_view_it(self):
+        for rel in ("../x.jpg", "c.jpg", ""):
+            self.assertEqual(self.client.get(self.url, {"file": rel}).status_code, status.HTTP_404_NOT_FOUND, rel)
+        self.assertEqual(self.client.post(self.url, {"file": ["a.jpg", "../../x"]}).status_code, status.HTTP_404_NOT_FOUND)
+        other = self.client_for("testuser2")
+        self.assertEqual(other.get(self.url, {"file": "a.jpg"}).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(other.post(self.url, {"file": ["a.jpg"]}).status_code, status.HTTP_404_NOT_FOUND)
+
+
 def flight_frames(count):
     return [f for f in jpegs_in("DJI_THERMAL_FLIGHT_DIR") if f.upper().endswith("_T.JPG")][:count]
 

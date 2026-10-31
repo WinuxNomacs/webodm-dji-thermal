@@ -7,6 +7,7 @@
     var POLL_MS = 2000;
     var FILES_SHOWN = 12;     // files listed under a problem before "and N more"
     var THUMBS_KEY = "thermalAnalyzer.thumbnails";     // the Files tab's Thumbnails box, remembered per browser
+    var HOVER_KEY = "thermalAnalyzer.hoverDetail";     // and its Hover for Detail box
 
     // EXIF's "2026:10:12 18:29:50" as "2026-10-12 18:29:50"
     function captureTime(t) { return t ? String(t).replace(/^(\d{4}):(\d{2}):/, "$1-$2-") : ""; }
@@ -179,13 +180,14 @@
         return core.sortRows(rows, view.sort || "path", !!view.desc);
     }
 
-    // The table under the Files tab's bar. view.frames (the newest ready conversion's frame page) makes thermal rows
-    // links to their frame; view.thumbs (the thumbnail URL without the file) adds a small picture of each image.
+    // The table under the Files tab's bar: a click on a row selects it (view.selected, paths). view.frames (the newest
+    // ready conversion's frame page) makes thermal frames' names links to their frame; view.thumbs (the thumbnail URL
+    // without the file) adds a small picture of each image.
     function filesTableHtml(a, view) {
         var flags = flagsByFile(a.findings);
         var rows = fileRows(a, view);
-        var html = '<div class="ta-table-scroll"><table class="table table-condensed ta-files' + (view.frames ? " ta-files-linked" : "") +
-            '"><thead><tr>' + (view.thumbs ? "<th></th>" : "") + FILE_COLUMNS.map(function (c) {
+        var selected = view.selected || [];
+        var html = '<div class="ta-table-scroll"><table class="table table-condensed ta-files"><thead><tr>' + (view.thumbs ? "<th></th>" : "") + FILE_COLUMNS.map(function (c) {
             var arrow = (view.sort || "path") === c.key ? ' <i class="fa fa-caret-' + (view.desc ? "down" : "up") + '"></i>' : "";
             return '<th data-sort="' + c.key + '"' + (c.title ? ' title="' + esc(c.title) + '"' : "") + ">" + esc(c.label) + arrow + "</th>";
         }).join("") + "<th>Notes</th></tr></thead><tbody>";
@@ -199,9 +201,9 @@
             var href = view.frames && r.kind === "thermal" ? view.frames + "?frame=" + encodeURIComponent(r.path) : null;
             var thumb = view.thumbs ? '<td class="ta-thumb">' + (core.isImage({name: r.path}) ?
                 '<img loading="lazy" alt="" src="' + esc(view.thumbs + encodeURIComponent(r.path)) + '">' : "") + "</td>" : "";
-            return '<tr class="ta-kind-' + esc(r.kind) + '"' + (href ? ' data-href="' + esc(href) + '" title="Open the frame"' : "") + ">" + thumb +
+            return '<tr class="ta-kind-' + esc(r.kind) + (selected.indexOf(r.path) >= 0 ? " ta-selected" : "") + '" data-path="' + esc(r.path) + '">' + thumb +
                 FILE_COLUMNS.map(function (c) {
-                    return "<td>" + (href && c.key === "path" ? '<a href="' + esc(href) + '">' + cell(r, c) + "</a>" : cell(r, c)) + "</td>";
+                    return "<td>" + (href && c.key === "path" ? '<a href="' + esc(href) + '" title="Open the frame">' + cell(r, c) + "</a>" : cell(r, c)) + "</td>";
                 }).join("") + "<td>" + notes.join(" ") + "</td></tr>";
         }).join("");
         return {html: html + "</tbody></table></div>", count: rows.length};
@@ -231,9 +233,53 @@
             }).join("") +
             '<input type="search" class="form-control input-sm ta-files-filter" placeholder="Filter by name" value="' + esc(view.filter || "") + '">' +
             '<label class="checkbox-inline"><input type="checkbox" class="ta-files-thumbs"' + (view.thumbs ? " checked" : "") + "> Thumbnails</label>" +
+            '<label class="checkbox-inline" title="The detail pane follows the image under the mouse, while none is selected"><input type="checkbox" class="ta-files-hover"' +
+            (view.hover ? " checked" : "") + "> Hover for Detail</label>" +
             scopeHtml(a, view) +
             '<span class="text-muted ta-files-shown">' + table.count + " shown</span></div>" +
-            '<div class="ta-files-table">' + table.html + "</div>";
+            '<div class="ta-files-layout"><div class="ta-files-table">' + table.html + '</div><aside class="ta-file-detail" hidden></aside></div>';
+    }
+
+    // What the detail pane shows of one file, as [label, value] (values as shown, empty ones left out)
+    function detailRows(r, notes) {
+        var temp = function (v) { return core.formatTemp(v, "C", 1); };
+        var num = function (v, digits, unit) { return core.formatNumber(v, digits, unit); };
+        var rows = [["Kind", core.kindLabel(r.kind)], ["Captured", captureTime(r.time)],
+            ["Camera", [r.model, r.serial ? "SN " + r.serial : ""].filter(Boolean).join(" · ")],
+            ["Image size", r.width && r.height ? r.width + " × " + r.height + " px" : ""], ["File size", core.formatBytes(r.size)],
+            ["Latitude", num(r.lat, 7)], ["Longitude", num(r.lon, 7)], ["Height", num(r.alt, 1, " m")],
+            ["Altitude", num(r.abs_alt, 1, " m")], ["GPS", r.gps], ["Gimbal pitch", num(r.pitch, 1, "°")], ["Gimbal yaw", num(r.yaw, 1, "°")],
+            ["Min", temp(r.tmin)], ["Max", temp(r.tmax)], ["Mean", temp(r.tmean)], ["Distance", num(r.distance, 1, " m")],
+            ["Rangefinder", num(r.lrf, 1, " m")], ["Emissivity", num(r.emissivity, 2)], ["Humidity", num(r.humidity, 0, " %")],
+            ["Reflected", temp(r.reflection)], ["Ambient", temp(r.ambient)], ["Palette", r.palette], ["Reason", r.kind !== "thermal" ? r.reason : ""]];
+        (r.warnings || []).forEach(function (w) { rows.push(["Warning", w]); });
+        (notes || []).forEach(function (f) { rows.push([f.code, f.message]); });
+        return rows.filter(function (row) { return row[1] !== "" && row[1] !== null && row[1] !== undefined; });
+    }
+
+    // The detail pane of the files selected, or of the one under the mouse (urls: {files: the source file's URL
+    // without the file, frames: the frame page or null}); "" when there is none
+    function detailHtml(a, paths, selected, urls) {
+        if (!paths.length) return "";
+        var close = selected ? '<button type="button" class="close" data-act="detail-close" title="Unselect" aria-label="Unselect">&times;</button>' : "";
+        if (paths.length > 1) {
+            return '<div class="ta-file-detail-head"><strong>' + paths.length + " images selected</strong>" + close + "</div>" +
+                '<button type="button" class="btn btn-primary btn-sm" data-act="download-selected"><i class="fa fa-download"></i> Download ' +
+                paths.length + " images</button>" +
+                '<p class="text-muted ta-files-hint">As a zip, each at its path in the dataset. Ctrl/Cmd-click adds or removes an image, Shift-click a range.</p>';
+        }
+        var r = (a.files || []).filter(function (f) { return f.path === paths[0]; })[0];
+        if (!r) return "";
+        var src = urls.files + encodeURIComponent(r.path);
+        var frame = urls.frames && r.kind === "thermal" ? urls.frames + "?frame=" + encodeURIComponent(r.path) : null;
+        return '<div class="ta-file-detail-head"><strong title="' + esc(r.path) + '">' + esc(r.path.split("/").pop()) + "</strong>" + close + "</div>" +
+            (core.isImage({name: r.path}) ? '<a href="' + esc(src) + '" target="_blank" rel="noopener" title="Open the image"><img class="ta-file-detail-img" alt="" src="' +
+                esc(src) + '"></a>' : "") +
+            '<div class="ta-file-detail-actions"><a class="btn btn-primary btn-xs" href="' + esc(src + "&download=1") + '"><i class="fa fa-download"></i> Download</a>' +
+            (frame ? ' <a class="btn btn-default btn-xs" href="' + esc(frame) + '"><i class="fa fa-th-large"></i> Open frame</a>' : "") + "</div>" +
+            '<table class="table table-condensed ta-file-detail-table"><tbody>' + detailRows(r, flagsByFile(a.findings)[r.path]).map(function (row) {
+                return "<tr><th>" + esc(row[0]) + "</th><td>" + esc(row[1]) + "</td></tr>";
+            }).join("") + "</tbody></table>";
     }
 
     // The Problems tab: the findings, most severe first, each with what addresses it and the files it names (each a
@@ -329,6 +375,9 @@
         var dataset = null, view = {show: "all", sort: "path", desc: false, filter: ""}, tab = "convert", tabChosen = false, timer = null, uploading = false;
         var filesKey = null;
         try { view.thumbs = root.localStorage && root.localStorage.getItem(THUMBS_KEY) === "1" ? thumbsUrl : null; } catch (e) { view.thumbs = null; }
+        try { view.hover = !!root.localStorage && root.localStorage.getItem(HOVER_KEY) === "1"; } catch (e) { view.hover = false; }
+        view.selected = [];
+        var anchor = null, hovered = null;      // the last row clicked (Shift-click's range starts there); the row under the mouse
         // A link to a tab (#convert, as the mosaic viewer's way back) opens it
         var linked = ((root.location && root.location.hash) || "").replace(/[^a-z]/g, "");
         if (linked && page.querySelector('#ta-tabs a[data-tab="' + linked + '"]')) { tab = linked; tabChosen = true; }
@@ -421,13 +470,73 @@
             timer = (analyzing || converting) && root.setTimeout ? root.setTimeout(load, POLL_MS) : null;
         }
 
-        function renderFiles() { $("ta-tab-files").innerHTML = filesHtml(dataset.analysis, view); }
+        function renderFiles() {
+            $("ta-tab-files").innerHTML = filesHtml(dataset.analysis, view);
+            renderDetail();
+        }
 
         // Only the table and its count, while typing in the filter
         function renderFilesTable() {
             var table = filesTableHtml(dataset.analysis, view);
             page.querySelector(".ta-files-table").innerHTML = table.html;
             page.querySelector(".ta-files-shown").textContent = table.count + " shown";
+        }
+
+        // The detail pane: the files selected, else (with Hover for Detail) the one under the mouse
+        function renderDetail() {
+            var pane = page.querySelector(".ta-file-detail");
+            if (!pane) return;
+            var paths = view.selected.length ? view.selected : view.hover && hovered ? [hovered] : [];
+            var html = detailHtml(dataset.analysis, paths, view.selected.length > 0, {files: url + "/files?file=", frames: view.frames || null});
+            pane.hidden = !html;
+            if (pane.innerHTML !== html) pane.innerHTML = html;
+        }
+
+        // The selection changed: the rows marked (the table kept as it is, scrolled where it was) and the pane
+        function selectionChanged() {
+            [].forEach.call(page.querySelectorAll(".ta-files tbody tr[data-path]"), function (tr) {
+                tr.classList.toggle("ta-selected", view.selected.indexOf(tr.getAttribute("data-path")) >= 0);
+            });
+            renderDetail();
+        }
+
+        // A click on a row: it alone selected (unselected when it was), Ctrl/Cmd adds or removes it, Shift the range
+        // from the last one clicked, in the table's order
+        function select(path, e) {
+            if (e.shiftKey && anchor !== null) {
+                var order = fileRows(dataset.analysis, view).map(function (r) { return r.path; });
+                var i = order.indexOf(anchor), j = order.indexOf(path);
+                if (i >= 0 && j >= 0) {
+                    view.selected = order.slice(Math.min(i, j), Math.max(i, j) + 1);
+                    if (root.getSelection) root.getSelection().removeAllRanges();
+                    return selectionChanged();
+                }
+            }
+            if (e.ctrlKey || e.metaKey) {
+                view.selected = view.selected.indexOf(path) >= 0 ? view.selected.filter(function (p) { return p !== path; }) : view.selected.concat([path]);
+            } else {
+                view.selected = view.selected.length === 1 && view.selected[0] === path ? [] : [path];
+            }
+            anchor = path;
+            selectionChanged();
+        }
+
+        // The selected files as a zip: a form posted, so the browser downloads it however many there are
+        function downloadSelected() {
+            var form = doc.createElement("form");
+            form.method = "POST";
+            form.action = url + "/files";
+            form.hidden = true;
+            [["csrfmiddlewaretoken", csrf]].concat(view.selected.map(function (p) { return ["file", p]; })).forEach(function (f) {
+                var input = doc.createElement("input");
+                input.type = "hidden";
+                input.name = f[0];
+                input.value = f[1];
+                form.appendChild(input);
+            });
+            doc.body.appendChild(form);
+            form.submit();
+            doc.body.removeChild(form);
         }
 
         function showTab(t) {
@@ -474,9 +583,29 @@
                 view.sort = key;
                 return renderFilesTable();
             }
-            // A click anywhere on a frame's row opens it, as its name's link does
-            var tr = e.target.closest("tr[data-href]");
-            if (tr && !e.target.closest("a")) nav(tr.getAttribute("data-href"));
+            if (e.target.closest('[data-act="detail-close"]')) {
+                view.selected = [];
+                return selectionChanged();
+            }
+            if (e.target.closest('[data-act="download-selected"]')) return downloadSelected();
+            // A click on a row (not on its name's link) selects it
+            var tr = e.target.closest(".ta-files tbody tr[data-path]");
+            if (tr && !e.target.closest("a")) select(tr.getAttribute("data-path"), e);
+        });
+
+        $("ta-tab-files").addEventListener("mouseover", function (e) {
+            if (!dataset || !view.hover || view.selected.length || !e.target.closest) return;
+            var tr = e.target.closest(".ta-files tbody tr[data-path]");
+            if (!tr || tr.getAttribute("data-path") === hovered) return;
+            hovered = tr.getAttribute("data-path");
+            renderDetail();
+        });
+
+        doc.addEventListener("keydown", function (e) {
+            if (e.key === "Escape" && view.selected.length && tab === "files") {
+                view.selected = [];
+                selectionChanged();
+            }
         });
 
         $("ta-tab-files").addEventListener("change", function (e) {
@@ -488,6 +617,11 @@
                 view.thumbs = e.target.checked ? thumbsUrl : null;
                 try { root.localStorage.setItem(THUMBS_KEY, e.target.checked ? "1" : "0"); } catch (err) { /* not remembered */ }
                 renderFilesTable();
+            } else if (e.target.classList.contains("ta-files-hover")) {
+                view.hover = e.target.checked;
+                hovered = null;
+                try { root.localStorage.setItem(HOVER_KEY, e.target.checked ? "1" : "0"); } catch (err) { /* not remembered */ }
+                renderDetail();
             }
         });
 
@@ -666,7 +800,7 @@
     }
 
     var api = {captureTime: captureTime, median: core.median, overview: overview, summaryRows: summaryRows, duration: duration, overviewHtml: overviewHtml, flagsByFile: flagsByFile,
-               sortRows: core.sortRows, fileRows: fileRows, filesHtml: filesHtml, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
+               sortRows: core.sortRows, fileRows: fileRows, detailRows: detailRows, detailHtml: detailHtml, filesHtml: filesHtml, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
     root.ThermalAnalyzerDataset = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});
