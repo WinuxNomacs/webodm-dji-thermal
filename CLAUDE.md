@@ -19,8 +19,9 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
   macOS installer is a manager for Docker) or from its native Windows installer (the plugin's Python on Windows,
   with no node, npm or webpack). So: no POSIX-only module at import time (OS differences in `portable.py`), no
   outside tool (exiftool: dji-thermal-cli writes the TIFFs' metadata), the JSX shipped built (`dev/package.sh`
-  puts `public/build` in the zip; WebODM then skips its own webpack), and no Mac runs (plan: "Up next: Linux,
-  Windows and macOS").
+  puts `public/build` in the zip; WebODM then skips its own webpack), every dji-thermal-cli call that can start
+  processes given `jobs=1` (Windows' worker can start them, but they lack the plugin's site-packages), and no Mac
+  runs (plan: "Done: Linux, Windows and macOS").
 - **Temperatures come from [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/)** (pure Python, AGPL),
   a separate package; a change it needs is made and released there first (its `RELEASING.md`: a `release/X.Y.Z`
   branch and its local checks; pushing its `main` runs nothing, its `vX.Y.Z` tag runs CI on three systems, then
