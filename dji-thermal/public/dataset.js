@@ -310,8 +310,8 @@
         [/--ambient-temp and --reflected-temp/g, "an Ambient and a Reflected temperature"],
         [/--ambient-temp\b/g, "Ambient temperature"], [/--reflected-temp\b/g, "Reflected temperature"],
         [/--emissivity\b/g, "Emissivity"], [/--humidity\b/g, "Relative humidity"],
-        [/--distance lrf \(the default\)/g, "Distance to the target, the rangefinder's (the default),"],
-        [/--distance embedded/g, "Distance to the target, Embedded,"], [/--distance METRES/g, "a Distance to the target in metres"],
+        [/--distance lrf \(the default\)/g, "Distance to the target, Laser rangefinder (the default),"],
+        [/--distance embedded/g, "Distance to the target, As recorded,"], [/--distance METRES/g, "a Distance to the target in metres"],
         [/--distance\b/g, "Distance to the target"],
         [/--replace-above\/--replace-above-value \(or --replace-below\/\.\.\.\)/g, "Replace temperatures above (or below), in the settings' Adjustments,"],
         [/--replace-(above|below) TEMP --replace-(?:above|below)-value TEMP/g, "Replace temperatures $1, in the settings' Adjustments"],
@@ -334,7 +334,7 @@
         {code: /^temperature_(max|min)_outlier$/, text: "Hot or cold spots such as sun glint: Replace temperatures above (or below), " +
             "in the settings' Adjustments, blanks or replaces them; a Colour range gives a fixed colour scale."},
         {code: /^rangefinder_distance$/, text: "The workset measures with the rangefinder's distance (the default). To use the " +
-            "distance recorded in each photo instead, choose Embedded in Distance to the target."},
+            "distance recorded in each photo instead, choose As recorded in Distance to the target."},
         {code: /^rangefinder_invalid$/, text: "Their recorded distance is used instead. If that's wrong, give a Distance to the " +
             "target in metres."},
         {code: /^rangefinder_outlier$/, text: "The laser hit something nearer or farther (a roof, a tree, the horizon). To use one " +

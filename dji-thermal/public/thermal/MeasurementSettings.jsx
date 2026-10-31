@@ -89,7 +89,7 @@ export default class MeasurementSettings extends React.Component {
                 )}
 
                 <div className={"form-group " + (errors.distance ? "has-error" : "")}>
-                    <label className="col-sm-2 control-label" htmlFor="dji-thermal-distance-mode">{_("Distance")}</label>
+                    <label className="col-sm-2 control-label" htmlFor="dji-thermal-distance-mode">{_("Distance to the target")}</label>
                     <div className="col-sm-10">
                         <select id="dji-thermal-distance-mode" className="form-control dji-thermal-input" value={distanceMode}
                                 disabled={disabled} onChange={this.setValue("distanceMode")}>

@@ -890,7 +890,15 @@ goes (the docs are written once, from it); 10 needs no dji-thermal-cli release, 
    (✓ checked, ✓ 2 worksets, ✓ in a task, the map link), and as a new dataset (its worksets and tasks removed from
    the page's copy): the plan link filled the form (Normalize, −80°) on the Worksets tab.
 5. The Thermal Task panel: 6 and its half of 4 (`thermal/ThermalTaskPanel.jsx`, one webpack rebuild; the workset
-   form's side of 6 in `conversions.js`).
+   form's side of 6 in `conversions.js`). Done, `ux-measurement`: the panel's order (emissivity, reflected, ambient,
+   humidity, then distance) and words in both: "Distance to the target" with "Laser rangefinder, else as recorded",
+   "As recorded", "Set for all photos"; "As recorded (0.91)" placeholders and "Recorded: 0.91" hints in the workset
+   form too (its intro "Left empty, each photo keeps the value its camera recorded."); a distance chip reads
+   "recorded distance"; the Problems advice and option names follow (`dataset.js`). The panel's first line points to
+   the Thermal Analyzer. Tests changed (expected text only): `analyzer.test.js`, "shows what the flight recorded
+   beside each measurement parameter…" (3 strings) and "shows the recorded values once an analysis running…"
+   (2 strings). Jest 161 (measurement 11); JSX rebuilt in the dev container; live: the panel for 6 M4T photos (only
+   `describe`, no task), the workset form's fields in the same order.
 6. The Analyzer list: 12, 13 and its half of 4 (`datasets.js`, `datasets.html`).
 
 ## Up next: Thermal Inspector
