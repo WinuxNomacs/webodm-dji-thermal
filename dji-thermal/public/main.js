@@ -10,6 +10,11 @@ PluginsAPI.Dashboard.addNewTaskButton(
     }
 );
 
+// The Thermal Inspector on WebODM's 2D map, when it shows a thermal orthophoto (inspector.js), with WebODM's Leaflet
+PluginsAPI.Map.willAddControls(["leaflet", "dji-thermal/inspector.css"], function(args, L){
+    if (window.ThermalInspector && window.ThermalInspector.hasThermal(args.tiles)) window.ThermalInspector.create(args, L);
+});
+
 // A Thermal dataset button on a task's expanded panel: on the dataset's own task (its hidden tag) and on a task made
 // from one of its worksets (the tag naming the dataset, see conversion_tasks.py)
 PluginsAPI.Dashboard.addTaskActionButton(function(args){
