@@ -869,7 +869,7 @@ describe("a dataset's page", () => {
         expect(pane().hidden).toBe(false);
         expect(pane().querySelector(".ta-file-detail-head").textContent).toBe("a_T.JPG");
         expect(pane().querySelector(".close")).toBeNull();
-        expect(pane().querySelector("img").getAttribute("src")).toBe(URL5 + "/files?file=thermal%2Fa_T.JPG");
+        expect(pane().querySelector("img").getAttribute("src")).toBe(URL5 + "/thumbnail?size=large&file=thermal%2Fa_T.JPG");    // drawn in a palette
         expect(pane().querySelector(".ta-file-detail-actions a").getAttribute("href")).toBe(URL5 + "/files?file=thermal%2Fa_T.JPG&download=1");
         expect(pane().querySelector(".ta-file-detail-table").textContent).toContain("Max");
 

@@ -251,6 +251,12 @@ class TestAnalysis(AnalyzerTestCase):
         self.assertEqual(len(os.listdir(datasets.data_path(task, "thumbnails", "rainbow1"))), 1)
         again = self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": row["path"], "palette": "rainbow1"})
         self.assertEqual(again.content, drawn.content)
+        # The detail pane's: at the frame's own size, in its own DJI palette when the user's is one of WebODM's
+        large = self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": row["path"], "palette": "magma", "size": "large"})
+        own = self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": row["path"], "palette": row["palette"], "size": "large"})
+        with Image.open(io.BytesIO(large.content)) as im:
+            self.assertEqual(im.size, (row["width"], row["height"]))
+        self.assertEqual(large.content, own.content)
         self.assertEqual(self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": "../x.jpg"}).status_code,
                          status.HTTP_404_NOT_FOUND)
 
