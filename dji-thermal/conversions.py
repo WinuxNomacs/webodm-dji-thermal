@@ -80,10 +80,26 @@ SETTINGS_FIELDS = ('distance', 'humidity', 'emissivity', 'reflected_temp', 'ambi
                    'replace_above_value', 'replace_below', 'replace_below_value', 'strip_location')
 
 
+# dji-thermal-cli's products in words, for the pages; the coloured ones (pseudo, rjpeg) are drawn in the palette
+PRODUCT_NAMES = {'temp_c': '°C', 'temp_f': '°F', 'temp_k': 'K', 'temp_ck': 'centi-kelvin', 'temp_dc': 'tenth-°C',
+                 'raw': 'raw counts', 'gray16': '16-bit grey', 'pseudo': 'colour', 'rjpeg': 'R-JPEG'}
+COLOURED = ('pseudo', 'rjpeg')
+
+
 def products():
-    """The outputs dji-thermal-cli can write: [{product, description, formats}]"""
-    return [{'product': name, 'description': p.description, 'formats': list(p.formats)}
+    """The outputs dji-thermal-cli can write: [{product, name, description, formats}]"""
+    return [{'product': name, 'name': PRODUCT_NAMES.get(name, name), 'description': p.description,
+             'formats': list(p.formats)}
             for name, p in converter.library().outputs.PRODUCTS.items()]
+
+
+def output_text(output, palette=None):
+    """An output ('temp_c:tiff', or a product alone) in words: '°C TIFF', 'colour PNG in ironred'"""
+    product, _, fmt = output.partition(':')
+    text = PRODUCT_NAMES.get(product, product)
+    if product != 'rjpeg':
+        text += ' ' + (fmt.upper() if fmt else 'images')
+    return text + (' in ' + palette if palette and product in COLOURED else '')
 
 
 def palettes():
@@ -209,7 +225,7 @@ def parse_settings(raw):
 
 def summary_text(s):
     """A short description of a conversion's settings, for the list"""
-    parts = [', '.join(o.replace(':', ' ') for o in s.get('outputs') or [])]
+    parts = [', '.join(output_text(o, s.get('palette')) for o in s.get('outputs') or [])]
     if s.get('normalize'):
         parts.append('normalized')
     if s.get('max_pitch') is not None:
@@ -218,8 +234,6 @@ def summary_text(s):
                if s.get(f) != DEFAULTS[f]]
     if changed:
         parts.append('measurement: ' + ', '.join(f.replace('_', ' ') for f in changed))
-    if s.get('palette'):
-        parts.append(s['palette'])
     if s.get('mosaics'):
         parts.append('mosaics')
     return ' · '.join(p for p in parts if p)

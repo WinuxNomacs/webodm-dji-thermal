@@ -257,7 +257,7 @@
 .ta-viewer .ta-viewer-range input{ width: 80px; }
 .ta-viewer .ta-viewer-values{ margin-bottom: 4px; }
 .ta-viewer .ta-viewer-values th{ font-weight: normal; opacity: .7; white-space: nowrap; }
-.ta-viewer .ta-viewer-values td{ word-break: break-all; }
+.ta-viewer .ta-viewer-values td{ overflow-wrap: anywhere; }
 .ta-viewer .ta-viewer-files{ list-style: none; padding: 0; }
 .ta-viewer .ta-viewer-swatch{ display: inline-block; width: 10px; height: 10px; margin-right: 2px; border-radius: 2px; }
 /* Measuring (the viewer and the frame page) */

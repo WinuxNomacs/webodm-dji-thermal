@@ -854,7 +854,12 @@ last UX step (Documentation is next, then the release, redone once at the end); 
 goes (the docs are written once, from it); 10 needs no dji-thermal-cli release, as 1 replaces that text.
 
 **Steps**, each its own branch, tested (Jest, ESLint, the Django tests where Python changes) and checked live:
-1. The mosaic viewer: 7 (wrapping), 8 and 9 in its subtitle (`viewer.js`, `analyzer.css`).
+1. The mosaic viewer: 7 (wrapping), 8 and 9 in its subtitle (`viewer.js`, `analyzer.css`). Done, `ux-viewer`:
+   the panel's values wrap at spaces (`overflow-wrap: anywhere`), a file name after its underscores; outputs in
+   words from one table, `conversions.PRODUCT_NAMES` (`output_text`: "°C TIFF", "colour PNG in ironred", the
+   palette only on the coloured outputs; `products()` gives each its `name` for step 2), used by `summary_text`,
+   so the subtitle and the workset cards' description read "°C TIFF, colour PNG in ironred · normalized · …".
+   Ruff, Jest 161, `test_analyzer` 58; live on both worksets (GETs only).
 2. The Worksets tab's chips and workset cards: 5, 8, 9 (`conversions.js`), and 2 (Create task beside View mosaics,
    same file).
 3. Problems and the WebODM plan: 1, 11, 10 with them (`dataset.js`; the buttons reuse the form's "Use these
