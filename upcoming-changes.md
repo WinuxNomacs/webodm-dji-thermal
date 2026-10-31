@@ -536,6 +536,14 @@ WebODM 3.3.2 lacks: the `point` and `region-stats` endpoints, the highlight colo
 2. **The unit and palette shared**: the Analyzer's unit choice writes WebODM's `unit_system` and follows its change
    event (`onUnitSystemChanged`); °C and °F only; the saved unit migrated once and removed; the palette preference
    read and saved by the map through the existing `display` endpoint.
+   **Done** (2026-10-30, `shared-unit-palette`): `analyzer_core.js` (`userUnit` is WebODM's alone, `setUserUnit`
+   as WebODM's selector does it, `migrateUnit` on each Analyzer page, `savePalette`; the Preferences dialog's °C/°F
+   and its palettes, DJI's then WebODM's; a page reloads when the unit changes in another tab); the viewer saves a
+   temperature tab's palette; `conversions.py` (the preference is a palette of DJI's or WebODM's `COLORMAPS`; a unit
+   saved before is handed to the page once), `mosaics.default_palette` (a WebODM colour map preferred); the Thermal
+   Task form defaults to WebODM's unit. Django 121 (`app.tests.test_plugins` included), Jest 131. Live check on
+   :8002 (the preference PUT intercepted, nothing saved): admin's saved °F became the browser's imperial units on an
+   Analyzer page, WebODM's map then showed Imperial, the dialog offered °C/°F and the 20 palettes.
 3. **The control, the value under the cursor, pins and the palette**: the plugin's own endpoints for a task the
    user can view (the orthophoto's value at a point; its tiles drawn in any palette and range); a control through
    `willAddControls` on maps with a thermal orthophoto; the palette chosen switches the thermal layer's tiles to

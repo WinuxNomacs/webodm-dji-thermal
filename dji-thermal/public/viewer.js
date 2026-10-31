@@ -458,6 +458,8 @@
         $("ta-viewer-controls").addEventListener("change", function (e) {
             if (e.target.id === "ta-viewer-palette") {
                 style().palette = e.target.value;
+                // A temperature palette is the user's, everywhere (DJI's keys carry the viewer's prefix)
+                if (isTemperature(tab)) core.savePalette(fetchFn, page.getAttribute("data-api"), csrf, e.target.value.replace(/^dji_/, "")).catch(function () {});
                 return restyle();
             }
             if (e.target.id === "ta-viewer-min" || e.target.id === "ta-viewer-max") {

@@ -299,23 +299,35 @@ class TestConversionSettings(AnalyzerTestCase):
         self.assertFalse(self.client.get(url).data["saved"])
 
 
-    def test_a_user_saves_their_display_preferences_and_the_pages_get_them(self):
+    def test_a_user_saves_their_palette_of_djis_or_webodms_and_the_pages_get_it(self):
         url = "/api/plugins/dji-thermal/display"
         res = self.client.get(url)
         self.assertEqual((res.data["unit"], res.data["palette"]), (None, None))
         self.assertIn("ironred", res.data["palettes"])
-        self.assertEqual(self.client.put(url, {"unit": "R", "palette": "pink"}, format="json").data.keys(),
-                         {"unit", "palette"})
-        self.client.put(url, {"unit": "K", "palette": "ironred"}, format="json")
-        self.assertEqual((self.client.get(url).data["unit"], self.client.get(url).data["palette"]), ("K", "ironred"))
-        self.assertEqual(self.client_for("testuser2").get(url).data["unit"], None)
+        self.assertIn("magma", res.data["colormaps"])
+        self.assertIn("palette", self.client.put(url, {"palette": "pink"}, format="json").data)
+        self.client.put(url, {"palette": "ironred"}, format="json")
+        self.assertEqual(self.client.get(url).data["palette"], "ironred")
+        self.client.put(url, {"palette": "magma"}, format="json")
+        self.assertEqual(self.client.get(url).data["palette"], "magma")
+        self.assertEqual(self.client_for("testuser2").get(url).data["palette"], None)
         self.assertContains(self.client.get("/plugins/dji-thermal/"),
-                            '<script id="ta-display" type="application/json">{"unit": "K", "palette": "ironred"}')
-        self.client.put(url, {"unit": "", "palette": None}, format="json")
-        self.assertEqual((self.client.get(url).data["unit"], self.client.get(url).data["palette"]), (None, None))
+                            '<script id="ta-display" type="application/json">{"unit": null, "palette": "magma"}')
+        self.client.put(url, {"palette": None}, format="json")
+        self.assertEqual(self.client.get(url).data["palette"], None)
+
+    def test_a_unit_saved_before_is_handed_to_the_page_once_and_dropped_when_it_saves_again(self):
+        url = "/api/plugins/dji-thermal/display"
+        conversions.save_display(self.user, {"unit": "F", "palette": "ironred"})
+        self.assertEqual((self.client.get(url).data["unit"], self.client.get(url).data["palette"]), ("F", "ironred"))
+        res = self.client.put(url, {"unit": "K", "palette": "ironred"}, format="json")
+        self.assertEqual((res.data["unit"], res.data["palette"]), (None, "ironred"))
+        self.assertEqual(self.client.get(url).data["unit"], None)
 
     def test_new_conversions_start_with_the_preferred_palette_unless_the_saved_defaults_have_one(self):
         url = "/api/plugins/dji-thermal/preferences"
+        self.client.put("/api/plugins/dji-thermal/display", {"palette": "magma"}, format="json")
+        self.assertEqual(self.client.get(url).data["settings"]["palette"], None)
         self.client.put("/api/plugins/dji-thermal/display", {"palette": "ironred"}, format="json")
         self.assertEqual(self.client.get(url).data["settings"]["palette"], "ironred")
         self.client.put(url, {"settings": {"palette": "rainbow1"}}, format="json")
@@ -328,6 +340,7 @@ class TestConversionSettings(AnalyzerTestCase):
             self.assertEqual(mosaics.default_palette(None, "c", {}, "ironred"), "dji_ironred")
             self.assertEqual(mosaics.default_palette(None, "c", {}, "hotiron"), "dji_whitehot")
             self.assertEqual(mosaics.default_palette(None, "c", {}, None), "dji_whitehot")
+            self.assertEqual(mosaics.default_palette(None, "c", {}, "magma"), "magma")
 
 
 class TestConversions(AnalyzerTestCase):
