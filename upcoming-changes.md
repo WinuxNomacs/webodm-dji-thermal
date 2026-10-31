@@ -761,13 +761,15 @@ anyway for the release: WebODM downloads the zip from the URL in WebODM-Plugins'
 4. **Kept current**: a rule in CLAUDE.md, as for README: a change to what the user sees updates the docs and reruns
    the screenshots on the same branch.
 
-**Open** (for the user):
-- Screenshots are images in the repo, which CLAUDE.md's "never commit an image" rule forbids (it was written for
-  the test images and DJI's files): allow them in `docs/` only?
-- Which data the screenshots show: a flight of yours (its location visible on the map, and in the coordinates the
-  Inspector and Files show), DJI's sample images (no GPS; DJI's licence on them to check), or a flight you're happy
-  to publish.
-- Pages once public (proposed), or the Markdown in `docs/` only.
+**Decided** (the user, 2026-10-31):
+- Screenshots go in `docs/` (the only images the repo takes; CLAUDE.md's "never commit an image" rule gets that
+  exception on the docs branch).
+- They may show the user's own data, but never the GPS or address information of a real picture: no coordinates
+  (the Files tab's and the detail pane's GPS columns, the Inspector's readouts, WebODM's map coordinates) and no
+  place names or addresses. The screenshot script blanks those before each capture, and each screenshot is looked
+  at before it is committed. Still to settle when building: the map pages show the place itself (the basemap under
+  the orthophoto); blank the basemap, or crop to the orthophoto.
+- GitHub Pages (`main` `/docs`) once the repo is public.
 
 ## Then: UX review
 
