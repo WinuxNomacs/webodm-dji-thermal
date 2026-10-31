@@ -195,6 +195,13 @@
   "Up next: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0. Steps 2–5
   and 3b done (the last, isotherms and the legend, 2026-10-31), and dji-thermal-cli 1.10.0 pinned with the fallback
   to its internal tables dropped (2026-10-31, `pin-cli-1.10.0`). Done.
+- **Linux, Windows and macOS** (the user, 2026-10-31, from `new.md`; details under "Up next: Linux, Windows and
+  macOS" below): the plugin works on every way WebODM is installed, with only the platform tests that are needed;
+  Windows checked from this machine (WSL with Windows at hand), the Mac as rarely as possible. Before 1.0.0: on a
+  native Windows WebODM the plugin would not load today (`datasets.py` imports `fcntl`).
+- **UX review** (the user, 2026-10-31, from `new.md`: "how would you make this ui more intuitive?"; details under
+  "Then: UX review" below): a review of every page and control the plugin adds, proposals for the user to choose
+  from, then the chosen ones built.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -206,7 +213,8 @@
 - **Thermal Analyzer, part 2** — measurements (spot, line, area), comparisons and frame views (below).
 - **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
   the earlier "Folder conversion" item (below).
-- **macOS**: the dev setup and checks run on macOS, at the very end.
+- **macOS**: the dev setup and checks run on macOS, at the very end (narrowed by "Linux, Windows and macOS" above:
+  only what differs on macOS).
 
 **Done**
 - **Release 1.0.0** — 2026-10-30, `release/1.0.0` (details below).
@@ -540,6 +548,69 @@ setting, under Administration.
   `main_menu`). Jest 31, Django 65 with `app.tests.test_plugins`, ESLint, Ruff.
 - Live check on :8002: admin sees DJI Thermal under Administration after Plugins and opens the page; a temporary
   user made for it has no link and gets 403 at `/plugins/dji-thermal/`; the user was removed afterwards.
+
+## Up next: Linux, Windows and macOS
+
+**The request** (the user, 2026-10-31): "This needs to support Linux, Windows and MacOS. You're currently on WSL with
+access to Windows for any Windows specific tests. I do prefer we limit the need to run platform specific tests on
+MacOS as it requires me to pull on my macbook and run the tests there. Make sure any tests are truly necessary and
+not just providing coverage."
+
+**Where the platform matters.** WebODM is installed with Docker on all three systems (the plugin's Python then runs
+in WebODM's Linux container, the same everywhere) or with its native installers, which its docs recommend on Windows
+and macOS (the plugin's Python then runs on that system). The browser side (the pages, the map control) is the same
+JavaScript everywhere: no platform tests. What differs, found by reading the code (2026-10-31):
+- `datasets.locked` holds the dataset's records with `fcntl.flock`, imported at the top of `datasets.py`: **on
+  Windows the plugin fails to import** (no `fcntl`), so nothing of it works. Needs a lock that works on Windows
+  (`msvcrt.locking`) with `fcntl` kept on Linux and macOS.
+- `converter.exiftool_command` runs `exiftool` to copy the R-JPEG's metadata into the TIFF; WebODM's Docker image
+  installs it, a native install may not have it. To find out what the native installers ship; if not there, the
+  plugin needs another way (dji-thermal-cli writes its TIFFs' EXIF/XMP itself, `tiffout`), or says so on the SDK
+  page.
+- DJI's own SDK (`sdk.py`): its zip has Linux and Windows libraries, none for macOS; dji-thermal-cli picks the
+  folder (`native.bindings.platform_dirs`). On macOS the SDK page should say it can't be used there (the built-in
+  port is used, as without it).
+- Paths: zip members and stored paths use `/`, files are read with `os.path`; `os.replace` over a file another
+  process has open fails on Windows (thumbnail cache, SDK install, records). To check where it can happen.
+- dji-thermal-cli is pure Python and tested on all three systems by its own release workflow.
+
+**Proposed steps**:
+1. **The code made portable** (Linux tests as now): the lock, exiftool's absence handled, the SDK page on macOS, the
+   `os.replace` cases. Each OS branch small and in one place, so Linux runs cover the rest.
+2. **Windows checks from this machine**: the tests of what differs on Windows (the lock, exiftool's absence, the
+   SDK's Windows libraries and the `os.replace` cases) run with Windows' Python through WSL, outside WebODM; and,
+   if a native Windows WebODM can be installed here, the plugin installed in it as a user would, with a Thermal Task
+   and an Analyzer dataset, as the release check does on Linux.
+3. **macOS**: no Mac run for code shared with Linux (POSIX: the same lock, paths and files). A Mac run only where
+   macOS differs: the SDK page's message and exiftool on the native installer, once, before the release that adds
+   this support. A checklist the user runs on their MacBook in a few minutes.
+
+**Open** (for the user):
+- Which installs the plugin supports: Docker on all three systems, WebODM's native Windows installer, its native
+  macOS installer (proposed: all of them).
+- Whether a native Windows WebODM can be installed on this machine for step 2 (WebODM's native installers are
+  sold on webodm.org), or whether step 2 stays with the Windows Python checks only.
+- Whether exiftool-less native installs get the CLI's own metadata writing (preferred, if it keeps every tag ODM
+  reads) or a message.
+
+## Then: UX review
+
+**The request** (the user, 2026-10-31): "Using your expert ux designer skills, how would you make this ui more
+intuitive?"
+
+**Scope**: everything the plugin adds to WebODM: the Thermal Task button and its dialog, the Thermal Analyzer's
+list, a dataset's page (summary, Worksets, Files, Problems, WebODM plan), the mosaic viewer, the Thermal Inspector
+on the map, the DJI Thermal page under Administration.
+
+**Proposed**:
+1. **Review**: each page walked through in a browser on the user's data, as a first-time user with a flight to
+   process would (upload, analyze, convert, process, inspect), at desktop and phone widths; what is unclear, hidden,
+   inconsistent with WebODM or the other pages, or takes more steps than needed. Written up as ranked proposals,
+   each with what changes and why, screenshots and mockups, sorted into quick fixes and larger changes.
+2. **The user chooses** which to build; the chosen ones become steps here, each on its branch, tested and checked
+   live.
+
+**Open**: none until the review is written.
 
 ## Up next: Thermal Inspector
 
