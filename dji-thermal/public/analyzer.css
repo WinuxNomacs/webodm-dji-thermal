@@ -170,12 +170,13 @@
 .ta-page .ta-chips{ display: inline-flex; gap: 4px; flex-wrap: wrap; }
 .ta-page .ta-chip{ display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 12px; background: rgba(128, 128, 128, .15); }
 .ta-page .ta-chip-changed{ background: rgba(52, 152, 219, .18); }
-.ta-page .ta-chip-off-plan{ box-shadow: inset 0 0 0 1px #e67e22; }
-.ta-page .ta-chip-off-plan:before{ content: "\26A0\FE0E  "; color: #e67e22; }
+.ta-page .ta-chip-off-plan{ box-shadow: inset 0 0 0 1px rgba(128, 128, 128, .55); }
+.ta-page .ta-chip-off-plan:after{ content: " \2260  plan"; opacity: .65; }
+.ta-page .ta-chips-legend{ font-size: 12px; align-self: center; margin-left: 4px; }
 .ta-page .ta-changed{ border-left: 3px solid #3498db; padding-left: 6px; }
-.ta-page .ta-off-plan{ border-left: 3px solid #e67e22; padding-left: 6px; }
+.ta-page .ta-off-plan{ border-left: 3px dashed rgba(128, 128, 128, .55); padding-left: 6px; }
 .ta-page .ta-mark-note{ font-size: 12px; margin-left: 6px; }
-.ta-page .ta-off-plan .ta-mark-note{ color: #e67e22; }
+.ta-page .ta-off-plan .ta-mark-note{ opacity: .75; }
 .ta-page .ta-conversion-chips{ margin: 3px 0; }
 .ta-page .ta-menu{ display: inline-block; }
 .ta-page .ta-menu .dropdown-menu{ font-size: 13px; min-width: 180px; }

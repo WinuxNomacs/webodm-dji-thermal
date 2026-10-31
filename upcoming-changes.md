@@ -848,7 +848,8 @@ above). Proposals, the most useful first; the numbers are for choosing.
 
 Screenshots of each page are kept outside the repo (they show the flight's location).
 
-**Decided** (the user, 2026-10-31): all 13, in an order Claude chooses, planned around what is left so nothing is
+**Decided** (the user, 2026-10-31): tests whose expected wording changes get the new text, nothing else added or
+changed, each such test named in its step. All 13, in an order Claude chooses, planned around what is left so nothing is
 done twice. So: proposals that change the same code go on one branch; the screenshots and the docs wait for the
 last UX step (Documentation is next, then the release, redone once at the end); each step updates README.md as it
 goes (the docs are written once, from it); 10 needs no dji-thermal-cli release, as 1 replaces that text.
@@ -857,11 +858,19 @@ goes (the docs are written once, from it); 10 needs no dji-thermal-cli release, 
 1. The mosaic viewer: 7 (wrapping), 8 and 9 in its subtitle (`viewer.js`, `analyzer.css`). Done, `ux-viewer`:
    the panel's values wrap at spaces (`overflow-wrap: anywhere`), a file name after its underscores; outputs in
    words from one table, `conversions.PRODUCT_NAMES` (`output_text`: "°C TIFF", "colour PNG in ironred", the
-   palette only on the coloured outputs; `products()` gives each its `name` for step 2), used by `summary_text`,
+   palette only on the coloured outputs; sent with a dataset as `product_names` for step 2), used by `summary_text`,
    so the subtitle and the workset cards' description read "°C TIFF, colour PNG in ironred · normalized · …".
    Ruff, Jest 161, `test_analyzer` 58; live on both worksets (GETs only).
 2. The Worksets tab's chips and workset cards: 5, 8, 9 (`conversions.js`), and 2 (Create task beside View mosaics,
-   same file).
+   same file). Done, `ux-worksets`: chips and the Outputs list name the outputs in words (the names sent with the
+   dataset, `product_names`, so every viewer has them); the palette chip only where there are colour outputs
+   ("colour PNG in ironred"); a chip off the plan is neutral, marked "≠ plan", with one legend line after the chips
+   (the form's fields: a dashed grey edge, "≠ plan: …"); Create task beside View mosaics on a workset in no task
+   (neither its own task nor the dataset's), in the menu otherwise; the form's hints say "colour outputs" and
+   "16-bit grey outputs". Test changed (expected text only): `analyzer.test.js`, "lists what settings change
+   dji-thermal-cli's defaults…", outputs "temp_c TIFF, pseudo TIFF" (no names loaded there). Jest 161, Ruff,
+   `test_analyzer` 58; live (GETs only): both worksets, the settings open, a workset shown taskless (its tasks
+   removed from the page's copy of the response) with Create task beside View mosaics.
 3. Problems and the WebODM plan: 1, 11, 10 with them (`dataset.js`; the buttons reuse the form's "Use these
    settings" path in `conversions.js`).
 4. The dataset page's steps and empty Worksets: 3, after 2 and 3, which its links point to (`dataset.js`,

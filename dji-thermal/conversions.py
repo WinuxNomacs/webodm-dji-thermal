@@ -87,9 +87,8 @@ COLOURED = ('pseudo', 'rjpeg')
 
 
 def products():
-    """The outputs dji-thermal-cli can write: [{product, name, description, formats}]"""
-    return [{'product': name, 'name': PRODUCT_NAMES.get(name, name), 'description': p.description,
-             'formats': list(p.formats)}
+    """The outputs dji-thermal-cli can write: [{product, description, formats}]"""
+    return [{'product': name, 'description': p.description, 'formats': list(p.formats)}
             for name, p in converter.library().outputs.PRODUCTS.items()]
 
 
