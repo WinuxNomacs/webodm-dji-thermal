@@ -150,18 +150,6 @@
         {key: "emissivity", label: "Emissivity", digits: 2}
     ];
 
-    function sortRows(rows, key, desc) {
-        var copy = rows.slice();
-        copy.sort(function (a, b) {
-            var x = a[key], y = b[key];
-            var xm = x === null || x === undefined || x === "", ym = y === null || y === undefined || y === "";
-            if (xm || ym) return xm === ym ? 0 : (xm ? 1 : -1);    // missing values last either way
-            var c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y));
-            return desc ? -c : c;
-        });
-        return copy;
-    }
-
     function cell(row, col) {
         var v = row[col.key];
         if (col.key === "kind") return esc(core.kindLabel(v));
@@ -188,7 +176,7 @@
             if (view.show === "flagged") return !!flags[f.path] || f.kind !== "thermal" && f.kind !== "not_thermal" || (f.warnings || []).length;
             return true;
         });
-        return sortRows(rows, view.sort || "path", !!view.desc);
+        return core.sortRows(rows, view.sort || "path", !!view.desc);
     }
 
     // The table under the Files tab's bar. view.frames (the newest ready conversion's frame page) makes thermal rows
@@ -305,9 +293,9 @@
             (args ? '<p class="ta-odm-args"><code>' + esc(args) + "</code> " + copy("the options", args) + "</p>" : "") +
             "<h4>To consider</h4>" + optionsTable(p.consider) +
             "<h4>Preparing the images</h4>" +
-            "<p>Convert the frames with these settings before processing them." +
+            "<p>Create a workset with these settings before processing the frames." +
             (p.process_args && canConvert ? ' <button type="button" class="btn btn-primary btn-xs" id="ta-plan-convert" title="Open the Worksets tab with these settings">' +
-                '<i class="fa fa-magic"></i> Convert with these</button>' : "") + "</p>" +
+                '<i class="fa fa-magic"></i> Use these settings</button>' : "") + "</p>" +
             '<div class="ta-command-row"><pre class="ta-command">' + esc(p.process_command || "") + "</pre>" +
             (p.process_command ? copy("the command", p.process_command) : "") + "</div>" +
             ((p.notes || []).length ? "<h4>Notes</h4><ul>" + p.notes.map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("") + "</ul>" : "");
@@ -678,7 +666,7 @@
     }
 
     var api = {captureTime: captureTime, median: core.median, overview: overview, summaryRows: summaryRows, duration: duration, overviewHtml: overviewHtml, flagsByFile: flagsByFile,
-               sortRows: sortRows, fileRows: fileRows, filesHtml: filesHtml, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
+               sortRows: core.sortRows, fileRows: fileRows, filesHtml: filesHtml, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
     root.ThermalAnalyzerDataset = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

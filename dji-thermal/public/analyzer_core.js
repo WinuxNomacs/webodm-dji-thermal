@@ -17,6 +17,19 @@
         });
     }
 
+    // Rows (objects) sorted by a key, missing values last either way
+    function sortRows(rows, key, desc) {
+        var copy = rows.slice();
+        copy.sort(function (a, b) {
+            var x = a[key], y = b[key];
+            var xm = x === null || x === undefined || x === "", ym = y === null || y === undefined || y === "";
+            if (xm || ym) return xm === ym ? 0 : (xm ? 1 : -1);    // missing values last either way
+            var c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y));
+            return desc ? -c : c;
+        });
+        return copy;
+    }
+
     function formatBytes(n) {
         if (n === null || n === undefined || isNaN(n)) return "";
         var units = ["B", "KB", "MB", "GB", "TB"], i = 0;
@@ -466,7 +479,7 @@
         formatTemp: formatTemp, formatDelta: formatDelta, stageText: stageText, mosaicLabel: mosaicLabel,
         batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName,
         preferences: preferences, setPreferences: setPreferences, editPreferences: editPreferences, bindPreferences: bindPreferences,
-        setUserUnit: setUserUnit, savePalette: savePalette, migrateUnit: migrateUnit, paletteOptions: paletteOptions
+        setUserUnit: setUserUnit, savePalette: savePalette, migrateUnit: migrateUnit, paletteOptions: paletteOptions, sortRows: sortRows
     };
     root.ThermalAnalyzerCore = api;
     if (root.document && root.fetch) {
