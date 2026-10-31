@@ -5,6 +5,24 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - **Workset wording and layout** (the user, 2026-10-31, from `new.md`), one branch, to plan before building:
+    1. The Convert form's button **Convert** becomes **Create Workset** (`public/conversions.js`; also the
+       messages that say "Convert", e.g. the WebODM plan's "Convert with these" and the task hint "Convert, then
+       create the task from the new workset", reworded to match).
+    2. The form's **Settings:** toggle becomes **Workset Creation Settings:** (`conversions.js`, the `ta-collapse`
+       toggle).
+    3. A workset's **Files** leaves its menu (`conversions.js`, the `files` item, "Files" / "Hide files") and becomes
+       an expandable/collapsible table in the workset's box, under its Task link area.
+    4. The **Harmonized** mosaic's note at its top right (`public/viewer.js`, `TAB_HINTS.harmonized`, now "Normalized:
+       one ambient and reflected temperature for every frame, and each frame's offset against its neighbours removed
+       (camera drift between recalibrations).") rewritten to explain harmonization simply and say concisely how it
+       differs from the mosaic converted with the workset's settings. Draft, for the user: "Harmonized: the frames
+       made to agree. The camera drifts a little between its self-calibrations, so overlapping frames of the same
+       ground can read a degree or two apart. Here every frame uses the same ambient and reflected temperature, and
+       each is shifted to match its neighbours where they overlap. Compared with the Mosaic tab: no seams or patches
+       from drift; the temperatures may sit slightly higher or lower overall."
+    Open: whether the Files table starts collapsed (proposed: collapsed, its state kept per workset in the browser);
+    the Harmonized wording.
   - Done: **bug, the Thermal Inspector's palettes didn't match the Analyzer's** (the user, 2026-10-31),
     `inspector-dji-palettes`: the inspector listed only WebODM's colour maps. It now lists the Analyzer's list (DJI's
     palettes as "DJI *name*", then WebODM's colour maps) and draws DJI's with the plugin's own tiles (step 3b below).
