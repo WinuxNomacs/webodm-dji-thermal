@@ -39,5 +39,5 @@ The first release, for WebODM 3.3.2 or later.
   runs in a process of its own; without it, dji-thermal-cli's built-in port is used.
 
 **Cameras**: H20N, H20T, H30T, M2EA, M30T, M3T, M3TD, M4T and XT S (temperatures by
-[dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/) 1.9.0). The M4T checked on a real flight, the others
+[dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/) 1.10.0). The M4T checked on a real flight, the others
 on DJI's Thermal SDK sample images. The server calls no outside service.

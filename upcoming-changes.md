@@ -156,8 +156,8 @@
 - **Thermal Inspector** (the user, 2026-10-30): the earlier Pixel Inspector ported as a control on WebODM's 2D map,
   for thermal orthophotos, with the palette and unit shared with the Analyzer; in five steps (details under
   "Up next: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0. Steps 2–5
-  and 3b done (the last, isotherms and the legend, 2026-10-31); left: pinning dji-thermal-cli 1.10.0 once released
-  (its failing test fixed in its `main`), dropping the fallback to its internal tables.
+  and 3b done (the last, isotherms and the legend, 2026-10-31), and dji-thermal-cli 1.10.0 pinned with the fallback
+  to its internal tables dropped (2026-10-31, `pin-cli-1.10.0`). Done.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -616,7 +616,16 @@ WebODM 3.3.2 lacks: the `point` and `region-stats` endpoints, the highlight colo
 the R-JPEG copy's picture is exactly Pillow's JPEG of the pseudo output (quality 92, 4:2:0), but the test held it
 within 4 of the uncompressed output, and on the flight's first frame compression alone loses 7.2. The test now
 compares with that JPEG (`fix-rjpeg-picture-test`, merged in its `main`; its full suite: 1191 passed, 10 skipped).
-Its release (with `palette_luts()`) is the user's call; then the plugin pins it and drops the fallback.
+Released as 1.10.0 (the user, 2026-10-31: 1.9.2, never published, folded in; published by its release workflow,
+which now runs CI first, see below); the plugin pins it and `converter.palette_luts` is the library's alone
+(`pin-cli-1.10.0`; Django 135 on 1.10.0, live check on HomerunObliqueII: DJI palettes and isotherms drawn).
+
+**Open** (2026-10-31): WebODM installs a plugin's requirements with `pip install -U --target`, which leaves the old
+version's `dji_thermal_cli-X.dist-info` beside the new one when the pin changes; the library reads its version from
+that metadata, so after an upgrade `dji-thermal-cli 1.9.0` would still be named in converted TIFFs' Software tag,
+the reports and the SDK page (the code itself is the new one). Seen on the dev server, fixed there by removing the
+stale folder. Proposed: the plugin removes `dji_thermal_cli-*.dist-info` folders other than the pinned version's in
+its own site-packages when it loads (or the CLI reads its version without that metadata); for the user to decide.
 
 **Tests**: the Jest tests ported (rewritten without Enzyme, which this repo doesn't have), Django tests of the
 endpoints on the flight's orthophoto (`DT_FLIGHT_DIR`), the CLI's own tests for its function; live checks on
