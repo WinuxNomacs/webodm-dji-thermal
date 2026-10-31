@@ -17,9 +17,10 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
   version's `.dist-info` behind, which `Plugin.check_requirements` removes.
 - **Linux, Windows and macOS**: WebODM runs in Docker on all three (the plugin's Python in its Linux container; the
   macOS installer is a manager for Docker) or from its native Windows installer (the plugin's Python on Windows,
-  with no node, npm or webpack). So: no POSIX-only module at import time, no outside tool (exiftool: dji-thermal-cli
-  writes the TIFFs' metadata), no JSX built by webpack (plain JavaScript in `public/`), and no Mac runs (plan:
-  "Up next: Linux, Windows and macOS").
+  with no node, npm or webpack). So: no POSIX-only module at import time (OS differences in `portable.py`), no
+  outside tool (exiftool: dji-thermal-cli writes the TIFFs' metadata), the JSX shipped built (`dev/package.sh`
+  puts `public/build` in the zip; WebODM then skips its own webpack), and no Mac runs (plan: "Up next: Linux,
+  Windows and macOS").
 - **Temperatures come from [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/)** (pure Python, AGPL),
   a separate package; a change it needs is made and released there first (its `RELEASING.md`: a `release/X.Y.Z`
   branch and its local checks; pushing its `main` runs nothing, its `vX.Y.Z` tag runs CI on three systems, then
@@ -30,7 +31,7 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
 - **Never push and never tag.** Nothing is published by a push: the repo has no GitHub workflows, and gets none
   without the user's say (Actions minutes). A release: Claude prepares a
   `release/X.Y.Z` branch (manifest version, `CHANGELOG.md`, `README.md`), builds the zip with `dev/package.sh`
-  (`dist/dji-thermal-X.Y.Z.zip` and its sha256), runs the `release-check` skill and merges; the user tags `vX.Y.Z`,
+  (`dist/dji-thermal-X.Y.Z.zip` and its sha256, with `public/build` built in the dev container against its WebODM), runs the `release-check` skill and merges; the user tags `vX.Y.Z`,
   attaches the zip to the GitHub release and adds `{url, sha256}` to WebODM-Plugins' `directory.json`.
 - **`README.md` is the plugin's public page**: every feature change updates it on the same branch (what the
   plugin does, installing, using it, the outside services it calls).
