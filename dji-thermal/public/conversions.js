@@ -422,20 +422,8 @@
                     esc(info.process_args.join(" ")) + '"><i class="fa fa-magic"></i> New workset with the plan\'s settings</button>' : "") + "</div>";
         }
         var d = draft || {};
-        var picked = d.options || null;
         if (info.options.length) {
-            html += '<table class="table table-condensed ta-task-options"><thead><tr><th></th><th>Option</th><th>Value</th><th>Why</th></tr></thead><tbody>' +
-                info.options.map(function (o, i) {
-                    var was = picked && picked[o.name];
-                    var on = picked ? !!was : o.recommended;
-                    var v = was && was.value !== undefined ? was.value : o.value;
-                    return '<tr' + (o.recommended ? "" : ' class="ta-task-consider"') + '><td><input type="checkbox" name="task-option" value="' + i + '"' +
-                        (on ? " checked" : "") + ' aria-label="' + esc(o.name) + '"></td><td><code>' + esc(o.name) + "</code>" +
-                        (o.recommended ? "" : ' <span class="text-muted">to consider</span>') + "</td><td>" +
-                        (o.value === true ? '<span class="text-muted">on</span>' : '<input type="text" class="form-control input-sm" name="task-value-' + i +
-                            '" value="' + esc(optionValue(v)) + '" aria-label="' + esc(o.name) + ' value">') +
-                        "</td><td>" + esc(o.reason) + "</td></tr>";
-                }).join("") + "</tbody></table>";
+            html += optionsFormHtml(info.options, d.options);
         } else {
             html += '<p class="text-muted">The WebODM plan has no options: the task has ODM\'s defaults.</p>';
         }
@@ -448,21 +436,44 @@
         return html;
     }
 
-    // The task panel's fields: {draft (taskHtml's), data (to send), problem (what stops it, or null)}
-    function readTaskForm(el, info) {
-        var get = function (name) { return el.querySelector('[name="' + name + '"]'); };
-        var draft = {name: get("task-name").value, options: {}};
-        var options = [], problem = null;
-        info.options.forEach(function (o, i) {
+    // ODM options to tick and edit (options: [{name, value, reason, recommended}], the recommended ones ticked; picked:
+    // readOptions' draft, to keep what was typed across a redraw)
+    function optionsFormHtml(options, picked) {
+        return '<table class="table table-condensed ta-task-options"><thead><tr><th></th><th>Option</th><th>Value</th><th>Why</th></tr></thead><tbody>' +
+            options.map(function (o, i) {
+                var was = picked && picked[o.name];
+                var on = picked ? !!was : o.recommended;
+                var v = was && was.value !== undefined ? was.value : o.value;
+                return '<tr' + (o.recommended ? "" : ' class="ta-task-consider"') + '><td><input type="checkbox" name="task-option" value="' + i + '"' +
+                    (on ? " checked" : "") + ' aria-label="' + esc(o.name) + '"></td><td>' + core.optionHtml(o.name) +
+                    (o.recommended ? "" : ' <span class="text-muted">to consider</span>') + "</td><td>" +
+                    (o.value === true ? '<span class="text-muted">on</span>' : '<input type="text" class="form-control input-sm" name="task-value-' + i +
+                        '" value="' + esc(optionValue(v)) + '" aria-label="' + esc(o.name) + ' value">') +
+                    "</td><td>" + esc(o.reason) + "</td></tr>";
+            }).join("") + "</tbody></table>";
+    }
+
+    // optionsFormHtml's fields: {draft (by name: {value}, or null when unticked), options ([{name, value}] ticked),
+    // problem (what stops them, or null)}
+    function readOptions(el, options) {
+        var draft = {}, ticked = [], problem = null;
+        options.forEach(function (o, i) {
             var box = el.querySelector('input[name="task-option"][value="' + i + '"]');
-            var v = o.value === true ? true : get("task-value-" + i).value.trim();
+            var v = o.value === true ? true : el.querySelector('[name="task-value-' + i + '"]').value.trim();
             if (typeof o.value === "number" && v !== "" && !isNaN(Number(v))) v = Number(v);
-            draft.options[o.name] = box.checked ? {value: v} : null;
+            draft[o.name] = box.checked ? {value: v} : null;
             if (!box.checked) return;
             if (v === "") problem = problem || "Give " + o.name + " a value, or untick it.";
-            options.push({name: o.name, value: v});
+            ticked.push({name: o.name, value: v});
         });
-        return {draft: draft, data: {name: draft.name.trim(), options: options}, problem: problem};
+        return {draft: draft, options: ticked, problem: problem};
+    }
+
+    // The task panel's fields: {draft (taskHtml's), data (to send), problem (what stops it, or null)}
+    function readTaskForm(el, info) {
+        var name = el.querySelector('[name="task-name"]').value;
+        var o = readOptions(el, info.options);
+        return {draft: {name: name, options: o.draft}, data: {name: name.trim(), options: o.options}, problem: o.problem};
     }
 
     var USE_TITLE = "Fill the settings form with this workset's settings, to start a new workset from them";
@@ -1044,7 +1055,7 @@
     var api = {recorded: recorded, settingsIn: settingsIn, formHtml: formHtml, readForm: readForm, formProblem: formProblem, planSettings: planSettings, statusLabel: statusLabel,
                differences: differences, chipsHtml: chipsHtml, markForm: markForm, resetSetting: resetSetting,
                mosaicHtml: mosaicHtml, actionsHtml: actionsHtml, listHtml: listHtml, parentHtml: parentHtml, taskStatusLabel: taskStatusLabel, tasksHtml: tasksHtml,
-               taskHtml: taskHtml, readTaskForm: readTaskForm, skipReasons: skipReasons, resultsHtml: resultsHtml, init: init};
+               taskHtml: taskHtml, readTaskForm: readTaskForm, optionsFormHtml: optionsFormHtml, readOptions: readOptions, skipReasons: skipReasons, resultsHtml: resultsHtml, init: init};
     root.ThermalAnalyzerConversions = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

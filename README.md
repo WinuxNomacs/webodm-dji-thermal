@@ -107,7 +107,8 @@ Then:
 - **Problems**: what dji-thermal-cli found (errors, warnings, notes), each with what addresses it in the Workset
   Creation Settings' terms and the files it names (a file's value in its tooltip). Where one setting addresses it
   (Normalize, frames at or below −80°), a button sets it in the form on the Worksets tab.
-- **WebODM plan**: how well the frames cover the ground, the task options to use (to copy), **Use these settings**
+- **WebODM plan**: how well the frames cover the ground, the task options to use (each with its section in
+  WebODM's task options; to copy, or **Save as a WebODM preset** to pick in a new task), **Use these settings**
   for the workset that prepares the images (also as a dji-thermal-cli command, folded), and notes.
 - **Worksets**: see below.
 

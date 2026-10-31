@@ -428,8 +428,50 @@
         return '<table class="table table-condensed ta-options"><thead><tr><th>Option</th><th>Value</th><th>Why</th></tr></thead><tbody>' +
             keys.map(function (k) {
                 var o = options[k];
-                return "<tr><td><code>" + esc(k) + "</code></td><td>" + esc(o.value) + "</td><td>" + esc(o.reason) + "</td></tr>";
+                return "<tr><td>" + core.optionHtml(k) + "</td><td>" + esc(o.value) + "</td><td>" + esc(o.reason) + "</td></tr>";
             }).join("") + "</tbody></table>";
+    }
+
+    // The plan's ODM options, [{name, value, reason, recommended}]: the recommended ones first (conversion_tasks.plan_options)
+    function planOptions(p) {
+        var out = [];
+        [["recommended", true], ["consider", false]].forEach(function (g) {
+            Object.keys((p && p[g[0]]) || {}).forEach(function (name) {
+                var o = p[g[0]][name];
+                out.push({name: name, value: o.value, reason: o.reason || "", recommended: g[1]});
+            });
+        });
+        return out;
+    }
+
+    // The options of a preset made from the plan: the plan's, then those of WebODM's Default preset (defaults: its
+    // options, [{name, value}]) the plan doesn't set, ticked, so that picking the preset loses none of them
+    function presetOptions(p, defaults) {
+        var out = planOptions(p);
+        (defaults || []).forEach(function (o) {
+            if (out.some(function (x) { return x.name === o.name; })) return;
+            out.push({name: o.name, value: o.value, reason: "in WebODM's Default preset", recommended: true});
+        });
+        return out;
+    }
+
+    // The Save as a WebODM preset panel (info: {name, options}; draft: the fields as they were, to keep across a redraw)
+    function presetHtml(info, draft) {
+        var d = draft || {};
+        return '<div class="ta-task-head"><strong>New WebODM preset</strong>: pick it in a task\'s Options, in place of Default</div>' +
+            conversionsModule.optionsFormHtml(info.options, d.options) +
+            '<div class="ta-task-actions"><input type="text" class="form-control input-sm" name="preset-name" maxlength="255" value="' +
+            esc(d.name !== undefined ? d.name : info.name) + '" placeholder="Name" aria-label="Preset name">' +
+            '<button type="button" class="btn btn-primary btn-xs" data-act="preset-save"><i class="fa fa-save"></i> Save preset</button> ' +
+            '<button type="button" class="btn btn-default btn-xs" data-act="preset-close">Close</button></div><div class="ta-task-message"></div>';
+    }
+
+    // The preset panel's fields: {draft (presetHtml's), data ({name, options}, to send), problem (what stops it, or null)}
+    function readPresetForm(el, info) {
+        var name = el.querySelector('[name="preset-name"]').value;
+        var o = conversionsModule.readOptions(el, info.options);
+        var problem = o.problem || (name.trim() ? null : "Give the preset a name.") || (o.options.length ? null : "Tick at least one option.");
+        return {draft: {name: name, options: o.draft}, data: {name: name.trim(), options: o.options}, problem: problem};
     }
 
     // The WebODM plan tab: how well the frames cover the ground, the task options to use and how to prepare the images
@@ -454,9 +496,13 @@
         return '<h4>Coverage</h4><dl class="ta-figures">' + figures.map(function (f) {
                 return "<div><dt>" + esc(f[0]) + "</dt><dd>" + esc(f[1]) + "</dd></div>";
             }).join("") + "</dl>" +
-            "<h4>Recommended task options</h4>" + optionsTable(p.recommended) +
+            "<h4>Recommended task options</h4>" +
+            '<p class="text-muted">In WebODM, a task\'s <em>Options</em> &gt; <em>Edit</em> lists these by name, in the sections shown above them. ' +
+            "Create task, on a workset, sets them for you, and so does a preset saved from here.</p>" + optionsTable(p.recommended) +
             (args ? '<p class="ta-odm-args"><code>' + esc(args) + "</code> " + copy("the options", args) + "</p>" : "") +
             "<h4>To consider</h4>" + optionsTable(p.consider) +
+            (planOptions(p).length ? '<p><button type="button" class="btn btn-default btn-xs" id="ta-plan-preset" title="Save these options as a preset, to pick in a new task\'s Options">' +
+                '<i class="fa fa-save"></i> Save as a WebODM preset</button></p><div class="ta-conversion-task" id="ta-plan-preset-panel"></div>' : "") +
             "<h4>Preparing the images</h4>" +
             "<p>Create a workset with these settings before processing the frames." +
             (p.process_args && canConvert ? ' <button type="button" class="btn btn-primary btn-xs" id="ta-plan-convert" title="Open the Worksets tab with these settings">' +
@@ -493,6 +539,7 @@
         var $ = function (i) { return doc.getElementById(i); };
         var dataset = null, view = {show: "all", sort: "path", desc: false, filter: ""}, tab = "convert", tabChosen = false, timer = null, uploading = false;
         var filesKey = null;
+        var planShown = null, preset = null;    // the WebODM plan tab as drawn; its preset panel, when open: {info, draft}
         try { view.thumbs = root.localStorage && root.localStorage.getItem(THUMBS_KEY) === "1" ? thumbsUrl : null; } catch (e) { view.thumbs = null; }
         try { view.hover = !!root.localStorage && root.localStorage.getItem(HOVER_KEY) === "1"; } catch (e) { view.hover = false; }
         view.selected = [];
@@ -578,10 +625,18 @@
                 if (key !== filesKey) renderFiles();
                 filesKey = key;
                 $("ta-tab-problems").innerHTML = problemsHtml(a, d.can_change);
-                $("ta-tab-webodm").innerHTML = planHtml(a, d.can_change);
+                // Redrawn only when it changes, not to lose the preset panel's fields
+                var plan = planHtml(a, d.can_change);
+                if (plan !== planShown) {
+                    $("ta-tab-webodm").innerHTML = plan;
+                    planShown = plan;
+                    preset = null;
+                }
             } else {
                 ["files", "problems", "webodm"].forEach(function (t) { $("ta-tab-" + t).innerHTML = ""; });
                 filesKey = null;
+                planShown = null;
+                preset = null;
             }
             renderTabs();
 
@@ -845,11 +900,75 @@
             if (!e.target.closest) return;
             var button = e.target.closest("button[data-copy]");
             if (button) return copyText(button.getAttribute("data-copy"), button, "Copy");
+            if (e.target.closest("#ta-plan-preset")) return openPreset();
+            var act = (e.target.closest("button[data-act]") || {getAttribute: function () { return null; }}).getAttribute("data-act");
+            if (act === "preset-save") return savePreset();
+            if (act === "preset-close") {
+                preset = null;
+                return renderPreset();
+            }
             if (e.target.closest("#ta-plan-convert") && conversions.usePlan()) {
                 showTab("convert");
                 if ($("ta-convert-settings").scrollIntoView) $("ta-convert-settings").scrollIntoView();
             }
         });
+
+        // Save as a WebODM preset: a panel of the plan's options and those of WebODM's Default preset, saved through
+        // WebODM's presets API, replacing (once asked) a preset of the user's with the same name
+        var PRESETS = API.replace(/plugins\/.*$/, "presets/");
+
+        function renderPreset() {
+            var el = $("ta-plan-preset-panel");
+            if (el) el.innerHTML = !preset ? "" : preset.info ? presetHtml(preset.info, preset.draft) : '<p class="text-muted">Loading…</p>';
+        }
+
+        function presetMessage(text, cls) {
+            var m = $("ta-plan-preset-panel") && $("ta-plan-preset-panel").querySelector(".ta-task-message");
+            if (!m) return;
+            m.className = "ta-task-message" + (cls ? " " + cls : "");
+            m.innerHTML = text;
+        }
+
+        function openPreset() {
+            var plan = (dataset.analysis || {}).webodm;
+            preset = {info: null, draft: null};
+            renderPreset();
+            return fetchFn(PRESETS, {credentials: "same-origin"}).then(core.readJson).then(function (r) {
+                if (!preset) return;
+                if (!r.ok || !Array.isArray(r.data)) {
+                    preset = null;
+                    $("ta-plan-preset-panel").innerHTML = '<p class="text-danger">' + esc(core.errorText(r.data, "Could not read WebODM's presets.")) + "</p>";
+                    return;
+                }
+                var defaults = r.data.filter(function (x) { return x.system && x.name === "Default"; })[0];
+                preset.info = {name: "DJI Thermal: " + dataset.name, options: presetOptions(plan, defaults ? defaults.options : [])};
+                renderPreset();
+            });
+        }
+
+        function savePreset() {
+            var el = $("ta-plan-preset-panel");
+            if (!el || !preset || !preset.info) return;
+            var form = readPresetForm(el, preset.info);
+            preset.draft = form.draft;
+            if (form.problem) return presetMessage(esc(form.problem), "text-danger");
+            var btn = el.querySelector('[data-act="preset-save"]');
+            btn.disabled = true;
+            return fetchFn(PRESETS, {credentials: "same-origin"}).then(core.readJson).then(function (r) {
+                if (!r.ok || !Array.isArray(r.data)) return r;
+                var same = r.data.filter(function (x) { return !x.system && x.name === form.data.name; })[0];
+                if (!same) return send(PRESETS, "POST", form.data);
+                return core.ask(doc, "Replace the preset?", 'You already have a preset named "' + form.data.name + '". Replace its options with these?',
+                                "Replace", "danger").then(function (yes) {
+                    return yes ? send(PRESETS + same.id + "/", "PATCH", {options: form.data.options}) : null;
+                });
+            }).then(function (r) {
+                btn.disabled = false;
+                if (!r) return;
+                if (!r.ok) return presetMessage(esc(core.errorText(r.data, "Could not save the preset.")), "text-danger");
+                presetMessage('<i class="fa fa-check"></i> Saved &ldquo;' + esc(r.data.name) + "&rdquo;: pick it in a new task's <em>Options</em>.", "text-success");
+            });
+        }
 
         // To the clipboard, the button saying so (an icon's tick for a moment); without one (or refused), a dialog to
         // copy it from
@@ -963,7 +1082,8 @@
         return load();
     }
 
-    var api = {captureTime: captureTime, median: core.median, overview: overview, summaryRows: summaryRows, duration: duration, overviewHtml: overviewHtml, flagsByFile: flagsByFile,
+    var api = {planOptions: planOptions, presetOptions: presetOptions, presetHtml: presetHtml, readPresetForm: readPresetForm,
+               captureTime: captureTime, median: core.median, overview: overview, summaryRows: summaryRows, duration: duration, overviewHtml: overviewHtml, flagsByFile: flagsByFile,
                sortRows: core.sortRows, fileRows: fileRows, detailRows: detailRows, viewerSrc: viewerSrc, viewerItems: viewerItems, detailHtml: detailHtml, filesHtml: filesHtml, stepsHtml: stepsHtml, settingsWords: settingsWords, findingMessage: findingMessage, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
     root.ThermalAnalyzerDataset = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

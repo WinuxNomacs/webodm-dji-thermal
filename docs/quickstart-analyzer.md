@@ -68,9 +68,17 @@ that sets it in the workset settings for you.
 ## 5. Read the WebODM plan
 
 The **WebODM plan** tab shows how well the frames cover the ground and which WebODM task options to use, with the
-reason for each.
+reason for each. Above each option's name is the section it's in, in WebODM's task options (a task's **Options** >
+**Edit**), where options are listed by the same names.
 
 ![The WebODM plan tab](images/dataset-plan.png)
+
+**Save as a WebODM preset** saves the options as a preset of yours, to pick in a new task's **Options** in place
+of Default. Tick the ones you want (the recommended ones are ticked, and so are the options of WebODM's own Default
+preset, so nothing it sets is lost), name it, and **Save preset**. If you already have a preset with that name,
+you're asked before it's replaced.
+
+![Save as a WebODM preset](images/dataset-preset.png)
 
 **Use these settings** fills in the workset settings the plan recommends. That's the next step:
 [Worksets, mosaics and a task](quickstart-worksets.md).

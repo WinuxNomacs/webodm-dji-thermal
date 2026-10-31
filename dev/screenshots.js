@@ -138,6 +138,13 @@ const SHOTS = {
         await p.waitForTimeout(500);
         return p.locator("#ta-tab-webodm");
     },
+    "dataset-preset": async (p, env) => {
+        await openDataset(p, env);
+        await p.click('#ta-tabs a[data-tab="webodm"]');
+        await p.click("#ta-plan-preset");
+        await p.waitForSelector('[data-act="preset-save"]');
+        return p.locator("#ta-plan-preset-panel");
+    },
     "mosaic-viewer": async (p, env) => {
         await openViewer(p, env);
         await hoverMap(p);

@@ -214,6 +214,7 @@
 .ta-page .ta-task-options td{ vertical-align: middle; }
 .ta-page .ta-task-options input[type="text"]{ max-width: 140px; }
 .ta-page .ta-task-consider code{ opacity: .8; }
+.ta-page .ta-option-section{ display: block; font-size: 11px; opacity: .7; white-space: nowrap; }
 .ta-page .ta-task-actions{ display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .ta-page .ta-task-actions input[type="text"]{ max-width: 280px; }
 .ta-page .ta-task-actions select{ max-width: 260px; }
