@@ -25,3 +25,12 @@
     background: rgba(0, 0, 0, 0.75); color: #fff; font-size: 12px; white-space: nowrap;
 }
 .leaflet-tooltip.dt-inspector-tip { padding: 1px 4px; font-size: 11px; }
+.dt-inspector-modes .btn { padding: 1px 6px; }
+.dt-inspector-regions tr.active td { background: #fff3e0; }
+.dt-inspector-shown { margin: 4px 0; }
+.dt-inspector-stats { margin: 2px 0 4px; }
+.dt-inspector-stats td { padding: 1px 4px !important; }
+.dt-inspector-histogram svg { display: block; background: #f7f7f7; }
+.dt-inspector-histogram rect { fill: #ff9800; }
+.dt-inspector-range { display: flex; justify-content: space-between; font-size: 11px; color: #777; }
+.dt-inspector-pins td.text-right { white-space: nowrap; }

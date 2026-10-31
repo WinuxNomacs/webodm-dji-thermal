@@ -10,7 +10,7 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
   worksets side by side), places the frames into mosaics shown on a map, and makes a WebODM task from the
   workset you choose.
 - **Thermal Inspector**, on WebODM's 2D map of a task with a thermal orthophoto: the temperature under the cursor,
-  pinned points, and the map's palette.
+  pinned points, the statistics of regions drawn on it, and the map's palette.
 
 Temperatures are computed with [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/), a pure-Python
 implementation of DJI's Thermal SDK: no native library and no outside service. An administrator can have DJI's own
@@ -195,6 +195,14 @@ Thermal Task's images or a workset's), a thermometer button opens the Thermal In
 - **Pin**: a click pins the point with its temperature, labelled P1, P2…, shown on the map instead of WebODM's
   popup. The pins are listed in the panel (click one to go to it), can be hidden and shown together, removed, and
   downloaded as CSV (latitude, longitude, temperature). They are kept in your browser for the same tasks.
+- **Regions**: draw a rectangle or a circle (press and drag) or a polygon (click its corners; double-click or Enter
+  finishes, Backspace removes the last corner, Esc cancels), labelled R1, R2…. The panel shows the statistics of
+  the temperatures inside it: minimum, maximum, mean, median, standard deviation, 2nd and 98th percentiles, the
+  number of pixels and the area, and a histogram; the hottest and coldest pixels are marked on the map. Pixels
+  outside the task's crop or without data are left out; a region more than 4,096 pixels across is read at a reduced
+  resolution, and the panel says so. Regions are listed (click one to go to it, or its chart icon for its
+  statistics), can be hidden, removed and downloaded as CSV (a row of statistics per region, with the hottest and
+  coldest pixels' positions), and are kept in your browser for the same tasks.
 - **Palette**: the thermal layer's colour map. It is your palette everywhere: the Analyzer's preference, saved when
   you choose one here or in WebODM's own layer panel, and the one the map opens in.
 

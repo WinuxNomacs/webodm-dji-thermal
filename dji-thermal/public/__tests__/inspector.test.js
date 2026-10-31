@@ -63,7 +63,7 @@ function start(map, routes, extra) {
     const plugins = {Map: {onHandleClick: jest.fn()}};
     const fetchFn = server(Object.assign({"GET /api/plugins/dji-thermal/display": DISPLAY}, routes));
     const saved = [];
-    const ins = inspector.create({map, tiles: [{type: "orthophoto", meta: {task: THERMAL_TASK}}]}, fakeLeaflet(),
+    const ins = inspector.create({map, tiles: [{type: "orthophoto", meta: {task: THERMAL_TASK}}]}, (extra && extra.L) || fakeLeaflet(),
                                  Object.assign({fetch: fetchFn, storage, doc: document, pluginsApi: plugins, save: p => saved.push(p)}, extra));
     return {ins, fetchFn, plugins, saved, panel: () => map.el.querySelector(".dt-inspector-panel")};
 }
@@ -133,7 +133,7 @@ describe("the Thermal Inspector", () => {
         expect(click({latlng: {lat: 42.1, lng: -88.07}})).toBe(true);
         await flush(); await flush();
         expect(panel().querySelector(".dt-inspector-pins").textContent).toContain("P130.00 °C");
-        const pins = map.added[0];
+        const pins = map.added[1];      // above the regions
         expect(pins.layers.map(m => m.tooltip)).toEqual(["P1: 30.00 °C"]);
         const key = inspector.pinsKey(["abc-1"]);
         expect(JSON.parse(window.localStorage.getItem(key))[0]).toMatchObject({label: "P1", lat: 42.1, lng: -88.07, temperature: 30});
@@ -179,5 +179,77 @@ describe("the Thermal Inspector", () => {
         expect(inspector.colorMapOf(layer._url)).toBe("magma");
         expect(ins.state.palette).toBe("magma");
         expect(saved).toEqual([]);
+    });
+});
+
+describe("the Thermal Inspector's regions", () => {
+    const L = require("leaflet");
+    const REGION = "POST /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/region";
+    const STATS = {valid: true, reason: null, pixel_size: 0.5, resampled: false, statistics: {
+        count: 400, min: 10, max: 50, mean: 30, std: 5, median: 29.5, percentiles: {"2": 12, "98": 48},
+        histogram: {counts: [100, 200, 100], edges: [10, 23, 36, 50]}, min_location: [-88.0701, 42.0001], max_location: [-88.0702, 42.0002]}};
+
+    // WebODM's map: Leaflet's, with a thermal orthophoto layer as WebODM adds it
+    function leafletMap() {
+        const div = document.createElement("div");
+        document.body.appendChild(div);
+        const map = L.map(div, {zoomControl: false, renderer: new L.SVG()}).setView([42, -88.07], 18);
+        const layer = L.tileLayer(TILES);
+        layer[META] = {raster: true, task: THERMAL_TASK};
+        layer.addTo(map);
+        map.el = div;
+        return map;
+    }
+
+    function drawRectangle(map) {
+        const a = map.containerPointToLatLng(L.point(10, 10));
+        map.fire("mousedown", {latlng: a, originalEvent: {button: 0}});
+        document.dispatchEvent(new MouseEvent("mouseup", {clientX: 60, clientY: 50}));
+    }
+
+    it("draws a region, reads its statistics and shows them with its hottest and coldest pixels", async () => {
+        const map = leafletMap();
+        const {ins, fetchFn, plugins, panel} = start(map, {[REGION]: STATS}, {L});
+        ins.open();
+        panel().querySelector('[data-mode="rectangle"]').click();
+        expect(plugins.Map.onHandleClick.mock.calls[0][0]({latlng: map.getCenter()})).toBe(true);    // not WebODM's popup
+        drawRectangle(map);
+        await flush(); await flush();
+        const posted = fetchFn.mock.calls.filter(c => c[1] && c[1].method === "POST");
+        expect(posted.length).toBe(1);
+        expect(JSON.parse(posted[0][1].body).geometry.type).toBe("Polygon");
+        expect(ins.state.mode).toBe("hover");
+        const text = panel().querySelector(".dt-inspector-shown").textContent;
+        ["R1", "Rectangle", "10.00 °C", "50.00 °C", "30.00 °C", "5.00 °C", "48.00 °C", "400", "100 m²"].forEach(t => expect(text).toContain(t));
+        expect(panel().querySelectorAll(".dt-inspector-histogram rect").length).toBe(3);
+        const tips = [];
+        map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) tips.push(l.getTooltip()._content); });
+        expect(tips).toEqual(expect.arrayContaining(["R1", "R1 coldest: 10.00 °C", "R1 hottest: 50.00 °C"]));
+
+        // Kept in the browser, in WebODM's units, exported
+        const saved = JSON.parse(window.localStorage.getItem(inspector.regionsKey(["abc-1"])));
+        expect(saved[0]).toMatchObject({label: "R1", shape: "rectangle", statistics: {mean: 30}});
+        expect(saved[0].loading).toBeUndefined();
+        expect(inspector.regionsCsv(saved, "F").split("\n")[1]).toBe(
+            "R1,rectangle,400,100.000,50.000,122.000,86.000,9.000,85.100,53.600,118.400,42.00010000,-88.07010000,42.00020000,-88.07020000");
+        window.localStorage.setItem("unit_system", "imperial");
+        expect(inspector.statisticsHtml(saved[0], "F")).toContain("1076 ft²");
+        panel().querySelector('[data-region] [data-act="remove"]').click();
+        expect(window.localStorage.getItem(inspector.regionsKey(["abc-1"]))).toBe(null);
+        expect(panel().querySelector(".dt-inspector-shown")).toBe(null);
+        map.remove();
+    });
+
+    it("says when a region has no temperatures, and reads one the page left before its statistics", async () => {
+        window.localStorage.setItem(inspector.regionsKey(["abc-1"]), JSON.stringify([
+            {id: "a", label: "R1", shape: "polygon", geometry: {type: "Polygon", coordinates: [[[-88.07, 42], [-88.069, 42], [-88.069, 42.001], [-88.07, 42]]]},
+             statistics: null, reason: null}]));
+        const map = leafletMap();
+        const {ins, fetchFn, panel} = start(map, {[REGION]: {valid: false, reason: "excluded", statistics: null}}, {L});
+        await flush(); await flush();
+        expect(fetchFn.mock.calls.filter(c => c[1] && c[1].method === "POST").length).toBe(1);
+        ins.open();
+        expect(panel().querySelector(".dt-inspector-shown").textContent).toContain("Outside the task's crop");
+        map.remove();
     });
 });
