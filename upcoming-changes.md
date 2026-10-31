@@ -152,7 +152,8 @@
 
 - **Thermal Inspector** (the user, 2026-10-30): the earlier Pixel Inspector ported as a control on WebODM's 2D map,
   for thermal orthophotos, with the palette and unit shared with the Analyzer; in five steps (details under
-  "Up next: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0.
+  "Up next: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0. Steps 2–4
+  done; left: step 5 (isotherms and the legend), and DJI's palettes on the map (3b) once dji-thermal-cli is released.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -563,6 +564,15 @@ WebODM 3.3.2 lacks: the `point` and `region-stats` endpoints, the highlight colo
    intercepted): 30.41 °C under the cursor, two pins (33.77 and 50.36 °C) with no WebODM popup, jet chosen and drawn.
 4. **Region statistics**: rectangle, circle and polygon; minimum, maximum, mean, percentiles, histogram, the
    hottest and coldest pixels marked; CSV; read at native resolution up to a size limit; the task's crop respected.
+   **Done** (2026-10-31, `inspector-regions`): `public/regions.js` (the earlier drawing tool and its geometry as a
+   plain script, `ThermalRegions`: WebODM's map has no drawing tool a plugin can use), the Regions section of
+   `public/inspector.js` (R1, R2…, kept in `localStorage` beside the pins; statistics from step 3's `region`
+   endpoint at the region's centre, a table and an SVG histogram; the hottest and coldest pixels as markers; CSV of
+   a row per region; WebODM's popup kept off while drawing and for the click Leaflet fires after a drag; the panel
+   kept within the map). Leaflet 1.3.1 (WebODM's) added to the dev dependencies for the tests. Tests:
+   `__tests__/regions.test.js` (8, on real Leaflet), `inspector.test.js` (10). Live check on HomerunObliqueII's
+   map (read only; the regions removed afterwards): a rectangle (84,376 pixels, 11.48–53.99 °C, mean 30.32 °C), a
+   circle and a polygon partly off the orthophoto, kept across a reload, no WebODM popup.
 5. **Isotherms and the legend**: above, below or between limits, drawn by the plugin's tiles; the colour bar of the
    palette and range in the shared unit.
 

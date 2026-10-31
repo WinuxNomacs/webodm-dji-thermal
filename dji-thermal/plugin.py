@@ -36,7 +36,7 @@ class Plugin(PluginBase):
         ]
 
     def include_js_files(self):
-        return ['main.js', 'inspector.js']
+        return ['main.js', 'regions.js', 'inspector.js']
 
     def build_jsx_components(self):
         # Leaflet: WebODM's own, for the mosaic viewer (see thermal/Leaflet.js)
