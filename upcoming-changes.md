@@ -624,11 +624,11 @@ layouts, and the UX review checks desktop only.
 the macOS installer (Docker); the React parts are rewritten in plain JavaScript; a native Windows WebODM is used for
 the checks.
 
-**Open** (for the user):
-- The converter on `process()` instead of exiftool (proposed), and whether `dtc:Software` should name DJI's SDK when
-  it measured (a dji-thermal-cli change and release first).
-- Which native Windows WebODM to check in: the existing 3.2.7 in `C:\WebODM` (its own projects; upgrading it to
-  3.3.2 with the installer touches them), or a second install beside it.
+Also decided (the user, 2026-10-31): the converter on `process()`, exiftool dropped; `dtc:Software` stays as the
+CLI writes it (no CLI change); the Windows checks use the install in `C:\WebODM` (unused), which the user upgraded
+to 3.3.2.
+
+**Open**: none.
 
 ## Then: UX review
 
