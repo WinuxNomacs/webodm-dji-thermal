@@ -272,6 +272,26 @@
         });
     }
 
+    // The frame page of the dataset's newest workset that converted (the Files tab's frames open there), or null
+    function framePage(publicUrl, d) {
+        var ready = (d.conversions || []).filter(function (c) { return c.status === "ready"; });
+        if (!ready.length) return null;
+        var newest = ready.reduce(function (a, b) { return String(b.created_at || "") > String(a.created_at || "") ? b : a; });
+        return publicUrl + "dataset/" + d.id + "/conversion/" + newest.id + "/frame";
+    }
+
+    // A link from the frame page's "New workset with these" (?from=<workset>&emissivity=…): {id, changes}, or null
+    function fromQuery(search) {
+        var q = new root.URLSearchParams(search), id = q.get("from");
+        if (!id) return null;
+        var changes = {};
+        ["distance", "humidity", "emissivity", "reflected_temp", "ambient_temp"].forEach(function (k) {
+            var v = parseFloat(q.get(k));
+            if (q.get(k) !== null && !isNaN(v)) changes[k] = v;
+        });
+        return {id: id, changes: changes};
+    }
+
     // The detail pane of the files selected, or of the one under the mouse (urls: {files: the source file's URL
     // without the file, picture: the thumbnail URL, frames: the frame page or null, palette: the user's preferred DJI
     // palette or ""}); "" when there is none. A thermal frame is drawn in that palette (the server draws it in its own
@@ -548,6 +568,7 @@
         var linked = ((root.location && root.location.hash) || "").replace(/[^a-z]/g, "");
         if (linked && page.querySelector('#ta-tabs a[data-tab="' + linked + '"]')) { tab = linked; tabChosen = true; }
         var conversions = conversionsModule.init({doc: doc, fetchFn: fetchFn, api: API, publicUrl: publicUrl, csrf: csrf, datasetId: id,
+                                                  from: fromQuery((root.location && root.location.search) || ""),
                                                   onChange: function () { return load(); }});
 
         function send(u, method, data) {
@@ -626,12 +647,13 @@
             });
             if (!a.files || !tabChosen) tab = "convert";
             conversions.update(d);
+            view.frames = framePage(publicUrl, d);
             if (a.files) {
                 $("ta-files-count").textContent = a.files.length;
                 var serious = (a.findings || []).filter(function (f) { return f.severity !== "info"; }).length;
                 $("ta-problems-count").textContent = serious || "";
                 // Polling redraws the rest: the Files tab only when it would change, not to lose the filter's focus
-                var key = [d.analyzed_at, a.files.length].join("|");
+                var key = [d.analyzed_at, a.files.length, view.frames].join("|");
                 if (key !== filesKey) renderFiles();
                 filesKey = key;
                 $("ta-tab-problems").innerHTML = problemsHtml(a, d.can_change);
@@ -1097,7 +1119,7 @@
 
     var api = {planOptions: planOptions, presetOptions: presetOptions, presetHtml: presetHtml, readPresetForm: readPresetForm,
                captureTime: captureTime, median: core.median, overview: overview, summaryRows: summaryRows, duration: duration, overviewHtml: overviewHtml, flagsByFile: flagsByFile,
-               sortRows: core.sortRows, fileRows: fileRows, detailRows: detailRows, viewerSrc: viewerSrc, viewerItems: viewerItems, detailHtml: detailHtml, filesHtml: filesHtml, stepsHtml: stepsHtml, settingsWords: settingsWords, findingMessage: findingMessage, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
+               framePage: framePage, fromQuery: fromQuery, sortRows: core.sortRows, fileRows: fileRows, detailRows: detailRows, viewerSrc: viewerSrc, viewerItems: viewerItems, detailHtml: detailHtml, filesHtml: filesHtml, stepsHtml: stepsHtml, settingsWords: settingsWords, findingMessage: findingMessage, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
     root.ThermalAnalyzerDataset = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

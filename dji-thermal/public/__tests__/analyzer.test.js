@@ -1358,6 +1358,22 @@ describe("a dataset's conversions", () => {
         expect(input("humidity").value).toBe("55");
     });
 
+    it("fills the form with a workset's settings and the frame page's changed parameters, from its New workset with these", async () => {
+        window.history.replaceState(null, "", "/?from=9&emissivity=0.8&humidity=40&palette=x#convert");
+        expect(dataset.fromQuery(window.location.search)).toEqual({id: "9", changes: {emissivity: 0.8, humidity: 40}});
+        const fetchFn = server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [CONVERSION], defaults: DEFAULTS}),
+                                "/api/plugins/dji-thermal/preferences": PREFERENCES});
+        dataset.init(document, fetchFn);
+        await ticks();
+        expect(form().hidden).toBe(false);
+        expect(input("emissivity").value).toBe("0.8");
+        expect(input("humidity").value).toBe("40");
+        // The rest is the workset's own
+        expect(input("normalize").checked).toBe(true);
+        expect(document.getElementById("ta-convert-message").textContent).toMatch(/Nadir's settings with humidity 40, emissivity 0.8, from the frame page/);
+        expect(calls(fetchFn).filter(c => c.indexOf("POST") === 0)).toEqual([]);
+    });
+
     it("opens the form at once for a dataset without conversions", async () => {
         const fetchFn = server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [], defaults: DEFAULTS}),
                                 "/api/plugins/dji-thermal/preferences": PREFERENCES});
@@ -1475,6 +1491,10 @@ describe("a dataset's conversions", () => {
         expect(document.getElementById("ta-convert-origin").textContent).toMatch(/dji-thermal-cli's defaults/);
 
         // A conversion's settings, and the WebODM plan's, fill the form
+        expect(dataset.framePage("/plugins/dji-thermal/", {id: 5, conversions: [
+            {id: "a", status: "ready", created_at: "2026-10-01T00:00:00Z"}, {id: "b", status: "ready", created_at: "2026-10-03T00:00:00Z"},
+            {id: "c", status: "failed", created_at: "2026-10-05T00:00:00Z"}]})).toBe("/plugins/dji-thermal/dataset/5/conversion/b/frame");
+        expect(dataset.framePage("/plugins/dji-thermal/", {id: 5, conversions: []})).toBeNull();
         click(document.querySelector('.ta-conversion[data-id="9"] button[data-act="use"]'));
         expect(input("emissivity").value).toBe("0.95");
         expect(input("normalize").checked).toBe(true);
@@ -2183,6 +2203,10 @@ describe("the mosaic viewer", () => {
         expect(picked.layers[0].polygon[0]).toEqual([45, 10]);
         expect(kept.layers.map(l => l.marker)).toEqual([{lng: 10.0005, lat: 45.0005}]);
         expect(pip.querySelector('[data-pip="prev"]').disabled).toBe(true);
+        // The frame on its own page, in a new tab
+        const open = pip.querySelector('[data-pip="open"]');
+        expect(open.getAttribute("href")).toBe("/plugins/dji-thermal/dataset/5/conversion/9/frame?frame=b_T.JPG");
+        expect(open.getAttribute("target")).toBe("_blank");
 
         // The next frame; a palette changed redraws it
         click(pip.querySelector('[data-pip="next"]'));

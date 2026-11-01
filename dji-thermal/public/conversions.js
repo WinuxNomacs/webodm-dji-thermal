@@ -688,6 +688,7 @@
         var menu = null;    // the conversion whose menu is open
         var task = null;    // the task panel open: {id, info, draft}
         var drawnWith;      // the analysis the form shows the recorded values of (its time)
+        var fromUsed = false;   // the frame page's workset and changes (ctx.from) put in the form, once
         var panel = root$("ta-tab-convert");
 
         function send(u, method, data) {
@@ -859,8 +860,21 @@
                 settings = r.data.settings;
                 saved = r.data.saved;
                 renderForm();
+                useFrom();
             });
             return loading;
+        }
+
+        // The frame page's "New workset with these": the form has its workset's settings with the parameters changed
+        function useFrom() {
+            var c = ctx.from && !fromUsed && meta && dataset && (dataset.conversions || []).filter(function (x) { return String(x.id) === ctx.from.id; })[0];
+            if (!c) return;
+            fromUsed = true;
+            settings = Object.assign({}, c.settings, ctx.from.changes);
+            editing = true;
+            renderForm();
+            var changed = Object.keys(ctx.from.changes).map(function (k) { return k.replace(/_/g, " ") + " " + ctx.from.changes[k]; }).join(", ");
+            message("The form has " + esc(c.name) + "'s settings" + (changed ? " with " + esc(changed) : "") + ", from the frame page. Create Workset when the settings are ready.", "text-muted");
         }
 
         function update(d) {

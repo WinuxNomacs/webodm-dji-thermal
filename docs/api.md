@@ -42,6 +42,13 @@ workset's id (12 hexadecimal characters).
 | GET | `.../mosaics/<tab>/curve?rescale=&gamma=&equalize=` | How the tab's images are drawn, for the colour scale: the palette's share at 65 values evenly across the range. |
 | GET | `.../mosaics/<tab>/point?lon=&lat=` | The temperature, frame, frame pixel (the frame's column and row) and view angle at a point. |
 | GET | `.../mosaics/<tab>/frames?lon=&lat=`, `.../frames/<index>.png` | The frames that saw a point; one frame's picture. |
+| GET | `.../conversions/<workset>/frames` | The frame page's list: the dataset's thermal frames (`path`, `time`, `pitch`, `converted`, `mosaic`: its place among the mosaics' frames or null), the workset's unit, whether it normalized or harmonized, the mosaics' pitch limit, the palettes and your default. |
+| GET | `.../conversions/<workset>/frame?frame=` | A frame measured as the workset converted it, or with `distance`, `humidity`, `emissivity`, `reflected_temp`, `ambient_temp` changed (temperatures in the workset's unit): its size, what the SDK measured with (`params`, °C), what the camera recorded, the distance's source, notes, the normalization's offset and its range, mean and histogram. |
+| GET | `.../conversions/<workset>/frame/values?frame=` | The frame's values (with the same changes) for the browser to colour, as a mosaic tab's `values` with no margin. |
+| POST | `.../conversions/<workset>/frame/region` | What a pin, line or polygon drawn in a frame's pixels (`geometry`, x right and y down, with `frame`, `changes` and `isotherm` in °C) measures, in °C, as the Thermal Inspector's `region`; sizes in pixels. |
+| GET | `.../conversions/<workset>/frame/download?frame=&kind=` | The frame's temperatures (with the changes) as `csv` or a float `tiff`. |
+| GET, POST | `.../conversions/<workset>/frame/measurements` | The measurements saved on the workset's frames (`?frame=` those of one) and whether you can change them; saves one (`name`, `comment`, `shape`, `frame`, `changes`, `geometry`, `isotherm`), measured on the server. |
+| PATCH, DELETE | `.../conversions/<workset>/frame/measurements/<id>` | Renames a measurement saved on a frame or changes its comment; deletes it. |
 | GET, POST | `.../conversions/<workset>/measurements` | The measurements saved on the workset's mosaics, with what they were measured with (`baseline`) and whether you can change them; saves one, as the Thermal Inspector's `measurements`, with the `tab` it was measured on. |
 | PATCH, DELETE | `.../conversions/<workset>/measurements/<id>` | Renames a saved measurement or changes its comment; deletes it. |
 | GET, PUT, DELETE | `preferences` | Your saved workset settings (your defaults); save them; back to dji-thermal-cli's. |

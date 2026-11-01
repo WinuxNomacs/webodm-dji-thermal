@@ -8,8 +8,8 @@ The DJI Thermal plugin turns the radiometric thermal photos of a DJI drone (R-JP
 - **DJI Thermal Task**, a button on each project of the dashboard. It's the quick way: the photos are converted into
   temperature images as they upload, then WebODM processes them like any other task.
 - **DJI Thermal Analyzer**, in WebODM's menu, for a flight you want to look at first. It checks the photos, converts
-  them with the settings you choose (several worksets side by side), shows quick mosaics on a map, and makes a
-  WebODM task from the workset you pick.
+  them with the settings you choose (several worksets side by side), shows quick mosaics on a map and each frame on
+  its own page, and makes a WebODM task from the workset you pick.
 - **Thermal Inspector**, on WebODM's map of a processed thermal task. It shows the temperature under the cursor,
   pinned points, the statistics of regions and lines (surroundings, ΔT, a line's profile), measurements saved for
   the project, a correction for another emissivity, isotherms and a legend, lays the Analyzer's mosaics on the map to
@@ -26,8 +26,8 @@ Each one walks through a task from start to finish.
    of temperatures.
 2. [Checking a flight in the DJI Thermal Analyzer](quickstart-analyzer.md): upload the photos, read the problems
    found and the settings WebODM should use.
-3. [Worksets, mosaics and a task](quickstart-worksets.md): convert the photos, look at the mosaics, and make a
-   WebODM task from them.
+3. [Worksets, mosaics and a task](quickstart-worksets.md): convert the photos, look at the mosaics and at each frame
+   (measured, or measured again with other values), and make a WebODM task from them.
 4. [Measuring on the map](quickstart-inspector.md): temperatures, points, regions and lines on the processed map,
    saved for the project and corrected for another emissivity.
 

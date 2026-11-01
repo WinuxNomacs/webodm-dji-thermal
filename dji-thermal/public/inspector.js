@@ -1719,7 +1719,8 @@
         function drawPick() {
             var pick = state.pick, f = pick.frames[pick.at];
             frameBox.hidden = false;
-            frameBox.innerHTML = Frames.pipHtml(pick, frameImageUrl(pick));
+            var src = framesSource(thermalLayer(pick.t.layer), state.mosaics, state.palette, state.display);
+            frameBox.innerHTML = Frames.pipHtml(pick, frameImageUrl(pick), src && src.base);
             placeFrames(panelMove.offset());
             if (pick.error) frameBox.querySelector(".ta-message").textContent = pick.error;
             pickLayer.clearLayers();

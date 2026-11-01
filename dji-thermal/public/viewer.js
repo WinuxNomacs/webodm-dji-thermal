@@ -513,7 +513,7 @@
         function showPick() {
             var box = $("ta-viewer-pip"), f = pick.frames[pick.at];
             box.hidden = false;
-            box.innerHTML = pipHtml(pick, f ? frameUrl(base, tab, f.index, style(), v.built_at) : "");
+            box.innerHTML = pipHtml(pick, f ? frameUrl(base, tab, f.index, style(), v.built_at) : "", base);
             pickLayer.clearLayers();
             if (f && f.footprint) {
                 L.polygon(f.footprint.map(function (c) { return [c[1], c[0]]; }),

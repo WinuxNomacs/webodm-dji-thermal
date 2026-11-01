@@ -21,8 +21,8 @@ const OUT = path.join(REPO, "docs", "images");
 const SIZE = {width: 1280, height: 800};
 const MARGIN = 8;       // around an element shot
 // What may be posted: the login, a photo's description (the Thermal Task panel) and a region's statistics (the
-// Thermal Inspector), which compute without saving
-const POSTS = [/\/login\/$/, /\/api\/plugins\/dji-thermal\/describe$/, /\/inspector\/region$/];
+// Thermal Inspector, the frame page), which compute without saving
+const POSTS = [/\/login\/$/, /\/api\/plugins\/dji-thermal\/describe$/, /\/inspector\/region$/, /\/frame\/region$/];
 // A number with five or more decimals, as coordinates are shown
 const COORDINATE = /-?\b\d{1,3}\.\d{5,}\b/;
 // A camera's serial number, as the dataset's summary and the detail pane show it
@@ -158,6 +158,36 @@ const SHOTS = {
         await p.waitForTimeout(1500);
         return p;
     },
+    "frame-page": async (p, env) => {
+        // A frame of the dataset's first workset, a rectangle measured on it, the cursor on the frame
+        await p.setViewportSize({width: SIZE.width, height: 1000});
+        await openFrame(p, env);
+        const frame = await p.locator("#ta-frame-map-0").boundingBox();
+        const at = (fx, fy) => [frame.x + frame.width * fx, frame.y + frame.height * fy];
+        await p.click('[data-tool="rectangle"]');
+        await p.mouse.move(...at(0.3, 0.35));
+        await p.mouse.down();
+        await p.mouse.move(...at(0.45, 0.55), {steps: 6});
+        await p.mouse.up();
+        await p.waitForSelector("#ta-frame-measure .dt-inspector-histogram", {timeout: 30000});
+        await p.mouse.move(...at(0.6, 0.4));
+        await p.waitForTimeout(500);
+        return p;
+    },
+    "frame-measure-again": async (p, env) => {
+        // The same frame measured again with another emissivity, beside it, the cursor's two temperatures read
+        await p.setViewportSize({width: SIZE.width, height: 1000});
+        await openFrame(p, env);
+        await p.fill('#ta-frame-params input[name="emissivity"]', "0.8");
+        await p.click("#ta-frame-apply");
+        await p.waitForSelector("#ta-frame-pane-1:not([hidden]) canvas", {timeout: 30000});
+        await p.waitForTimeout(1500);
+        await p.locator('[data-section="params"]').scrollIntoViewIfNeeded();
+        const frame = await p.locator("#ta-frame-map-0").boundingBox();
+        await p.mouse.move(frame.x + frame.width * 0.4, frame.y + frame.height * 0.45);
+        await p.waitForTimeout(500);
+        return p;
+    },
     "inspector": async (p, env) => {
         await p.setViewportSize({width: SIZE.width, height: 1100});    // room for a region's statistics
         await p.goto(env.url + need(env, "DT_DOCS_MAP"));
@@ -251,6 +281,7 @@ const SHOTS = {
     },
     "inspector-frames": async (p, env) => {
         // The frames that saw a point clicked on the map's thermal orthophoto (its task processed from a workset)
+        await p.setViewportSize({width: SIZE.width, height: 1100});    // room for the window, down to Open this frame
         await p.goto(env.url + need(env, "DT_DOCS_MAP"));
         await p.waitForSelector(".dt-inspector-button", {timeout: 30000});
         await p.waitForTimeout(3000);
@@ -298,6 +329,16 @@ async function openViewer(p, env) {
     const conversion = (list.conversions || list)[0];
     await p.goto(env.url + "/plugins/dji-thermal/dataset/" + dataset + "/conversion/" + conversion.id);
     await p.waitForSelector("#ta-viewer-map .leaflet-tile-loaded", {timeout: 60000});
+    await p.waitForTimeout(2000);
+}
+
+// The frame page of the dataset's first workset, at its first frame
+async function openFrame(p, env) {
+    const dataset = need(env, "DT_DOCS_DATASET");
+    const list = await p.evaluate(async (d) => (await fetch("/api/plugins/dji-thermal/datasets/" + d + "/conversions")).json(), dataset);
+    const conversion = (list.conversions || list)[0];
+    await p.goto(env.url + "/plugins/dji-thermal/dataset/" + dataset + "/conversion/" + conversion.id + "/frame");
+    await p.waitForSelector("#ta-frame-map-0 canvas", {timeout: 60000});
     await p.waitForTimeout(2000);
 }
 
