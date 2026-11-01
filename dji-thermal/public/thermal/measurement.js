@@ -38,13 +38,16 @@ function round(n, decimals){
     return Math.round(n * f) / f;
 }
 
-// descriptions: the server's describe of one photo per camera ({camera, recorded, ranges}). The ranges every
-// camera accepts, the first camera's recorded values, and the cameras that do not use a parameter.
+// descriptions: the server's describe of one photo per camera ({camera, recorded, ranges, palette, palettes}). The
+// ranges every camera accepts, the first camera's recorded values, the cameras that do not use a parameter, DJI's
+// palettes and the first palette the photos were shot in ("" for none).
 export function combineCameras(descriptions){
-    const combined = {cameras: [], ranges: {}, recorded: {}, unusedBy: {}};
+    const combined = {cameras: [], ranges: {}, recorded: {}, unusedBy: {}, palettes: [], palette: ""};
     const names = FIELDS.map(f => f.name).concat(["distance"]);
 
     descriptions.forEach(d => {
+        if (!combined.palettes.length && d.palettes) combined.palettes = d.palettes.slice();
+        if (!combined.palette && d.palette) combined.palette = d.palette;
         const camera = cameraName(d.camera);
         if (combined.cameras.indexOf(camera) === -1) combined.cameras.push(camera);
         names.forEach(name => {
@@ -62,6 +65,13 @@ export function combineCameras(descriptions){
         });
     });
     return combined;
+}
+
+// Where the Palette field starts: the photos' palette, else DJI's iron red, else the first of DJI's
+export function startPalette(combined){
+    const list = combined.palettes || [];
+    if (list.indexOf(combined.palette) !== -1) return combined.palette;
+    return list.indexOf("ironred") !== -1 ? "ironred" : (list[0] || "");
 }
 
 function parse(text){

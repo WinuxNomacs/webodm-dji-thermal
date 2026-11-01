@@ -1,4 +1,4 @@
-import { combineCameras, defaultUnit, rangeText, recordedText, requestData, validate } from "../thermal/measurement";
+import { combineCameras, defaultUnit, rangeText, recordedText, requestData, startPalette, validate } from "../thermal/measurement";
 
 // As the server describes the sample photos (converter.describe)
 const M4T = {
@@ -46,6 +46,14 @@ describe("the cameras' ranges", () => {
         expect(mixed.ranges.ambient_temp).toEqual([-40, 80]);
         expect(mixed.unusedBy.ambient_temp).toEqual(["H20T"]);
         expect(mixed.ranges.humidity).toEqual([20, 100]);
+    });
+
+    test("the Palette starts on the photos' palette, else DJI's iron red", () => {
+        const palettes = ["whitehot", "ironred", "arctic"];
+        const both = combineCameras([Object.assign({palettes, palette: ""}, H20T), Object.assign({palettes, palette: "arctic"}, M4T)]);
+        expect([both.palettes, both.palette, startPalette(both)]).toEqual([palettes, "arctic", "arctic"]);
+        expect(startPalette(combineCameras([Object.assign({palettes, palette: "pink"}, M4T)]))).toBe("ironred");
+        expect(startPalette(combineCameras([M4T]))).toBe("");
     });
 
     test("the default unit is WebODM's: Fahrenheit in an imperial unit system, else Celsius", () => {

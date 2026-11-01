@@ -18,7 +18,10 @@ out the visible (RGB) photos taken with them. You can add a GCP file too.
 
 ## 2. Check the measurement values
 
-The panel shows how many thermal photos it found, then two settings, off by default:
+The panel shows how many thermal photos it found, then the **Palette**: the DJI palette the task's thermal map
+opens in, starting on the one the photos were shot in. It doesn't change the task's images, which hold temperatures,
+and your own palette, if you've chosen one in the DJI Thermal Analyzer's preferences, comes first; the map can show
+any palette later. Then two settings, off by default:
 
 - **Normalize** measures every frame with one ambient and reflected temperature, the flight's medians of the values
   the camera recorded, so there are no jumps between frames where those values change.

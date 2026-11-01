@@ -293,6 +293,23 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **A palette in DJI Thermal Task** (the user, 2026-11-01, with a screenshot of the panel): "add a dropdown above
+  the "Normalize:" checkbox that allows the user to select the color palette from the supported dji color palettes.
+  If detectable, it should default to that of the source photos." Done 2026-11-01, `task-palette`. The task's TIFFs
+  hold temperatures, so the palette is where its thermal map opens. Decided (the user): **the task's palette when the
+  user has none** (Preferences' "Each image's own"); theirs wins once chosen. Server: `conversion_tasks.task_palette`
+  / `set_task_palette` (`thermal/task.json`, beside the saved measurements), set by `TaskConvert` and `TaskWorkset`
+  (also the workset's palette) and by a task made from a workset or a workset sent to the dataset's task (the
+  workset's palette); `converter.describe` gives the photo's palette, `Describe` DJI's palettes; the Inspector's
+  `measurements` GET gives `palette`. Panel: `ThermalTaskPanel.jsx` `renderPalette` (the photos' palette marked,
+  else ironred), `measurement.js` `combineCameras`, `startPalette`. Inspector: `openInTaskPalette` (the topmost
+  orthophoto's task, until the user chooses a palette on the page). README, `quickstart-thermal-task.md`, `api.md`;
+  screenshot `thermal-task-panel` retaken. Tests: `measurement.test.js` (1), `inspector.test.js` (1), `test_api.py`
+  (1 new, 2 extended), `test_analyzer.py`, `test_inspector.py`. Jest, ESLint, Ruff, Django 179 (1 skipped). Live
+  (read only): 4 M4T photos, the Palette above Normalize on "ironred (the photos')"; ThermalTest's map, its
+  measurements answer given palette arctic and the display none, opened in DJI arctic. Noticed: deleting a dataset
+  kept in a task (`conversion_tasks.release`) removes the task's whole `thermal/` folder, its saved measurements and
+  palette with it.
 - **Faster image adjustments** (the user, 2026-11-01, from `new.md`): "can anything be done to improve the
   rendering response time of changes to the images sliders? How fast the tiles are rendered? etc.... Looking for it
   to be as seamless and realtime as possible without needing a webodm pr".

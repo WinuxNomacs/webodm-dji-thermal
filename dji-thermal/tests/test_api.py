@@ -98,6 +98,9 @@ class TestDescribe(ApiTestCase):
         self.assertEqual(res.data["camera"], "ZH20T")
         self.assertEqual(res.data["ranges"]["humidity"], [20.0, 100.0])
         self.assertNotIn("ambient_temp", res.data["recorded"])
+        # The palette it was shot in, among DJI's, for the panel's Palette
+        self.assertIn(res.data["palette"], res.data["palettes"])
+        self.assertIn("ironred", res.data["palettes"])
         self.assertNoWorkFilesLeft()
 
 
@@ -179,6 +182,17 @@ class TestConvert(ApiTestCase):
         with Image.open(self.task.get_image_path(name)) as im:
             self.assertEqual(im.mode, "F")
         self.assertEqual(read_tags(self.task.get_image_path(name), "XMP-dtc:Emissivity")["Emissivity"], 0.9)
+
+    def test_the_palette_sent_with_the_photos_is_the_task_s_and_must_be_one_of_dji_s(self):
+        self.assertEqual(conversion_tasks.task_palette(self.task), "")
+        res = self.post_file(convert_url(self.task), sample("M4T"), unit="C", palette="pink")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.task_images(), [])
+        res = self.post_file(convert_url(self.task), sample("M4T"), unit="C", palette="arctic")
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual(conversion_tasks.task_palette(self.task), "arctic")
+        # Kept out of WebODM's images: the task folder's root holds only the TIFFs
+        self.assertEqual(len(self.task.scan_images()), 1)
 
 
 class TestTaskDataset(ApiTestCase):
@@ -283,7 +297,8 @@ class TestTaskWorkset(ApiTestCase):
         self.made_dataset()
         with mock.patch.object(datasets, "start_job"):
             res = self.client.post(self.url, {"settings": {"harmonize": True, "emissivity": "0.9", "unit": "F",
-                                                           "reflected_temp": "70", "distance": "embedded"}}, format="json")
+                                                           "reflected_temp": "70", "distance": "embedded",
+                                                           "palette": "hotiron"}}, format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
         record = conversions.record(self.task, res.data["id"])
         self.assertEqual(record["name"], "DJI Thermal Task")
@@ -291,6 +306,8 @@ class TestTaskWorkset(ApiTestCase):
                                                              "distance", "outputs", "mosaics")},
                          {"normalize": True, "harmonize": True, "emissivity": 0.9, "unit": "F", "reflected_temp": 70.0,
                           "distance": "embedded", "outputs": ["temp_c:tiff"], "mosaics": True})
+        # The panel's palette is the task's and the workset's
+        self.assertEqual((record["settings"]["palette"], conversion_tasks.task_palette(self.task)), ("hotiron", "hotiron"))
         self.assertEqual(record["then"], {"processing_node": None, "auto_processing_node": True})
 
     def test_once_converted_the_task_gets_the_tiffs_keeps_its_text_files_and_is_committed(self):
