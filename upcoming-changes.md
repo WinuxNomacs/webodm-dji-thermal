@@ -27,6 +27,13 @@
     folder (`in_task` added), ThermalTest tagged as the dataset (its link tag dropped), checked read only (the
     dataset page, the workset's mosaic viewer drawing tiles, the panel's Thermal dataset link), then the holder task
     deleted with its folder; checked again after.
+- **Polish: the dataset page names its WebODM task** (the user, 2026-11-01, with a screenshot of ThermalTest's
+  dataset page): "We should add the name and a link to the parent webodm task, for both visibility in the ui but a
+  navigation path between the 2". Done (2026-11-01), `dataset-task-link`: under the dataset's name, "WebODM task
+  <name>" linking to the task's expanded panel on the Dashboard (whose Thermal dataset button links back), for a
+  dataset kept in a task (`in_task`, now in the dataset's details) or whose own task holds images (`dataset.js`
+  `taskLink`). README, `quickstart-analyzer.md` section 2; screenshot `dataset` retaken. `analyzer.test.js` (1),
+  `test_api.py`. Live on ThermalTest (read only): the link shown, followed to its panel.
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
   - Done: **polish, the Thermal Inspector's Regions list: no "Show its statistics" button** (the user, 2026-10-31:

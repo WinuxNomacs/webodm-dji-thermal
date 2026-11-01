@@ -1811,6 +1811,22 @@ describe("a task made from a conversion", () => {
     const PARENT = {id: "50", project: 1, name: "Thermal dataset: Roof", images_count: 5, status: 40, processing_node: 1,
                     last_error: "", processed: true, busy: false, conversion: "", sent_at: null, sent_by: null};
 
+    it("names the WebODM task the dataset is kept in under its title, linked to it, when it is a task of its own or holds images", async () => {
+        const subtitle = async extra => {
+            document.body.innerHTML = page('dataset.html');
+            dataset.init(document, server({[URL5]: Object.assign(d({}), extra)}));
+            await ticks();
+            return document.getElementById("ta-subtitle");
+        };
+        let el = await subtitle({parent: PARENT});
+        expect(el.textContent).toContain("WebODM task  Thermal dataset: Roof");
+        expect(el.querySelector("a").getAttribute("href")).toBe("/dashboard/?project_task_open=1&project_task_expanded=50");
+        el = await subtitle({in_task: true, parent: Object.assign({}, PARENT, {name: "Roof", images_count: 0})});
+        expect(el.querySelector("a").textContent).toBe(" Roof");
+        el = await subtitle({parent: Object.assign({}, PARENT, {images_count: 0})});
+        expect(el.textContent).not.toContain("WebODM task");
+    });
+
     it("sends a conversion to the dataset's task once what it replaces is confirmed, then links to it", async () => {
         const sent = Object.assign({}, PARENT, {images_count: 12, status: null, processing_node: null, processed: false, conversion: "9"});
         const fetchFn = server({

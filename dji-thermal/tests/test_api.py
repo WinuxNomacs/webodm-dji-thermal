@@ -207,8 +207,8 @@ class TestTaskDataset(ApiTestCase):
         self.assertEqual(self.task.tags, "roof .dji-thermal-task .dji-thermal-dataset")
         self.assertEqual(self.task.name, "Thermal")
         self.assertTrue(os.path.isdir(datasets.images_path(self.task)))
-        self.assertEqual(self.client.get("/api/plugins/dji-thermal/datasets/{}".format(self.task.id)).data["name"],
-                         "Thermal")
+        detail = self.client.get("/api/plugins/dji-thermal/datasets/{}".format(self.task.id)).data
+        self.assertEqual((detail["name"], detail["in_task"], detail["parent"]["name"]), ("Thermal", True, "Thermal"))
 
     def test_a_task_that_is_a_dataset_gets_itself_again(self):
         self.client.post(dataset_url(self.task))

@@ -588,11 +588,21 @@
             [].forEach.call(page.querySelectorAll(".ta-tab"), function (el) { el.hidden = el.getAttribute("data-tab") !== tab; });
         }
 
+        // The WebODM task the dataset is kept in, when it is a task of its own (a DJI Thermal Task's) or holds a
+        // workset's TIFFs: its name, linked to it on the Dashboard
+        function taskLink(d) {
+            var t = d.parent;
+            if (!t || !(d.in_task || t.images_count)) return "";
+            var url = "/dashboard/?project_task_open=" + t.project + "&project_task_expanded=" + t.id;
+            return ' · WebODM task <a href="' + esc(url) + '" title="Open the task on WebODM\'s Dashboard">' +
+                '<i class="fa fa-tasks"></i> ' + esc(t.name) + "</a>";
+        }
+
         function render(d) {
             dataset = d;
             $("ta-name").textContent = d.name;
             doc.title = d.name + " - DJI Thermal Analyzer";
-            $("ta-subtitle").innerHTML = "Project <strong>" + esc(d.project.name) + "</strong>" +
+            $("ta-subtitle").innerHTML = "Project <strong>" + esc(d.project.name) + "</strong>" + taskLink(d) +
                 (d.created_by ? " · created by " + esc(d.created_by) : "") + " · " + esc(core.formatDate(d.created_at));
             var analyzing = d.status === "analyzing";
             $("ta-add").hidden = !d.can_change || analyzing || uploading;
