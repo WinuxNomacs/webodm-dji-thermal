@@ -169,6 +169,8 @@ const SHOTS = {
         await p.click('.dt-inspector-modes [data-mode="pin"]');
         await p.mouse.click(...at(0.45, 0.4));
         await p.waitForTimeout(1000);
+        // The pin opens the frames that saw it (a task processed from a workset): closed, off the region's place
+        await p.click('.dt-inspector-frames [data-pip="close"]', {timeout: 5000}).catch(() => {});
         await p.click('.dt-inspector-modes [data-mode="rectangle"]');
         await p.mouse.move(...at(0.5, 0.5));
         await p.mouse.down();
@@ -178,6 +180,26 @@ const SHOTS = {
         await p.click('.dt-inspector-modes [data-mode="hover"]');
         await p.mouse.move(...at(0.4, 0.55));
         await p.waitForTimeout(1500);
+        return p;
+    },
+    "inspector-line": async (p, env) => {
+        // A line across the map's thermal orthophoto, its profile hovered: the point found on the map
+        await p.setViewportSize({width: SIZE.width, height: 1100});    // room for its statistics and profile
+        await p.goto(env.url + need(env, "DT_DOCS_MAP"));
+        await p.waitForSelector(".dt-inspector-button", {timeout: 30000});
+        await p.waitForTimeout(3000);
+        await p.click(".dt-inspector-button");
+        const map = await p.locator(".leaflet-container").first().boundingBox();
+        const at = (fx, fy) => [map.x + map.width * fx, map.y + map.height * fy];
+        await p.click('.dt-inspector-modes [data-mode="line"]');
+        await p.mouse.click(...at(0.3, 0.5));
+        await p.waitForTimeout(300);
+        await p.mouse.dblclick(...at(0.55, 0.6));
+        await p.waitForSelector(".dt-inspector-profile svg", {timeout: 30000});
+        await p.locator(".dt-inspector-profile svg").scrollIntoViewIfNeeded();
+        const profile = await p.locator(".dt-inspector-profile svg").boundingBox();
+        await p.mouse.move(profile.x + profile.width * 0.6, profile.y + profile.height / 2);
+        await p.waitForTimeout(1000);
         return p;
     },
     "inspector-frames": async (p, env) => {

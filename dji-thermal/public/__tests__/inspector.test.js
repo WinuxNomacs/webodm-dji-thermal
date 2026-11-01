@@ -330,6 +330,9 @@ describe("the Thermal Inspector's regions", () => {
         expect(panel().querySelector(".dt-inspector-profile-read").textContent).toContain("12.5 m: 30.00 °C");
         panel().dispatchEvent(new MouseEvent("mouseleave"));
         expect(markers()).toEqual([]);
+        const labels = [];
+        map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) labels.push([l.getTooltip()._content, l.getLatLng ? l.getLatLng() : null]); });
+        expect(labels).toContainEqual(["L1", L.latLng(42, -88.07)]);     // at its start
 
         expect(inspector.profileCsv(ins.state.regions[0], "C").split("\n").slice(0, 3)).toEqual(
             ["distance_m,latitude,longitude,temperature_c", "0.000,42.00000000,-88.07000000,20.000", "5.000,42.00000000,-88.06990000,"]);

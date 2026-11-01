@@ -785,8 +785,11 @@
                 var shape = r.circle ? L.circle([r.circle.lat, r.circle.lng], assign({radius: r.circle.radius, interactive: false}, style)) :
                     r.shape === "line" ? L.polyline(latLngs(r), assign({interactive: false}, style, {weight: style.weight + 1})) :
                     L.polygon(latLngs(r), assign({interactive: false}, style));
-                shape.bindTooltip(r.label, {permanent: true, direction: "center", className: "dt-inspector-tip"});
                 regionLayer.addLayer(shape);
+                // A line's label at its start, off the points its profile finds along it
+                var labelled = r.shape !== "line" ? shape : L.circleMarker(latLngs(r)[0], {radius: 3, color: style.color, weight: 2, fillColor: "#fff", fillOpacity: 1, interactive: false});
+                labelled.bindTooltip(r.label, {permanent: true, direction: r.shape === "line" ? "left" : "center", className: "dt-inspector-tip"});
+                if (labelled !== shape) regionLayer.addLayer(labelled);
                 if (r.statistics) {
                     regionLayer.addLayer(extremeMarker(r, "min"));
                     regionLayer.addLayer(extremeMarker(r, "max"));

@@ -34,7 +34,7 @@ workset's id (12 hexadecimal characters).
 | POST | `.../conversions/<workset>/parent` | Sends the workset's TIFFs to the dataset's own task. |
 | GET, POST | `.../conversions/<workset>/mosaics` | The mosaics as the viewer shows them; builds them. |
 | GET | `.../mosaics/<tab>/tiles/<z>/<x>/<y>.png` | A map tile of a mosaic tab, over `rescale=min,max` in `color_map`, drawn with `gamma` (0.2 to 5), `sharpen` (0 to 5), and on temperatures `equalize=1` and `isotherm` (`above,T`, `below,T` or `between,A,B`, in the mosaic's unit: those pixels in the palette, the rest grey); the same for a frame's picture. |
-| POST | `.../mosaics/<tab>/region` | A temperature tab's statistics inside a GeoJSON polygon, in °C, as the Thermal Inspector's `region`. |
+| POST | `.../mosaics/<tab>/region` | A temperature tab's statistics inside a GeoJSON polygon or along a line, in °C, as the Thermal Inspector's `region`; a line's profile also names each sample's source frame. |
 | GET | `.../mosaics/<tab>/isotherm/<z>/<x>/<y>.png?low=&high=&color=` | A temperature tab's isotherm tile, as the Thermal Inspector's `isotherm` (limits in °C). |
 | GET | `.../mosaics/<tab>/curve?rescale=&gamma=&equalize=` | How the tab's images are drawn, for the colour scale: the palette's share at 65 values evenly across the range. |
 | GET | `.../mosaics/<tab>/point?lon=&lat=` | The temperature, frame, frame pixel (the frame's column and row) and view angle at a point. |
@@ -49,7 +49,7 @@ On a task with a thermal orthophoto, under `projects/<project>/tasks/<task>/insp
 | Method | Path | What it does |
 | --- | --- | --- |
 | GET | `point?lon=&lat=` | The temperature at a point, or why there's none. |
-| POST | `region` | A region's statistics and histogram, from a GeoJSON polygon. Nothing is kept. |
+| POST | `region` | The statistics and histogram of a GeoJSON polygon, or of a line (a strip 0.25 m either side, with its length and profile), with the surroundings' mean and ΔT; `isotherm: {low, high}` (°C, either null) adds the share of its pixels within them. Nothing is kept. |
 | GET | `tiles/<z>/<x>/<y>` | The orthophoto drawn in one of DJI's palettes. |
 | GET | `isotherm/<z>/<x>/<y>` | An isotherm's tiles. |
 | GET | `palette?name=` | A palette's colours, for the legend. |
