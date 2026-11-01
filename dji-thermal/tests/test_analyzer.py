@@ -661,7 +661,8 @@ class TestMosaics(AnalyzerTestCase):
         self.assertLess(tab["stats"]["min"] - 1, p["temperature"])
         self.assertIn(p["frame"], v["frames"])
         self.assertTrue(set(v["frames"]) <= {os.path.basename(f) for f in frames}, v["frames"])
-        self.assertFalse(self.client.get(self.url(task, cid, "/harmonized/point"), {"lon": 0, "lat": 0}).data["valid"])
+        outside = self.client.get(self.url(task, cid, "/harmonized/point"), {"lon": 0, "lat": 0}).data
+        self.assertEqual((outside["valid"], outside["frame_pixel"]), (False, None))
 
         # The frames that saw a mosaic pixel's centre, the mosaic's own first; each drawn as its tab draws the mosaic,
         # the same value at the point's pixel as the mosaic's (the view angle from the frame's pixel, not the ground's)
@@ -677,6 +678,10 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual((first["file"], first["source"]), (own["frame"], True))
         self.assertTrue(all(not f["source"] for f in found["frames"][1:]))
         here = (math.floor(first["y"] + 0.5), math.floor(first["x"] + 0.5))
+        # The frame's pixel the mosaic read the point from (its column and row), as the frames window finds it
+        self.assertEqual(len(own["frame_pixel"]), 2)
+        for got, want in zip(own["frame_pixel"], (here[1], here[0])):
+            self.assertAlmostEqual(got, want, delta=1)
         for name, key, delta in (("harmonized", "temperature", 0.01), ("as_converted", "temperature", 0.01),
                                  ("view_angle", "view_angle", 0.2)):
             want = self.client.get(self.url(task, cid, "/{}/point".format(name)), centre).data[key]

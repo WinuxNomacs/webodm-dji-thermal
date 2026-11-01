@@ -34,7 +34,7 @@ workset's id (12 hexadecimal characters).
 | POST | `.../conversions/<workset>/parent` | Sends the workset's TIFFs to the dataset's own task. |
 | GET, POST | `.../conversions/<workset>/mosaics` | The mosaics as the viewer shows them; builds them. |
 | GET | `.../mosaics/<tab>/tiles/<z>/<x>/<y>.png` | A map tile of a mosaic tab. |
-| GET | `.../mosaics/<tab>/point?lon=&lat=` | The temperature, frame and view angle at a point. |
+| GET | `.../mosaics/<tab>/point?lon=&lat=` | The temperature, frame, frame pixel (the frame's column and row) and view angle at a point. |
 | GET | `.../mosaics/<tab>/frames?lon=&lat=`, `.../frames/<index>.png` | The frames that saw a point; one frame's picture. |
 | GET, PUT, DELETE | `preferences` | Your saved workset settings (your defaults); save them; back to dji-thermal-cli's. |
 | GET, PUT | `display` | Your palette and unit, with DJI's palettes and WebODM's colour maps; save them. |

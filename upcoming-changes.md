@@ -261,7 +261,8 @@
 - **The mosaic viewer's image controls** (the user, 2026-10-31, from a screenshot of dji-thermal-ui's viewer panel:
   "How much of this can be built into the mosaic/harmonized/source frame viewers?"; details under "Up next: The
   mosaic viewer's image controls" below): the frame pixel under the cursor, brightness, contrast, gamma,
-  sharpening, Linear/Equalized, an isotherm, and a click keeping the readout with "Follow the cursor". In four steps.
+  sharpening, Linear/Equalized, an isotherm, and a click keeping the readout with "Follow the cursor". In four steps;
+  step 1 done.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -366,6 +367,11 @@ HomerunObliqueII, and README and docs (`docs/`, screenshots retaken):
 1. **Frame pixel**: `mosaics.point` reads bands 4 and 5 (`source_u`, `source_v`, written by dji-thermal-cli since
    1.4.0; the dev server's mosaics have them) as `frame_pixel`; the readout shows "Frame pixel x, y" (none for a
    mosaic without them).
+   **Done** (2026-10-31, `viewer-frame-pixel`): `mosaics.point` (as dji-thermal-ui's `api.py`), `viewer.js`
+   `readoutHtml` (as its `panel.tsx`); README, `docs/quickstart-worksets.md`, `docs/api.md`, screenshot
+   `mosaic-viewer` retaken. Tests (agreed): `test_analyzer.py`'s mosaic test (the frame pixel as the frames window
+   finds it, none outside), `analyzer.test.js`'s readout test. Django 134 (1 skipped: Windows only), Jest 161,
+   ESLint, Ruff; live on HomerunObliqueII: the row shows, matching the frames window's pixel within one.
 2. **A click keeps the point, "Follow the cursor"** (`viewer.js`).
 3. **The Image section**: brightness, contrast, gamma, sharpening, Linear/Equalized, Reset; tiles, frame pictures
    and the colour bar.

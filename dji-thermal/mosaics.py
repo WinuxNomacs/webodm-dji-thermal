@@ -429,7 +429,10 @@ def rendered(data, valid, cmap, low, high):
 
 
 def point(task, cid, tab, lon, lat):
-    """A viewer tab's values at a point: {valid, temperature, frame, frame_index, view_angle, unit, reason}"""
+    """
+    A viewer tab's values at a point: {valid, temperature, frame, frame_index, view_angle, frame_pixel, unit, reason};
+    frame_pixel: the frame's pixel it was read from (column, row; none in a mosaic built before dji-thermal-cli 1.4.0)
+    """
     from rio_tiler.errors import PointOutsideBounds
     from rio_tiler.io import COGReader
 
@@ -437,25 +440,27 @@ def point(task, cid, tab, lon, lat):
     built = result(task, cid)
     unit = built.get('unit') or 'C'
     out = {'coordinates': [lon, lat], 'valid': False, 'unit': unit, 'temperature': None, 'frame': None,
-           'frame_index': None, 'view_angle': None}
+           'frame_index': None, 'view_angle': None, 'frame_pixel': None}
     try:
         with COGReader(raster) as src:
             # Checked first: far from the mosaic, a point may be outside its projection's domain too
             west, south, east, north = src.bounds
             if not (west <= lon <= east and south <= lat <= north):
                 raise PointOutsideBounds()
-            values = src.point(lon, lat, indexes=(1, 2, 3))
+            values = src.point(lon, lat, indexes=(1, 2, 3, 4, 5) if src.dataset.count >= 5 else (1, 2, 3))
     except PointOutsideBounds:
         out['reason'] = 'outside_raster'
         return out
     finite = [v if math.isfinite(v) else None for v in (float(x) for x in values)]
-    temperature, frame, angle = finite
+    temperature, frame, angle = finite[:3]
     if temperature is not None and temperature > low_value(unit):
         out['temperature'] = temperature
     frames = built.get('frames') or []
     if frame is not None:
         out['frame_index'] = round(frame)
         out['frame'] = frames[out['frame_index']] if 0 <= out['frame_index'] < len(frames) else None
+        if len(finite) == 5 and None not in finite[3:]:
+            out['frame_pixel'] = [int(finite[3]), int(finite[4])]
     out['view_angle'] = angle
     out['valid'] = out['temperature'] is not None or out['frame'] is not None
     if not out['valid']:
