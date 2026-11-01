@@ -1,6 +1,6 @@
 """
 The Thermal Inspector's reads of a task's thermal orthophoto, for the control on WebODM's 2D map: the temperature at a
-point and the statistics of a region, in degrees Celsius (the orthophoto's first band, as WebODM's Celsius formula
+point and the statistics of a region or a line (with its profile), in degrees Celsius (the orthophoto's first band, as WebODM's Celsius formula
 reads it). Pixels outside the task's crop are left out, as WebODM's map draws them. The regions and isotherms of a
 workset's mosaics laid on the map read them alike (raster_region, raster_isotherm), in °C from the mosaic's unit.
 """
@@ -14,6 +14,12 @@ HISTOGRAM_BINS = 64
 MAX_HISTOGRAM_BINS = 255
 # dji-thermal-cli's no-data marker: absolute zero, in each unit (a mosaic's pixels at or below it hold none)
 ABSOLUTE_ZERO = {'C': -273.15, 'F': -459.67, 'K': 0.0}
+# As dji-thermal-ui measures: a line's strip either side of it, a region's surroundings (m), a profile's samples
+LINE_HALF_WIDTH = 0.25
+RING_MIN = 1.0
+RING_MAX = 3.0
+MAX_SAMPLES = 1000
+DEGREE_M = 111320.0           # metres per degree, about, for a raster in lon/lat
 
 
 def thermal_orthophoto(task):
@@ -79,22 +85,29 @@ def point(task, lon, lat):
     return out
 
 
-def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS):
+def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS, isotherm=None):
     """
-    The statistics of the temperatures inside a polygon (GeoJSON geometry, lon/lat), within the task's crop: {valid,
-    reason, statistics: {count, min, max, mean, std, median, percentiles, histogram, min_location, max_location},
-    pixel_size (m), resampled}. Pixels the outline touches are included; read at the orthophoto's resolution up to
-    REGION_MAX_SIZE pixels a side.
-    :raises ValueError: not a polygon
+    The statistics of the temperatures inside a polygon or along a line (GeoJSON geometry, lon/lat), within the task's
+    crop: {valid, reason, statistics: {count, min, max, mean, std, median, percentiles, histogram, min_location,
+    max_location, surroundings, delta_t[, isotherm_share]}, pixel_size (m), resampled[, length, profile]}. Pixels the
+    outline touches are included; read at the orthophoto's resolution up to REGION_MAX_SIZE pixels a side.
+    :raises ValueError: not a polygon or a line
     """
-    return raster_region(thermal_orthophoto(task), geometry, _crop(task), percentiles=percentiles, bins=bins)
+    return raster_region(thermal_orthophoto(task), geometry, _crop(task), percentiles=percentiles, bins=bins,
+                         isotherm=isotherm)
 
 
-def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILES, bins=HISTOGRAM_BINS):
+def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILES, bins=HISTOGRAM_BINS, isotherm=None,
+                  frames=None):
     """
     region of a raster's first band, within crop (a GEOS geometry) when given; with unit (a mosaic's), its no-data
-    marker left out and the statistics in °C
-    :raises ValueError: not a polygon
+    marker left out and the statistics in °C. A line measures a strip LINE_HALF_WIDTH either side of it, and adds its
+    length (m) and profile: {distance (m), values (°C, None where there is none), points ([lon, lat])}, with frames
+    ((raster, band, names): a mosaic's source frame band) the name of the frame each sample came from. The surroundings
+    are the mean of a ring around a polygon (from its outline out to its size, RING_MIN to RING_MAX m) or of a band
+    RING_MIN m beside a line's strip, and delta_t the mean's difference with them; isotherm ((low, high), °C, either
+    None) adds the share of the pixels in it.
+    :raises ValueError: not a polygon or a line
     """
     import numpy as np
     import rasterio
@@ -105,30 +118,40 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
     from rasterio.windows import Window, from_bounds, intersection
 
     shape = GEOSGeometry(json.dumps(geometry), srid=4326)
-    if shape.geom_type not in ('Polygon', 'MultiPolygon'):
-        raise ValueError("Not a polygon")
-    if not shape.valid:
+    if shape.geom_type not in ('Polygon', 'MultiPolygon', 'LineString'):
+        raise ValueError("Not a polygon or a line")
+    line = shape.geom_type == 'LineString'
+    if line and (len(shape.coords) < 2 or shape.length == 0):
+        raise ValueError("A line needs two points")
+    if not line and not shape.valid:
         shape = shape.buffer(0)
-    if crop is not None:
-        shape = shape.intersection(crop)
     out = {'valid': False, 'reason': None, 'statistics': None, 'pixel_size': None, 'resampled': False}
-    polygons = _polygons(shape)
-    if not polygons:
-        out['reason'] = 'excluded'
-        return out
+    if line:
+        measured = {'type': 'LineString', 'coordinates': [list(c) for c in shape.coords]}
+        if crop is not None and not shape.intersects(crop):
+            out['reason'] = 'excluded'
+            return out
+    else:
+        measured = _polygons(shape.intersection(crop) if crop is not None else shape)
+        if not measured:
+            out['reason'] = 'excluded'
+            return out
 
     with rasterio.open(raster) as src:
         west, south, east, north = _lonlat_bounds(src)
-        lons = [c[0] for polygon in polygons['coordinates'] for ring in polygon for c in ring]
-        lats = [c[1] for polygon in polygons['coordinates'] for ring in polygon for c in ring]
+        lons, lats = zip(*_coordinates(measured))
         if max(lons) < west or min(lons) > east or max(lats) < south or min(lats) > north:
             out['reason'] = 'outside_raster'
             return out
-        local = transform_geom('EPSG:4326', src.crs, polygons)
-        coords = np.array([c for polygon in local['coordinates'] for ring in polygon for c in ring])
-        # Every pixel the polygon reaches into
-        bounds = from_bounds(coords[:, 0].min(), coords[:, 1].min(), coords[:, 0].max(), coords[:, 1].max(),
-                             src.transform)
+        crs = src.crs
+        metre = crs.linear_units_factor[1] if crs.is_projected else DEGREE_M      # metres per unit of the raster's CRS
+        local = GEOSGeometry(json.dumps(transform_geom('EPSG:4326', crs, measured)))
+        inside = local.buffer(LINE_HALF_WIDTH / metre) if line else local
+        width = RING_MIN if line else min(RING_MAX, max(RING_MIN, math.sqrt(inside.area) * metre))
+        ring = inside.buffer(width / metre).difference(inside)
+        # Every pixel the region and its surroundings reach into
+        xmin, ymin, xmax, ymax = (ring if not ring.empty else inside).extent
+        bounds = from_bounds(xmin, ymin, xmax, ymax, src.transform)
         col0, row0 = math.floor(bounds.col_off), math.floor(bounds.row_off)
         window = Window(col0, row0, math.ceil(bounds.col_off + bounds.width) - col0 + 1,
                         math.ceil(bounds.row_off + bounds.height) - row0 + 1)
@@ -142,19 +165,30 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
         scale = max(1.0, max(window.width, window.height) / REGION_MAX_SIZE)
         shape_out = (max(1, int(window.height / scale)), max(1, int(window.width / scale)))
         data = src.read(1, window=window, out_shape=shape_out).astype(np.float64)
-        valid = _valid(src, window, shape_out)
+        usable = _valid(src, window, shape_out) & np.isfinite(data)
         wt = src.window_transform(window) * rasterio.Affine.scale(window.width / shape_out[1],
                                                                   window.height / shape_out[0])
-        inside = geometry_mask([local], out_shape=shape_out, transform=wt, invert=True, all_touched=True)
-        crs = src.crs
-        out['pixel_size'] = abs(wt.a) * (crs.linear_units_factor[1] if crs.is_projected else 1.0)
+
+        def mask(g):
+            polygons = _polygons(g)
+            if not polygons:
+                return np.zeros(shape_out, dtype=bool)
+            return geometry_mask([polygons], out_shape=shape_out, transform=wt, invert=True, all_touched=True)
+
+        if crop is not None:
+            usable &= mask(GEOSGeometry(json.dumps(transform_geom('EPSG:4326', crs, _polygons(crop)))))
+        within = mask(inside)
+        around = mask(ring) & ~within
+        out['pixel_size'] = abs(wt.a) * metre
         out['resampled'] = scale > 1.0
 
-    keep = inside & valid & np.isfinite(data)
     if unit is not None:
-        keep &= _measured(data, unit)
+        usable &= _measured(data, unit)
         data = to_celsius(data, unit)
+    keep = within & usable
     values = data[keep]
+    if line:
+        out['length'] = local.length * metre
     if values.size == 0:
         out['reason'] = 'nodata'
         return out
@@ -167,14 +201,59 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
 
     masked = np.where(keep, data, np.nan)
     counts, edges = np.histogram(values, bins=bins)
+    mean = float(values.mean())
+    ring_values = data[around & usable]
+    surroundings = float(ring_values.mean()) if ring_values.size else None
     out['valid'] = True
     out['statistics'] = {
         'count': int(values.size), 'min': float(values.min()), 'max': float(values.max()),
-        'mean': float(values.mean()), 'std': float(values.std()), 'median': float(np.median(values)),
+        'mean': mean, 'std': float(values.std()), 'median': float(np.median(values)),
         'percentiles': {'{:g}'.format(p): float(np.percentile(values, p)) for p in percentiles},
         'histogram': {'counts': counts.tolist(), 'edges': edges.tolist()},
         'min_location': location(int(np.nanargmin(masked))), 'max_location': location(int(np.nanargmax(masked))),
+        'surroundings': surroundings, 'delta_t': mean - surroundings if surroundings is not None else None,
     }
+    if isotherm is not None:
+        low, high = isotherm
+        within_isotherm = np.ones(values.shape, dtype=bool)
+        if low is not None:
+            within_isotherm &= values >= low
+        if high is not None:
+            within_isotherm &= values <= high
+        out['statistics']['isotherm_share'] = float(within_isotherm.mean())
+    if line:
+        out['profile'] = _profile(local, data, usable, wt, crs, metre, frames)
+    return out
+
+
+def _profile(line, data, usable, wt, crs, metre, frames=None):
+    """A line's (GEOS, in the raster's CRS) temperatures every pixel along it, at most MAX_SAMPLES of them, from the
+    grid read (data where usable, its transform wt); frames as raster_region's"""
+    import numpy as np
+    import rasterio
+    from rasterio.warp import transform
+
+    coords = np.asarray(line.coords, dtype=np.float64)
+    along = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(coords[:, :2], axis=0).T))])
+    n = max(2, min(MAX_SAMPLES, math.floor(along[-1] / abs(wt.a)) + 1))
+    distances = np.linspace(0.0, along[-1], n)
+    xs, ys = np.interp(distances, along, coords[:, 0]), np.interp(distances, along, coords[:, 1])
+    cols, rows = ~wt * (xs, ys)
+    cols, rows = np.floor(cols).astype(np.int64), np.floor(rows).astype(np.int64)
+    found = (rows >= 0) & (rows < data.shape[0]) & (cols >= 0) & (cols < data.shape[1])
+    found[found] = usable[rows[found], cols[found]]
+    values = [float(data[r, c]) if ok else None for r, c, ok in zip(rows, cols, found)]
+    lons, lats = transform(crs, 'EPSG:4326', xs.tolist(), ys.tolist())
+    out = {'distance': (distances * metre).tolist(), 'values': values,
+           'points': [[float(a), float(b)] for a, b in zip(lons, lats)]}
+    if frames is not None:
+        path, band, names = frames
+        with rasterio.open(path) as ds:
+            sampled = [v[0] for v in ds.sample(zip(xs, ys), indexes=band)]
+        out['frames'] = []
+        for value, ok in zip(sampled, found):
+            i = round(float(value)) if ok and np.isfinite(value) else -1
+            out['frames'].append(names[i] if 0 <= i < len(names) else None)
     return out
 
 
@@ -266,6 +345,13 @@ def _valid(src, window, out_shape=None):
 def _lonlat_bounds(src):
     from rasterio.warp import transform_bounds
     return transform_bounds(src.crs, 'EPSG:4326', *src.bounds)
+
+
+def _coordinates(geometry):
+    """A GeoJSON LineString's or MultiPolygon's positions"""
+    if geometry['type'] == 'LineString':
+        return geometry['coordinates']
+    return [c for polygon in geometry['coordinates'] for ring in polygon for c in ring]
 
 
 def _polygons(geometry):

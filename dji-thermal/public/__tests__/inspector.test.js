@@ -241,7 +241,12 @@ describe("the Thermal Inspector's regions", () => {
     const REGION = "POST /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/region";
     const STATS = {valid: true, reason: null, pixel_size: 0.5, resampled: false, statistics: {
         count: 400, min: 10, max: 50, mean: 30, std: 5, median: 29.5, percentiles: {"2": 12, "98": 48},
-        histogram: {counts: [100, 200, 100], edges: [10, 23, 36, 50]}, min_location: [-88.0701, 42.0001], max_location: [-88.0702, 42.0002]}};
+        histogram: {counts: [100, 200, 100], edges: [10, 23, 36, 50]}, min_location: [-88.0701, 42.0001], max_location: [-88.0702, 42.0002],
+        surroundings: 26, delta_t: 4}};
+    const LINE = Object.assign({}, STATS, {length: 12.5, profile: {distance: [0, 5, 10, 12.5], values: [20, null, 40, 30],
+        points: [[-88.07, 42], [-88.0699, 42], [-88.0698, 42], [-88.0697, 42]]}});
+    const change = (el, value) => { el.value = value; el.dispatchEvent(new Event("change", {bubbles: true})); };
+    const posts = fetchFn => fetchFn.mock.calls.filter(c => c[1] && c[1].method === "POST").map(c => JSON.parse(c[1].body));
 
     // WebODM's map: Leaflet's, with a thermal orthophoto layer as WebODM adds it
     function leafletMap() {
@@ -274,7 +279,9 @@ describe("the Thermal Inspector's regions", () => {
         expect(JSON.parse(posted[0][1].body).geometry.type).toBe("Polygon");
         expect(ins.state.mode).toBe("hover");
         const text = panel().querySelector(".dt-inspector-shown").textContent;
-        ["R1", "Rectangle", "10.00 °C", "50.00 °C", "30.00 °C", "5.00 °C", "48.00 °C", "400", "100 m²"].forEach(t => expect(text).toContain(t));
+        ["R1", "Rectangle", "10.00 °C", "50.00 °C", "30.00 °C", "5.00 °C", "48.00 °C", "400", "100 m²", "Surroundings26.00 °C", "ΔT+4.00 °C"]
+            .forEach(t => expect(text).toContain(t));
+        expect(text).not.toContain("In the isotherm");
         expect(panel().querySelectorAll(".dt-inspector-histogram rect").length).toBe(3);
         const tips = [];
         map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) tips.push(l.getTooltip()._content); });
@@ -285,12 +292,76 @@ describe("the Thermal Inspector's regions", () => {
         expect(saved[0]).toMatchObject({label: "R1", shape: "rectangle", statistics: {mean: 30}});
         expect(saved[0].loading).toBeUndefined();
         expect(inspector.regionsCsv(saved, "F").split("\n")[1]).toBe(
-            "R1,rectangle,400,100.000,50.000,122.000,86.000,9.000,85.100,53.600,118.400,42.00010000,-88.07010000,42.00020000,-88.07020000");
+            "R1,rectangle,400,100.000,,50.000,122.000,86.000,9.000,85.100,53.600,118.400,78.800,7.200,,42.00010000,-88.07010000,42.00020000,-88.07020000");
         window.localStorage.setItem("unit_system", "imperial");
         expect(inspector.statisticsHtml(saved[0], "F")).toContain("1076 ft²");
         panel().querySelector('[data-region] [data-act="remove"]').click();
         expect(window.localStorage.getItem(inspector.regionsKey(["abc-1"]))).toBe(null);
         expect(panel().querySelector(".dt-inspector-shown")).toBe(null);
+        map.remove();
+    });
+
+    it("draws a line and shows its temperatures along it, each found on the map from its profile, and exports them", async () => {
+        const map = leafletMap();
+        const {ins, fetchFn, panel} = start(map, {[REGION]: LINE}, {L});
+        ins.open();
+        panel().querySelector('[data-mode="line"]').click();
+        expect(panel().textContent).toContain("Click the line's points");
+        map.fire("click", {latlng: L.latLng(42, -88.07)});
+        map.fire("dblclick", {latlng: L.latLng(42, -88.07)});
+        expect(ins.state.notice).toBe("A line needs two points");
+        map.fire("click", {latlng: L.latLng(42, -88.0697)});
+        map.fire("dblclick", {latlng: L.latLng(42, -88.0697)});
+        await flush(); await flush();
+        expect(posts(fetchFn)).toEqual([{geometry: {type: "LineString", coordinates: [[-88.07, 42], [-88.0697, 42]]}, isotherm: null}]);
+        const shown = panel().querySelector(".dt-inspector-shown");
+        ["L1", "Line", "Length12.5 m", "ΔT+4.00 °C"].forEach(t => expect(shown.textContent).toContain(t));
+        expect(shown.textContent).not.toContain("Area");
+        expect(shown.querySelector(".dt-inspector-histogram")).toBe(null);
+        // No temperature at the second sample: the profile is broken there
+        expect([shown.querySelectorAll(".dt-inspector-profile circle").length, shown.querySelectorAll(".dt-inspector-profile polyline").length]).toEqual([1, 1]);
+
+        // Hovering the profile's end finds it on the map
+        const svg = shown.querySelector(".dt-inspector-profile svg");
+        svg.getBoundingClientRect = () => ({left: 0, width: 100});
+        svg.dispatchEvent(new MouseEvent("mousemove", {clientX: 100, bubbles: true}));
+        const markers = () => { const found = []; map.eachLayer(l => { if (l.getLatLng && l.options.fillColor === "#ff9800") found.push(l.getLatLng()); }); return found; };
+        expect(markers()).toEqual([L.latLng(42, -88.0697)]);
+        expect(panel().querySelector(".dt-inspector-profile-read").textContent).toContain("12.5 m: 30.00 °C");
+        panel().dispatchEvent(new MouseEvent("mouseleave"));
+        expect(markers()).toEqual([]);
+
+        expect(inspector.profileCsv(ins.state.regions[0], "C").split("\n").slice(0, 3)).toEqual(
+            ["distance_m,latitude,longitude,temperature_c", "0.000,42.00000000,-88.07000000,20.000", "5.000,42.00000000,-88.06990000,"]);
+        expect(inspector.regionsCsv(ins.state.regions, "C").split("\n")[1]).toMatch(/^L1,line,400,,12\.500,/);
+        // Lines and regions are numbered apart
+        panel().querySelector('[data-mode="rectangle"]').click();
+        drawRectangle(map);
+        await flush(); await flush();
+        expect(ins.state.regions.map(r => r.label)).toEqual(["L1", "R1"]);
+        map.remove();
+    });
+
+    it("measures the share of a region in the isotherm shown, again when the isotherm changes", async () => {
+        const map = leafletMap();
+        const {ins, fetchFn, panel} = start(map, {[REGION]: (url, opts) => jsonResponse(JSON.parse(opts.body).isotherm ?
+            Object.assign({}, STATS, {statistics: Object.assign({}, STATS.statistics, {isotherm_share: 0.25})}) : STATS)}, {L});
+        await ins.ready;
+        ins.open();
+        panel().querySelector('[data-mode="rectangle"]').click();
+        drawRectangle(map);
+        await flush(); await flush();
+        expect(panel().querySelector(".dt-inspector-shown").textContent).not.toContain("In the isotherm");
+        change(panel().querySelector('[data-act="isotherm-mode"]'), "above");
+        await flush(); await flush();
+        expect(posts(fetchFn).map(b => b.isotherm)).toEqual([null, {low: 31, high: null}]);
+        expect(panel().querySelector(".dt-inspector-shown").textContent).toContain("In the isotherm25.0 %");
+        // Other limits: the share is not that region's until measured with them
+        change(panel().querySelector('[data-act="isotherm-low"]'), "35");
+        expect(panel().querySelector(".dt-inspector-shown").textContent).not.toContain("25.0 %");
+        await flush(); await flush();
+        expect(posts(fetchFn).map(b => b.isotherm)[2]).toEqual({low: 35, high: null});
+        expect(panel().querySelector(".dt-inspector-shown").textContent).toContain("25.0 %");
         map.remove();
     });
 

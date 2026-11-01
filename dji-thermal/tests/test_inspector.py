@@ -139,12 +139,67 @@ class TestInspector(BootTestCase):
         self.assertAlmostEqual(st['min'], 40 + 0.25 * 30, places=4)
         self.assertEqual(self.region(square(500, 0, 510, 9)).data['reason'], 'excluded')
 
-    def test_a_region_far_from_the_orthophoto_or_not_a_polygon_is_said_so(self):
+    def test_a_region_far_from_the_orthophoto_or_not_a_polygon_nor_a_line_is_said_so(self):
         far = {'type': 'Polygon', 'coordinates': [[[0, 0], [1, 0], [1, 1], [0, 0]]]}
         self.assertEqual(self.region(far).data['reason'], 'outside_raster')
         self.assertEqual(self.region({'type': 'Point', 'coordinates': [0, 0]}).status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.region("roof").status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.region(square(20, 10, 29, 19), bins=0).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_a_line_measures_a_strip_along_it_and_its_profile_every_pixel(self):
+        line = {'type': 'LineString', 'coordinates': [list(lonlat(20, 40)), list(lonlat(40, 40))]}
+        res = self.region(line)
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertAlmostEqual(res.data['length'], 20 * PIXEL, places=2)
+        profile = res.data['profile']
+        self.assertEqual(len(profile['distance']), 21)
+        self.assertAlmostEqual(profile['distance'][-1], 20 * PIXEL, places=2)
+        np.testing.assert_allclose(profile['values'], [col + 0.25 * 40 for col in range(20, 41)], atol=1e-4)
+        np.testing.assert_allclose(profile['points'][0], lonlat(20, 40), atol=1e-7)
+        self.assertNotIn('frames', profile)
+        # A sample without data is None; a line of one point is refused
+        into_the_edge = {'type': 'LineString', 'coordinates': [list(lonlat(5, 40)), list(lonlat(15, 40))]}
+        values = self.region(into_the_edge).data['profile']['values']
+        self.assertIsNone(values[0])
+        self.assertAlmostEqual(values[-1], 15 + 0.25 * 40, places=4)
+        one = {'type': 'LineString', 'coordinates': [list(lonlat(20, 40)), list(lonlat(20, 40))]}
+        self.assertEqual(self.region(one).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_a_regions_surroundings_are_a_ring_around_it_and_delta_t_the_difference(self):
+        # 20 °C, with a square of 50 °C (columns and rows 30 to 39)
+        path = os.path.join(self.task.task_path(), "hot.tif")
+        values = np.full((HEIGHT, WIDTH), 20, np.float32)
+        values[30:40, 30:40] = 50
+        with rasterio.open(path, 'w', driver='GTiff', width=WIDTH, height=HEIGHT, count=1, dtype='float32',
+                           crs='EPSG:32616', transform=from_origin(ORIGIN[0], ORIGIN[1], PIXEL, PIXEL)) as dst:
+            dst.write(values, 1)
+        st = inspector.raster_region(path, square(30, 30, 39, 39))['statistics']
+        self.assertEqual((st['count'], st['mean'], st['surroundings'], st['delta_t']), (100, 50, 20, 30))
+        # Half in it: the surroundings are what is around it, the hot square's rest included
+        st = inspector.raster_region(path, square(30, 30, 34, 39))['statistics']
+        self.assertTrue(20 < st['surroundings'] < 50, st)
+        # A line along a hot band two pixels wide (between rows 49 and 50, on the pixels' corners so that its strip's
+        # edges are mid-pixel): the strip is the band, its surroundings the band beside it
+        values = np.full((HEIGHT, WIDTH), 20, np.float32)
+        values[49:51, 19:41] = 50
+        with rasterio.open(path, 'w', driver='GTiff', width=WIDTH, height=HEIGHT, count=1, dtype='float32',
+                           crs='EPSG:32616', transform=from_origin(ORIGIN[0], ORIGIN[1], PIXEL, PIXEL)) as dst:
+            dst.write(values, 1)
+        line = {'type': 'LineString', 'coordinates': [list(lonlat(19.5, 49.5)), list(lonlat(39.5, 49.5))]}
+        st = inspector.raster_region(path, line)['statistics']
+        self.assertEqual((st['count'], st['mean'], st['surroundings'], st['delta_t']), (44, 50, 20, 30))
+
+    def test_a_regions_isotherm_share_is_that_of_its_pixels_within_the_limits(self):
+        expected = temperatures()[10:20, 20:30]
+        low = float(np.median(expected))
+        st = self.region(square(20, 10, 29, 19), isotherm={'low': low, 'high': None}).data['statistics']
+        self.assertAlmostEqual(st['isotherm_share'], float((expected >= low).mean()))
+        st = self.region(square(20, 10, 29, 19), isotherm={'low': 25, 'high': 27}).data['statistics']
+        self.assertAlmostEqual(st['isotherm_share'], float(((expected >= 25) & (expected <= 27)).mean()))
+        self.assertNotIn('isotherm_share', self.region(square(20, 10, 29, 19)).data['statistics'])
+        for wrong in ({'low': 30, 'high': 20}, {'low': 'warm'}, "above"):
+            self.assertEqual(self.region(square(20, 10, 29, 19), isotherm=wrong).status_code,
+                             status.HTTP_400_BAD_REQUEST, wrong)
 
     def tile(self, col, row, zoom=18, task=None, what="tiles", **params):
         """The map tile holding a pixel's centre (of the thermal layer, or what), and where that centre is in it (x, y)"""

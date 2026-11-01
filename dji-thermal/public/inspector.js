@@ -1,6 +1,6 @@
 // The Thermal Inspector: a control on WebODM's 2D map for thermal orthophotos (a single lwir band). The temperature
-// under the cursor, points pinned with theirs and regions drawn with their statistics (both kept in the browser, for
-// the same tasks; regions drawn by regions.js), isotherms (the temperatures above, below or between limits painted
+// under the cursor, points pinned with theirs and regions drawn with their statistics, surroundings and ΔT (both kept
+// in the browser, for the same tasks; regions drawn by regions.js; a line also has its profile), isotherms (the temperatures above, below or between limits painted
 // over the thermal layers, also kept in the browser), the thermal layer's palette, which is the user's everywhere (the
 // Analyzer's preference), and a legend of its palette and range (scale.js). Temperatures come from the plugin's API
 // (inspector_api.py) in °C and are shown in WebODM's units (°F when imperial). The project's workset mosaics can be
@@ -19,9 +19,10 @@
     var LEGEND_KEY = "dji-thermal-inspector:legend";
     var ISOTHERM_MODES = {off: "Off", above: "Above", below: "Below", between: "Between"};
     var ISOTHERM_COLORS = {red: "e53935", orange: "fb8c00", yellow: "fdd835", green: "43a047", blue: "1e88e5", magenta: "d81b60"};
-    var SHAPES = {rectangle: "far fa-square", circle: "far fa-circle", polygon: "fa fa-draw-polygon"};
-    var SHAPE_NAMES = {rectangle: "Rectangle", circle: "Circle", polygon: "Polygon"};
+    var SHAPES = {rectangle: "far fa-square", circle: "far fa-circle", polygon: "fa fa-draw-polygon", line: "fa fa-route"};
+    var SHAPE_NAMES = {rectangle: "Rectangle", circle: "Circle", polygon: "Polygon", line: "Line"};
     var SQ_FT_PER_SQ_M = 10.7639104;
+    var FT_PER_M = 3.2808399;
     var Regions = root.ThermalRegions || (typeof require !== "undefined" ? require("./regions.js") : null);
     var Scale = root.ThermalScale || (typeof require !== "undefined" ? require("./scale.js") : null);
     var Frames = root.ThermalFrames || (typeof require !== "undefined" ? require("./frames.js") : null);
@@ -36,7 +37,7 @@
     var DJI_PREFIX = "dji_";            // a DJI palette's key among a mosaic's palettes
     var REASONS = {excluded: "Outside the task's crop", outside_raster: "Outside the orthophoto", nodata: "No data here",
                    too_few_points: "A polygon needs three corners", self_intersecting: "The polygon's edges cross",
-                   no_area: "The polygon has no area"};
+                   no_area: "The polygon has no area", line_too_short: "A line needs two points"};
 
     function assign(target) {
         for (var i = 1; i < arguments.length; i++) {
@@ -72,6 +73,15 @@
     // A temperature typed in the user's unit, in °C (to a millionth: no 30.999999999999996 in a tile URL)
     function typedTemp(value, unit) { return Math.round(((unit || userUnit()) === "F" ? (value - 32) / 1.8 : value) * 1e6) / 1e6; }
     function roundShown(celsius, unit) { return Math.round(shownTemp(celsius, unit) * 10) / 10; }
+    // A difference of temperatures with its sign (ΔT)
+    function formatSigned(celsius, unit) {
+        if (celsius === null || celsius === undefined || isNaN(celsius)) return "";
+        return (celsius > 0 ? "+" : "") + formatDelta(celsius, unit);
+    }
+    function formatLength(m, unit) {
+        var imperial = (unit || userUnit()) === "F";
+        return (imperial ? m * FT_PER_M : m).toFixed(m >= 100 ? 0 : 1) + (imperial ? " ft" : " m");
+    }
     function formatArea(m2, unit) {
         var imperial = (unit || userUnit()) === "F";
         var v = imperial ? m2 * SQ_FT_PER_SQ_M : m2;
@@ -272,6 +282,12 @@
 
     // Isotherms: {mode: off, above, below or between, low and high (°C, as the mode uses them), color (a name of
     // ISOTHERM_COLORS)}, remembered in the browser for the same tasks
+    // The isotherm's limits a region's share in it is measured with (°C): {low, high}, either null; null when it is off
+    function isothermLimits(iso) {
+        if (!validIsotherm(iso)) return null;
+        return {low: iso.mode === "below" ? null : iso.low, high: iso.mode === "above" ? null : iso.high};
+    }
+    function limitsKey(iso) { return JSON.stringify(isothermLimits(iso)); }
     function isothermKey(tasks) { return ISOTHERM_PREFIX + tasks.slice().sort().join(","); }
     function validIsotherm(iso) {
         if (!iso || !ISOTHERM_MODES[iso.mode] || iso.mode === "off" || !ISOTHERM_COLORS[iso.color]) return false;
@@ -377,28 +393,43 @@
     }
 
     function regionArea(r) {
-        return r.statistics && r.pixel_size ? r.statistics.count * r.pixel_size * r.pixel_size : null;
+        return r.statistics && r.pixel_size && r.shape !== "line" ? r.statistics.count * r.pixel_size * r.pixel_size : null;
     }
 
     // One row per region with statistics
     function regionsCsv(regions, unit) {
         var u = unit.toLowerCase();
-        var rows = [["label", "shape", "pixels", "area_m2"].concat(["min", "max", "mean", "std", "median", "p2", "p98"].map(function (s) { return s + "_" + u; }))
-            .concat(["coldest_latitude", "coldest_longitude", "hottest_latitude", "hottest_longitude"])];
+        var rows = [["label", "shape", "pixels", "area_m2", "length_m"].concat(["min", "max", "mean", "std", "median", "p2", "p98", "surroundings", "delta_t"].map(function (s) { return s + "_" + u; }))
+            .concat(["isotherm_share_pct", "coldest_latitude", "coldest_longitude", "hottest_latitude", "hottest_longitude"])];
         regions.forEach(function (r) {
             var s = r.statistics;
             if (!s) return;
             var t = function (c) { return c === null || c === undefined ? "" : shownTemp(c, unit).toFixed(3); };
             var p = s.percentiles || {};
-            rows.push([r.label, r.shape, s.count, regionArea(r) === null ? "" : regionArea(r).toFixed(3),
-                       t(s.min), t(s.max), t(s.mean), (unit === "F" ? s.std * 1.8 : s.std).toFixed(3), t(s.median), t(p["2"]), t(p["98"]),
+            var d = function (c) { return c === null || c === undefined ? "" : (unit === "F" ? c * 1.8 : c).toFixed(3); };
+            var share = typeof s.isotherm_share === "number" ? (s.isotherm_share * 100).toFixed(2) : "";
+            rows.push([r.label, r.shape, s.count, regionArea(r) === null ? "" : regionArea(r).toFixed(3), typeof r.length === "number" ? r.length.toFixed(3) : "",
+                       t(s.min), t(s.max), t(s.mean), d(s.std), t(s.median), t(p["2"]), t(p["98"]), t(s.surroundings), d(s.delta_t), share,
                        s.min_location[1].toFixed(8), s.min_location[0].toFixed(8), s.max_location[1].toFixed(8), s.max_location[0].toFixed(8)]);
         });
         return rows.map(function (r) { return r.map(csvCell).join(","); }).join("\n") + "\n";
     }
 
-    // The statistics of a region: a table and its histogram
-    function statisticsHtml(r, unit) {
+    // A line's profile: a row per sample (distance in metres, where, the temperature; on a mosaic, the frame)
+    function profileCsv(r, unit) {
+        var p = r.profile, framed = !!p.frames;
+        var rows = [["distance_m", "latitude", "longitude", "temperature_" + unit.toLowerCase()].concat(framed ? ["frame"] : [])];
+        p.distance.forEach(function (d, i) {
+            var v = p.values[i];
+            rows.push([d.toFixed(3), p.points[i][1].toFixed(8), p.points[i][0].toFixed(8),
+                       v === null || v === undefined ? "" : shownTemp(v, unit).toFixed(3)].concat(framed ? [p.frames[i] || ""] : []));
+        });
+        return rows.map(function (row) { return row.map(csvCell).join(","); }).join("\n") + "\n";
+    }
+
+    // The statistics of a region: a table and its histogram (a line's profile); iso, the isotherm shown: a share in it
+    // measured with other limits isn't shown
+    function statisticsHtml(r, unit, iso) {
         if (r.loading) return '<div class="text-muted"><i class="fa fa-spinner fa-spin"></i> Reading the region…</div>';
         if (r.error) return '<div class="text-danger">' + escapeHtml(r.error) + "</div>";
         var s = r.statistics;
@@ -407,11 +438,14 @@
         var rows = [["Minimum", formatTemp(s.min, unit)], ["Maximum", formatTemp(s.max, unit)], ["Mean", formatTemp(s.mean, unit)],
                     ["Median", formatTemp(s.median, unit)], ["Std. deviation", formatDelta(s.std, unit)],
                     ["2nd percentile", formatTemp(p["2"], unit)], ["98th percentile", formatTemp(p["98"], unit)],
+                    ["Surroundings", formatTemp(s.surroundings, unit)], ["ΔT", formatSigned(s.delta_t, unit)],
+                    ["In the isotherm", typeof s.isotherm_share === "number" && r.isotherm === limitsKey(iso) ? (s.isotherm_share * 100).toFixed(1) + " %" : ""],
                     ["Pixels", String(s.count)]];
         if (regionArea(r) !== null) rows.push(["Area", formatArea(regionArea(r), unit)]);
+        if (typeof r.length === "number") rows.push(["Length", formatLength(r.length, unit)]);
         return '<table class="table table-condensed dt-inspector-stats"><tbody>' + rows.filter(function (row) { return row[1]; }).map(function (row) {
             return "<tr><td>" + escapeHtml(row[0]) + '</td><td class="text-right">' + escapeHtml(row[1]) + "</td></tr>";
-        }).join("") + "</tbody></table>" + histogramHtml(s.histogram, unit) +
+        }).join("") + "</tbody></table>" + (r.profile ? profileHtml(r.profile, unit, r.length) : histogramHtml(s.histogram, unit)) +
             (r.resampled ? '<div class="text-muted dt-inspector-hint">A large region: read at a reduced resolution.</div>' : "");
     }
 
@@ -428,9 +462,42 @@
             escapeHtml(formatTemp(h.edges[h.edges.length - 1], unit)) + "</span></div></div>";
     }
 
+    var PROFILE_W = 240, PROFILE_H = 64;
+    function profileX(d, length) { return length > 0 ? d / length * PROFILE_W : 0; }
+
+    // A line's temperatures along it, broken where there are none; hovering it finds the point on the map
+    function profileHtml(p, unit, length) {
+        var found = p.values.filter(function (v) { return v !== null && v !== undefined; });
+        if (!found.length) return "";
+        length = length || p.distance[p.distance.length - 1];
+        var lo = Math.min.apply(null, found), hi = Math.max.apply(null, found), span = hi - lo || 1;
+        var lines = [], current = [];
+        p.values.forEach(function (v, i) {
+            if (v === null || v === undefined) { if (current.length) lines.push(current); current = []; return; }
+            current.push(profileX(p.distance[i], length).toFixed(2) + "," + (PROFILE_H - 2 - (v - lo) / span * (PROFILE_H - 4)).toFixed(2));
+        });
+        if (current.length) lines.push(current);
+        return '<div class="dt-inspector-profile"><div class="dt-inspector-range"><span>' + escapeHtml(formatTemp(hi, unit)) + "</span></div>" +
+            '<svg viewBox="0 0 ' + PROFILE_W + " " + PROFILE_H + '" preserveAspectRatio="none" width="100%" height="' + PROFILE_H + '" data-act="profile">' +
+            lines.map(function (l) {
+                return l.length === 1 ? '<circle cx="' + l[0].split(",")[0] + '" cy="' + l[0].split(",")[1] + '" r="1.5"></circle>' :
+                    '<polyline points="' + l.join(" ") + '" vector-effect="non-scaling-stroke"></polyline>';
+            }).join("") + '<line class="dt-inspector-profile-at" x1="0" x2="0" y1="0" y2="' + PROFILE_H + '" vector-effect="non-scaling-stroke" visibility="hidden"></line></svg>' +
+            '<div class="dt-inspector-range"><span>' + escapeHtml(formatTemp(lo, unit)) + "</span></div>" +
+            '<div class="dt-inspector-range"><span>' + escapeHtml(formatLength(0, unit)) + "</span><span>" + escapeHtml(formatLength(length, unit)) + "</span></div>" +
+            '<div class="text-muted dt-inspector-hint dt-inspector-profile-read">Hover the profile to find its point on the map.</div></div>';
+    }
+
+    // The sample of a profile nearest a share (0..1) of its length
+    function profileIndex(p, share) {
+        var at = share * p.distance[p.distance.length - 1], best = 0;
+        p.distance.forEach(function (d, i) { if (Math.abs(d - at) < Math.abs(p.distance[best] - at)) best = i; });
+        return best;
+    }
+
     function regionsHtml(state, unit) {
         var regions = state.regions;
-        if (!regions.length) return '<div class="text-muted dt-inspector-hint">Choose a shape, then draw on the map to read a region\'s temperatures.</div>';
+        if (!regions.length) return '<div class="text-muted dt-inspector-hint">Choose a shape or the line, then draw on the map to read a region\'s temperatures.</div>';
         var shown = regions.filter(function (r) { return r.id === state.shown; })[0];
         return '<table class="table table-condensed dt-inspector-pins dt-inspector-regions"><tbody>' + regions.map(function (r) {
             var s = r.statistics;
@@ -441,7 +508,9 @@
                 '</td><td class="text-right"><a href="javascript:void(0)" data-act="remove" title="Remove"><i class="fa fa-times"></i></a></td></tr>';
         }).join("") + "</tbody></table>" +
             (shown ? '<div class="dt-inspector-shown"><strong>' + escapeHtml(shown.label) + "</strong> " +
-                '<span class="text-muted">' + escapeHtml(SHAPE_NAMES[shown.shape] || "") + "</span>" + statisticsHtml(shown, unit) + "</div>" : "") +
+                '<span class="text-muted">' + escapeHtml(SHAPE_NAMES[shown.shape] || "") + "</span>" + statisticsHtml(shown, unit, state.isotherm) +
+                (shown.profile && shown.statistics ? '<button type="button" class="btn btn-default btn-xs" data-act="csv-profile"><i class="fa fa-download"></i> Profile CSV</button>' : "") +
+                "</div>" : "") +
             '<div class="dt-inspector-actions">' +
             '<button type="button" class="btn btn-default btn-xs" data-act="toggle-regions">' + (state.regionsVisible ? '<i class="fa fa-eye-slash"></i> Hide' : '<i class="fa fa-eye"></i> Show') + "</button> " +
             '<button type="button" class="btn btn-default btn-xs" data-act="csv-regions"><i class="fa fa-download"></i> CSV</button> ' +
@@ -505,13 +574,14 @@
         return '<div class="dt-inspector-head"><strong><i class="fa fa-thermometer-half"></i> Thermal Inspector</strong>' +
             '<a href="javascript:void(0)" class="dt-inspector-close" data-act="close" title="Close"><i class="fa fa-times"></i></a></div>' +
             '<div class="btn-group btn-group-xs dt-inspector-modes">' +
-            ["hover", "pin", "rectangle", "circle", "polygon"].map(function (m) {
+            ["hover", "pin", "rectangle", "circle", "polygon", "line"].map(function (m) {
                 var label = m === "hover" ? '<i class="fa fa-mouse-pointer"></i> Hover' : m === "pin" ? '<i class="fa fa-map-pin"></i> Pin' :
                     '<i class="' + SHAPES[m] + '"></i>';
                 return '<button type="button" class="btn btn-' + (state.mode === m ? "primary" : "default") + '" data-mode="' + m + '"' +
-                    (SHAPES[m] ? ' title="Draw a region: ' + SHAPE_NAMES[m].toLowerCase() + '"' : "") + ">" + label + "</button>";
+                    (SHAPES[m] ? ' title="' + (m === "line" ? "Draw a line: its temperatures along it" : "Draw a region: " + SHAPE_NAMES[m].toLowerCase()) + '"' : "") + ">" + label + "</button>";
             }).join("") + "</div>" +
             (state.mode === "polygon" ? '<div class="text-muted dt-inspector-hint">Click the corners; double-click or Enter finishes, Esc cancels.</div>' : "") +
+            (state.mode === "line" ? '<div class="text-muted dt-inspector-hint">Click the line\'s points; double-click or Enter finishes, Esc cancels.</div>' : "") +
             (state.notice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.notice) + "</div>" : "") +
             '<div class="dt-inspector-readout">' + readoutHtml(state.readout, unit, state.frames) + "</div>" +
             (options.length ? '<label class="dt-inspector-label">Palette <select class="form-control input-sm" data-act="palette">' +
@@ -524,7 +594,7 @@
             '<div class="dt-inspector-section"><strong>Isotherm</strong>' + isothermHtml(state.isotherm, unit) +
             (state.isothermNotice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.isothermNotice) + "</div>" : "") + "</div>" +
             '<div class="dt-inspector-section"><strong>Pinned points</strong>' + pinsHtml(state.pins, unit, state.pinsVisible) + "</div>" +
-            '<div class="dt-inspector-section"><strong>Regions</strong>' + regionsHtml(state, unit) + "</div>";
+            '<div class="dt-inspector-section"><strong>Regions and lines</strong>' + regionsHtml(state, unit) + "</div>";
     }
 
     function csrfToken(doc) {
@@ -556,6 +626,7 @@
         var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
         var search = deps.search !== undefined ? deps.search : root.location && root.location.search;
         var container, panel, frameBox, cursor, pinLayer, regionLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
+        var profileMarker = null, profileAt = null;     // the point of the profile hovered, on the map
         var pickSeq = 0;                    // the frames asked for last
         var overlays = [], colors = {};     // the isotherm's layer over each thermal layer; each palette's colours
 
@@ -637,6 +708,9 @@
             state.isotherm = iso;
             state.isothermNotice = "";
             saveIsotherm(storage, ikey, iso);
+            // The region shown is measured again for its share in the new isotherm, the others when shown
+            var shown = state.regions.filter(function (r) { return r.id === state.shown; })[0];
+            if (shown && shown.statistics && !shown.loading && shown.isotherm !== limitsKey(iso)) measure(shown);
             drawIsotherms();
             renderLegend();
             render();
@@ -692,7 +766,9 @@
 
         // -- regions -----------------------------------------------------------------------------------------------
 
-        function latLngs(r) { return r.geometry.coordinates[0].map(function (c) { return [c[1], c[0]]; }); }
+        function latLngs(r) {
+            return (r.geometry.type === "LineString" ? r.geometry.coordinates : r.geometry.coordinates[0]).map(function (c) { return [c[1], c[0]]; });
+        }
         function regionBounds(r) { return L.latLngBounds(latLngs(r)); }
 
         function extremeMarker(r, which) {
@@ -707,6 +783,7 @@
             state.regions.forEach(function (r) {
                 var style = r.id === state.shown ? Regions.STYLE : {color: Regions.STYLE.color, weight: 1, opacity: 0.8, fillOpacity: 0.05};
                 var shape = r.circle ? L.circle([r.circle.lat, r.circle.lng], assign({radius: r.circle.radius, interactive: false}, style)) :
+                    r.shape === "line" ? L.polyline(latLngs(r), assign({interactive: false}, style, {weight: style.weight + 1})) :
                     L.polygon(latLngs(r), assign({interactive: false}, style));
                 shape.bindTooltip(r.label, {permanent: true, direction: "center", className: "dt-inspector-tip"});
                 regionLayer.addLayer(shape);
@@ -728,7 +805,7 @@
             render();
         }
 
-        // The statistics of a region, from the thermal orthophoto at its centre
+        // The statistics of a region, from the thermal orthophoto at its centre; with the isotherm shown, its share in it
         function measure(r) {
             var t = thermalLayerAt(map, regionBounds(r).getCenter()) || thermalLayers(map)[0];
             if (!t) {
@@ -737,16 +814,17 @@
             }
             r.loading = true;
             r.error = null;
+            var iso = limitsKey(state.isotherm);
             return fetchFn(inspectorUrl(t, "region"), {method: "POST", credentials: "same-origin",
                 headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken(doc)},
-                body: JSON.stringify({geometry: r.geometry})}).then(readJson).then(function (res) {
+                body: JSON.stringify({geometry: r.geometry, isotherm: isothermLimits(state.isotherm)})}).then(readJson).then(function (res) {
                 if (!res.ok) return {error: (res.data && (res.data.error || res.data.detail)) || "Could not read the region"};
                 return res.data;
             }, function () { return {error: "Could not read the region"}; }).then(function (data) {
                 r.loading = false;
                 if (data.error) r.error = data.error;
                 else assign(r, {statistics: data.statistics || null, reason: data.reason || null, pixel_size: data.pixel_size,
-                                resampled: !!data.resampled});
+                                resampled: !!data.resampled, length: data.length, profile: data.profile || null, isotherm: iso});
                 if (state.regions.indexOf(r) !== -1) regionsChanged();
             });
         }
@@ -754,8 +832,11 @@
         function regionDrawn(shape, drawn) {
             drawnAt = Date.now();
             map.removeLayer(drawn.layer);       // drawn again with the others
-            var n = state.regions.reduce(function (m, r) { return Math.max(m, Number(String(r.label).replace(/\D/g, "")) || 0); }, 0) + 1;
-            var r = {id: String(Date.now()) + "r" + n, label: "R" + n, shape: shape, geometry: drawn.geometry, statistics: null, reason: null};
+            var prefix = shape === "line" ? "L" : "R";
+            var n = state.regions.reduce(function (m, r) {
+                return String(r.label).charAt(0) === prefix ? Math.max(m, Number(String(r.label).replace(/\D/g, "")) || 0) : m;
+            }, 0) + 1;
+            var r = {id: String(Date.now()) + "r" + n, label: prefix + n, shape: shape, geometry: drawn.geometry, statistics: null, reason: null};
             if (drawn.circle) r.circle = drawn.circle;
             state.regions.push(r);
             state.shown = r.id;
@@ -1078,7 +1159,7 @@
                     if (state.shown === region.id) state.shown = state.regions.length ? state.regions[state.regions.length - 1].id : null;
                 } else {
                     state.shown = region.id;
-                    if (!region.statistics && !region.loading) measure(region);
+                    if (!region.loading && (!region.statistics || (validIsotherm(state.isotherm) && region.isotherm !== limitsKey(state.isotherm)))) measure(region);
                 }
                 return regionsChanged();
             }
@@ -1097,6 +1178,36 @@
             else if (what === "toggle-regions") { state.regionsVisible = !state.regionsVisible; drawRegions(); render(); }
             else if (what === "clear-regions") { state.regions = []; state.shown = null; regionsChanged(); }
             else if (what === "csv-regions") download("thermal-regions.csv", regionsCsv(state.regions, userUnit()));
+            else if (what === "csv-profile") {
+                var line = state.regions.filter(function (r) { return r.id === state.shown; })[0];
+                if (line && line.profile) download("thermal-profile-" + line.label + ".csv", profileCsv(line, userUnit()));
+            } else if (what === "profile" && profileAt) showFrames(thermalLayerAt(map, profileAt), profileAt);
+        }
+
+        // Hovering the profile of the line shown: the point on the map, its distance, temperature and frame
+        function onProfileMove(e) {
+            var svg = e.target.closest && e.target.closest(".dt-inspector-profile svg");
+            var line = state.regions.filter(function (r) { return r.id === state.shown; })[0];
+            if (!svg || !line || !line.profile) return onProfileOut();
+            var box = svg.getBoundingClientRect(), p = line.profile;
+            var i = profileIndex(p, box.width > 0 ? Math.min(1, Math.max(0, (e.clientX - box.left) / box.width)) : 0);
+            profileAt = L.latLng(p.points[i][1], p.points[i][0]);
+            if (!profileMarker) profileMarker = L.circleMarker(profileAt, {radius: 5, color: "#fff", weight: 2, fillColor: Regions.STYLE.color, fillOpacity: 1, interactive: false}).addTo(map);
+            else profileMarker.setLatLng(profileAt);
+            var x = profileX(p.distance[i], p.distance[p.distance.length - 1]).toFixed(2), at = svg.querySelector(".dt-inspector-profile-at");
+            if (at) { at.setAttribute("x1", x); at.setAttribute("x2", x); at.setAttribute("visibility", "visible"); }
+            var v = p.values[i], read = panel.querySelector(".dt-inspector-profile-read");
+            if (read) {
+                read.textContent = formatLength(p.distance[i]) + ": " + (v === null || v === undefined ? "no temperature" : formatTemp(v)) +
+                    (p.frames && p.frames[i] ? " · " + p.frames[i] : "") + (state.frames ? " (click: the frames that saw it)" : "");
+            }
+        }
+
+        function onProfileOut() {
+            if (profileMarker) { map.removeLayer(profileMarker); profileMarker = null; }
+            profileAt = null;
+            var at = panel.querySelector(".dt-inspector-profile-at");
+            if (at) at.setAttribute("visibility", "hidden");
         }
 
         function download(name, text) {
@@ -1129,6 +1240,7 @@
 
         function close() {
             closeFrames();
+            onProfileOut();
             setMode("hover");
             state.open = false;
             state.readout = null;
@@ -1160,6 +1272,8 @@
                 container.querySelector(".dt-inspector-button").addEventListener("click", function () { if (state.open) close(); else open(); });
                 panel.addEventListener("click", onPanelClick);
                 panel.addEventListener("change", onPanelChange);
+                panel.addEventListener("mousemove", onProfileMove);
+                panel.addEventListener("mouseleave", onProfileOut);
                 return container;
             }
         });
@@ -1245,7 +1359,8 @@
                isothermKey: isothermKey, validIsotherm: validIsotherm, loadIsotherm: loadIsotherm, defaultIsotherm: defaultIsotherm,
                isothermUrl: isothermUrl, describeIsotherm: describeIsotherm, legendHtml: legendHtml,
                pinsKey: pinsKey, regionsKey: regionsKey, loadPins: loadPins, savePins: savePins, pinsCsv: pinsCsv,
-               regionsCsv: regionsCsv, statisticsHtml: statisticsHtml, readoutHtml: readoutHtml,
+               regionsCsv: regionsCsv, profileCsv: profileCsv, statisticsHtml: statisticsHtml, profileHtml: profileHtml, profileIndex: profileIndex,
+               isothermLimits: isothermLimits, readoutHtml: readoutHtml,
                panelHtml: panelHtml, hasThermal: hasThermal, projectOf: projectOf, linkedMosaic: linkedMosaic, paletteKey: paletteKey,
                mosaicRange: mosaicRange, laidMosaic: laidMosaic, mosaicTileUrl: mosaicTileUrl, mosaicIsothermUrl: mosaicIsothermUrl,
                framesSource: framesSource, fromCelsius: fromCelsius,

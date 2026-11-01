@@ -38,6 +38,11 @@
 .dt-inspector-histogram svg { display: block; background: #f7f7f7; }
 .dt-inspector-histogram rect { fill: #ff9800; }
 .dt-inspector-range { display: flex; justify-content: space-between; font-size: 11px; color: #777; }
+.dt-inspector-profile svg { display: block; background: #f7f7f7; cursor: crosshair; }
+.dt-inspector-profile polyline { fill: none; stroke: #ff9800; stroke-width: 1.5px; }
+.dt-inspector-profile circle { fill: #ff9800; }
+.dt-inspector-profile-at { stroke: #333; stroke-width: 1px; }
+.dt-inspector-profile-read { min-height: 2.6em; }
 .dt-inspector-pins td.text-right { white-space: nowrap; }
 .dt-inspector-check input { margin: 0 4px 0 0; vertical-align: middle; }
 .dt-inspector-isotherm { margin: 4px 0 6px; }
