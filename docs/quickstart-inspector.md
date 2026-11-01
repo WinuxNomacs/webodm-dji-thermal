@@ -47,13 +47,28 @@ the next time you open the same task; to share one, save it (section 6).
 ## 3. Colours, legend and isotherms
 
 - **Palette**: the thermal layer's colours, from the same list as the Thermal Analyzer's. It's your palette
-  everywhere: choosing one here also sets it in the Analyzer. The range is set in WebODM's own layer panel.
+  everywhere: choosing one here also sets it in the Analyzer.
+- **The colour scale**, under Palette: the palette over the range the layer is drawn with, with that range in two
+  boxes in your unit. Type a new minimum or maximum, or click **Auto** for the layer's 2nd to 98th percentile. "This
+  layer" gives its own coldest and hottest temperatures. The range is the same one WebODM's layer panel sets: a
+  range set there shows here, and the map draws the one set here. WebODM's panel only shows its new value when the
+  page is next loaded.
+- **Image**: how the layer is drawn, as in the Analyzer's mosaic viewer. **Brightness** and **Contrast** move and
+  narrow the range from Auto's; **Gamma** above 1 brightens the cooler part of the range; **Equalized** spreads the
+  colours over the temperatures the whole layer has most of; **Sharpening** brings out edges. **Reset** goes back to
+  Auto's range with no adjustments. The temperatures don't change, only the colours.
 - **Legend on the map**: a colour bar with the palette's range, at the map's top left. Its two ends say the range's
   lowest and highest temperatures, with round values between them. If the image itself goes colder or hotter than
   that range (when it was narrowed in WebODM's layer panel), a line under the bar says how far: "Image: -42.5–56.6
   °C". Those parts take the colours of the bar's ends.
 - **Isotherm**: paints the temperatures above, below or between limits you type, in a colour you choose. The
   legend marks the part painted. **Off** removes it.
+
+![The colour scale and the Image section under Palette, the contrast raised and gamma above 1](images/inspector-image.png)
+
+With several thermal layers on the map, the scale and the Image section are those of the topmost one (the panel
+says which), and each layer keeps its own. Nothing is remembered: each visit starts from the layer's own range,
+with no adjustments.
 
 The panel and the legend can be moved out of the way: drag the panel by its heading (the frames window comes along,
 beside it), or the legend by any part. Both stay inside the map. Closing the panel, hiding the legend or reloading

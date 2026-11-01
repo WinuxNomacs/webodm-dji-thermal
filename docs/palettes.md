@@ -15,7 +15,8 @@ It's used:
   the server; the first view of a large dataset takes a while), and as the palette new worksets start with;
 - in the mosaic viewer, where its temperature tabs open in it;
 - on WebODM's map of a thermal task, where the Thermal Inspector draws DJI's palettes itself, over the range set in
-  WebODM's layer panel.
+  its colour scale or in WebODM's layer panel (the same range). Its Image section, as the mosaic viewer's, changes
+  how the colours are shared out over that range.
 
 WebODM's own layer panel lists only WebODM's colour maps. Choosing one there also sets your palette; a colour map
 WebODM has that the plugin's list doesn't is drawn but not saved.

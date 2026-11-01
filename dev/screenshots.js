@@ -180,6 +180,8 @@ const SHOTS = {
         await p.click('.dt-inspector-modes [data-mode="hover"]');
         await p.mouse.move(...at(0.4, 0.55));
         await p.waitForTimeout(1500);
+        await p.locator(".dt-inspector-shown").scrollIntoViewIfNeeded();
+        await p.waitForTimeout(300);
         return p;
     },
     "inspector-line": async (p, env) => {
@@ -200,6 +202,25 @@ const SHOTS = {
         const profile = await p.locator(".dt-inspector-profile svg").boundingBox();
         await p.mouse.move(profile.x + profile.width * 0.6, profile.y + profile.height / 2);
         await p.waitForTimeout(1000);
+        return p;
+    },
+    "inspector-image": async (p, env) => {
+        // The colour scale and the Image section under Palette: the contrast raised, gamma above 1 and some sharpening
+        // (not Equalized: its histogram would be kept on the server, and the script stays read only)
+        await p.setViewportSize({width: SIZE.width, height: 1100});
+        await p.goto(env.url + need(env, "DT_DOCS_MAP"));
+        await p.waitForSelector(".dt-inspector-button", {timeout: 30000});
+        await p.waitForTimeout(3000);
+        await p.click(".dt-inspector-button");
+        await p.click('[data-act="range-auto"]');
+        const set = (act, value) => p.$eval('[data-act="' + act + '"]', (e, v) => {
+            e.value = v;
+            e.dispatchEvent(new Event("change", {bubbles: true}));
+        }, value);
+        await set("image-contrast", "0.5");
+        await set("image-gamma", "0.6");
+        await set("image-sharpen", "1");
+        await p.waitForTimeout(4000);
         return p;
     },
     "inspector-saved": async (p, env) => {
