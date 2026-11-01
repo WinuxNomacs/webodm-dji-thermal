@@ -5,6 +5,10 @@ takes it), marked with a hidden tag. Everything the dataset has is in that task'
 folder's root holds no image), so it counts toward the project owner's quota, is shared as the project is and goes
 when the task or the project is deleted. Its name is the task's, after NAME_PREFIX.
 
+A dataset made for an existing task (the Create thermal dataset button, or DJI Thermal Task keeping its photos) is kept
+in that task instead (adopt): the same tag and thermal/ folder, the task's name as it is, and no holder task beside it.
+Deleting such a dataset keeps its task (conversion_tasks.release).
+
 Its records are JSON files there, each replaced whole (written aside, then renamed) under a lock the web app and
 the worker share, so a job's progress never overwrites a user's change:
 
@@ -157,9 +161,26 @@ def create(project, name, user):
     return task
 
 
+def adopt(task, user):
+    """An existing task made a dataset: its records in its thermal/ folder, its name kept"""
+    os.makedirs(images_path(task), exist_ok=True)
+    write_json(data_path(task, DATASET_FILE), {'created_by': user.username, 'created_at': now(), 'in_task': True})
+    write_json(data_path(task, JOB_FILE), {'status': 'new'})
+    task.tags = " ".join((task.tags or '').split() + [TAG])
+    Task.objects.filter(pk=task.pk).update(tags=task.tags)
+    update_size(task)
+    return task
+
+
+def in_task(task):
+    """Whether the dataset is kept in a task of its own making (adopt), not a holder task"""
+    return bool(info(task).get('in_task'))
+
+
 def rename(task, name):
-    Task.objects.filter(pk=task.pk).update(name=task_name(name))
-    task.name = task_name(name)
+    name = name[:255] if in_task(task) else task_name(name)
+    Task.objects.filter(pk=task.pk).update(name=name)
+    task.name = name
 
 
 def update_size(task):

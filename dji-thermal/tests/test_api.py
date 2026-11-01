@@ -158,10 +158,8 @@ class TestConvert(ApiTestCase):
 
     def link_dataset(self):
         res = self.client.post(dataset_url(self.task))
-        dataset = Task.objects.get(pk=res.data["id"])
-        self.addCleanup(shutil.rmtree, dataset.task_path(), True)
         self.task.refresh_from_db()
-        return dataset
+        return Task.objects.get(pk=res.data["id"])
 
     def test_a_converted_image_is_named_after_its_photo_with_no_folder(self):
         self.assertEqual(api.tiff_name("DJI_0001_T.JPG"), "DJI_0001_T.tif")
@@ -187,10 +185,8 @@ class TestTaskDataset(ApiTestCase):
         self.task.tags = "roof .dji-thermal-task"
         self.task.save()
 
-    def made(self, res):
-        dataset = Task.objects.get(pk=res.data["id"])
-        self.addCleanup(shutil.rmtree, dataset.task_path(), True)
-        return dataset
+    def tasks_in_project(self):
+        return Task.objects.filter(project=self.project).count()
 
     def test_making_a_task_s_dataset_needs_a_login_and_the_right_to_change_the_project(self):
         self.client.logout()
@@ -200,37 +196,55 @@ class TestTaskDataset(ApiTestCase):
         self.assertEqual(self.client.post(dataset_url(self.task)).status_code, status.HTTP_404_NOT_FOUND)
         self.assertFalse(Task.objects.filter(tags__contains=datasets.TAG).exists())
 
-    def test_a_task_gets_a_new_dataset_in_its_project_named_after_it_and_is_linked_to_it(self):
+    def test_a_task_becomes_its_own_dataset_with_its_name_and_no_task_beside_it(self):
+        before = self.tasks_in_project()
         res = self.client.post(dataset_url(self.task))
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        dataset = self.made(res)
-        self.assertTrue(datasets.is_dataset(dataset))
-        self.assertEqual(dataset.project, self.project)
-        self.assertEqual(datasets.name_of(dataset), "Thermal")
+        self.assertEqual(res.data["id"], str(self.task.id))
+        self.assertEqual(self.tasks_in_project(), before)
         self.task.refresh_from_db()
-        self.assertEqual(self.task.tags, "roof .dji-thermal-task .dji-thermal-from-{}".format(dataset.id))
+        self.assertTrue(datasets.is_dataset(self.task))
+        self.assertEqual(self.task.tags, "roof .dji-thermal-task .dji-thermal-dataset")
+        self.assertEqual(self.task.name, "Thermal")
+        self.assertTrue(os.path.isdir(datasets.images_path(self.task)))
+        self.assertEqual(self.client.get("/api/plugins/dji-thermal/datasets/{}".format(self.task.id)).data["name"],
+                         "Thermal")
 
-    def test_a_task_already_linked_gets_its_dataset_again_not_a_new_one(self):
-        first = self.made(self.client.post(dataset_url(self.task)))
+    def test_a_task_that_is_a_dataset_gets_itself_again(self):
+        self.client.post(dataset_url(self.task))
         res = self.client.post(dataset_url(self.task))
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(res.data["id"], str(first.id))
-        self.assertEqual(Task.objects.filter(tags__contains=datasets.TAG).count(), 1)
-
-    def test_a_task_whose_dataset_was_deleted_gets_a_new_one(self):
-        first = self.made(self.client.post(dataset_url(self.task)))
-        first.delete()
+        self.assertEqual(res.data["id"], str(self.task.id))
         self.task.refresh_from_db()
-        self.assertEqual(self.task.tags, "roof .dji-thermal-task")
-        second = self.made(self.client.post(dataset_url(self.task)))
-        self.assertNotEqual(second.id, first.id)
+        self.assertEqual(self.task.tags.split().count(datasets.TAG), 1)
 
-    def test_a_dataset_s_own_task_and_an_owner_over_quota_get_no_dataset(self):
-        dataset = datasets.create(self.project, "Flight", User.objects.get(username="testuser"))
-        self.addCleanup(shutil.rmtree, dataset.task_path(), True)
-        self.assertEqual(self.client.post(dataset_url(dataset)).status_code, status.HTTP_400_BAD_REQUEST)
+    def test_a_task_linked_to_a_dataset_gets_that_one(self):
+        holder = datasets.create(self.project, "Flight", User.objects.get(username="testuser"))
+        self.addCleanup(shutil.rmtree, holder.task_path(), True)
+        Task.objects.filter(pk=self.task.pk).update(tags="roof .dji-thermal-from-{}".format(holder.id))
+        res = self.client.post(dataset_url(self.task))
+        self.assertEqual((res.status_code, res.data["id"]), (status.HTTP_200_OK, str(holder.id)))
+
+    def test_renaming_the_dataset_renames_its_task_without_the_holder_s_prefix(self):
+        self.client.post(dataset_url(self.task))
+        self.client.patch("/api/plugins/dji-thermal/datasets/{}".format(self.task.id), {"name": "Roof"}, format="json")
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.name, "Roof")
+
+    def test_deleting_the_dataset_keeps_its_task_as_it_was(self):
+        self.client.post(dataset_url(self.task))
+        res = self.client.delete("/api/plugins/dji-thermal/datasets/{}".format(self.task.id))
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.task.refresh_from_db()
+        self.assertEqual((self.task.name, self.task.tags), ("Thermal", "roof .dji-thermal-task"))
+        self.assertFalse(os.path.exists(datasets.data_path(self.task)))
+        res = self.client.post(dataset_url(self.task))
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_an_owner_over_quota_gets_no_dataset(self):
         with mock.patch.object(datasets, "over_quota", return_value=True):
             res = self.client.post(dataset_url(self.task))
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("quota", str(res.data))
-        self.assertEqual(Task.objects.filter(tags__contains=datasets.TAG).count(), 1)
+        self.task.refresh_from_db()
+        self.assertFalse(datasets.is_dataset(self.task))

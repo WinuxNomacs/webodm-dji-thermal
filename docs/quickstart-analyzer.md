@@ -17,8 +17,9 @@ also drop them on the page).
 Only JPEGs are uploaded. Visible photos are listed but not analyzed. Once uploaded, the photos are analyzed in
 WebODM's background worker; the page shows its progress and a **Cancel** button.
 
-The dataset is kept in a task of the project called "Thermal dataset: *name*". So it's shared as the project is, and
-its photos count toward the project owner's storage.
+The dataset is kept in a task of the project called "Thermal dataset: *name*" (a dataset made for a
+[DJI Thermal Task](quickstart-thermal-task.md#5-look-at-the-photos-in-the-dji-thermal-analyzer)'s task is kept in
+that task). So it's shared as the project is, and its photos count toward the project owner's storage.
 
 ## 2. Read the summary
 
