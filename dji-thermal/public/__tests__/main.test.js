@@ -69,7 +69,7 @@ test("the Thermal Inspector is added to every map, with WebODM's Leaflet (its bu
     sideMenu(false);
     loadMain();
     const [deps, add] = global.PluginsAPI.Map.willAddControls.mock.calls[0];
-    expect(deps).toEqual(["leaflet", "dji-thermal/inspector.css"]);
+    expect(deps).toEqual(["leaflet", "dji-thermal/inspector.css", "dji-thermal/frames.css"]);
     window.ThermalInspector = {create: jest.fn()};
     add({tiles: []}, "L");
     expect(window.ThermalInspector.create).toHaveBeenCalledWith({tiles: []}, "L");

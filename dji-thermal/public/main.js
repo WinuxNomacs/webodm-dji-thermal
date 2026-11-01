@@ -10,9 +10,9 @@ PluginsAPI.Dashboard.addNewTaskButton(
     }
 );
 
-// The Thermal Inspector on WebODM's 2D map (inspector.js), with WebODM's Leaflet: its button shows when the map has a
-// thermal orthophoto or the project has workset mosaics
-PluginsAPI.Map.willAddControls(["leaflet", "dji-thermal/inspector.css"], function(args, L){
+// The Thermal Inspector on WebODM's 2D map (inspector.js, with frames.js's source frames window), with WebODM's Leaflet:
+// its button shows when the map has a thermal orthophoto or the project has workset mosaics
+PluginsAPI.Map.willAddControls(["leaflet", "dji-thermal/inspector.css", "dji-thermal/frames.css"], function(args, L){
     if (window.ThermalInspector) window.ThermalInspector.create(args, L);
 });
 

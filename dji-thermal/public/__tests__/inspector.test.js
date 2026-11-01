@@ -543,6 +543,94 @@ describe("the Thermal Inspector's workset mosaics", () => {
         map.remove();
     });
 
+    // The frames that saw a point, as the Analyzer's API lists them
+    const FOOTPRINT = [[-88.071, 41.999], [-88.069, 41.999], [-88.069, 42.001], [-88.071, 42.001]];
+    const FRAMES = {models: true, frames: [
+        {index: 3, file: "DJI_0003_T.JPG", x: 100, y: 50, width: 640, height: 512, view_angle: 8.25, footprint: FOOTPRINT, source: true},
+        {index: 5, file: "DJI_0005_T.JPG", x: 300, y: 250, width: 640, height: 512, view_angle: 2.5, footprint: FOOTPRINT, source: false}]};
+    const frameBox = map => map.el.querySelector(".dt-inspector-frames");
+    const pip = (map, action) => frameBox(map).querySelector('[data-pip="' + action + '"]').click();
+
+    it("shows the frames that saw a point clicked on a mosaic beside the panel, drawn as the mosaic is", async () => {
+        const map = leafletMap();
+        const frames = jest.fn(() => jsonResponse(FRAMES));
+        const {ins, panel, laid} = begin(map, [], {["GET " + BASE + "as_converted/frames"]: frames, ["GET " + BASE + "harmonized/frames"]: frames});
+        await ins.mosaicsReady;
+        ins.open();
+        change(panel().querySelector('[data-act="mosaic-on"]'), true);
+        expect(panel().querySelector(".dt-inspector-readout").textContent).toContain("Click it to see the frames that saw the point");
+
+        // A click in Hover is the Inspector's, not WebODM's popup
+        expect(ins.click({latlng: L.latLng(42, -88.07)})).toBe(true);
+        await flush(); await flush();
+        expect(frames.mock.calls[0][0]).toBe(BASE + "as_converted/frames?lon=-88.07&lat=42");
+        expect(frameBox(map).hidden).toBe(false);
+        expect(frameBox(map).textContent).toContain("Frame 1 of 2 that saw this point");
+        expect(frameBox(map).textContent).toContain("The mosaic's pixel here comes from this frame");
+        expect(frameBox(map).querySelector("img").getAttribute("src"))
+            .toBe(BASE + "as_converted/frames/3.png?v=2026-11-01T10%3A00%3A00%2B00%3A00&color_map=dji_ironred&rescale=50,121");
+        pip(map, "next");
+        expect(frameBox(map).textContent).toContain("Frame 2 of 2");
+        expect(frameBox(map).querySelector("img").getAttribute("src")).toContain(BASE + "as_converted/frames/5.png?");
+
+        // Drawn again in the palette chosen; on another tab, its frames, the one shown kept
+        change(panel().querySelector('[data-act="palette"]'), "inferno");
+        expect(frameBox(map).querySelector("img").getAttribute("src")).toContain("color_map=inferno&");
+        change(panel().querySelector('[data-act="mosaic-tab"]'), "harmonized");
+        await flush(); await flush();
+        expect(frames.mock.calls[1][0]).toContain(BASE + "harmonized/frames?");
+        expect(frameBox(map).querySelector("img").getAttribute("src")).toMatch(/harmonized\/frames\/5\.png\?.*rescale=60,110$/);
+
+        pip(map, "close");
+        expect(frameBox(map).hidden).toBe(true);
+        // Gone with the mosaic lifted
+        ins.click({latlng: L.latLng(42, -88.07)});
+        await flush(); await flush();
+        expect(frameBox(map).hidden).toBe(false);
+        change(panel().querySelector('[data-act="mosaic-on"]'), false);
+        expect(laid().length).toBe(0);
+        expect(frameBox(map).hidden).toBe(true);
+        map.remove();
+    });
+
+    it("shows the frames of the workset an orthophoto was processed from, by view angle, in the orthophoto's palette and range", async () => {
+        const map = leafletMap(THERMAL_TASK);
+        const tiles = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}];
+        const frames = jest.fn(() => jsonResponse(FRAMES));
+        const point = jest.fn(() => jsonResponse({valid: true, temperature: 30}));
+        const made = [Object.assign({}, MOSAICS[0], {tasks: ["abc-1"]})];
+        const {ins} = begin(map, tiles, {[LIST]: {mosaics: made}, ["GET " + BASE + "as_converted/frames"]: frames, [POINT]: point});
+        await ins.mosaicsReady;
+        ins.open();
+        expect(ins.click({latlng: L.latLng(42, -88.07)})).toBe(true);
+        await flush(); await flush();
+        // ODM blended the frames: none is the pixel's own, the one closest to straight down first, placed approximately
+        expect(frameBox(map).querySelector("img").getAttribute("src"))
+            .toBe(BASE + "as_converted/frames/5.png?v=2026-11-01T10%3A00%3A00%2B00%3A00&color_map=dji_ironred&rescale=50,104");
+        expect(frameBox(map).textContent).not.toContain("comes from this frame");
+        expect(frameBox(map).textContent).toContain("not ODM's cameras");
+
+        // A pin shows them too
+        ins.setMode("pin");
+        ins.click({latlng: L.latLng(42.0005, -88.0705)});
+        await flush(); await flush();
+        expect(frames.mock.calls[1][0]).toContain("lat=42.0005");
+        expect(ins.state.pins.length).toBe(1);
+        map.remove();
+    });
+
+    it("leaves a click on an orthophoto from elsewhere to WebODM", async () => {
+        const map = leafletMap(THERMAL_TASK);
+        const tiles = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}];
+        const {ins, fetchFn, panel} = begin(map, tiles, {[LIST]: {mosaics: [Object.assign({}, MOSAICS[0], {tasks: ["other"]})]}});
+        await ins.mosaicsReady;
+        ins.open();
+        expect(panel().querySelector(".dt-inspector-readout").textContent).toBe("Move the cursor over a thermal layer.");
+        expect(ins.click({latlng: L.latLng(42, -88.07)})).toBe(false);
+        expect(fetchFn.mock.calls.some(c => c[0].includes("/frames"))).toBe(false);
+        map.remove();
+    });
+
     it("reads the project, the linked mosaic and the palette a mosaic is drawn in", () => {
         expect(inspector.projectOf([{meta: {task: {project: 7}}}], "/map/project/2/")).toBe("7");
         expect(inspector.projectOf([], "/map/project/2/task/abc/")).toBe("2");

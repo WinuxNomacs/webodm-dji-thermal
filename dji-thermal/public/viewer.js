@@ -6,6 +6,8 @@
 (function (root) {
     var core = root.ThermalAnalyzerCore || (typeof require !== "undefined" ? require("./analyzer_core") : null);
     var scale = root.ThermalScale || (typeof require !== "undefined" ? require("./scale") : null);
+    var Frames = root.ThermalFrames || (typeof require !== "undefined" ? require("./frames") : null);
+    var pipHtml = Frames.pipHtml;
     var gradientCss = scale.gradientCss, scaleTicks = scale.scaleTicks;
     var esc = function (t) { return core.escapeHtml(t); };
     var POLL_MS = 2000;
@@ -176,34 +178,7 @@
     function frameUrl(base, tab, index, style, builtAt) {
         var query = ["v=" + encodeURIComponent(builtAt || ""), "color_map=" + encodeURIComponent(style.palette),
                      "rescale=" + style.range[0] + "," + style.range[1]];
-        return base + "/mosaics/" + tab + "/frames/" + index + ".png?" + query.join("&") + adjustQuery(style.adjust) + isothermQuery(tab, style);
-    }
-
-    // The window of the frames that saw a point (pick: {frames, models, at: the one shown}), the frame drawn from url
-    // with a crosshair on the point
-    function pipHtml(pick, url) {
-        var close = '<button type="button" class="btn btn-link btn-sm" data-pip="close" title="Close" aria-label="Close">' +
-            '<i class="fa fa-times"></i></button>';
-        var frames = pick.frames || [];
-        if (!frames.length) {
-            return '<div class="ta-pip-head"><span class="ta-pip-title">Source frame</span>' + close + "</div>" +
-                '<div class="ta-message">' + (pick.models ? "No frame saw this point." :
-                "These mosaics were built without their frames' positions: build them again to see the frames.") + "</div>";
-        }
-        var f = frames[pick.at], n = frames.length;
-        var nav = function (action, icon, label, disabled) {
-            return '<button type="button" class="btn btn-default btn-sm" data-pip="' + action + '" title="' + label + '" aria-label="' +
-                label + '"' + (disabled ? " disabled" : "") + '><i class="fa fa-' + icon + '"></i></button>';
-        };
-        var left = ((f.x + 0.5) / f.width * 100).toFixed(2), top = ((f.y + 0.5) / f.height * 100).toFixed(2);
-        return '<div class="ta-pip-head"><span class="ta-pip-title">Frame ' + (pick.at + 1) + " of " + n + " that saw this point</span>" +
-            nav("prev", "chevron-left", "Previous frame", pick.at === 0) + nav("next", "chevron-right", "Next frame", pick.at === n - 1) +
-            close + "</div>" +
-            '<div class="ta-pip-image" style="aspect-ratio: ' + f.width + " / " + f.height + ';"><img src="' + esc(url) +
-            '" alt="' + esc(f.file) + '"><span class="ta-pip-mark" style="left: ' + left + "%; top: " + top + '%;"></span></div>' +
-            '<div class="ta-pip-foot">' + esc(f.file) + '<br><span class="ta-message">' +
-            (f.source ? "The mosaic's pixel here comes from this frame; " : "") + "seen " +
-            esc(core.formatNumber(f.view_angle, 1, "°")) + " from straight down</span></div>";
+        return Frames.frameUrl(base, tab, index, query.join("&") + adjustQuery(style.adjust) + isothermQuery(tab, style));
     }
 
     function tabsHtml(tabs, current) {
@@ -481,7 +456,7 @@
         // The frames that saw a point, for the tab shown; keep: the frame to show again if it saw it too
         function select(latlng, keep) {
             var askedTab = tab;
-            return fetchFn(base + "/mosaics/" + tab + "/frames?lon=" + latlng.lng + "&lat=" + latlng.lat, {credentials: "same-origin"})
+            return fetchFn(Frames.framesUrl(base, tab, latlng), {credentials: "same-origin"})
                 .then(core.readJson).then(function (r) {
                     if (askedTab !== tab) return;
                     if (!r.ok) {

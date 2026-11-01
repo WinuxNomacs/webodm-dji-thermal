@@ -788,6 +788,7 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual([(m["dataset"]["id"], m["workset"]["id"]) for m in listed], [(str(task.id), cid)])
         self.assertEqual([t["tab"] for t in listed[0]["tabs"]], ["as_converted", "harmonized", "source_frame"])
         self.assertIn(listed[0]["default_palette"], listed[0]["palettes"])
+        self.assertEqual(listed[0]["tasks"], [])      # no WebODM task processed its TIFFs
         other = APIClient()
         other.login(username="testuser2", password="test1234")
         self.assertEqual(other.get(listed_url).status_code, status.HTTP_404_NOT_FOUND)
@@ -1011,6 +1012,19 @@ class TestConversionTasks(AnalyzerTestCase):
         self.assertEqual(res.data["conversion"], cid2)
         # The conversion's own files are untouched
         self.assertTrue(os.path.isfile(os.path.join(conversions.output_path(task, cid), "a", "DJI_0001_T_temp_c.tiff")))
+
+    def test_a_conversions_tiffs_are_held_by_the_tasks_made_from_it_and_by_the_datasets_own_while_last_sent_there(self):
+        # The tasks whose orthophotos the Thermal Inspector shows the conversion's source frames on
+        task, cid = self.converted()
+        task, cid2 = self.converted(frames=("DJI_0005_T.JPG", "DJI_0006_T.JPG"), task=task)
+        made = Task.objects.get(pk=self.client.post(self.url(task, cid), {"name": "x", "options": []}, format="json").data["id"])
+        self.addCleanup(shutil.rmtree, made.task_path(), True)
+        self.assertEqual((conversion_tasks.holding(task, cid), conversion_tasks.holding(task, cid2)), ([str(made.id)], []))
+        self.client.post(self.parent_url(task, cid2), format="json")
+        self.assertEqual((conversion_tasks.holding(task, cid), conversion_tasks.holding(task, cid2)), ([str(made.id)], [str(task.id)]))
+        self.client.post(self.parent_url(task, cid), format="json")
+        self.assertEqual((conversion_tasks.holding(task, cid), conversion_tasks.holding(task, cid2)),
+                         ([str(made.id), str(task.id)], []))
 
     def test_the_datasets_task_is_not_replaced_while_it_processes_nor_by_a_conversion_it_cannot_use(self):
         task, cid = self.converted()

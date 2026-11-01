@@ -11,7 +11,8 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
   workset you choose.
 - **Thermal Inspector**, on WebODM's 2D map of a task with a thermal orthophoto: the temperature under the cursor,
   pinned points, the statistics of regions drawn on it, isotherms, the map's palette and its legend. It also lays the
-  Analyzer's workset mosaics on the map, to compare them with the project's own layers.
+  Analyzer's workset mosaics on the map, to compare them with the project's own layers, and shows the frames that saw
+  a point clicked.
 
 Temperatures are computed with [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/), a pure-Python
 implementation of DJI's Thermal SDK: no native library and no outside service. An administrator can have DJI's own
@@ -255,6 +256,13 @@ Inspector:
   legend read the topmost thermal layer, a mosaic or an orthophoto. They are the plugin's layers, not entries of
   WebODM's layer panel (a plugin can't add those), and are laid again on each visit; the workset's **Open on
   WebODM's map** opens the project's map with its mosaic laid. Not on WebODM's public maps.
+- **Source frames**: a click in Hover (or a pin dropped, or a pin's name clicked in the panel) on a workset mosaic, or
+  on the orthophoto of a task processed from a workset whose mosaics are built, opens the window of the frames that
+  saw that point beside the panel, as in the mosaic viewer: one at a time with a crosshair on the point, its outline
+  on the map, drawn in the layer's palette and range. On a mosaic, its own frame comes first; on an orthophoto, the
+  one that saw the point closest to straight down, placed with the workset's camera models (from the frames' GPS and
+  gimbal, not ODM's refined cameras, so the point can be a little off). Elsewhere a click in Hover is still WebODM's
+  (its popup).
 
 Temperatures are read from the orthophoto or mosaic on the server (the plugin's own API, for those who can view the
 task or project) and shown in WebODM's units (°F when imperial), the same setting as the Analyzer's.

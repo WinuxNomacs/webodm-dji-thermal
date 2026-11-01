@@ -49,7 +49,7 @@ class Plugin(PluginBase):
     def include_js_files(self):
         # WebODM only turns these into URLs: versioned like the Analyzer's pages' (analyzer_pages.version)
         v = version(self.get_path("public"))
-        return [name + "?v=" + v for name in ['main.js', 'scale.js', 'regions.js', 'inspector.js']]
+        return [name + "?v=" + v for name in ['main.js', 'scale.js', 'regions.js', 'frames.js', 'inspector.js']]
 
     def build_jsx_components(self):
         # Leaflet: WebODM's own, for the mosaic viewer (see thermal/Leaflet.js)
