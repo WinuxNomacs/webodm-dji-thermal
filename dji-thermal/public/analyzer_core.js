@@ -1,4 +1,4 @@
-// What the Thermal Analyzer's pages share: formatting, a dataset's status, uploading images in batches, and the
+// What the DJI Thermal Analyzer's pages share: formatting, a dataset's status, uploading images in batches, and the
 // pages' dialog. Plain functions (the dialog aside, DOM-free), so Jest can test them.
 (function (root) {
     var STATUS_LABELS = {new: "Not analyzed", analyzing: "Analyzing", ready: "Analyzed", failed: "Failed", canceled: "Canceled"};

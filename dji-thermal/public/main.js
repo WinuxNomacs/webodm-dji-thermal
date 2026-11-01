@@ -29,7 +29,7 @@ PluginsAPI.Dashboard.addTaskActionButton(function(args){
     return React.createElement("a", {
         className: "btn btn-sm btn-primary",
         href: "/plugins/dji-thermal/dataset/" + id,
-        title: "Open the thermal dataset in the Thermal Analyzer"
+        title: "Open the thermal dataset in the DJI Thermal Analyzer"
     }, React.createElement("i", {className: "fa fa-thermometer-half fa-fw"}), " Thermal dataset");
 });
 

@@ -1,6 +1,6 @@
 # The converted images
 
-## A Thermal Task's images
+## A DJI Thermal Task's images
 
 Each thermal R-JPEG becomes a single-band 32-bit float TIFF of its temperatures in degrees Celsius, measured with
 the [measurement settings](measurement.md) of the task. The photos themselves aren't kept.

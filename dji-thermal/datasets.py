@@ -1,5 +1,5 @@
 """
-The Thermal Analyzer's datasets. A dataset is kept in a holder task of its project: a task WebODM never processes
+The DJI Thermal Analyzer's datasets. A dataset is kept in a holder task of its project: a task WebODM never processes
 (no processing node, none to be assigned, not partial, so neither processing nor the cleanup of partial tasks ever
 takes it), marked with a hidden tag. Everything the dataset has is in that task's folder, under thermal/ (the
 folder's root holds no image), so it counts toward the project owner's quota, is shared as the project is and goes

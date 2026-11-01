@@ -1,5 +1,5 @@
 """
-The Thermal Analyzer's API: a user's thermal datasets (those of every project they can view), creating one in a
+The DJI Thermal Analyzer's API: a user's thermal datasets (those of every project they can view), creating one in a
 project, uploading its images, its analysis in WebODM's worker, a thumbnail of each file, its conversions (several,
 side by side, see conversions) with their downloads, their mosaics on a map (see mosaics: what the viewer shows, its
 tiles and the values at a point), the WebODM tasks made from them (see conversion_tasks) and the user's saved

@@ -2,11 +2,11 @@
 
 A thermal camera measures the infrared radiation reaching it, not temperature. To turn that into the temperature of
 the surface, dji-thermal-cli (like DJI's own software) needs a few values about the surface and the air between it
-and the camera. These are the measurement settings. The Thermal Task panel and the Workset Creation Settings ask for
+and the camera. These are the measurement settings. The DJI Thermal Task panel and the Workset Creation Settings ask for
 the same values, in the same order.
 
 **Left empty, each photo keeps the value its camera recorded.** The pilot sets these in DJI's flight app, and the
-camera writes them into each photo. Each field shows the recorded value (in the Thermal Analyzer, the flight's
+camera writes them into each photo. Each field shows the recorded value (in the DJI Thermal Analyzer, the flight's
 median) and the range the camera accepts.
 
 ## Emissivity
@@ -51,7 +51,7 @@ the camera recorded 5 m and the drone flew at 20 m.
 
 ## Temperature unit
 
-The unit of the values you type: Celsius, Fahrenheit or Kelvin. The Thermal Task's images are always in degrees
+The unit of the values you type: Celsius, Fahrenheit or Kelvin. The DJI Thermal Task's images are always in degrees
 Celsius. In the Workset Creation Settings, **Unit of the files** sets the unit of a workset's temperature TIFFs
 separately.
 

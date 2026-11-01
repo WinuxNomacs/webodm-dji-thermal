@@ -6,7 +6,7 @@ import ThermalTaskPanel from './ThermalTaskPanel';
 import { sortFiles } from './rjpeg';
 import './ThermalTask.scss';
 
-// The Thermal Task button beside a project's "Select Images and GCP" (PluginsAPI.Dashboard.addNewTaskButton). The
+// The DJI Thermal Task button beside a project's "Select Images and GCP" (PluginsAPI.Dashboard.addNewTaskButton). The
 // photos picked are sorted in the browser (rjpeg.js) and the thermal task's panel opens where WebODM's own does:
 // at the top of the project's content, below its buttons.
 export default class ThermalTaskButton extends React.Component {
@@ -79,7 +79,7 @@ export default class ThermalTaskButton extends React.Component {
                         onClick={this.handleClick} ref={b => { this.button = b; }}
                         title={_("Create a task of temperature images from DJI thermal photos")}>
                     <i className={sorting ? "fa fa-circle-notch fa-spin" : "fa fa-thermometer-half"}></i>
-                    <span className="hidden-xs"> {_("Thermal Task")}</span>
+                    <span className="hidden-xs"> {_("DJI Thermal Task")}</span>
                 </button>
                 <input type="file" multiple accept=".jpg,.jpeg,.txt" className="hide" ref={i => { this.input = i; }}
                        onChange={this.handleFilesPicked} />

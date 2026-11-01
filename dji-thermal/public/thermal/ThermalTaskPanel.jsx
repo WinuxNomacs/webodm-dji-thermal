@@ -15,7 +15,7 @@ function readExif(file){
     return exifr.parse(file, EXIF_OPTIONS).then(exif => exif || {}, () => ({}));
 }
 
-// The panel of a new thermal task, for the files picked with the Thermal Task button: the Measurement section,
+// The panel of a new thermal task, for the files picked with the DJI Thermal Task button: the Measurement section,
 // then WebODM's own task panel (name, processing node, options, the photos on the map; no resizing).
 export default class ThermalTaskPanel extends React.Component {
     static propTypes = {
@@ -170,7 +170,7 @@ export default class ThermalTaskPanel extends React.Component {
         if (unsupported.length) text += " " + interpolate(_("%(count)s photos of a camera this plugin cannot convert are left out."), {count: unsupported.length});
         if (others) text += " " + interpolate(_("%(count)s other files (RGB photos, ...) are ignored."), {count: others});
         return <p>{text} <span className="text-muted">{_("To check the flight first or compare settings, use the")}{" "}
-            <a href="/plugins/dji-thermal/">{_("Thermal Analyzer")}</a>.</span></p>;
+            <a href="/plugins/dji-thermal/">{_("DJI Thermal Analyzer")}</a>.</span></p>;
     }
 
     renderProgress(){

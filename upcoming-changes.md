@@ -400,6 +400,16 @@
   - Decided (the user, 2026-11-01): **"DJI Thermal Analyzer" and "DJI Thermal Task"**; **the user's image, the
     map credit cropped off** (it keeps the earlier panel and name). First of the new phases, before the speed-up
     and Part 2's step 5.
+  - Done (2026-11-01), `names-splash`: "DJI Thermal Analyzer" in WebODM's sidebar (`plugin.py`), the landing
+    page's heading and title (`analyzer_pages.py`, `datasets.html`), the dataset page's breadcrumb and title
+    (`dataset.html`, `dataset.js`), and "DJI Thermal Task" on the Dashboard's button (`ThermalTaskButton.jsx`,
+    rebuilt), in the links and hints naming them, the manifest's description, README and docs. The image cropped
+    of its bottom 28 px (the map credit): `docs/images/splash-source.png` (2185×1902) and `splash.png` (1200 px,
+    256 colours, 414 KB) at the top of README and `docs/index.md`, linking to the source; `CLAUDE.md` and the
+    `docs` skill say it isn't made by `dev/screenshots.js`. Jest 192, Django 148 (1 skipped), ESLint, Ruff;
+    screenshots showing the sidebar or the button retaken and looked at (`thermal-task-button`,
+    `thermal-task-panel`, `analyzer-list`, `dataset`, `dataset-files`, `picture-viewer`, `mosaic-viewer`,
+    `mosaic-frames`, `dji-sdk` and the six `inspector*`).
 
 - **Faster image adjustments** (the user, 2026-11-01, from `new.md`): "can anything be done to improve the
   rendering response time of changes to the images sliders? How fast the tiles are rendered? etc.... Looking for it

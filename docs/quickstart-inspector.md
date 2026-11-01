@@ -1,8 +1,8 @@
 # Measuring on the map
 
 The Thermal Inspector reads temperatures from a processed thermal task, on WebODM's 2D map. It works on any task
-whose orthophoto holds temperatures: one made with [Thermal Task](quickstart-thermal-task.md), or from a
-[workset](quickstart-worksets.md). It can also lay the mosaics of the Thermal Analyzer's worksets on the map, to
+whose orthophoto holds temperatures: one made with [DJI Thermal Task](quickstart-thermal-task.md), or from a
+[workset](quickstart-worksets.md). It can also lay the mosaics of the DJI Thermal Analyzer's worksets on the map, to
 compare them with the project's own layers, show the frames that saw a point, keep measurements for everyone who
 can view the project, and correct the temperatures for another emissivity.
 
@@ -46,7 +46,7 @@ the next time you open the same task; to share one, save it (section 6).
 
 ## 3. Colours, legend and isotherms
 
-- **Palette**: the thermal layer's colours, from the same list as the Thermal Analyzer's. It's your palette
+- **Palette**: the thermal layer's colours, from the same list as the DJI Thermal Analyzer's. It's your palette
   everywhere: choosing one here also sets it in the Analyzer.
 - **The colour scale**, under Palette: the palette over the range the layer is drawn with, with that range in two
   boxes in your unit. Type a new minimum or maximum, or click **Auto** for the layer's 2nd to 98th percentile. "This
@@ -142,7 +142,7 @@ Saved measurements go with their task or workset: deleting either deletes them.
 ## 7. Correcting for another emissivity
 
 The temperatures were measured with the emissivity and reflected temperature the camera recorded, or those set in
-Thermal Task or the workset (see [Measurement settings](measurement.md)). To see what a surface would measure with
+DJI Thermal Task or the workset (see [Measurement settings](measurement.md)). To see what a surface would measure with
 others, tick **Correct for another emissivity and reflected temperature**. The values start from what the topmost
 layer was measured with, and the panel lists what each layer on the map was measured with. Change them, and:
 

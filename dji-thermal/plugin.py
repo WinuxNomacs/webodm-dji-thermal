@@ -33,7 +33,7 @@ class Plugin(PluginBase):
             logger.warning("DJI Thermal plugin enabled, but {}".format(message))
 
     def main_menu(self):
-        return [Menu(_("Thermal Analyzer"), self.public_url(""), "fa fa-thermometer-half fa-fw")]
+        return [Menu(_("DJI Thermal Analyzer"), self.public_url(""), "fa fa-thermometer-half fa-fw")]
 
     def app_mount_points(self):
         # The SDK page is for superusers only, linked from the Administration menu by main.js (WebODM's menu hook

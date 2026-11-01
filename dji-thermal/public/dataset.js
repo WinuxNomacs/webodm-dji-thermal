@@ -591,7 +591,7 @@
         function render(d) {
             dataset = d;
             $("ta-name").textContent = d.name;
-            doc.title = d.name + " - Thermal Analyzer";
+            doc.title = d.name + " - DJI Thermal Analyzer";
             $("ta-subtitle").innerHTML = "Project <strong>" + esc(d.project.name) + "</strong>" +
                 (d.created_by ? " · created by " + esc(d.created_by) : "") + " · " + esc(core.formatDate(d.created_at));
             var analyzing = d.status === "analyzing";

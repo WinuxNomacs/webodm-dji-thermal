@@ -1,4 +1,4 @@
-// The Thermal Analyzer's landing page: the datasets of every project the user can view, like the Dashboard's tasks,
+// The DJI Thermal Analyzer's landing page: the datasets of every project the user can view, like the Dashboard's tasks,
 // and New Dataset (its images uploaded).
 (function (root) {
     var core = root.ThermalAnalyzerCore || (typeof require !== "undefined" ? require("./analyzer_core") : null);
@@ -161,7 +161,7 @@
             if (!shown.length) {
                 table.hidden = true;
                 message.textContent = !datasets.length ? "No datasets yet. Use New Dataset to check a flight's thermal photos; for a task straight away, " +
-                    "use Thermal Task on a project on the Dashboard." :
+                    "use DJI Thermal Task on a project on the Dashboard." :
                     search.value.trim() ? "No datasets match the search." : "No datasets in this project.";
             } else {
                 message.textContent = "";
