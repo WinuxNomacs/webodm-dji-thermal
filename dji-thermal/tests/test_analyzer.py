@@ -937,7 +937,7 @@ class TestConversionTasks(AnalyzerTestCase):
         return "{}/{}/conversions/{}/task".format(API, task.id, cid)
 
     def test_a_task_is_made_of_the_conversions_tiffs_and_waits_for_a_processing_node(self):
-        task, cid = self.converted(normalize=True, max_pitch=-80.0, emissivity=0.95)
+        task, cid = self.converted(normalize=True, harmonize=True, max_pitch=-80.0, emissivity=0.95)
         info = self.client.get(self.url(task, cid)).data
         self.assertEqual((info["problems"], info["warnings"], info["frames"]), ([], [], 3))
         self.assertEqual([o["name"] for o in info["options"]],
