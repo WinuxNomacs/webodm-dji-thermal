@@ -898,6 +898,23 @@ last phase did with its colouring.
    `measurement.md`, `api.md`; screenshots `inspector` retaken, `inspector-saved` new (the form filled, not sent).
 5. **The frame page**: one frame with the Image and Isotherm sections, the tools in its pixels, and measured again
    exactly by dji-thermal-cli with changed parameters (dji-thermal-ui's `measure_frame`, `parse_changes`).
+   Design (2026-11-01): an Analyzer page of its own, `datasets/<id>/worksets/<cid>/frame?frame=…`: the frame list
+   beside it (← and → step), the frame panned and zoomed (Leaflet in pixels), the panel with Image (palette, range,
+   sliders), Isotherm, the readout under the cursor, the frame's figures and histogram. Coloured in the browser from
+   its values (a value PNG and `recolour.js`, as the maps). The Inspector's tools (Pin, Line, Rectangle, Circle,
+   Polygon) in the frame's pixels, with the same statistics, surroundings, ΔT, isotherm share and profile. Measure
+   again: distance, humidity, emissivity, reflected and ambient temperature changed, measured exactly by
+   dji-thermal-cli; a second pane beside it, the readout both values and their difference. Opened from the source
+   frames window ("Open this frame", mosaic viewer and Inspector) and the Files tab's detail pane (the newest ready
+   workset). Left out: dji-thermal-ui's visual pair (the plugin pairs no visual photos) and its locator map (it would
+   show where the flight was).
+   Decided (the user, 2026-11-01): **measurements on a frame are savable** (as the Inspector's, kept with the
+   workset, each with the parameters it was measured with); **all the frames, with a switch** (All / In the mosaic /
+   Oblique once the mosaics are built); **downloads: the PNG as shown, the temperatures as CSV and as a 32-bit TIFF**
+   (no location); **"New workset with these"** after measuring again (the Worksets tab's form filled in).
+   Steps: (a) the server: the frame list, a frame measured (with changes), its values tile, a region in its pixels,
+   the downloads; (b) the page: list, frame, Image, Isotherm, readout, figures, measure again; (c) the tools and saved
+   measurements on frames; (d) the links in, New workset with these, docs and screenshots.
 
 Open, to check in step 1: the Inspector's palette and range are per thermal layer today; a mosaic laid beside an
 orthophoto takes the same palette, and its own range unless the user links them.
