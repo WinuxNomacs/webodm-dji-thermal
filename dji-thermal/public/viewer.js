@@ -10,6 +10,7 @@
     var esc = function (t) { return core.escapeHtml(t); };
     var POLL_MS = 2000;
     var HOVER_MS = 120;         // the readout asks for the point the cursor rests on, not every point it crosses
+    var READOUT_HINT = "Move the cursor over the mosaic; a click keeps the values there and opens the frames that saw it.";
     var TAB_LABELS = {as_converted: "Mosaic", harmonized: "Harmonized", source_frame: "Source frame",
                       view_angle: "View angle"};
     var TAB_HINTS = {
@@ -161,10 +162,17 @@
         return out;
     }
 
-    // The values under the cursor
-    function readoutHtml(res, unit) {
+    // The button that lets go of the point a click kept
+    function followHtml() {
+        return '<div><button type="button" class="btn btn-default btn-sm" id="ta-viewer-follow" ' +
+            'title="Let go of the point kept (Esc)">Follow the cursor</button></div>';
+    }
+
+    // The values under the cursor, or at the point a click kept (pinned), with the button that lets go of it
+    function readoutHtml(res, unit, pinned) {
+        var follow = pinned ? followHtml() : "";
         if (!res || !res.valid) return '<span class="ta-message">' + (res && res.reason === "outside_raster" ?
-            "Outside the mosaic." : "No data here.") + "</span>";
+            "Outside the mosaic." : "No data here.") + "</span>" + follow;
         var rows = [["Temperature", res.temperature === null || res.temperature === undefined ? "no data" : core.formatTemp(res.temperature, unit)]];
         if (res.frame !== null && res.frame !== undefined) rows.push(["Frame", res.frame]);
         if (res.frame_pixel) rows.push(["Frame pixel", "x " + res.frame_pixel[0] + ", y " + res.frame_pixel[1]]);
@@ -172,7 +180,7 @@
         // A file name may break after its underscores
         return '<table class="table table-condensed ta-viewer-values"><tbody>' + rows.map(function (r) {
             return "<tr><th>" + esc(r[0]) + "</th><td>" + esc(r[1]).replace(/_/g, "_<wbr>") + "</td></tr>";
-        }).join("") + "</tbody></table>";
+        }).join("") + "</tbody></table>" + follow;
     }
 
     // What dji-thermal-cli reports about a mosaic, then its files to download (base: the conversion's API URL)
@@ -253,6 +261,8 @@
         var csrf = (page.querySelector("input[name=csrfmiddlewaretoken]") || {}).value;
         var v = null, tab = null, styles = {}, map = null, L = null, layer = null, timer = null, hover = null, fitted = false;
         var mapReady = null, pick = null, pickLayer = null;
+        // The point a click kept the readout on (until "Follow the cursor" or Esc), and its marker
+        var pinned = null, pinLayer = null;
 
         function status(s) {
             $("ta-viewer-status").className = "ta-status" + (s.cls ? " " + s.cls : "");
@@ -279,24 +289,46 @@
                 L.control.scale({imperial: false}).addTo(map);
                 map.on("mousemove", function (e) {
                     if (hover) root.clearTimeout(hover);
+                    if (pinned) return;
                     hover = root.setTimeout(function () { readout(e.latlng); }, HOVER_MS);
                 });
                 map.on("mouseout", function () { if (hover) root.clearTimeout(hover); });
-                map.on("click", function (e) { select(e.latlng); });
+                map.on("click", function (e) { pin(e.latlng); });
                 pickLayer = L.layerGroup().addTo(map);
+                pinLayer = L.layerGroup().addTo(map);
                 return map;
             });
             return mapReady;
         }
 
+        // The values at a point; a reply for a point the cursor has moved on from, or the readout let go of, is dropped
+        var asked = 0;
         function readout(latlng) {
-            var askedTab = tab;
+            var askedTab = tab, n = ++asked, kept = pinned;
             return fetchFn(base + "/mosaics/" + tab + "/point?lon=" + latlng.lng + "&lat=" + latlng.lat, {credentials: "same-origin"})
                 .then(core.readJson).then(function (r) {
-                    if (askedTab !== tab) return;
-                    $("ta-viewer-readout").innerHTML = r.ok ? readoutHtml(r.data, v.unit) : '<span class="text-danger">' +
-                        esc(core.errorText(r.data, "Could not read the mosaic here.")) + "</span>";
+                    if (askedTab !== tab || n !== asked || kept !== pinned) return;
+                    $("ta-viewer-readout").innerHTML = r.ok ? readoutHtml(r.data, v.unit, !!pinned) : '<span class="text-danger">' +
+                        esc(core.errorText(r.data, "Could not read the mosaic here.")) + "</span>" + (pinned ? followHtml() : "");
                 });
+        }
+
+        // A click keeps the readout on its point, marked on the map, and opens the frames that saw it
+        function pin(latlng) {
+            if (hover) root.clearTimeout(hover);
+            pinned = latlng;
+            pinLayer.clearLayers();
+            L.circleMarker(latlng, {radius: 6, color: "#000", weight: 1, fillColor: "#fff", fillOpacity: 1}).addTo(pinLayer);
+            readout(latlng);
+            select(latlng);
+        }
+
+        // The readout follows the cursor again
+        function follow() {
+            pinned = null;
+            asked++;
+            if (pinLayer) pinLayer.clearLayers();
+            $("ta-viewer-readout").innerHTML = '<span class="ta-message">' + esc(READOUT_HINT) + "</span>";
         }
 
         // The frames that saw a point, for the tab shown; keep: the frame to show again if it saw it too
@@ -323,7 +355,6 @@
             box.hidden = false;
             box.innerHTML = pipHtml(pick, f ? frameUrl(base, tab, f.index, style(), v.built_at) : "");
             pickLayer.clearLayers();
-            L.circleMarker(pick.latlng, {radius: 6, color: "#000", weight: 1, fillColor: "#fff", fillOpacity: 1}).addTo(pickLayer);
             if (f && f.footprint) {
                 L.polygon(f.footprint.map(function (c) { return [c[1], c[0]]; }),
                           {color: "#fff", weight: 2, dashArray: "6 4", fill: false, interactive: false}).addTo(pickLayer);
@@ -355,8 +386,11 @@
             $("ta-viewer-tabs").innerHTML = tabsHtml(v.tabs, tab);
             $("ta-viewer-controls").innerHTML = controlsHtml(t, style(), v.palettes || [], v.unit);
             $("ta-viewer-report").innerHTML = reportHtml(v.kinds[t.kind], t.kind, base);
-            $("ta-viewer-readout").innerHTML = '<span class="ta-message">Move the cursor over the mosaic; click it to see the frames that saw that point.</span>';
-            return ensureMap().then(showLayer);
+            $("ta-viewer-readout").innerHTML = '<span class="ta-message">' + esc(READOUT_HINT) + "</span>";
+            return ensureMap().then(function () {
+                showLayer();
+                if (pinned) readout(pinned);
+            });
         }
 
         // Only the scale and the tiles, as the palette or range changes
@@ -386,6 +420,7 @@
             if (builtBefore !== v.built_at) {
                 styles = {};
                 closePick();
+                follow();
             }
             if (!tab || !current()) tab = v.tabs[0].tab;
             return renderTab();
@@ -454,6 +489,16 @@
             restyle();
         });
 
+        $("ta-viewer-readout").addEventListener("click", function (e) {
+            if (e.target.closest && e.target.closest("#ta-viewer-follow")) follow();
+        });
+
+        // Esc lets go of the point kept, but not while typing in a field
+        doc.addEventListener("keydown", function (e) {
+            if (e.key !== "Escape" || !pinned || /^(INPUT|SELECT|TEXTAREA)$/.test((e.target || {}).tagName || "")) return;
+            follow();
+        });
+
         $("ta-viewer-build").addEventListener("click", function () { post(base + "/mosaics", "Could not build the mosaics."); });
         $("ta-viewer-cancel").addEventListener("click", function () { post(base + "/cancel", "Could not cancel."); });
 
@@ -471,7 +516,7 @@
 
     var api = {tabLabel: tabLabel, styleGroup: styleGroup, defaultRange: defaultRange, parseRange: parseRange, shownRange: shownRange,
                gradientCss: gradientCss, scaleTicks: scaleTicks, legendHtml: legendHtml, takenText: takenText, tileUrl: tileUrl,
-               frameUrl: frameUrl, pipHtml: pipHtml, tabsHtml: tabsHtml, controlsHtml: controlsHtml, readoutHtml: readoutHtml, reportHtml: reportHtml, statusHtml: statusHtml,
+               frameUrl: frameUrl, pipHtml: pipHtml, READOUT_HINT: READOUT_HINT, tabsHtml: tabsHtml, controlsHtml: controlsHtml, readoutHtml: readoutHtml, reportHtml: reportHtml, statusHtml: statusHtml,
                baseLayers: baseLayers, loadLeaflet: loadLeaflet, init: init};
     root.ThermalAnalyzerViewer = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

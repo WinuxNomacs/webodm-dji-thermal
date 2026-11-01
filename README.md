@@ -153,7 +153,8 @@ over WebODM's base layers:
   range, changed live, with the colour scale
   and **Auto** (the 2nd to 98th percentile);
 - the temperature, frame, frame pixel and view angle under the cursor;
-- a click on the map opens a window over it with the **frames that saw that point** (the mosaic's own first, the
+- a click on the map keeps those values at that point, marked, until **Follow the cursor** (or Esc), and opens a
+  window over the map with the **frames that saw that point** (the mosaic's own first, the
   others in turn with the arrows), each drawn in the tab's palette and range (on View angle, the angle each of its
   pixels saw the ground at), with a crosshair on the point and its outline on the map; mosaics built before version
   1.5.0 of dji-thermal-cli are built again to show them;
