@@ -38,6 +38,25 @@
 
     function defaultAdjust() { return {gamma: 1, equalize: false, sharpen: 0}; }
 
+    var ISOTHERM_MODES = [["", "None"], ["above", "Above"], ["below", "Below"], ["between", "Between"]];
+
+    // An isotherm typed (mode, and its temperatures in the user's unit) as the server takes it, in the mosaic's unit
+    // ("above,T", "below,T", "between,A,B"; "" for none): {value} or {error} (from dji-thermal-ui's isothermParam)
+    function isothermParam(mode, a, b, unit) {
+        if (!mode) return {value: ""};
+        var x = parseFloat(a), y = parseFloat(b);
+        if (isNaN(x)) return {error: "The isotherm needs a temperature"};
+        if (mode !== "between") return {value: mode + "," + typedTemp(x, unit)};
+        if (isNaN(y)) return {error: "The isotherm needs two temperatures"};
+        if (!(y > x)) return {error: "The second temperature must be above the first"};
+        return {value: "between," + typedTemp(x, unit) + "," + typedTemp(y, unit)};
+    }
+
+    // The isotherm of a style as a query, on the temperature tabs
+    function isothermQuery(tab, style) {
+        return isTemperature(tab) && style.isotherm && style.isotherm.value ? "&isotherm=" + encodeURIComponent(style.isotherm.value) : "";
+    }
+
     // The adjustments as a query (&gamma=&equalize=1&sharpen=), those not as by default
     function adjustQuery(adjust) {
         if (!adjust) return "";
@@ -149,7 +168,7 @@
     function tileUrl(base, tab, style, builtAt) {
         var query = ["v=" + encodeURIComponent(builtAt || ""), "color_map=" + encodeURIComponent(style.palette),
                      "rescale=" + style.range[0] + "," + style.range[1]];
-        return base + "/mosaics/" + tab + "/tiles/{z}/{x}/{y}.png?" + query.join("&") + adjustQuery(style.adjust);
+        return base + "/mosaics/" + tab + "/tiles/{z}/{x}/{y}.png?" + query.join("&") + adjustQuery(style.adjust) + isothermQuery(tab, style);
     }
 
     // One of the mosaic's frames as the tab draws it (its temperatures, or on View angle its pixels' angles), with the
@@ -157,7 +176,7 @@
     function frameUrl(base, tab, index, style, builtAt) {
         var query = ["v=" + encodeURIComponent(builtAt || ""), "color_map=" + encodeURIComponent(style.palette),
                      "rescale=" + style.range[0] + "," + style.range[1]];
-        return base + "/mosaics/" + tab + "/frames/" + index + ".png?" + query.join("&") + adjustQuery(style.adjust);
+        return base + "/mosaics/" + tab + "/frames/" + index + ".png?" + query.join("&") + adjustQuery(style.adjust) + isothermQuery(tab, style);
     }
 
     // The window of the frames that saw a point (pick: {frames, models, at: the one shown}), the frame drawn from url
@@ -218,7 +237,24 @@
         if (s) out += '<div class="ta-message">This mosaic: ' +
             core.formatNumber(temperature ? core.convertTemp(s.min, unit) : s.min, 1) + " to " +
             core.formatNumber(temperature ? core.convertTemp(s.max, unit) : s.max, 1, " " + symbol) + "</div>";
-        return out + imageHtml(tab, style, unit);
+        return out + imageHtml(tab, style, unit) + (temperature ? isothermHtml(style) : "");
+    }
+
+    // The isotherm: its temperatures keep the palette, the rest is grey (as dji-thermal-ui's)
+    function isothermHtml(style) {
+        var iso = style.isotherm || {mode: "", a: "", b: ""}, mode = iso.mode;
+        return '<details class="ta-section" open data-section="isotherm"><summary><h5>Isotherm</h5></summary>' +
+            '<div class="ta-viewer-isotherm"><select class="form-control input-sm" id="ta-viewer-iso-mode" aria-label="Isotherm">' +
+            ISOTHERM_MODES.map(function (m) {
+                return '<option value="' + m[0] + '"' + (m[0] === mode ? " selected" : "") + ">" + m[1] + "</option>";
+            }).join("") + "</select>" +
+            '<input type="number" step="0.1" class="form-control input-sm" id="ta-viewer-iso-a" title="Temperature" aria-label="Temperature"' +
+            (mode ? "" : " hidden") + ' value="' + esc(iso.a) + '">' +
+            '<input type="number" step="0.1" class="form-control input-sm" id="ta-viewer-iso-b" title="Up to" aria-label="Up to"' +
+            (mode === "between" ? "" : " hidden") + ' value="' + esc(iso.b) + '">' +
+            '<span id="ta-viewer-iso-unit"' + (mode ? "" : " hidden") + ">" + esc(core.unitSymbol(core.userUnit())) + "</span></div>" +
+            '<div class="text-danger" id="ta-viewer-iso-error"></div>' +
+            '<p class="ta-message" id="ta-viewer-iso-hint"' + (mode ? "" : " hidden") + ">Its pixels keep the palette, the rest is grey.</p></details>";
     }
 
     // How the image is drawn: brightness and contrast move the range, gamma and the tone curve share out the colours,
@@ -358,7 +394,7 @@
         function style() {
             var g = styleGroup(tab);
             if (!styles[g]) styles[g] = {palette: isTemperature(tab) ? v.default_palette : "inferno", range: defaultRange(current(), v.unit),
-                                         adjust: defaultAdjust(), curve: null};
+                                         adjust: defaultAdjust(), curve: null, isotherm: {mode: "", a: "", b: "", value: ""}};
             return styles[g];
         }
 
@@ -593,6 +629,7 @@
                 showRange();
                 return restyle();
             }
+            if (/^ta-viewer-iso-(mode|a|b)$/.test(e.target.id)) return isotherm();
             if (e.target.id === "ta-viewer-tone") {
                 style().adjust.equalize = e.target.value === "equalize";
                 return restyle();
@@ -603,6 +640,22 @@
                 restyle();
             }
         });
+
+        // The isotherm typed: its fields shown for its mode, drawn once it is complete
+        function isotherm() {
+            var iso = style().isotherm, mode = $("ta-viewer-iso-mode").value;
+            iso.mode = mode;
+            iso.a = $("ta-viewer-iso-a").value;
+            iso.b = $("ta-viewer-iso-b").value;
+            $("ta-viewer-iso-a").hidden = $("ta-viewer-iso-unit").hidden = $("ta-viewer-iso-hint").hidden = !mode;
+            $("ta-viewer-iso-b").hidden = mode !== "between";
+            var r = isothermParam(mode, iso.a, iso.b, v.unit);
+            // Not an error yet while a temperature is still to be typed
+            $("ta-viewer-iso-error").textContent = r.error && (iso.a !== "" || mode === "between" && iso.b !== "") ? r.error : "";
+            if (r.error || r.value === iso.value) return;
+            iso.value = r.value;
+            restyle();
+        }
 
         // A slider moved: brightness and contrast move the range from the Auto one, gamma and sharpening the adjustments
         function slide(input) {
@@ -670,7 +723,7 @@
                frameUrl: frameUrl, pipHtml: pipHtml, READOUT_HINT: READOUT_HINT, tabsHtml: tabsHtml, controlsHtml: controlsHtml, readoutHtml: readoutHtml, reportHtml: reportHtml, statusHtml: statusHtml,
                baseLayers: baseLayers, loadLeaflet: loadLeaflet, init: init, adjustQuery: adjustQuery, toneShares: toneShares,
                slidRange: slidRange, sliderPositions: sliderPositions, sliderGamma: sliderGamma, gammaSlider: gammaSlider,
-               SLIDERS: SLIDERS, imageHtml: imageHtml};
+               SLIDERS: SLIDERS, imageHtml: imageHtml, isothermParam: isothermParam, isothermHtml: isothermHtml};
     root.ThermalAnalyzerViewer = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

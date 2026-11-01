@@ -635,7 +635,8 @@ class MosaicTile(DatasetView):
     def get(self, request, pk, cid, tab, z, x, y):
         """
         A PNG tile of a viewer tab: temperatures and view angles over rescale=min,max with color_map (one of the
-        viewer's palettes) and the adjustments (gamma, equalize=1 on temperatures, sharpen), the source frames as the
+        viewer's palettes), the adjustments (gamma, equalize=1 on temperatures, sharpen) and on temperatures an isotherm
+        (above,T, below,T or between,A,B: its temperatures in the palette, the rest in grey), the source frames as the
         temperatures with lines between the frames. The viewer's URL carries the mosaics' build time, so a tile is
         cached until they are built again.
         """
@@ -648,7 +649,7 @@ class MosaicTile(DatasetView):
 
 
 def mosaic_style(request, task, cid, tab):
-    """A viewer image's colour map, range and adjustments from its query: (cmap, low, high, adjust)"""
+    """A viewer image's colour map, range, adjustments and isotherm from its query: (cmap, low, high, adjust, isotherm)"""
     settings = conversions.record(task, cid).get('settings') or {}
     try:
         cmap = mosaics.colormap(task, cid, request.query_params.get('color_map') or
@@ -656,7 +657,19 @@ def mosaic_style(request, task, cid, tab):
     except ValueError as e:
         raise ValidationError({'error': str(e)}) from None
     low, high = mosaic_range(request)
-    return cmap, low, high, mosaic_adjust(request, tab)
+    return cmap, low, high, mosaic_adjust(request, tab), mosaic_isotherm(request, tab)
+
+
+def mosaic_isotherm(request, tab):
+    """A viewer request's isotherm (colouring.parse_isotherm), only on temperatures"""
+    from . import colouring
+    try:
+        isotherm = colouring.parse_isotherm(request.query_params.get('isotherm'))
+    except ValueError as e:
+        raise ValidationError({'error': str(e)}) from None
+    if isotherm and not mosaics.is_temperature(tab):
+        raise ValidationError({'isotherm': "Only temperatures have an isotherm"})
+    return isotherm
 
 
 def mosaic_range(request):

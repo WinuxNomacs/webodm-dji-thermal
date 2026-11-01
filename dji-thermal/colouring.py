@@ -28,6 +28,7 @@ SHARPEN_LIMITS = (0.0, 5.0)
 EQUALIZE_BINS = 1024
 EQUALIZE_SPAN = (0.1, 99.9)     # the percentiles a mosaic's histogram spans: its outliers would empty all its bins but one
 CURVE_SAMPLES = 65
+ISOTHERM_MODES = ('above', 'below', 'between')
 HISTOGRAMS_KEPT = 16      # the mosaics' histograms kept in memory
 
 _histograms = {}
@@ -157,6 +158,39 @@ def parse_adjust(params):
         raise ValueError("equalize is 1 or 0")
     return {'gamma': ranged('gamma', "Gamma", GAMMA_LIMITS, 1.0), 'equalize': equalize == '1',
             'sharpen': ranged('sharpen', "Sharpening", SHARPEN_LIMITS, 0.0)}
+
+
+def parse_isotherm(value):
+    """
+    "above,T", "below,T" or "between,A,B" as (mode, low, high): the values above low, below high or between both;
+    None when value is empty
+    :raises ValueError: not one of them (the message is for the user)
+    """
+    if value is None or value == "":
+        return None
+    parts = str(value).split(',')
+    mode = parts[0]
+    if mode not in ISOTHERM_MODES or len(parts) != (3 if mode == 'between' else 2):
+        raise ValueError("The isotherm is above,T or below,T or between,A,B")
+    try:
+        values = [float(p) for p in parts[1:]]
+    except ValueError:
+        raise ValueError("The isotherm's temperature is not a number") from None
+    if mode == 'above':
+        return mode, values[0], None
+    if mode == 'below':
+        return mode, None, values[0]
+    if not values[1] > values[0]:
+        raise ValueError("The isotherm's second temperature must be above the first")
+    return mode, values[0], values[1]
+
+
+def isotherm_range(isotherm):
+    """parse_isotherm's (mode, low, high) as the values inside it, as colour takes it, or None"""
+    if not isotherm:
+        return None
+    _mode, low, high = isotherm
+    return (-3e38 if low is None else low, 3e38 if high is None else high)
 
 
 def value_histogram(values, span=None):
