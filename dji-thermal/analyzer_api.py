@@ -635,29 +635,64 @@ class MosaicTile(DatasetView):
     def get(self, request, pk, cid, tab, z, x, y):
         """
         A PNG tile of a viewer tab: temperatures and view angles over rescale=min,max with color_map (one of the
-        viewer's palettes), the source frames as the temperatures with lines between the frames. The viewer's URL
-        carries the mosaics' build time, so a tile is cached until they are built again.
+        viewer's palettes) and the adjustments (gamma, equalize=1 on temperatures, sharpen), the source frames as the
+        temperatures with lines between the frames. The viewer's URL carries the mosaics' build time, so a tile is
+        cached until they are built again.
         """
         task = get_conversion(request, pk, cid)
         tab_raster(task, cid, tab)
-        content = mosaics.tile(task, cid, tab, int(z), int(x), int(y), *mosaic_style(request, task, cid))
+        content = mosaics.tile(task, cid, tab, int(z), int(x), int(y), *mosaic_style(request, task, cid, tab))
         if content is None:
             raise NotFound()
         return png_response(content)
 
 
-def mosaic_style(request, task, cid):
-    """A viewer image's colour map and range from its query: (cmap, low, high)"""
+def mosaic_style(request, task, cid, tab):
+    """A viewer image's colour map, range and adjustments from its query: (cmap, low, high, adjust)"""
     settings = conversions.record(task, cid).get('settings') or {}
     try:
         cmap = mosaics.colormap(task, cid, request.query_params.get('color_map') or
                                 mosaics.default_palette(task, cid, settings, conversions.display(request.user)['palette']))
-        low, high = (float(v) for v in (request.query_params.get('rescale') or '0,1').split(','))
     except ValueError as e:
-        raise ValidationError({'error': str(e) if 'color' in str(e) else "Invalid rescale value"}) from None
+        raise ValidationError({'error': str(e)}) from None
+    low, high = mosaic_range(request)
+    return cmap, low, high, mosaic_adjust(request, tab)
+
+
+def mosaic_range(request):
+    """A viewer request's rescale=min,max: (low, high)"""
+    try:
+        low, high = (float(v) for v in (request.query_params.get('rescale') or '0,1').split(','))
+    except ValueError:
+        raise ValidationError({'error': "Invalid rescale value"}) from None
     if not high > low:
         raise ValidationError({'rescale': "The range's maximum must be above its minimum"})
-    return cmap, low, high
+    return low, high
+
+
+def mosaic_adjust(request, tab):
+    """A viewer request's adjustments (colouring.parse_adjust), equalize only on temperatures"""
+    from . import colouring
+    try:
+        adjust = colouring.parse_adjust(request.query_params)
+    except ValueError as e:
+        raise ValidationError({'error': str(e)}) from None
+    if adjust['equalize'] and not mosaics.is_temperature(tab):
+        raise ValidationError({'equalize': "Only temperatures can be equalized"})
+    return adjust
+
+
+class MosaicCurve(DatasetView):
+    def get(self, request, pk, cid, tab):
+        """How a viewer tab's images are drawn over rescale=min,max with gamma and equalize=1, for the legend: the
+        palette's share at colouring.CURVE_SAMPLES values evenly across the range"""
+        from . import colouring
+        task = get_conversion(request, pk, cid)
+        tab_raster(task, cid, tab)
+        low, high = mosaic_range(request)
+        adjust = mosaic_adjust(request, tab)
+        tone = mosaics.shares(task, cid, tab, low, high, adjust)
+        return Response({'shares': tone if tone is not None else colouring.curve_shares(low, high)})
 
 
 def png_response(content):
@@ -703,7 +738,7 @@ class MosaicFrame(DatasetView):
         """
         task = get_conversion(request, pk, cid)
         tab_raster(task, cid, tab)
-        style = mosaic_style(request, task, cid)
+        style = mosaic_style(request, task, cid, tab)
         try:
             content = mosaics.frame_image(task, cid, tab, int(index), *style)
         except LookupError as e:

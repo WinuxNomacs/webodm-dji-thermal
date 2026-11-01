@@ -251,6 +251,13 @@
 .ta-viewer .ta-viewer-hint{ opacity: .75; }
 .ta-viewer .ta-viewer-legend{ height: 14px; border-radius: 2px; border: 1px solid rgba(128, 128, 128, .4); }
 .ta-viewer .ta-scale{ margin-bottom: 8px; }
+/* The Image section's sliders (as dji-thermal-ui's): label, slider, value */
+.ta-viewer .ta-slider{ display: grid; grid-template-columns: 76px minmax(0, 1fr) 3em; align-items: center; gap: 6px; margin: 2px 0;
+    font-weight: normal; }
+.ta-viewer .ta-slider input[type=range]{ margin: 0; }
+.ta-viewer .ta-slider-value{ text-align: right; opacity: .75; font-size: 12px; }
+.ta-viewer .ta-viewer-tone{ display: flex; gap: 6px; margin: 6px 0; }
+.ta-viewer .ta-viewer-tone select{ width: auto; }
 .ta-viewer .ta-legend-ticks{ position: relative; height: 16px; font-size: 11px; line-height: 1; }
 .ta-viewer .ta-tick{ position: absolute; top: 4px; transform: translateX(-50%); white-space: nowrap; }
 .ta-viewer .ta-tick::before{ content: ""; position: absolute; left: 50%; top: -4px; height: 3px; border-left: 1px solid currentColor; }

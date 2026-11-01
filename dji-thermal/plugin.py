@@ -81,6 +81,7 @@ class Plugin(PluginBase):
             MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/tiles/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)\.png$',
                        analyzer_api.MosaicTile.as_view()),
             MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/point$', analyzer_api.MosaicPoint.as_view()),
+            MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/curve$', analyzer_api.MosaicCurve.as_view()),
             MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/frames$', analyzer_api.MosaicFrames.as_view()),
             MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/frames/(?P<index>\d+)\.png$',
                        analyzer_api.MosaicFrame.as_view()),

@@ -2203,6 +2203,88 @@ describe("the mosaic viewer", () => {
         expect(kept.layers.length).toBe(0);
     });
 
+    it("ports dji-thermal-ui's image adjustments: the sliders' range, gamma, the query and the colour bar's curve", () => {
+        expect(viewer.slidRange([10, 30], 0, 0)).toEqual([10, 30]);
+        expect(viewer.slidRange([10, 30], 0.5, 0)).toEqual([0, 20]);
+        expect(viewer.slidRange([10, 30], 0, 1)).toEqual([15, 25]);
+        expect(viewer.sliderPositions([10, 30], [15, 25])).toEqual({brightness: 0, contrast: 1});
+        expect(viewer.sliderPositions([10, 30], [0, 20])).toEqual({brightness: 0.5, contrast: 0});
+        expect(viewer.sliderPositions([10, 30], [29, 29.5])).toEqual({brightness: -0.46, contrast: 2});
+        expect([viewer.sliderGamma(1), viewer.gammaSlider(2), viewer.sliderGamma(-5)]).toEqual([2, 1, 0.2]);
+        expect(viewer.adjustQuery({gamma: 1, equalize: false, sharpen: 0})).toBe("");
+        expect(viewer.adjustQuery({gamma: 2, equalize: true, sharpen: 1.5})).toBe("&gamma=2&equalize=1&sharpen=1.5");
+        const t = viewer.toneShares(2);
+        expect([t.length, t[0], t[64]]).toEqual([65, 0, 1]);
+        expect(t[16]).toBeCloseTo(0.5);
+        const scale = require("../scale");
+        expect(scale.gradientCss([0x000000ff, 0xffffffff], [0, 0.5, 1])).toBe("linear-gradient(to right, rgb(0,0,0), rgb(128,128,128), rgb(255,255,255))");
+        expect(scale.gradientCss([0x000000ff, 0xffffffff]).match(/rgb\(/g).length).toBe(16);
+    });
+
+    it("draws the image as the Image section says: the sliders, Equalized, Reset, and the frames' pictures too", async () => {
+        const L = fakeLeaflet();
+        const at = "?lon=10.0005&lat=45.0005";
+        const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
+                                [C9 + "/mosaics/as_converted/curve?rescale=-1.6,26.2&gamma=2&equalize=1"]: {shares: [0, 0.9, 1]},
+                                [C9 + "/mosaics/as_converted/point" + at]: {valid: true, temperature: 30, frame: "b_T.JPG"},
+                                [C9 + "/mosaics/as_converted/frames" + at]: {frames: [{index: 1, file: "b_T.JPG", x: 3.5, y: 2.5,
+                                    width: 8, height: 6, view_angle: 2, source: true}], models: true},
+                                [C9 + "/mosaics/view_angle/point" + at]: {valid: true, frame: "b_T.JPG", view_angle: 2},
+                                [C9 + "/mosaics/view_angle/frames" + at]: {frames: [], models: true}});
+        await start(fetchFn, L);
+        await ticks();
+        const tile = () => L.tiles[L.tiles.length - 1].url;
+        const slide = (id, value, done) => {
+            $(id).value = value;
+            $(id).dispatchEvent(new Event("input", {bubbles: true}));
+            if (done) $(id).dispatchEvent(new Event("change", {bubbles: true}));
+        };
+        expect(tile()).toContain("rescale=12.3,40.1");
+        expect(tile()).not.toContain("gamma");
+
+        // Brightness moves the range: the boxes follow while it moves, the tiles once it is let go of
+        slide("ta-viewer-brightness", "0.5", false);
+        expect([$("ta-viewer-min").value, $("ta-viewer-max").value]).toEqual(["-1.6", "26.2"]);
+        expect(tile()).toContain("rescale=12.3,40.1");
+        slide("ta-viewer-brightness", "0.5", true);
+        expect(tile()).toContain("rescale=-1.6,26.2");
+
+        // Gamma: its value and the colour bar while it moves, the tiles once let go of
+        const legend = () => document.querySelector(".ta-viewer-legend").style.background;
+        const linear = legend();
+        slide("ta-viewer-gamma", "1", false);
+        expect($("ta-viewer-gamma-value").textContent).toBe("2.00");
+        expect(legend()).not.toBe(linear);
+        expect(tile()).not.toContain("gamma");
+        slide("ta-viewer-gamma", "1", true);
+        expect(tile()).toContain("&gamma=2");
+
+        // Equalized: the tiles, and the colour bar along the server's curve
+        $("ta-viewer-tone").value = "equalize";
+        change($("ta-viewer-tone"));
+        await ticks();
+        expect(tile()).toContain("&gamma=2&equalize=1");
+        expect(calls(fetchFn)).toContain("GET " + C9 + "/mosaics/as_converted/curve?rescale=-1.6,26.2&gamma=2&equalize=1");
+        expect(legend().match(/rgb\(/g).length).toBe(3);
+
+        // The frames window's picture is drawn the same way
+        L.maps[0].fire("click", {latlng: {lng: 10.0005, lat: 45.0005}});
+        await ticks();
+        expect($("ta-viewer-pip").querySelector("img").getAttribute("src")).toContain("rescale=-1.6,26.2&gamma=2&equalize=1");
+
+        // View angle: no Equalized
+        click($("ta-viewer-tabs").querySelector('[data-tab="view_angle"]'));
+        await ticks();
+        expect([...$("ta-viewer-tone").options].map(o => o.value)).toEqual(["linear"]);
+
+        // Reset: the Auto range, no adjustments
+        click($("ta-viewer-tabs").querySelector('[data-tab="as_converted"]'));
+        await ticks();
+        click($("ta-viewer-reset"));
+        expect(tile()).toMatch(/rescale=12\.3,40\.1$/);
+        expect([$("ta-viewer-gamma-value").textContent, $("ta-viewer-tone").value, $("ta-viewer-brightness").value]).toEqual(["1.00", "linear", "0"]);
+    });
+
     it("asks for the mosaics to be built again when they have no frame positions", () => {
         const el = document.createElement("div");
         el.innerHTML = viewer.pipHtml({frames: [], models: false, at: 0}, "");

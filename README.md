@@ -152,6 +152,11 @@ over WebODM's base layers:
 - the palette (the usual ones and the DJI palettes of the images; opening in your preferred one, if they hold it) and the
   range, changed live, with the colour scale
   and **Auto** (the 2nd to 98th percentile);
+- how the image is drawn (**Image**): **Brightness** and **Contrast** (which move and narrow the range), **Gamma**,
+  **Sharpening** (an unsharp mask), **Linear** or **Equalized** (the colours spread over the temperatures the whole
+  mosaic has most of; temperatures only) and **Reset**, drawn into the tiles and the frames' pictures, with the colour
+  scale drawn to match; the temperatures stay as they are. The temperature tabs share them, and each visit starts
+  without them;
 - the temperature, frame, frame pixel and view angle under the cursor;
 - a click on the map keeps those values at that point, marked, until **Follow the cursor** (or Esc), and opens a
   window over the map with the **frames that saw that point** (the mosaic's own first, the

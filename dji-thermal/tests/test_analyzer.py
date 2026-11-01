@@ -32,6 +32,7 @@ datasets = importlib.import_module("coreplugins.dji-thermal.datasets")
 analysis = importlib.import_module("coreplugins.dji-thermal.analysis")
 conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
 mosaics = importlib.import_module("coreplugins.dji-thermal.mosaics")
+colouring = importlib.import_module("coreplugins.dji-thermal.colouring")
 conversion_tasks = importlib.import_module("coreplugins.dji-thermal.conversion_tasks")
 
 API = "/api/plugins/dji-thermal/datasets"
@@ -541,6 +542,41 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual(first.astype(int).tolist(), [[0, 1, 0], [1, 1, 0], [0, 0, 0]])
         self.assertEqual(second.astype(int).tolist(), [[0, 0, 1], [0, 0, 1], [1, 1, 0]])
 
+    def test_the_viewer_draws_values_as_dji_thermal_ui_does(self):
+        import numpy as np
+        grey = [(i << 24) | (i << 16) | (i << 8) | 255 for i in range(256)]
+        # The range's ends at the palette's ends, its middle half way; no value clear
+        out = colouring.colour(np.array([[0.0, 5.0, 10.0, np.nan]]), grey, (0, 10))
+        self.assertEqual(out[0, :, 0].tolist(), [0, 128, 255, 0])
+        self.assertEqual(out[0, :, 3].tolist(), [255, 255, 255, 0])
+        # Gamma 2: a quarter of the range drawn half way along the palette
+        shares = colouring.curve_shares(0, 10, {"gamma": 2.0})
+        self.assertEqual(len(shares), colouring.CURVE_SAMPLES)
+        self.assertAlmostEqual(colouring.colour(np.array([[2.5]]), grey, (0, 10), shares)[0, 0, 0], 128, delta=1)
+        # Sharpening raises an edge (darker on its dark side, lighter on its light side) and leaves a flat area
+        edge = np.where(np.arange(9) < 5, 2.0, 8.0)[np.newaxis].repeat(9, axis=0)
+        plain, sharp = colouring.colour(edge, grey, (0, 10)), colouring.colour(edge, grey, (0, 10), sharpen=2.0)
+        self.assertLess(sharp[4, 4, 0], plain[4, 4, 0])
+        self.assertGreater(sharp[4, 5, 0], plain[4, 5, 0])
+        self.assertEqual(sharp[4, 0, 0], plain[4, 0, 0])
+        self.assertEqual(colouring.colour(edge, grey, (0, 10), sharpen=2.0, margin=2).shape, (5, 5, 4))
+        # The equalization's curve rises from 0 to 1, steepest where most values are
+        values = np.concatenate([np.full(900, 20.0), np.linspace(10, 30, 100)])
+        curve = colouring.equalization(colouring.value_histogram(values, (10, 30)), 10, 30)
+        self.assertEqual((curve[1][0], curve[1][-1]), (0.0, 1.0))
+        self.assertTrue(np.all(np.diff(curve[1]) >= 0))
+        self.assertGreater(np.interp(20.1, *curve) - np.interp(19.9, *curve), 0.5)
+        # The adjustments checked, none by default; the unsharp mask's sigma in the pixels drawn
+        self.assertEqual(colouring.parse_adjust({}), {"gamma": 1.0, "equalize": False, "sharpen": 0.0})
+        self.assertEqual(colouring.parse_adjust({"gamma": "2", "equalize": "1", "sharpen": "1.5"}),
+                         {"gamma": 2.0, "equalize": True, "sharpen": 1.5})
+        for bad in ({"gamma": "9"}, {"gamma": "x"}, {"sharpen": "-1"}, {"equalize": "2"}):
+            with self.assertRaises(ValueError, msg=bad):
+                colouring.parse_adjust(bad)
+        self.assertEqual(colouring.sharpen_sigma(0.02, 0.01), 2.0)
+        self.assertEqual((colouring.sharpen_sigma(0.01, 1), colouring.sharpen_sigma(1, 0.01)), colouring.SIGMA_LIMITS)
+        self.assertAlmostEqual(mosaics.tile_pixel_m(0, 0), 40075016.686 / 256, delta=1)
+
     def test_a_frames_pixels_angles_are_from_its_camera_model(self):
         import numpy as np
         # Looking straight down, the frame's top to the north: forward is down, right is east, the image's down south
@@ -644,6 +680,37 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual(Image.open(io.BytesIO(tile.content)).size, (256, 256))
         self.assertEqual(self.client.get(tile_url, {"color_map": "pink"}).status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.client.get(tile_url, {"rescale": "5,1"}).status_code, status.HTTP_400_BAD_REQUEST)
+        # Drawn with gamma and Equalized: the same pixels clear, other colours; sharpened, others again
+        import numpy as np
+        style = {"color_map": "inferno", "rescale": "{},{}".format(lo, hi)}
+        drawn = lambda r: np.asarray(Image.open(io.BytesIO(r.content)).convert("RGBA"))
+        plain = drawn(tile)
+        toned = self.client.get(tile_url, dict(style, gamma=2, equalize=1))
+        self.assertEqual(toned.status_code, status.HTTP_200_OK)
+        self.assertEqual((drawn(toned)[..., 3] > 0).tolist(), (plain[..., 3] > 0).tolist())
+        self.assertFalse(np.array_equal(drawn(toned)[..., :3], plain[..., :3]))
+        sharp = self.client.get(tile_url, dict(style, gamma=2, equalize=1, sharpen=3))
+        self.assertEqual(sharp.status_code, status.HTTP_200_OK)
+        self.assertFalse(np.array_equal(drawn(sharp)[..., :3], drawn(toned)[..., :3]))
+        self.assertEqual(self.client.get(tile_url, dict(style, gamma=9)).status_code, status.HTTP_400_BAD_REQUEST)
+        angles_url = self.url(task, cid, "/view_angle/tiles/{}/{}/{}.png".format(t.z, t.x, t.y))
+        self.assertEqual(self.client.get(angles_url, {"rescale": "0,20", "equalize": 1}).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.get(angles_url, {"rescale": "0,20", "gamma": 2, "sharpen": 3}).status_code, status.HTTP_200_OK)
+        # The colour scale's curve: linear without adjustments, Equalized from the mosaic's histogram, kept in a file
+        # and read again from it
+        linear = self.client.get(self.url(task, cid, "/harmonized/curve"), {"rescale": style["rescale"]}).data["shares"]
+        self.assertEqual(len(linear), colouring.CURVE_SAMPLES)
+        self.assertAlmostEqual(linear[32], 0.5)
+        curve = self.client.get(self.url(task, cid, "/harmonized/curve"), {"rescale": style["rescale"], "equalize": 1}).data["shares"]
+        self.assertEqual((len(curve), curve[0], curve[-1]), (colouring.CURVE_SAMPLES, 0.0, 1.0))
+        self.assertNotAlmostEqual(curve[32], 0.5, places=2)
+        self.assertEqual(self.client.get(self.url(task, cid, "/view_angle/curve"), {"rescale": "0,20", "equalize": 1}).status_code,
+                         status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(os.path.isfile(mosaics.path(task, cid, mosaics.VIEWER_DIR, mosaics.HISTOGRAM_FILE.format("harmonized"))))
+        kept = mosaics.histogram(task, cid, "harmonized")
+        colouring._histograms.clear()
+        with mock.patch.object(mosaics, "temperatures", side_effect=AssertionError("read again")):
+            self.assertEqual(mosaics.histogram(task, cid, "harmonized")[0].tolist(), kept[0].tolist())
         # The source frames: the temperatures in the palette, with black and white lines where frames meet (white is
         # not in inferno), the whole mosaic in one tile
         whole = web_mercator_tile(lon, lat, tab["minzoom"])
