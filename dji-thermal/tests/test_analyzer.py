@@ -36,6 +36,7 @@ mosaics = importlib.import_module("coreplugins.dji-thermal.mosaics")
 colouring = importlib.import_module("coreplugins.dji-thermal.colouring")
 conversion_tasks = importlib.import_module("coreplugins.dji-thermal.conversion_tasks")
 correction = importlib.import_module("coreplugins.dji-thermal.correction")
+measurements = importlib.import_module("coreplugins.dji-thermal.measurements")
 
 API = "/api/plugins/dji-thermal/datasets"
 
@@ -1096,6 +1097,16 @@ class TestConversionTasks(AnalyzerTestCase):
         self.client.post(self.parent_url(task, cid), format="json")
         self.client.delete("{}/{}".format(API, task.id))
         self.assertEqual((Task.objects.get(pk=made.pk).tags, Task.objects.get(pk=task.pk).tags), ("", ""))
+
+    def test_a_datasets_task_kept_after_it_is_deleted_keeps_its_saved_measurements_and_palette(self):
+        task, cid = self.converted()
+        self.client.post(self.parent_url(task, cid), format="json")
+        conversion_tasks.set_task_palette(task, "arctic")
+        with open(measurements.task_path(task), "w") as f:
+            f.write("[]")
+        self.assertEqual(self.client.delete("{}/{}".format(API, task.id)).status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(sorted(os.listdir(datasets.data_path(task))), ["measurements.json", "task.json"])
+        self.assertEqual(conversion_tasks.task_palette(task), "arctic")
 
     def parent_url(self, task, cid):
         return "{}/{}/conversions/{}/parent".format(API, task.id, cid)
