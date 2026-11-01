@@ -49,6 +49,9 @@ VIEWER_COLORMAPS = conversions.COLORMAPS
 DJI_PREFIX = 'dji_'
 SEAM_COLORS = ((0, 0, 0), (255, 255, 255))   # the source frame tab's lines: a pixel of each, either side of a seam
 TILE_SIZE = 256
+EARTH_CIRCUMFERENCE_M = 40075016.686
+HISTOGRAM_FILE = 'histogram-{}.json'    # a temperature mosaic's histogram, in VIEWER_DIR, for the equalization
+NO_ADJUST = {'gamma': 1.0, 'equalize': False, 'sharpen': 0.0}
 
 
 def conversions_module():
@@ -372,24 +375,88 @@ def seams(frames, valid):
     return first, second
 
 
-def tile(task, cid, tab, z, x, y, cmap, low, high):
+def tab_kind(tab):
+    """The mosaic (kind) a viewer tab shows"""
+    return {name: kind for name, kind, _band in TABS}[tab]
+
+
+def is_temperature(tab):
+    """Whether a viewer tab shows temperatures (its raster's first band; the source frames are drawn over them)"""
+    return tab == 'source_frame' or any(name == tab and band == 1 for name, _kind, band in TABS)
+
+
+def temperatures(raster, unit):
+    """A mosaic's temperatures, NaN where it has none"""
+    import numpy as np
+    import rasterio
+    with rasterio.open(raster) as src:
+        values = src.read(1).astype(np.float64)
+    values[~np.isfinite(values) | (values <= low_value(unit))] = np.nan
+    return values
+
+
+def histogram(task, cid, tab):
+    """A temperature tab's histogram (colouring.value_histogram of its mosaic), kept beside the viewer's other files"""
+    from . import colouring
+    raster, _band = tab_raster(task, cid, tab)
+    unit = result(task, cid).get('unit') or 'C'
+    return colouring.kept_histogram(raster, lambda p: temperatures(p, unit),
+                                    path(task, cid, VIEWER_DIR, HISTOGRAM_FILE.format(tab_kind(tab))))
+
+
+def shares(task, cid, tab, low, high, adjust):
     """
-    A tile of a viewer tab as PNG bytes: temperatures and view angles over low..high in cmap; the source frames as the
-    temperatures with black and white lines where one frame meets the next; never interpolated (nearest pixel).
+    The palette's share at values evenly across low..high that a viewer tab is drawn with (colouring.curve_shares): its
+    gamma, and with equalize its mosaic's histogram equalization; None when drawn linearly
+    :raises ValueError: equalize asked on a tab of no temperatures
+    """
+    from . import colouring
+    curve = None
+    if adjust['equalize']:
+        if not is_temperature(tab):
+            raise ValueError("Only temperatures can be equalized")
+        curve = colouring.equalization(histogram(task, cid, tab), low, high)
+    elif adjust['gamma'] == 1.0:
+        return None
+    return colouring.curve_shares(low, high, adjust, curve)
+
+
+def tile_pixel_m(z, y):
+    """The ground width of a web mercator tile's pixel at the middle of its row y, in metres"""
+    lat = math.atan(math.sinh(math.pi * (1 - 2 * (y + 0.5) / 2 ** z)))
+    return EARTH_CIRCUMFERENCE_M * math.cos(lat) / (TILE_SIZE * 2 ** z)
+
+
+def png(rgba):
+    """An RGBA image ((h, w, 4) uint8) as PNG bytes"""
+    import numpy as np
+    from rio_tiler.utils import render
+    return render(np.moveaxis(rgba[..., :3], 2, 0), rgba[..., 3], img_format='PNG')
+
+
+def tile(task, cid, tab, z, x, y, cmap, low, high, adjust=None):
+    """
+    A tile of a viewer tab as PNG bytes: temperatures and view angles over low..high in cmap, drawn with the adjustments
+    (colouring); the source frames as the temperatures with black and white lines where one frame meets the next;
+    never interpolated (nearest pixel).
     :return: None when the tile is outside the mosaic
+    :raises ValueError: equalize asked on a tab of no temperatures
     """
     import numpy as np
     from rio_tiler.errors import TileOutsideBounds
     from rio_tiler.io import COGReader
-    from rio_tiler.utils import render
 
     from app.api.tiler import get_zoom_safe
     from app.raster_utils import ZOOM_EXTRA_LEVELS
 
+    from . import colouring
+    adjust = adjust or NO_ADJUST
     raster, band = tab_raster(task, cid, tab)
     framed = tab == 'source_frame'
-    # The source frames read the temperatures too, and a pixel around the tile to find the seams on its edges
-    buffer = 1 if framed else 0
+    tone = shares(task, cid, tab, low, high, adjust)
+    # The source frames read the temperatures too, and a pixel around the tile to find the seams on its edges; the
+    # unsharp mask reads its margin
+    buffer = max(1 if framed else 0, colouring.MARGIN if adjust['sharpen'] > 0 else 0)
     with COGReader(raster) as src:
         if not src.tile_exists(z, x, y):
             return None
@@ -403,29 +470,23 @@ def tile(task, cid, tab, z, x, y, cmap, low, high):
             return None
     data = np.asarray(t.data[0], dtype=np.float64)
     valid = (t.mask > 0) & np.isfinite(data)
+    built = result(task, cid)
     if framed or band == 1:
-        valid &= data > low_value(result(task, cid).get('unit') or 'C')
-    if not framed:
-        return rendered(data, valid, cmap, low, high)
-    levels = np.clip(np.rint((np.where(valid, data, low) - low) / (high - low) * 255), 0, 255).astype(np.uint8)
-    lut = np.array([cmap[i][:3] for i in range(256)], dtype=np.uint8)
-    rgb = lut[levels]
-    frames = np.asarray(t.data[1], dtype=np.float64)
-    first, second = seams(np.rint(np.where(np.isfinite(frames), frames, -1)), valid & np.isfinite(frames))
-    rgb[first], rgb[second] = SEAM_COLORS
-    inner = (slice(buffer, -buffer), slice(buffer, -buffer))
-    rgb, valid = rgb[inner], valid[inner]
-    mask = np.where(valid, 255, 0).astype(np.uint8)
-    return render(np.moveaxis(rgb, 2, 0), mask, img_format='PNG')
+        valid &= data > low_value(built.get('unit') or 'C')
+    gsd = ((built.get('kinds') or {}).get(tab_kind(tab)) or {}).get('gsd_m')
+    rgba = colouring.colour(np.where(valid, data, np.nan), palette_colors(cmap), (low, high), tone, adjust['sharpen'],
+                            sigma=colouring.sharpen_sigma(gsd, tile_pixel_m(z, y)), margin=buffer)
+    if framed:
+        frames = np.asarray(t.data[1], dtype=np.float64)
+        first, second = seams(np.rint(np.where(np.isfinite(frames), frames, -1)), valid & np.isfinite(frames))
+        inner = (slice(buffer, -buffer), slice(buffer, -buffer))
+        rgba[first[inner], :3], rgba[second[inner], :3] = SEAM_COLORS
+    return png(rgba)
 
 
-def rendered(data, valid, cmap, low, high):
-    """Values (where valid) over low..high in cmap, as PNG bytes, transparent elsewhere"""
-    import numpy as np
-    from rio_tiler.utils import render
-    levels = np.clip(np.rint((np.where(valid, data, low) - low) / (high - low) * 255), 0, 255).astype(np.uint8)
-    mask = np.where(valid, 255, 0).astype(np.uint8)
-    return render(levels[np.newaxis], mask, img_format='PNG', colormap=cmap)
+def palette_colors(cmap):
+    """A colour map ({index: (r, g, b, a)}, 256 of them) as colouring takes it (0xRRGGBBAA integers)"""
+    return encoded([cmap[i] for i in range(256)])
 
 
 def point(task, cid, tab, lon, lat):
@@ -576,9 +637,11 @@ def frame_values(task, cid, tab, index):
     return values
 
 
-def frame_image(task, cid, tab, index, cmap, low, high):
-    """A frame as frame_values gives it, over low..high in cmap, as PNG bytes"""
-    import numpy as np
-    values = frame_values(task, cid, tab, index)
-    valid = np.isfinite(values)
-    return rendered(values, valid, cmap, low, high)
+def frame_image(task, cid, tab, index, cmap, low, high, adjust=None):
+    """A frame as frame_values gives it, over low..high in cmap, drawn as the tab's tiles are (its mosaic's curve), as
+    PNG bytes"""
+    from . import colouring
+    adjust = adjust or NO_ADJUST
+    tone = shares(task, cid, tab, low, high, adjust)
+    return png(colouring.colour(frame_values(task, cid, tab, index), palette_colors(cmap), (low, high), tone,
+                                adjust['sharpen']))

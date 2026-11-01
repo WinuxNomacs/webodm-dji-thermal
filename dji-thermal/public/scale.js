@@ -6,11 +6,25 @@
         return "rgb(" + ((c >>> 24) & 255) + "," + ((c >>> 16) & 255) + "," + ((c >>> 8) & 255) + ")";
     }
 
-    // A palette as a CSS gradient, from 16 of its colours
-    function gradientCss(encoded) {
+    // The palette's colour at a share of it, blended between its two nearest entries (from dji-thermal-ui)
+    function paletteCss(encoded, t) {
+        var x = Math.max(0, Math.min(1, t)) * (encoded.length - 1), i = Math.min(Math.floor(x), encoded.length - 2), f = x - i;
+        if (i < 0) return colorCss(encoded[0]);
+        var a = encoded[i] >>> 0, b = encoded[i + 1] >>> 0;
+        var mix = function (shift) { return Math.round(((a >>> shift) & 255) * (1 - f) + ((b >>> shift) & 255) * f); };
+        return "rgb(" + mix(24) + "," + mix(16) + "," + mix(8) + ")";
+    }
+
+    // A palette as a CSS gradient: from 16 of its colours, or, with shares (the palette's share at values evenly across
+    // the range: how the image is drawn), one stop per share
+    function gradientCss(encoded, shares) {
         if (!encoded || !encoded.length) return "";
         var stops = [];
-        for (var i = 0; i < 16; i++) stops.push(colorCss(encoded[Math.round(i * (encoded.length - 1) / 15)]));
+        if (shares && shares.length > 1) {
+            stops = shares.map(function (t) { return paletteCss(encoded, t); });
+        } else {
+            for (var i = 0; i < 16; i++) stops.push(colorCss(encoded[Math.round(i * (encoded.length - 1) / 15)]));
+        }
         return "linear-gradient(to right, " + stops.join(", ") + ")";
     }
 
@@ -32,7 +46,7 @@
         return out;
     }
 
-    var api = {colorCss: colorCss, gradientCss: gradientCss, scaleTicks: scaleTicks};
+    var api = {colorCss: colorCss, paletteCss: paletteCss, gradientCss: gradientCss, scaleTicks: scaleTicks};
     root.ThermalScale = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});
