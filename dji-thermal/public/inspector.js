@@ -11,7 +11,8 @@
 // frames window) beside the panel, on a mosaic and on an orthophoto processed from a workset's TIFFs. Pins, regions
 // and lines can be saved, named, with what they measured, for everyone who can view the project (kept with the task or
 // the workset: measurements.py); and the temperatures corrected for another emissivity and reflected temperature
-// (correction.py's model, from what each layer was measured with), the numbers only: the map's colours stay.
+// (correction.py's model, from what each layer was measured with): a correction changed keeps each layer's colour scale
+// at the temperatures it shows, so the colours change with it.
 (function (root) {
     var API = "/api/plugins/dji-thermal/";
     var HOVER_MS = 80;              // the readout asks for the point the cursor rests on, not every point it crosses
@@ -438,6 +439,12 @@
         var g = gainOffset(fix), w = (Math.pow(celsius + KELVIN, 4) - g.offset) / g.gain;
         return Math.pow(Math.max(w, 0), 0.25) - KELVIN;
     }
+    // A layer's range (its own values, °C) for another correction: the same temperatures shown, null when it can't be
+    function keptRange(range, from, to) {
+        if (!range) return null;
+        var out = range.map(function (c) { return Math.round(uncorrected(corrected(c, from), to) * 1e4) / 1e4; });
+        return isFinite(out[0]) && isFinite(out[1]) && out[1] > out[0] ? out : null;
+    }
     // An isotherm's limits (temperatures as shown, corrected) as a layer's own values, for its tiles
     function rawIsotherm(iso, fix) {
         if (!fix || !validIsotherm(iso)) return iso;
@@ -466,7 +473,7 @@
             (typeof c.reflected === "number" ? roundShown(c.reflected, unit) : "") + '"> <span class="text-muted">°' + unit + "</span></label></div>" +
             (notice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(notice) + "</div>" : "") + measured +
             '<div class="text-muted dt-inspector-hint">Approximate (a broadband model): for comparing surfaces, not calibrated values. ' +
-            "The temperatures shown change; the map's colours don't.</div>";
+            "The colour scale keeps its temperatures, so the colours change; Auto stretches it over the corrected layer again.</div>";
     }
 
     // The legend: the palette's colours (encoded, as the palette API gives them) over the range (°C), its ends marked
@@ -1110,7 +1117,15 @@
                     return render();
                 }
             }
+            var before = thermalLayers(map, true).map(function (t) { return {t: t, fix: fixFor(t)}; });
             state.correction = c;
+            // Each layer corrected otherwise keeps the temperatures its scale shows, so its colours change
+            before.forEach(function (b) {
+                var fix = fixFor(b.t);
+                if (fixKey(fix) === fixKey(b.fix)) return;
+                var range = keptRange(layerRange(b.t) || layerExtent(b.t), b.fix, fix);
+                if (range) setLook(b.t, range, layerAdjust(b.t));
+            });
             correctionChanged();
         }
 
@@ -2210,7 +2225,7 @@
                panelHtml: panelHtml, hasThermal: hasThermal, projectOf: projectOf, linkedMosaic: linkedMosaic, paletteKey: paletteKey,
                mosaicRange: mosaicRange, laidMosaic: laidMosaic, mosaicValuesUrl: mosaicValuesUrl, isothermStyle: isothermStyle, valuesUrl: valuesUrl,
                framesSource: framesSource, fromCelsius: fromCelsius, corrected: corrected, uncorrected: uncorrected,
-               rawIsotherm: rawIsotherm, correctionHtml: correctionHtml, loadCorrection: loadCorrection, correctionKey: correctionKey,
+               rawIsotherm: rawIsotherm, keptRange: keptRange, correctionHtml: correctionHtml, loadCorrection: loadCorrection, correctionKey: correctionKey,
                savedHtml: savedHtml, savedCsv: savedCsv, savedGeoJson: savedGeoJson, formHtml: formHtml, pinsHtml: pinsHtml,
                mosaicsHtml: mosaicsHtml, toCelsius: toCelsius, movable: movable, adjustOf: adjustOf, autoRange: autoRange,
                scaleHtml: scaleHtml, imageHtml: imageHtml, create: create};

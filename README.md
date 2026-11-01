@@ -310,7 +310,8 @@ Inspector:
   another emissivity and reflected temperature than the photos were measured with, from what each layer records: an orthophoto's TIFFs (the values dji-thermal-cli wrote
   in them), a workset mosaic's settings or its frames. It is approximate (a broadband model, the air's transmission
   taken as 1), for comparing surfaces, not calibrated values. The readout, pins, regions, lines, the legend's marks
-  and the isotherm's limits change; the map's colours don't. A layer that doesn't record its values (an orthophoto
+  and the isotherm's limits change, and the colour scale keeps the temperatures it shows, so the map's colours change
+  with the correction (Auto stretches the scale over the corrected layer again). A layer that doesn't record its values (an orthophoto
   not made from the plugin's TIFFs) isn't corrected, and the panel says so. Kept in your browser for the same tasks;
   unticking it forgets the values and closes the fields.
 - **Palette**: the thermal layer's palette, from the same list as the Analyzer's: DJI's palettes (drawn by the

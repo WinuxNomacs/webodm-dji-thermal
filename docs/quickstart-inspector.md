@@ -154,7 +154,9 @@ layer was measured with, and the panel lists what each layer on the map was meas
 
 - the readout, pins, regions and lines show corrected temperatures (the regions are measured again);
 - the legend's marks are corrected temperatures, and the isotherm's limits are too;
-- the map's colours stay as they are.
+- the colour scale keeps the temperatures it shows (say 20 to 40 °C), so the map's colours change with the
+  correction. **Auto** stretches the scale over the corrected layer again, which looks much like it did before: a
+  correction moves every temperature the same way, so a fixed scale is what shows the difference.
 
 The correction is approximate: a broadband model, with the air's transmission taken as 1, as at drone distances.
 It's for comparing surfaces, not for calibrated values; for exact values, make a workset with the measurement

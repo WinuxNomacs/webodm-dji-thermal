@@ -5,6 +5,17 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **bug, the Thermal Inspector's Manual Corrections: Emissivity and Reflected change nothing on the map**
+    (the user, 2026-11-01: "no visible impact on the image. Something's amiss"), `fix-correction-colours`. The
+    correction changed only the numbers shown: a layer's range is kept in its own values, so the scale's labels
+    moved and the colours stayed (dji-thermal-cli and the frame page's Measure again were checked and apply both).
+    Decided (the user): the colour scale **keeps the temperatures it shows**, so the colours change; Auto stretches
+    it over the corrected layer again. `inspector.js` (`keptRange`, `correctionInput` sets each corrected layer's
+    range), its note; README, `quickstart-inspector.md` section 7; screenshot `inspector-saved` retaken.
+    `inspector.test.js` (2). Jest 240, ESLint, Ruff (one earlier Jest run under load had 2 failures, not seen in
+    three runs since). Live on ThermalTest (read only): emissivity 0.6 kept 15–42.8 °C and changed the tiles'
+    pixels, reflected 60 °C again, Auto went to −32.6–26.1 °C with a picture close to the first, unticking kept
+    that scale.
   - Done: **bug, a task's dataset shows as a second task** (the user, 2026-11-01, with a screenshot of Test project on the
     Dashboard): "I clicked "Thermal dataset" on the ThermalTest task here. I then and added images, converted mosaics
     etc... however it seems to have created a new task in my Test Project instead of linking to the existing

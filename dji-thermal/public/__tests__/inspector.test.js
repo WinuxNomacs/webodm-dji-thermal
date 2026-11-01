@@ -523,6 +523,16 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         map.remove();
     });
 
+    it("keeps a range's temperatures as shown when the correction changes, in the layer's own values", () => {
+        const from = {wanted: {emissivity: 0.8, reflected: 21}, baseline: BASELINE}, to = {wanted: {emissivity: 0.6, reflected: 40}, baseline: BASELINE};
+        const kept = inspector.keptRange([10, 40], from, to);
+        kept.forEach((c, i) => expect(inspector.corrected(c, to)).toBeCloseTo(inspector.corrected([10, 40][i], from), 3));
+        // Off again: the layer's own values are the temperatures shown
+        expect(inspector.keptRange(kept, to, null).map(c => Number(c.toFixed(2))))
+            .toEqual([10, 40].map(c => Number(inspector.corrected(c, from).toFixed(2))));
+        expect(inspector.keptRange(null, from, to)).toBe(null);
+    });
+
     it("corrects the temperatures shown from what the layer was measured with, measuring the regions again", async () => {
         const map = leafletMap();
         const {ins, fetchFn, panel, plugins} = start(map, {
@@ -552,6 +562,14 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         const want = model(30, 0.8, 21, 0.91, 21);
         expect(panel().querySelector("[data-pin]").textContent).toContain(want.toFixed(2) + " °C");
         expect(JSON.parse(window.localStorage.getItem(inspector.correctionKey(["abc-1"])))).toEqual({on: true, emissivity: 0.8, reflected: 21});
+        // The colour scale keeps the temperatures it shows, so the layer is drawn over others of its own values
+        expect(panel().querySelector('[data-act="range-min"]').value).toBe("10");
+        expect(panel().querySelector('[data-act="range-max"]').value).toBe("40");
+        const layer = Object.values(map._layers).find(l => l._url && l._url.indexOf("orthophoto/tiles") >= 0);
+        const rescale = /rescale=([^&]+)/.exec(layer._url)[1].split(",").map(Number);
+        const fix = {wanted: {emissivity: 0.8, reflected: 21}, baseline: BASELINE};
+        expect(rescale[0]).toBeCloseTo(inspector.uncorrected(10, fix), 3);
+        expect(rescale[1]).toBeCloseTo(inspector.uncorrected(40, fix), 3);
         change(panel().querySelector('[data-act="correction-emissivity"]'), "1.5");
         expect(panel().textContent).toContain("The emissivity is between 0.1 and 1");
         expect(ins.state.correction.emissivity).toBe(0.8);
