@@ -396,8 +396,8 @@ HomerunObliqueII, and README and docs (`docs/`, screenshots retaken):
    curve, the refusals and the kept histogram), `analyzer.test.js` (the helpers; the page's sliders, Equalized,
    Reset and frame pictures). Django 135 (1 skipped: Windows only), Jest 164, ESLint, Ruff; live on
    HomerunObliqueII: each slider, Equalized and Reset, on Mosaic, Harmonized and View angle, and the frames
-   window. The live check left `histogram-as_converted.json` and `histogram-harmonized.json` in that workset's
-   `viewer/` folder (a cache; the removal was refused by a safety check).
+   window. The live check's `histogram-as_converted.json` and `histogram-harmonized.json` (a cache) were removed
+   from that workset's `viewer/` folder afterwards (2026-11-01), leaving it as found.
 4. **The Isotherm section**: tiles and frame pictures.
    **Done** (2026-11-01, `viewer-isotherm`): `colouring.py` (dji-thermal-ui's `parse_isotherm` and
    `isotherm_range`), `mosaics.tile` and `frame_image` (the isotherm to `colouring.colour`), `analyzer_api.py`
