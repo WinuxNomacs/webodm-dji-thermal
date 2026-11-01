@@ -1,7 +1,7 @@
 {% extends "app/plugins/templates/base.html" %}
 {% block content %}
-<link rel="stylesheet" href="{{ public }}build/Leaflet.css">
-<link rel="stylesheet" href="{{ public }}analyzer.css">
+<link rel="stylesheet" href="{{ public }}build/Leaflet.css?v={{ v }}">
+<link rel="stylesheet" href="{{ public }}analyzer.css?v={{ v }}">
 
 <div id="ta-viewer" class="ta-page ta-viewer" data-api="{{ api }}" data-public="{{ public }}" data-dataset="{{ dataset.id }}" data-id="{{ conversion.id }}">
     {% csrf_token %}
@@ -42,7 +42,7 @@
 
 {{ basemaps|json_script:"ta-basemaps" }}
 {{ display|json_script:"ta-display" }}
-<script src="{{ public }}analyzer_core.js"></script>
-<script src="{{ public }}scale.js"></script>
-<script src="{{ public }}viewer.js"></script>
+<script src="{{ public }}analyzer_core.js?v={{ v }}"></script>
+<script src="{{ public }}scale.js?v={{ v }}"></script>
+<script src="{{ public }}viewer.js?v={{ v }}"></script>
 {% endblock %}

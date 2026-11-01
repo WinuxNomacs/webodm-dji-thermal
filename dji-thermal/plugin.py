@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from app.plugins import Menu, MountPoint, PluginBase, logger, signals
 
 from . import analyzer_api, converter, datasets, inspector_api
-from .analyzer_pages import dataset_page, datasets_page, viewer_page
+from .analyzer_pages import dataset_page, datasets_page, version, viewer_page
 from .api import Describe, TaskConvert
 from .page import sdk_page
 
@@ -47,7 +47,9 @@ class Plugin(PluginBase):
         ]
 
     def include_js_files(self):
-        return ['main.js', 'scale.js', 'regions.js', 'inspector.js']
+        # WebODM only turns these into URLs: versioned like the Analyzer's pages' (analyzer_pages.version)
+        v = version(self.get_path("public"))
+        return [name + "?v=" + v for name in ['main.js', 'scale.js', 'regions.js', 'inspector.js']]
 
     def build_jsx_components(self):
         # Leaflet: WebODM's own, for the mosaic viewer (see thermal/Leaflet.js)

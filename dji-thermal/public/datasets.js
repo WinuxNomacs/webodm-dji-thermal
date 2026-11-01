@@ -203,11 +203,17 @@
                 .then(function (r) {
                     datasets = r.datasets;
                     projects = r.projects;
-                    fillProjects(projects);
-                    render();
+                    // Loaded, but the page failed drawing them: said apart from a failed request, and logged
+                    try {
+                        fillProjects(projects);
+                        render();
+                    } catch (e) {
+                        if (root.console) root.console.error(e);
+                        message.textContent = "Could not show the datasets (" + e.message + "). Reload the page, bypassing the browser's cache (Ctrl+Shift+R).";
+                        return;
+                    }
                     schedule();
-                })
-                .catch(function () { message.textContent = "Could not load the datasets."; });
+                }, function () { message.textContent = "Could not load the datasets."; });
         }
 
         function find(id) { return datasets.filter(function (d) { return String(d.id) === String(id); })[0]; }

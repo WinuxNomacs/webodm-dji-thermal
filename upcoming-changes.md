@@ -5,6 +5,15 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **bug, "Could not load the dataset." after an update** (the user, 2026-10-31), `script-versions`: the
+    browser ran its cached `analyzer_core.js` (without `optionHtml`) with the new `dataset.js`, drawing the page
+    threw, and `load()`'s catch said the request failed. Now `analyzer_pages.version` (a hash of `public/`'s and
+    `public/build/`'s scripts and stylesheets: names, sizes, times) is added as `?v=` to the pages' script and
+    stylesheet URLs, and to `include_js_files` (WebODM only turns those into URLs). The dataset and datasets pages
+    say a page that failed drawing apart from a failed request ("Could not show the dataset (…). Reload the page,
+    bypassing the browser's cache") and log the error. Still unversioned: what WebODM's module loader fetches by
+    name (`build/ThermalTaskButton.*`, `inspector.css`, `build/Leaflet.js`). Jest 161, Django 134 (1 skipped); live: the
+    pages and the Dashboard load with `?v=`, the old `analyzer_core.js` served shows the new message.
   - Done: **The WebODM plan tab, usable without a command line** (the user, 2026-10-31), `plan-presets`. Code:
     `analyzer_core.optionHtml` (the sections), `conversions.optionsFormHtml` / `readOptions` (Create task's
     tickboxes, shared), `dataset.js` (`presetOptions`, `presetHtml`, `readPresetForm`, the panel); docs: the

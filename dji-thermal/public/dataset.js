@@ -745,9 +745,12 @@
                 .then(core.readJson)
                 .then(function (r) {
                     if (!r.ok) return status("Could not load the dataset.", "text-danger");
-                    render(r.data);
-                })
-                .catch(function () { status("Could not load the dataset.", "text-danger"); });
+                    // Loaded, but the page failed drawing it: said apart from a failed request, and logged
+                    try { render(r.data); } catch (e) {
+                        if (root.console) root.console.error(e);
+                        status("Could not show the dataset (" + esc(e.message) + "). Reload the page, bypassing the browser's cache (Ctrl+Shift+R).", "text-danger");
+                    }
+                }, function () { status("Could not load the dataset.", "text-danger"); });
         }
 
         function action(u, failure) {
