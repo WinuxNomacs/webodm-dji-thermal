@@ -264,6 +264,10 @@
   sharpening, Linear/Equalized, an isotherm, and a click keeping the readout with "Follow the cursor". Done
   (2026-11-01), in four steps.
 
+- **Thermal Analyzer, part 2** (the user, 2026-11-01; details under "Up next: Thermal Analyzer, part 2" below):
+  the workset mosaics laid on WebODM's 2D map from the Thermal Inspector (for comparing with any task's layers), the
+  source frames window, measuring tools and saved measurements there, and the frame page. Planned; in five steps.
+
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
   (CHANGELOG, README, the zip rebuilt by `dev/package.sh` on the merge, its new sha256, the `release-check` skill);
@@ -271,7 +275,6 @@
   `directory.json` (details under "Done: Release 1.0.0" below).
 
 **Later**
-- **Thermal Analyzer, part 2** — measurements (spot, line, area), comparisons and frame views (below).
 - **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
   the earlier "Folder conversion" item (below).
 
@@ -319,6 +322,68 @@
   `Registered [coreplugins.dji-thermal.plugin]`. `ignored/WebODM` is at `v3.3.2`, `ignored/WebODM-Docs` and
   `ignored/WebODM-Plugins` on their upstream `main`. Ruff passes; Jest and ESLint have nothing to check until
   `dji-thermal/public/` exists.
+
+## Up next: Thermal Analyzer, part 2
+
+**The request** (the user, 2026-11-01): the phase after the mosaic viewer's image controls; port as much of
+dji-thermal-ui's code as sensible (its `thermal_measure.py`, `frontend/src/measure/`, `frontend/src/frame/`), as the
+last phase did with its colouring.
+
+**Decided** (the user, 2026-11-01):
+- **Built**: the measuring tools, saved measurements, the frame page, and the mosaics as layers on WebODM's own 2D
+  map for comparing (not dji-thermal-ui's Compare page).
+- **The Thermal Inspector is where the work happens** (the user: "It makes sense for this to exist in the Thermal
+  Inspector since that's the view where this work will take place"): the workset mosaics are laid on WebODM's map
+  from the Inspector's panel, never as entries in WebODM's Layers panel (the user: "which is ok"; found in WebODM
+  3.3.2: that list is the map component's React state, with no hook to add to it; the hook passes the component
+  (`mapView`), but filling its state means faking WebODM's internal layer metadata for a task with no orthophoto,
+  undocumented and broken by the next change to `Map.jsx`). What a plugin has: the Leaflet map from
+  `Map.willAddControls` (the Inspector already draws its tiles on it) and `PluginsAPI.Map.sideBySideChanged(layer,
+  side)`, the public function WebODM's Layers panel calls, which puts a layer on the right of WebODM's split
+  control, so a mosaic can be swiped against any task's orthophoto or surface model.
+- **When the Inspector appears**: as now (a task on the map has a thermal orthophoto), and also when the map's
+  project has a workset with mosaics, so they can be laid over an RGB task's orthophoto (the button added, shown
+  once the plugin has answered).
+- **Comparing within the same project**: the mosaics of any workset in any dataset of the map's project.
+- **The source frames window in the Inspector** (the user: "hover/select, drop a pin etc... and a popout with the
+  source frames that viewed the image appears on the right"), as in the mosaic viewer: on workset mosaics, and on
+  WebODM thermal orthophotos made from a workset whose mosaics are built, with that workset's camera models
+  (from GPS and gimbal, not ODM's refined cameras, so the frame pixel can be slightly off there).
+- **Measuring in the Inspector**, on WebODM's thermal orthophotos and the workset mosaics alike (it already has
+  pins and regions); the Analyzer's mosaic viewer page keeps what it has (readout, frames window, Image, Isotherm)
+  and links to the map.
+- **A workset's link to the map opens the project's map** (`/map/project/<id>/`; a holder task has no map), with
+  the Inspector open and that workset's mosaic laid on it.
+- **The frame page is a page of its own**, as dji-thermal-ui's: a frame list beside it, the panel with Image,
+  Isotherm, Measure and the changed parameters; opened from the frames window ("Open this frame", dropped from the
+  last phase, comes back), in the mosaic viewer and the Inspector, and from the Files tab's detail pane (its kept
+  `view.frames` hook), with its own URL.
+- **Saving, renaming and deleting measurements** is for those who can change the project, as with worksets; those
+  who can only view it see the saved measurements and can still measure without saving.
+
+**Design** (Claude's, to check while building):
+1. **Workset mosaics in the Inspector**: `GET projects/<project>/inspector/mosaics` (the project's worksets with
+   mosaics, by dataset, for those who can view it); the panel lists them, a tickbox lays a tab (Mosaic, Harmonized,
+   Source frame, View angle) on the map with the existing mosaic tiles in the Inspector's palette and range,
+   opacity, and "Swipe" (`sideBySideChanged`); hover and pins read the topmost thermal layer, a mosaic or an
+   orthophoto. `main.js` creates the control on every map and shows its button when `hasThermal` or the project
+   has mosaics. The workset's "Open on the map" link. Not on WebODM's public maps (the plugin's API needs a login).
+2. **The source frames window in the Inspector**: `viewer.js`'s frames window shared (moved to a script both
+   load), on a click or a pin; on an ODM orthophoto from the workset its task records (`conversions/<id>/tasks.json`).
+3. **Measuring tools**: dji-thermal-ui's tools (Spot, Line, Area, Box, Circle: `measure.ts`, `drawing.ts`) beside
+   the Inspector's pins and regions, from its `thermal_measure.py` (`check_geometry`, `region_stats`,
+   `profile_points`, `mosaic_measure`): statistics and histogram, where the extremes are, the surroundings and ΔT,
+   the isotherm's share, a line's profile (with each sample's frame on a mosaic); its result panel and charts
+   (`result.tsx`, `charts.tsx`) in plain JavaScript. The Inspector's region endpoint and this share one module.
+4. **Saved measurements**: named, with a comment, kept with what they measure (a workset's
+   `viewer/measurements.json`, a task's `thermal/measurements.json`, replaced atomically), listed in the panel,
+   renamed and deleted, exported as CSV and GeoJSON; the approximate emissivity / reflected-temperature correction
+   (`mosaic_correction`). The Inspector's own pins and regions stay in the browser as now.
+5. **The frame page**: one frame with the Image and Isotherm sections, the tools in its pixels, and measured again
+   exactly by dji-thermal-cli with changed parameters (dji-thermal-ui's `measure_frame`, `parse_changes`).
+
+Open, to check in step 1: the Inspector's palette and range are per thermal layer today; a mosaic laid beside an
+orthophoto takes the same palette, and its own range unless the user links them.
 
 ## Done: The mosaic viewer's image controls
 
