@@ -682,6 +682,21 @@
     only, on the user's workset: no requests while a slider moves, 5 brightness steps drawn in 160 ms, sharpening in
     75 ms; against the server's tiles with the same style, 15 of 35,546 pixels differ by at most 3 levels (6
     sharpened: the 16-bit codes), the source frames' 25 more on the tile's edge (seams found from a margin of 8, not 1).
+  - Done (2026-11-01), all three steps on `recolour-core`; step 3: `inspector.js` draws WebODM's thermal orthophoto
+    layer from value tiles (`watch` replaces its `createTile`, `valuesUrl` from its own tile's URL, `drawStyle`), in
+    every palette; its look stays in the layer's URL, changed with `setUrl(url, true)` and recoloured
+    (`restyleOrthophoto`), WebODM's layer panel's changes recoloured too; the laid mosaics (`mosaicValuesUrl`,
+    `drawnFromValues`) and the isotherm overlays (`isothermStyle`, recolour.js's paint mode) likewise; the legend's
+    and scale's curve from the layer's histogram (`histogramOf`, asked once); the Image sliders apply as they move
+    (no preview), the frames window's picture on release (`sliding`). `recolour.js`: paint mode, canvases Leaflet
+    1.3 drops while loading let go of. `plugin.py` loads `recolour.js` on the map. The server's coloured tiles,
+    isotherms and curves stay in the API (`api.md`), no longer asked for by the pages. README, `quickstart-inspector.md`;
+    screenshots `inspector-image`, `inspector-mosaics` retaken. `inspector.test.js` (updated, 1 new), `recolour.test.js`
+    (1). Jest 224, ESLint, Ruff, Django 170 (1 skipped). Live, read only, on the user's task: WebODM's layer all
+    canvases from 9 value tiles, no coloured tiles asked; no requests while a slider moves (5 brightness steps 159 ms,
+    sharpening 188 ms on 512-pixel tiles); the isotherm painted with no requests; against the plugin's tiles at most
+    7 levels apart on 0.2% of pixels, against WebODM's own magma at most 3; a laid mosaic from values, its tab's
+    values asked on a change, zooming in and out with no errors.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone

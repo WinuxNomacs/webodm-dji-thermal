@@ -57,7 +57,9 @@ the next time you open the same task; to share one, save it (section 6).
 - **Image**: how the layer is drawn, as in the Analyzer's mosaic viewer. **Brightness** and **Contrast** move and
   narrow the range from Auto's; **Gamma** above 1 brightens the cooler part of the range; **Equalized** spreads the
   colours over the temperatures the whole layer has most of; **Sharpening** brings out edges. **Reset** goes back to
-  Auto's range with no adjustments. The temperatures don't change, only the colours.
+  Auto's range with no adjustments. The temperatures don't change, only the colours. The map follows each slider as it
+  moves: your browser colours the layer from its temperatures, so nothing waits on the server. The frames window
+  (section 5) is drawn again once you let go.
 - **Legend on the map**: a colour bar with the palette's range, at the map's top left. Its two ends say the range's
   lowest and highest temperatures, with round values between them. If the image itself goes colder or hotter than
   that range (when it was narrowed in WebODM's layer panel), a line under the bar says how far: "Image: -42.5–56.6

@@ -162,10 +162,12 @@
 
     // A tile ({values, flags, width, height, margin, sigma}) coloured into out (the RGBA of its inner pixels, a canvas's
     // ImageData's data). style: {colors (encoded), range: [low, high], shares (null: linear), sharpen, isotherm: [low,
-    // high] (the values drawn in the palette, the rest in grey) or null, seams: draw the flagged seams}. The blur is kept
-    // on the tile for the same range and sigma.
+    // high] (the values drawn in the palette, the rest in grey) or null, seams: draw the flagged seams}; or, to paint an
+    // isotherm over another layer, {paint: [r, g, b], isotherm: [low, high]}. The blur is kept on the tile for the same
+    // range and sigma.
     function colour(tile, style, out) {
         var w = tile.width, h = tile.height, m = tile.margin || 0, iw = w - 2 * m, ih = h - 2 * m, v = tile.values;
+        if (style.paint) return paint(tile, style.paint, style.isotherm, out);
         var low = style.range[0], high = style.range[1], span = (high - low) || 1;
         var palette = tonedPalette(style.colors, style.shares), grey = style.isotherm ? tonedPalette(style.colors, style.shares, true) : null;
         var blur = null;
@@ -209,6 +211,21 @@
         return out;
     }
 
+    // The values within [low, high] painted in rgb, clear elsewhere (inspector.raster_isotherm)
+    function paint(tile, rgb, limits, out) {
+        var w = tile.width, m = tile.margin || 0, iw = w - 2 * m, ih = tile.height - 2 * m, v = tile.values;
+        for (var y = 0; y < ih; y++) {
+            for (var x = 0; x < iw; x++) {
+                var value = v[(y + m) * w + x + m], o = (y * iw + x) * 4, inside = value >= limits[0] && value <= limits[1];
+                out[o] = inside ? rgb[0] : 0;
+                out[o + 1] = inside ? rgb[1] : 0;
+                out[o + 2] = inside ? rgb[2] : 0;
+                out[o + 3] = inside ? 255 : 0;
+            }
+        }
+        return out;
+    }
+
     // The values of an isotherm as the server takes it ("above,T", "below,T", "between,A,B") drawn in the palette, as
     // colour takes them ([low, high]), or null for none
     function isothermRange(value) {
@@ -229,7 +246,7 @@
         var doc = root.document, canvases = [], frame = null, fetchFn = o.fetchFn || root.fetch.bind(root);
         layer.__dtValues = o;
         var later = function (f) { return root.requestAnimationFrame ? root.requestAnimationFrame(f) : setTimeout(f, 16); };
-        function paint(canvas) {
+        function draw(canvas) {
             var tile = canvas.__dtTile, style = o.style(), ctx = canvas.getContext("2d");
             if (!tile || !style) return ctx.clearRect(0, 0, canvas.width, canvas.height);
             var w = tile.width - 2 * tile.margin, h = tile.height - 2 * tile.margin;
@@ -253,7 +270,7 @@
             canvases.push(canvas);
             fetchValues(o.url(coords), fetchFn, controller && controller.signal).then(function (tile) {
                 canvas.__dtTile = tile;
-                if (tile) paint(canvas);
+                if (tile) draw(canvas);
                 // as Leaflet takes a loaded image (it removes those of another zoom still loading)
                 canvas.complete = true;
                 done(null, canvas);
@@ -263,17 +280,25 @@
             });
             return canvas;
         };
+        function unload(canvas) {
+            if (!canvas.complete && canvas.__dtAbort) canvas.__dtAbort.abort();
+        }
         layer.on("tileunload", function (e) {
             var at = canvases.indexOf(e.tile);
             if (at === -1) return;
             canvases.splice(at, 1);
-            if (!e.tile.complete && e.tile.__dtAbort) e.tile.__dtAbort.abort();
+            unload(e.tile);
         });
         layer.recolour = function () {
             if (frame !== null) return;
             frame = later(function () {
                 frame = null;
-                canvases.forEach(function (c) { if (c.__dtTile) paint(c); });
+                // Leaflet 1.3 takes the tiles of another zoom still loading off the map without unloading them
+                canvases = canvases.filter(function (c) {
+                    if (!c.parentNode) unload(c);
+                    return !!c.parentNode;
+                });
+                canvases.forEach(function (c) { if (c.__dtTile) draw(c); });
             });
         };
         return layer;

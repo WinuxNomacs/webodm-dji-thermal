@@ -101,6 +101,7 @@ describe("a Leaflet layer drawn from value tiles", () => {
             const c = fakeCanvas();
             c.ctx.getImageData = () => ({data: new Uint8ClampedArray([0, 0, 0, 255, 0, 10, 0, 255])});
             c.ctx.drawImage = jest.fn();
+            c.parentNode = document.body;       // on the map
             return c;
         });
         const handlers = {};
@@ -130,6 +131,15 @@ describe("a Leaflet layer drawn from value tiles", () => {
         handlers.tileunload({tile: slow});
         expect(fetchFn.mock.calls[1][1].signal.aborted).toBe(true);
         release();
+        // Taken off the map while loading without being unloaded (Leaflet 1.3, at another zoom): let go of too
+        const dropped = layer.createTile({z: 5, slow: true}, jest.fn());
+        dropped.parentNode = null;
+        jest.useFakeTimers();
+        layer.recolour();
+        jest.runOnlyPendingTimers();
+        jest.useRealTimers();
+        expect(fetchFn.mock.calls[2][1].signal.aborted).toBe(true);
+        expect(canvas.ctx.puts).toBe(3);
         create.mockRestore();
     });
 });
