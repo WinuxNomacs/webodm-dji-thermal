@@ -34,6 +34,7 @@ conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
 mosaics = importlib.import_module("coreplugins.dji-thermal.mosaics")
 colouring = importlib.import_module("coreplugins.dji-thermal.colouring")
 conversion_tasks = importlib.import_module("coreplugins.dji-thermal.conversion_tasks")
+correction = importlib.import_module("coreplugins.dji-thermal.correction")
 
 API = "/api/plugins/dji-thermal/datasets"
 
@@ -814,6 +815,35 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual(self.client.get(isotherm_url, {"low": 30}).status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.client.get(self.url(task, cid, "/view_angle/isotherm/{}/{}/{}.png".format(t.z, t.x, t.y)),
                                          {"low": 5, "color": "e53935"}).status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Measurements saved on the workset's mosaics: measured here, kept with the workset, renamed and deleted by who
+        # can change the project; corrected from what its frames were measured with
+        saved_url = "{}/{}/conversions/{}/measurements".format(API, task.id, cid)
+        saved = self.client.get(saved_url).data
+        self.assertEqual((saved["measurements"], saved["can_change"]), ([], True))
+        base = saved["baseline"]
+        self.assertTrue(0.1 <= base["emissivity"] <= 1 and -50 < base["reflected"] < 100, base)
+        pin = {"name": "Spot", "shape": "pin", "tab": "harmonized", "geometry": {"type": "Point", "coordinates": [lon, lat]}}
+        res = self.client.post(saved_url, pin, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        self.assertAlmostEqual(res.data["values"]["temperature"], p["temperature"], places=3)     # the workset is in °C
+        self.assertEqual(res.data["tab"], "harmonized")
+        hotter = dict(pin, correction={"emissivity": base["emissivity"] / 2, "reflected": base["reflected"]})
+        corrected = self.client.post(saved_url, hotter, format="json").data
+        wanted, baseline = (base["emissivity"] / 2, base["reflected"]), (base["emissivity"], base["reflected"])
+        self.assertAlmostEqual(corrected["values"]["temperature"], correction.value(p["temperature"], wanted, baseline),
+                               places=3)
+        self.assertEqual(corrected["correction"]["baseline"], base)
+        area = self.client.post(saved_url, {"name": "Area", "shape": "rectangle", "tab": "harmonized", "geometry": square},
+                                format="json").data
+        self.assertEqual(area["values"]["statistics"]["count"], st["count"])
+        self.assertEqual(self.client.post(saved_url, dict(pin, tab="view_angle"), format="json").status_code,
+                         status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.patch("{}/{}".format(saved_url, area["id"]), {"name": "Roof"}, format="json").data["name"],
+                         "Roof")
+        self.assertEqual(self.client.delete("{}/{}".format(saved_url, res.data["id"])).status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual([m["name"] for m in self.client.get(saved_url).data["measurements"]], ["Spot", "Roof"])
+        self.assertEqual(other.get(saved_url).status_code, status.HTTP_404_NOT_FOUND)
 
         download = "{}/{}/conversions/{}/download".format(API, task.id, cid)
         name = v["kinds"]["harmonized"]["files"][0]

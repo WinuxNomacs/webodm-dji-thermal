@@ -25,6 +25,7 @@ from app.tests.classes import BootTestCase
 inspector = importlib.import_module("coreplugins.dji-thermal.inspector")
 converter = importlib.import_module("coreplugins.dji-thermal.converter")
 conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
+correction = importlib.import_module("coreplugins.dji-thermal.correction")
 
 WIDTH, HEIGHT, PIXEL = 100, 80, 0.5
 ORIGIN = (400000.0, 4660000.0)     # UTM 16N, near Chicago
@@ -42,6 +43,21 @@ def lonlat(col, row):
     x, y = ORIGIN[0] + (col + 0.5) * PIXEL, ORIGIN[1] - (row + 0.5) * PIXEL
     lons, lats = transform('EPSG:32616', 'EPSG:4326', [x], [y])
     return lons[0], lats[0]
+
+
+def xmp_tiff(path, emissivity, reflected):
+    """A file holding what dji-thermal-cli records in a TIFF's XMP about how it was measured (no image)"""
+    with open(path, 'wb') as f:
+        f.write(b'II*\x00<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:Description xmlns:dtc="urn:dji-thermal-cli:xmp:1.0" '
+                b'dtc:Emissivity="%g" dtc:ReflectedTemperatureC="%g"/></x:xmpmeta>' % (emissivity, reflected))
+
+
+def corrected(celsius, wanted, baseline):
+    """The broadband model, written out: the radiance seen with the baseline, solved for the wanted parameters"""
+    k = 273.15
+    (e, r), (e0, r0) = wanted, baseline
+    seen = e0 * (celsius + k) ** 4 + (1 - e0) * (r0 + k) ** 4
+    return ((seen - (1 - e) * (r + k) ** 4) / e) ** 0.25 - k
 
 
 def square(col0, row0, col1, row1):
@@ -200,6 +216,95 @@ class TestInspector(BootTestCase):
         for wrong in ({'low': 30, 'high': 20}, {'low': 'warm'}, "above"):
             self.assertEqual(self.region(square(20, 10, 29, 19), isotherm=wrong).status_code,
                              status.HTTP_400_BAD_REQUEST, wrong)
+
+    def test_a_correction_solves_the_broadband_model_for_another_emissivity_and_reflected_temperature(self):
+        base = (0.91, 21.0)
+        self.assertEqual(correction.value(30.0, base, base), 30.0)
+        for wanted in ((0.95, 21.0), (0.7, 5.0), (1.0, 40.0)):
+            self.assertAlmostEqual(correction.value(30.0, wanted, base), corrected(30.0, wanted, base), places=6)
+        # A lower emissivity: the surface gave off more than it seemed, so it is hotter (above the reflected)
+        self.assertGreater(correction.value(30.0, (0.7, 21.0), base), 30.0)
+        values = correction.apply(np.array([10.0, np.nan, 50.0]), (0.8, 10.0), base)
+        self.assertTrue(np.isnan(values[1]))
+        self.assertAlmostEqual(values[2], corrected(50.0, (0.8, 10.0), base), places=6)
+        for wrong in ({'emissivity': 0.05, 'reflected': 20}, {'emissivity': 0.9, 'reflected': -200},
+                      {'emissivity': 0.9}, {'emissivity': True, 'reflected': 20}, "0.9,20"):
+            with self.assertRaises(ValueError, msg=wrong):
+                correction.parse(wrong)
+
+    def test_an_orthophotos_baseline_is_the_median_of_what_its_tiffs_record(self):
+        self.assertIsNone(correction.task_baseline(self.task))
+        for i, (e, r) in enumerate(((0.91, 21.0), (0.95, 19.0), (0.91, 25.0))):
+            xmp_tiff(os.path.join(self.task.task_path(), "DJI_000{}_T_temp_c.tiff".format(i)), e, r)
+        self.assertEqual(correction.task_baseline(self.task), (0.91, 21.0))
+
+    def test_a_corrected_region_has_the_statistics_of_its_corrected_temperatures(self):
+        wanted = {'emissivity': 0.8, 'reflected': 10.0}
+        res = self.region(square(20, 10, 29, 19), correction=wanted)
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)     # its TIFFs don't say how it was measured
+        xmp_tiff(os.path.join(self.task.task_path(), "DJI_0001_T_temp_c.tiff"), 0.91, 21.0)
+        expected = corrected(temperatures()[10:20, 20:30].astype(np.float64), (0.8, 10.0), (0.91, 21.0))
+        low = float(np.median(expected))
+        res = self.region(square(20, 10, 29, 19), correction=wanted, isotherm={'low': low, 'high': None})
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        st = res.data['statistics']
+        self.assertAlmostEqual(st['mean'], float(expected.mean()), places=4)
+        self.assertAlmostEqual(st['max'], float(expected.max()), places=4)
+        self.assertAlmostEqual(st['isotherm_share'], float((expected >= low).mean()))
+        self.assertEqual(res.data['correction'], {'emissivity': 0.8, 'reflected': 10.0,
+                                                  'baseline': {'emissivity': 0.91, 'reflected': 21.0}})
+        self.assertIsNone(self.region(square(20, 10, 29, 19)).data['correction'])
+
+    def test_measurements_are_saved_with_the_task_measured_here_renamed_and_deleted(self):
+        url = self.url(self.task, "measurements")
+        self.assertEqual(self.client.get(url).data, {'measurements': [], 'can_change': True, 'baseline': None})
+        pin = {'name': "Vent", 'comment': "Warm air", 'shape': 'pin',
+               'geometry': {'type': 'Point', 'coordinates': list(lonlat(50, 40))}}
+        res = self.client.post(url, pin, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        self.assertAlmostEqual(res.data['values']['temperature'], 60.0, places=4)
+        self.assertEqual((res.data['name'], res.data['comment'], res.data['created_by']), ("Vent", "Warm air", "testuser"))
+        area = {'name': "Roof", 'shape': 'circle', 'geometry': square(20, 10, 29, 19), 'circle': {'lat': 1, 'lng': 2, 'radius': 3},
+                'isotherm': {'low': 25, 'high': None}}
+        saved = self.client.post(url, area, format="json").data
+        self.assertEqual(saved['values']['statistics']['count'], 100)
+        self.assertEqual((saved['circle'], saved['isotherm']), ({'lat': 1, 'lng': 2, 'radius': 3}, {'low': 25, 'high': None}))
+        for wrong in (dict(pin, name=" "), dict(pin, shape='star'), dict(pin, geometry=square(1, 1, 2, 2)),
+                      dict(area, geometry={'type': 'Point', 'coordinates': [0, 0]}), dict(pin, comment=7),
+                      dict(pin, correction={'emissivity': 0.9, 'reflected': 20})):
+            self.assertEqual(self.client.post(url, wrong, format="json").status_code, status.HTTP_400_BAD_REQUEST, wrong)
+        one = "{}/{}".format(url, res.data['id'])
+        self.assertEqual(self.client.patch(one, {'name': "Chimney", 'comment': ""}, format="json").data['name'], "Chimney")
+        self.assertEqual(self.client.patch(one, {}, format="json").status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.patch(url + "/0123456789ab", {'name': "x"}, format="json").status_code,
+                         status.HTTP_404_NOT_FOUND)
+        listed = self.client.get(url).data['measurements']
+        self.assertEqual([(m['name'], m['comment']) for m in listed], [("Chimney", ""), ("Roof", "")])
+        with open(os.path.join(self.task.task_path(), "thermal", "measurements.json")) as f:
+            self.assertEqual(listed, json.load(f))
+        self.assertEqual(self.client.delete(one).status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(self.client.delete(one).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual([m['name'] for m in self.client.get(url).data['measurements']], ["Roof"])
+        # Saved with a correction: the corrected temperature, and the one measured
+        xmp_tiff(os.path.join(self.task.task_path(), "DJI_0001_T_temp_c.tiff"), 0.91, 21.0)
+        fixed = self.client.post(url, dict(pin, correction={'emissivity': 0.8, 'reflected': 10}), format="json").data
+        self.assertAlmostEqual(fixed['values']['measured'], 60.0, places=4)
+        self.assertAlmostEqual(fixed['values']['temperature'], corrected(60.0, (0.8, 10.0), (0.91, 21.0)), places=4)
+
+    def test_who_can_only_view_the_project_sees_the_saved_measurements_but_cant_change_them(self):
+        url = self.url(self.task, "measurements")
+        mid = self.client.post(url, {'name': "Vent", 'shape': 'pin', 'geometry': {'type': 'Point', 'coordinates': list(lonlat(50, 40))}},
+                               format="json").data['id']
+        self.task.public = True
+        self.task.save()
+        other = APIClient()
+        other.login(username="testuser2", password="test1234")
+        self.assertEqual(other.get(url).data['can_change'], False)
+        self.assertEqual(len(other.get(url).data['measurements']), 1)
+        self.assertEqual(other.post(url, {'name': "Mine", 'shape': 'pin'}, format="json").status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(other.patch("{}/{}".format(url, mid), {'name': "Mine"}, format="json").status_code,
+                         status.HTTP_403_FORBIDDEN)
+        self.assertEqual(other.delete("{}/{}".format(url, mid)).status_code, status.HTTP_403_FORBIDDEN)
 
     def tile(self, col, row, zoom=18, task=None, what="tiles", **params):
         """The map tile holding a pixel's centre (of the thermal layer, or what), and where that centre is in it (x, y)"""

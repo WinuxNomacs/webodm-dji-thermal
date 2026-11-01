@@ -7,6 +7,8 @@ workset's mosaics laid on the map read them alike (raster_region, raster_isother
 import json
 import math
 
+from . import correction as correcting
+
 THERMAL_BAND = 'lwir'
 REGION_MAX_SIZE = 4096        # pixels along the longer side; a larger region is read downsampled
 PERCENTILES = (2, 98)
@@ -85,20 +87,21 @@ def point(task, lon, lat):
     return out
 
 
-def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS, isotherm=None):
+def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS, isotherm=None, correction=None):
     """
     The statistics of the temperatures inside a polygon or along a line (GeoJSON geometry, lon/lat), within the task's
     crop: {valid, reason, statistics: {count, min, max, mean, std, median, percentiles, histogram, min_location,
-    max_location, surroundings, delta_t[, isotherm_share]}, pixel_size (m), resampled[, length, profile]}. Pixels the
+    max_location, surroundings, delta_t[, isotherm_share]}, pixel_size (m), resampled, correction[, length,
+    profile]}. Pixels the
     outline touches are included; read at the orthophoto's resolution up to REGION_MAX_SIZE pixels a side.
     :raises ValueError: not a polygon or a line
     """
     return raster_region(thermal_orthophoto(task), geometry, _crop(task), percentiles=percentiles, bins=bins,
-                         isotherm=isotherm)
+                         isotherm=isotherm, correction=correction)
 
 
 def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILES, bins=HISTOGRAM_BINS, isotherm=None,
-                  frames=None):
+                  frames=None, correction=None):
     """
     region of a raster's first band, within crop (a GEOS geometry) when given; with unit (a mosaic's), its no-data
     marker left out and the statistics in °C. A line measures a strip LINE_HALF_WIDTH either side of it, and adds its
@@ -106,7 +109,8 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
     ((raster, band, names): a mosaic's source frame band) the name of the frame each sample came from. The surroundings
     are the mean of a ring around a polygon (from its outline out to its size, RING_MIN to RING_MAX m) or of a band
     RING_MIN m beside a line's strip, and delta_t the mean's difference with them; isotherm ((low, high), °C, either
-    None) adds the share of the pixels in it.
+    None) adds the share of the pixels in it. With correction ((wanted, baseline): see correction.py) the temperatures
+    are corrected before anything is found of them (the isotherm's limits are corrected temperatures too).
     :raises ValueError: not a polygon or a line
     """
     import numpy as np
@@ -125,7 +129,8 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
         raise ValueError("A line needs two points")
     if not line and not shape.valid:
         shape = shape.buffer(0)
-    out = {'valid': False, 'reason': None, 'statistics': None, 'pixel_size': None, 'resampled': False}
+    out = {'valid': False, 'reason': None, 'statistics': None, 'pixel_size': None, 'resampled': False,
+           'correction': correcting.described(*correction) if correction else None}
     if line:
         measured = {'type': 'LineString', 'coordinates': [list(c) for c in shape.coords]}
         if crop is not None and not shape.intersects(crop):
@@ -185,6 +190,8 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
     if unit is not None:
         usable &= _measured(data, unit)
         data = to_celsius(data, unit)
+    if correction:
+        data = correcting.apply(data, *correction)
     keep = within & usable
     values = data[keep]
     if line:
