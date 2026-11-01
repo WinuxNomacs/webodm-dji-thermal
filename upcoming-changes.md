@@ -262,7 +262,7 @@
   "How much of this can be built into the mosaic/harmonized/source frame viewers?"; details under "Up next: The
   mosaic viewer's image controls" below): the frame pixel under the cursor, brightness, contrast, gamma,
   sharpening, Linear/Equalized, an isotherm, and a click keeping the readout with "Follow the cursor". In four steps;
-  steps 1 and 2 done.
+  steps 1 to 3 done.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -382,6 +382,22 @@ HomerunObliqueII, and README and docs (`docs/`, screenshots retaken):
    the button and Esc let go.
 3. **The Image section**: brightness, contrast, gamma, sharpening, Linear/Equalized, Reset; tiles, frame pictures
    and the colour bar.
+   **Done** (2026-11-01, `viewer-image`): `colouring.py` (dji-thermal-ui's `colouring.py` and the colours of its
+   `thermal_measure.py`: `colour` with a `margin` instead of `rows`, no source-frame colours; `parse_adjust`,
+   `value_histogram`, `equalization`, `tone`, `curve_shares`, `kept_histogram` keyed on the file, not the read
+   function); `mosaics.py` (`tile` and `frame_image` drawn by it, `shares`, `histogram` kept as
+   `viewer/histogram-<kind>.json`, `tile_pixel_m` for the unsharp mask's sigma, `is_temperature` counting Source
+   frame); `analyzer_api.py` (`mosaic_style` with the adjustments, `MosaicCurve`: `mosaics/<tab>/curve`);
+   `viewer.js` (from `view.ts`: `slidRange`, `sliderPositions`, `SLIDERS`, `sliderGamma`, `toneShares`,
+   `adjustQuery`; `imageHtml` from `panel.tsx`), `scale.js` (`paletteCss`, `gradientCss` along shares),
+   `analyzer.css`; README, `docs/quickstart-worksets.md`, `docs/api.md`, screenshots `mosaic-viewer` and
+   `mosaic-frames` retaken. The frames window's pictures use their mosaic's curve, so they match the colour bar.
+   Tests (agreed): `test_analyzer.py` (the drawing without images; in the mosaic test the adjusted tiles, the
+   curve, the refusals and the kept histogram), `analyzer.test.js` (the helpers; the page's sliders, Equalized,
+   Reset and frame pictures). Django 135 (1 skipped: Windows only), Jest 164, ESLint, Ruff; live on
+   HomerunObliqueII: each slider, Equalized and Reset, on Mosaic, Harmonized and View angle, and the frames
+   window. The live check left `histogram-as_converted.json` and `histogram-harmonized.json` in that workset's
+   `viewer/` folder (a cache; the removal was refused by a safety check).
 4. **The Isotherm section**: tiles and frame pictures.
 
 ## Evaluation: porting the existing DJI thermal plugin (2026-10-29)
