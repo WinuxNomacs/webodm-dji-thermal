@@ -28,7 +28,11 @@ function fakeApi(answers = {}){
         }),
         uploadFiles: jest.fn(() => Promise.resolve({})),
         commit: jest.fn(() => Promise.resolve({id: "t1", partial: false})),
-        removeTask: jest.fn(() => Promise.resolve())
+        removeTask: jest.fn(() => Promise.resolve()),
+        taskDataset: jest.fn(() => Promise.resolve({id: "d1"})),
+        uploadToDataset: jest.fn(() => Promise.resolve({})),
+        analyzeDataset: jest.fn(() => Promise.resolve({})),
+        removeDataset: jest.fn(() => Promise.resolve())
     };
     return api;
 }
@@ -110,5 +114,48 @@ describe("a thermal task's upload", () => {
         await expect(upload(api, [photo("DJI_0001_T.JPG")]).start()).rejects.toThrow("Cannot reach the server");
         expect(api.convert).not.toHaveBeenCalled();
         expect(api.removeTask).not.toHaveBeenCalled();
+    });
+
+    test("without keeping the photos, no dataset is made", async () => {
+        const api = fakeApi();
+        const result = await upload(api, [photo("DJI_0001_T.JPG")], {otherPhotos: [photo("DJI_0001_V.JPG")]}).start();
+        expect(api.taskDataset).not.toHaveBeenCalled();
+        expect(api.uploadToDataset).not.toHaveBeenCalled();
+        expect(result.dataset).toBeNull();
+    });
+
+    test("keeping the photos links a dataset first, keeps each photo with its conversion, uploads the others, then analyzes it", async () => {
+        const api = fakeApi();
+        const others = [photo("DJI_0001_V.JPG"), photo("notes.pdf")]
+            .concat(Array.from({length: 11}, (_, i) => photo("DJI_01" + String(i).padStart(2, "0") + "_V.JPG")));
+        const result = await upload(api, [photo("DJI_0001_T.JPG"), photo("DJI_0002_T.JPG")],
+                                    {keepPhotos: true, otherPhotos: others}).start();
+
+        expect(api.taskDataset).toHaveBeenCalledWith(7, "t1");
+        expect(api.convert.mock.calls.map(c => c[3])).toEqual([{unit: "C", distance: "lrf", dataset: "d1"},
+                                                               {unit: "C", distance: "lrf", dataset: "d1"}]);
+        const batches = api.uploadToDataset.mock.calls;
+        expect(batches.map(c => c[0])).toEqual(["d1", "d1"]);
+        expect(batches.map(c => c[1].length)).toEqual([10, 2]);     // the 12 JPEGs, not the PDF
+        expect(api.commit.mock.invocationCallOrder[0]).toBeGreaterThan(api.uploadToDataset.mock.invocationCallOrder[1]);
+        expect(api.analyzeDataset).toHaveBeenCalledWith("d1");
+        expect(result).toMatchObject({dataset: "d1", analysisError: ""});
+    });
+
+    test("a dataset whose analysis could not start is kept with the task, and says why", async () => {
+        const api = fakeApi();
+        api.analyzeDataset = jest.fn(() => Promise.reject(new Error("Over quota")));
+        const result = await upload(api, [photo("DJI_0001_T.JPG")], {keepPhotos: true}).start();
+        expect(result).toMatchObject({dataset: "d1", analysisError: "Over quota"});
+        expect(api.removeDataset).not.toHaveBeenCalled();
+        expect(api.removeTask).not.toHaveBeenCalled();
+    });
+
+    test("a failed upload removes the dataset with the task", async () => {
+        const api = fakeApi({"DJI_0001_T.JPG": {status: "ignored", reason: "not a DJI thermal image"}});
+        await expect(upload(api, [photo("DJI_0001_T.JPG")], {keepPhotos: true}).start()).rejects.toThrow(NO_IMAGES);
+        expect(api.removeDataset).toHaveBeenCalledWith("d1");
+        expect(api.removeTask).toHaveBeenCalledWith(7, "t1");
+        expect(api.commit).not.toHaveBeenCalled();
     });
 });

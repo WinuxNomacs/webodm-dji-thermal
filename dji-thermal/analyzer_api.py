@@ -272,6 +272,7 @@ class DatasetAnalyze(DatasetView):
             raise ValidationError({'error': "The dataset is already being analyzed"})
         if not datasets.image_files(task):
             raise ValidationError({'error': "Add images to the dataset first"})
+        datasets.update_size(task)      # images kept by DJI Thermal Task's conversions (api.keep_in_dataset) uncounted
         datasets.start_analysis(task)
         return Response(detail(task, request.user))
 

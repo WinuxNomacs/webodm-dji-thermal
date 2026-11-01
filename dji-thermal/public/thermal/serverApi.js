@@ -48,5 +48,14 @@ export default {
 
     commit: (projectId, taskId) => request({url: `${tasksUrl(projectId)}${taskId}/commit/`, type: "POST", dataType: "json"}),
 
-    removeTask: (projectId, taskId) => request({url: `${tasksUrl(projectId)}${taskId}/remove/`, type: "POST"})
+    removeTask: (projectId, taskId) => request({url: `${tasksUrl(projectId)}${taskId}/remove/`, type: "POST"}),
+
+    taskDataset: (projectId, taskId) =>
+        request({url: `${PLUGIN_API}/projects/${projectId}/tasks/${taskId}/dataset`, type: "POST", dataType: "json"}),
+
+    uploadToDataset: (datasetId, files) => postForm(`${PLUGIN_API}/datasets/${datasetId}/upload`, {}, files),
+
+    analyzeDataset: datasetId => request({url: `${PLUGIN_API}/datasets/${datasetId}/analyze`, type: "POST", dataType: "json"}),
+
+    removeDataset: datasetId => request({url: `${PLUGIN_API}/datasets/${datasetId}`, type: "DELETE"})
 };

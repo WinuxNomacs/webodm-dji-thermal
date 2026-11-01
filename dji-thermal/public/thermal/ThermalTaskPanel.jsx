@@ -16,7 +16,8 @@ function readExif(file){
 }
 
 // The panel of a new thermal task, for the files picked with the DJI Thermal Task button: the Measurement section,
-// then WebODM's own task panel (name, processing node, options, the photos on the map; no resizing).
+// whether to keep the photos in a DJI Thermal Analyzer dataset too, then WebODM's own task panel (name, processing
+// node, options, the photos on the map; no resizing).
 export default class ThermalTaskPanel extends React.Component {
     static propTypes = {
         projectId: PropTypes.number.isRequired,
@@ -40,6 +41,7 @@ export default class ThermalTaskPanel extends React.Component {
             values: {distanceMode: "lrf"},
             unit: defaultUnit(unitSystem()),
             errors: {},
+            keepPhotos: false,
             error: "",
             progress: null
         };
@@ -135,7 +137,9 @@ export default class ThermalTaskPanel extends React.Component {
             textFiles: this.props.files.textFiles,
             measurement: requestData(this.state.values, this.state.unit),
             api: this.props.api,
-            onProgress: progress => this.update({progress})
+            onProgress: progress => this.update({progress}),
+            keepPhotos: this.state.keepPhotos,
+            otherPhotos: this.otherPhotos()
         });
         this.setState({phase: "uploading", error: "", progress: {done: 0, total: this.state.photos.length, converted: [], ignored: [], failed: []}});
         this.upload.start().then(result => {
@@ -154,6 +158,12 @@ export default class ThermalTaskPanel extends React.Component {
         });
     };
 
+    // The photos picked that are not converted: the RGB ones, and those of a camera the plugin cannot convert
+    otherPhotos(){
+        const kept = new Set(this.state.photos);
+        return this.props.files.photos.filter(p => !kept.has(p)).concat(this.props.files.ignored);
+    }
+
     // NewTaskPanel shows "Loading…" once saved: back to its form, to correct the values or try again
     resetNewTaskPanel(){
         if (this.newTaskPanel && !this.unmounted) this.newTaskPanel.setState({loading: false, inReview: false});
@@ -168,7 +178,8 @@ export default class ThermalTaskPanel extends React.Component {
         const others = this.props.files.ignored.length;
         let text = interpolate(_("%(count)s thermal photos."), {count: photos.length});
         if (unsupported.length) text += " " + interpolate(_("%(count)s photos of a camera this plugin cannot convert are left out."), {count: unsupported.length});
-        if (others) text += " " + interpolate(_("%(count)s other files (RGB photos, ...) are ignored."), {count: others});
+        if (others) text += " " + interpolate(this.state.keepPhotos ? _("%(count)s other files (RGB photos, ...) go only in the dataset.") :
+                                              _("%(count)s other files (RGB photos, ...) are ignored."), {count: others});
         return <p>{text} <span className="text-muted">{_("To check the flight first or compare settings, use the")}{" "}
             <a href="/plugins/dji-thermal/">{_("DJI Thermal Analyzer")}</a>.</span></p>;
     }
@@ -216,6 +227,14 @@ export default class ThermalTaskPanel extends React.Component {
                             {this.renderSummary()}
                             <MeasurementSettings combined={combined} values={this.state.values} unit={this.state.unit}
                                 errors={this.state.errors} onChange={this.handleValuesChange} onUnitChange={this.handleUnitChange} />
+                            <div className="checkbox">
+                                <label>
+                                    <input type="checkbox" name="keepPhotos" checked={this.state.keepPhotos}
+                                           onChange={e => this.setState({keepPhotos: e.target.checked})} />
+                                    {" "}{_("Also keep the photos in a DJI Thermal Analyzer dataset")}
+                                </label>
+                                <span className="help-block">{_("A dataset named after the task, in this project, with every photo picked (the RGB ones too): to check the flight or try other conversion settings. The photos are sent once.")}</span>
+                            </div>
                         </div>
                         <NewTaskPanel
                             ref={p => { this.newTaskPanel = p; }}

@@ -62,6 +62,9 @@ export default class ThermalTaskButton extends React.Component {
             <div className={"alert alert-dismissible " + (r.failed.length ? "alert-warning" : "alert-info")}>
                 <button type="button" className="close" title={_("Close")} onClick={() => this.setState({result: null})}><span aria-hidden="true">&times;</span></button>
                 {interpolate(_("Thermal task created with %(count)s images."), {count: r.converted.length})}
+                {r.dataset ? <React.Fragment>{" "}{_("Its photos are in a")}{" "}
+                    <a href={"/plugins/dji-thermal/dataset/" + r.dataset}>{_("DJI Thermal Analyzer dataset")}</a>
+                    {r.analysisError ? ", " + interpolate(_("not analyzed yet: %(error)s"), {error: r.analysisError}) : ""}.</React.Fragment> : ""}
                 {r.failed.length ? " " + interpolate(_("%(count)s photos could not be converted:"), {count: r.failed.length}) : ""}
                 {problems.length ?
                     <ul>{problems.slice(0, 20).map(p => <li key={p.name}>{p.name}: {p.reason}</li>)}

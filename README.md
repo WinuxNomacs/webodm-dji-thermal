@@ -58,6 +58,9 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
      recorded (usually 5 m, whatever the flight height). Or the recorded distance, or one distance for all photos.
      With the rangefinder's distance, the temperatures differ slightly from DJI's own apps, which use the recorded
      one.
+   - **Also keep the photos in a DJI Thermal Analyzer dataset**: the task is linked to a new dataset, named after it
+     in the same project, that gets every photo picked (the RGB ones too) as they are uploaded, so they are sent
+     once, and is analyzed once the task is made. The message under the project then links to it.
 3. Below it, WebODM's own task panel: name, processing node, options and the photos on the map. Images are not
    resized: the thermal frames keep their size. **Review**, then **Start Processing**.
 4. Each photo is converted as it is uploaded, a few at a time. A photo that fails is left out with its reason;
@@ -67,8 +70,9 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
 The task's name is suggested from the first photo's date. WebODM's own upload also looks the place up on
 OpenStreetMap's Nominatim; the DJI Thermal Task does not, as the plugin calls no outside service.
 
-The DJI Thermal Task keeps only the converted images, not the photos. To look at the photos in the DJI Thermal
-Analyzer, press **Create thermal dataset** in the task's expanded panel on the dashboard: it makes a dataset for the
+The DJI Thermal Task keeps only the converted images, not the photos, unless you ticked **Also keep the photos in a
+DJI Thermal Analyzer dataset**. To look at a task's photos in the Analyzer afterwards, press **Create thermal
+dataset** in the task's expanded panel on the dashboard: it makes a dataset for the
 task, in its project and named after it, and opens it, to add the flight's photos (**Add images**). The panel then has
 a **Thermal dataset** button, back to it. Deleting the dataset leaves the task as it was.
 
