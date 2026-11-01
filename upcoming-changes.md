@@ -316,6 +316,44 @@
       section 3; screenshots retaken: `inspector`, `inspector-line`, `inspector-saved`, `inspector-frames`,
       `inspector-mosaics`, `mosaic-viewer`, `mosaic-frames`.
 
+- **The colour scale and the Image section in the Thermal Inspector** (the user, 2026-11-01, with a screenshot of
+  the mosaic viewer's panel):
+  - The request: "Let's move the color palette into the Thermal Inspector control along with copying the Image
+    section and functionality we use in the mosaics viewer." The screenshot shows the Analyzer's mosaic viewer
+    panel: Palette, the colour scale, the range boxes ("49.2 to 125.4 °F", Auto), "This mosaic: -49.2 to 133.6 °F",
+    and the Image section (Brightness, Contrast, Gamma, Sharpening, Linear/Equalized, Reset).
+  - What it builds on:
+    - The Inspector panel has Palette (applied to every thermal layer) and the "Legend on the map" tickbox. The
+      range is read from the layer: an orthophoto's `rescale`, set in WebODM's own layer panel; a mosaic's,
+      `mosaicRange` (its 2nd to 98th percentile).
+    - The mosaic viewer (`viewer.js`): `controlsHtml`/`imageHtml`, `slidRange` and `sliderPositions` (brightness
+      and contrast move and narrow the range around Auto), `SLIDERS`, `adjustQuery`. Its tiles and frame pictures
+      are drawn by the server with `gamma`, `equalize=1` and `sharpen` (`colouring.parse_adjust`, `colour`,
+      `mosaics` equalization from the mosaic's histogram, `tile_buffer` margins for sharpening).
+    - The orthophoto: drawn by WebODM's tiler (a colour map and `rescale` only), or by the plugin's
+      `inspector/tiles` for DJI's palettes (`inspector.tile`: a colour table over low..high, no adjustments).
+  - Decided (the user, 2026-11-01):
+    - **The panel gets the scale and range**, under Palette: the colour scale (as the legend's), the range boxes in
+      the user's unit, Auto, and the layer's own lowest and highest temperatures. **The map's legend stays**, with
+      its tickbox.
+    - **They act on the topmost thermal layer shown** (the one the legend reads); **each layer keeps its own** range
+      and adjustments.
+    - **Nothing is remembered**, as the mosaic viewer: each visit starts from the layer's own range and no
+      adjustments.
+    - **The range stays in step with WebODM's layer panel** both ways, as the palette does.
+  - Proposed build, one step (`inspector-image`):
+    - Server: `inspector/tiles` draws the orthophoto in any palette (DJI's, or WebODM's colour maps by their
+      encoded colours) with `gamma`, `equalize=1` and `sharpen` through `colouring.colour`, sharpening with a
+      margin; the equalization from the orthophoto's histogram, worked out once and kept in the task's `thermal/`
+      folder (by the orthophoto's time). An unadjusted orthophoto in one of WebODM's colour maps stays on WebODM's
+      tiles, so WebODM's layer panel keeps working as now.
+    - Browser: the panel's scale, range boxes and Auto (an orthophoto's Auto from the 2nd and 98th percentiles in
+      WebODM's tile metadata), and the Image section from `viewer.js`, shared rather than copied. A mosaic's
+      adjustments go in its tile and frame URLs; an orthophoto's, in the plugin's tile URL. The frames window's
+      pictures are drawn with the layer's adjustments.
+    - Tests (Django: the tile with each adjustment, the histogram kept; Jest: the panel, ranges in step with
+      WebODM's URL, per-layer state), live check, README, quickstart section 3, screenshots.
+
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
   (CHANGELOG, README, the zip rebuilt by `dev/package.sh` on the merge, its new sha256, the `release-check` skill);
