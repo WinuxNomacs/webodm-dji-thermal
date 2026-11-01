@@ -22,6 +22,11 @@ processing never reads) and what the task processed from them, and it waits for 
 from a conversion does. One task is processed again and again, rather than a new one for each conversion:
 
     thermal/parent.json                   {conversion, sent_at, sent_by}: what the dataset's task holds
+
+A task's thermal orthophoto opens on WebODM's map in its palette, one of DJI's (the Thermal Inspector's, for a user
+whose own preference is each image's palette): chosen in DJI Thermal Task, or the workset's it was made from.
+
+    thermal/task.json                     {palette}
 """
 
 import os
@@ -44,6 +49,29 @@ TIFF_SUFFIX = '_temp_c.tiff'
 MIN_FRAMES = 2      # as WebODM's own task creation
 FROM_TAG = '.dji-thermal-from-'     # then the dataset's id; hidden, as datasets.TAG
 THERMAL_TASK_TAG = '.dji-thermal-task'  # a task made by the Thermal Task button (public/thermal/upload.js)
+TASK_FILE = 'task.json'
+
+
+def task_palette(task):
+    """The DJI palette a task's thermal orthophoto opens in, or ''"""
+    palette = datasets.read_json(datasets.data_path(task, TASK_FILE), {}).get('palette') or ''
+    return palette if palette in conversions.palettes() else ''
+
+
+def set_task_palette(task, palette):
+    """
+    The DJI palette a task's thermal orthophoto opens in ('' or None: none)
+    :raises ValueError: not one of DJI's palettes
+    """
+    palette = palette or ''
+    if palette and palette not in conversions.palettes():
+        raise ValueError("Not one of DJI's palettes: {}".format(palette))
+    if palette == task_palette(task):
+        return
+    os.makedirs(datasets.data_path(task), exist_ok=True)
+    with datasets.locked(task):
+        path = datasets.data_path(task, TASK_FILE)
+        datasets.write_json(path, dict(datasets.read_json(path, {}), palette=palette or None))
 
 
 def plan_of(task):
@@ -168,6 +196,7 @@ def create(task, cid, name, options):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             new_task.update_size(commit=True)
+        set_task_palette(new_task, (conversions.record(task, cid).get('settings') or {}).get('palette'))
     except Exception:
         if new_task is not None:
             shutil.rmtree(new_task.task_path(), ignore_errors=True)
@@ -313,6 +342,9 @@ def use_for_parent(task, cid, user=None):
             t.options = serializer.validated_data['options']
         t.save()
     t.update_size(commit=True)
+    palette = (conversions.record(task, cid).get('settings') or {}).get('palette')
+    if palette:
+        set_task_palette(t, palette)
     with datasets.locked(task):
         datasets.write_json(datasets.data_path(task, PARENT_FILE), {
             'conversion': cid, 'sent_at': datasets.now(), 'sent_by': getattr(user, 'username', None)})

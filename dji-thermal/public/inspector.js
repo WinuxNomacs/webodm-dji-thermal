@@ -2,7 +2,8 @@
 // under the cursor, points pinned with theirs and regions drawn with their statistics, surroundings and ΔT (both kept
 // in the browser, for the same tasks; regions drawn by regions.js; a line also has its profile), isotherms (the temperatures above, below or between limits painted
 // over the thermal layers, also kept in the browser), the thermal layer's palette, which is the user's everywhere (the
-// Analyzer's preference), and a legend of its palette and range (scale.js). Temperatures come from the plugin's API
+// Analyzer's preference; without one, the task's, chosen in DJI Thermal Task), and a legend of its palette and range
+// (scale.js). Temperatures come from the plugin's API
 // (inspector_api.py) in °C and are shown in WebODM's units (°F when imperial). The project's workset mosaics can be
 // laid on the map too (the Analyzer's tiles, above WebODM's layers, swiped against them with WebODM's own split
 // control): a thermal layer like the orthophotos, read through the Analyzer's API. main.js adds it through
@@ -1010,6 +1011,7 @@
         var profileMarker = null, profileAt = null;     // the point of the profile hovered, on the map
         var pickSeq = 0;                    // the frames asked for last
         var overlays = [], colors = {};     // the isotherm's layer over each thermal layer; each palette's colours
+        var paletteChosen = false;          // a palette the user chose on this page, which the task's no longer replaces
         var histograms = {};                // each thermal image's histogram for the equalization, by its URL
         var sliding = false;                // while an Image slider moves (the frames window's picture waits)
 
@@ -1054,11 +1056,15 @@
             thermalLayers(map, true).forEach(function (t) {
                 var src = layerSource(t);
                 if (state.sources[src.key]) return;
-                state.sources[src.key] = assign(src, {loading: true, measurements: [], can_change: false, baseline: null});
+                state.sources[src.key] = assign(src, {loading: true, measurements: [], can_change: false, baseline: null, palette: ""});
                 fetchFn(src.url, {credentials: "same-origin"}).then(readJson).then(function (r) {
-                    if (r.ok) assign(src, {measurements: r.data.measurements || [], can_change: !!r.data.can_change, baseline: r.data.baseline || null});
+                    if (r.ok) {
+                        assign(src, {measurements: r.data.measurements || [], can_change: !!r.data.can_change, baseline: r.data.baseline || null,
+                                     palette: r.data.palette || ""});
+                    }
                 }, function () {}).then(function () {
                     src.loading = false;
+                    openInTaskPalette();
                     correctionChanged(true);
                     drawSaved();
                 });
@@ -1933,6 +1939,14 @@
             container.style.display = hasThermal(args.tiles) || (state.mosaics && state.mosaics.length) ? "" : "none";
         }
 
+        // Without a palette of the user's own, the map opens in the topmost orthophoto's task's (chosen in DJI Thermal
+        // Task), until the user chooses one
+        function openInTaskPalette() {
+            if (!state.display || state.display.palette || paletteChosen) return;
+            var t = thermalLayers(map).filter(function (x) { return !x.mosaic; }).pop(), src = t && state.sources[layerSource(t).key];
+            if (src && src.palette && src.palette !== state.palette && paletteNames(state.display).indexOf(src.palette) !== -1) showPalette(src.palette);
+        }
+
         function showPalette(name, except) {
             state.palette = name;
             thermalLayers(map).forEach(function (t) { if (t.layer !== except) applyPalette(t); });
@@ -1940,6 +1954,7 @@
         }
 
         function choosePalette(name, except) {
+            paletteChosen = true;
             showPalette(name, except);
             (deps.save || function (palette) {
                 return fetchFn(API + "display", {method: "PUT", credentials: "same-origin",
@@ -2180,6 +2195,7 @@
             } else {
                 var shown = thermalLayers(map)[0];
                 state.palette = shown ? paletteOf(shown.layer._url) : "";
+                openInTaskPalette();
             }
             renderLegend();
             render();

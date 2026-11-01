@@ -981,7 +981,7 @@ class TestConversionTasks(AnalyzerTestCase):
         return "{}/{}/conversions/{}/task".format(API, task.id, cid)
 
     def test_a_task_is_made_of_the_conversions_tiffs_and_waits_for_a_processing_node(self):
-        task, cid = self.converted(normalize=True, harmonize=True, max_pitch=-80.0, emissivity=0.95)
+        task, cid = self.converted(normalize=True, harmonize=True, max_pitch=-80.0, emissivity=0.95, palette="rainbow1")
         info = self.client.get(self.url(task, cid)).data
         self.assertEqual((info["problems"], info["warnings"], info["frames"]), ([], [], 3))
         self.assertEqual([o["name"] for o in info["options"]],
@@ -1005,6 +1005,8 @@ class TestConversionTasks(AnalyzerTestCase):
         self.assertGreater(new.size, 0)
         # Its hidden tag names the dataset, for the dashboard's Thermal dataset button
         self.assertEqual(new.tags, ".dji-thermal-from-{}".format(task.id))
+        # Its thermal map opens in the workset's palette
+        self.assertEqual(conversion_tasks.task_palette(new), "rainbow1")
         src = os.path.join(conversions.output_path(task, cid), "a", "DJI_0001_T_temp_c.tiff")
         self.assertTrue(os.path.samefile(src, new.task_path("a_DJI_0001_T_temp_c.tiff")))
         self.assertNotIn(new, get_pending_tasks())

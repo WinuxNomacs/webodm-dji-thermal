@@ -239,6 +239,29 @@ describe("the Thermal Inspector", () => {
         expect(panel().querySelector('[data-act="palette"]').value).toBe("rdylgn");
     });
 
+    it("opens in the task's palette when the user has none, until they choose one; theirs wins", async () => {
+        const MEASUREMENTS = "GET /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/measurements";
+        const own = {measurements: [], can_change: true, baseline: null, palette: "ironred"};
+        let layer = tileLayer(TILES, THERMAL_TASK);
+        let s = start(fakeMap([layer]), {[MEASUREMENTS]: own});
+        await s.ins.ready; await flush(); await flush();
+        expect(inspector.paletteOf(layer._url)).toBe("ironred");
+        expect(s.ins.state.palette).toBe("ironred");
+        expect(s.saved).toEqual([]);
+
+        // The user's palette wins
+        layer = tileLayer(TILES, THERMAL_TASK);
+        s = start(fakeMap([layer]), {[MEASUREMENTS]: own, "GET /api/plugins/dji-thermal/display": Object.assign({}, DISPLAY, {palette: "inferno"})});
+        await s.ins.ready; await flush(); await flush();
+        expect(inspector.paletteOf(layer._url)).toBe("inferno");
+
+        // A task without one keeps WebODM's colour map
+        layer = tileLayer(TILES, THERMAL_TASK);
+        s = start(fakeMap([layer]), {[MEASUREMENTS]: Object.assign({}, own, {palette: ""})});
+        await s.ins.ready; await flush(); await flush();
+        expect(inspector.colorMapOf(layer._url)).toBe("magma");
+    });
+
     it("keeps the layer's own palette when the user's is not one offered", async () => {
         const layer = tileLayer(TILES, THERMAL_TASK);
         const map = fakeMap([layer]);

@@ -360,12 +360,12 @@ class InspectorProjectPalette(InspectorProjectView):
 
 # -- saved measurements (measurements.py) ---------------------------------------------------------------------------
 
-def saved_list(path, baseline, can_change):
-    """The measurements saved at path, with what the layer was measured with (for the correction) and whether the
-    user may save, rename and delete them"""
+def saved_list(path, baseline, can_change, palette=''):
+    """The measurements saved at path, with what the layer was measured with (for the correction), whether the
+    user may save, rename and delete them, and the palette the layer opens in ('' for none of its own)"""
     base = baseline()
     return Response({'measurements': measurements.listed(path), 'can_change': can_change,
-                     'baseline': {'emissivity': base[0], 'reflected': base[1]} if base else None})
+                     'baseline': {'emissivity': base[0], 'reflected': base[1]} if base else None, 'palette': palette})
 
 
 def saved_record(data, point, region, baseline):
@@ -458,7 +458,7 @@ class InspectorMeasurements(InspectorMeasurementsView):
         """The measurements saved on the task's thermal orthophoto (saved_list)"""
         task = self.thermal_task(request, pk)
         return saved_list(measurements.task_path(task), lambda: correction.task_baseline(task),
-                          request.user.has_perm('change_project', task.project))
+                          request.user.has_perm('change_project', task.project), conversion_tasks.task_palette(task))
 
     def post(self, request, pk=None, project_pk=None):
         """A pin, region or line measured and saved (saved_record)"""

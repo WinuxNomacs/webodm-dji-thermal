@@ -5,7 +5,7 @@ import exifr from 'webodm/vendor/exifr';
 import { unitSystem } from 'webodm/classes/Units';
 import { _, interpolate } from 'webodm/classes/gettext';
 import MeasurementSettings from './MeasurementSettings';
-import { combineCameras, defaultUnit, requestData, validate } from './measurement';
+import { combineCameras, defaultUnit, requestData, startPalette, validate } from './measurement';
 import ThermalUpload from './upload';
 import serverApi from './serverApi';
 
@@ -43,6 +43,7 @@ export default class ThermalTaskPanel extends React.Component {
             errors: {},
             keepPhotos: false,
             frames: {normalize: false, harmonize: false},
+            palette: "",
             error: "",
             progress: null
         };
@@ -89,11 +90,13 @@ export default class ThermalTaskPanel extends React.Component {
                         }
                     });
                     const keptSet = new Set(kept);
+                    const combined = described.length ? combineCameras(described) : null;
                     this.update({
                         phase: "editing",
                         photos: photos.filter(p => keptSet.has(p)),
                         unsupported,
-                        combined: described.length ? combineCameras(described) : null,
+                        combined,
+                        palette: combined ? startPalette(combined) : "",
                         error: described.length ? "" : _("None of the files picked is a DJI thermal photo this plugin can convert.")
                     });
                 });
@@ -136,7 +139,7 @@ export default class ThermalTaskPanel extends React.Component {
             taskInfo,
             photos: this.state.photos,
             textFiles: this.props.files.textFiles,
-            measurement: requestData(this.state.values, this.state.unit),
+            measurement: Object.assign(requestData(this.state.values, this.state.unit), {palette: this.state.palette}),
             api: this.props.api,
             onProgress: progress => this.update({progress}),
             keepPhotos: this.keepsPhotos(),
@@ -171,6 +174,26 @@ export default class ThermalTaskPanel extends React.Component {
         if (e.target.name === "normalize" && !e.target.checked) frames.harmonize = false;
         this.setState({frames});
     };
+
+    // The palette the task's thermal map opens in (conversion_tasks.task_palette), the photos' to start with
+    renderPalette(){
+        const { combined, palette } = this.state;
+        if (!combined.palettes.length) return "";
+        return (
+            <div className="form-group dji-thermal-palette">
+                <label className="col-sm-2 control-label" htmlFor="dji-thermal-palette">{_("Palette")}</label>
+                <div className="col-sm-10">
+                    <select id="dji-thermal-palette" className="form-control dji-thermal-input" value={palette}
+                            onChange={e => this.setState({palette: e.target.value})}>
+                        {combined.palettes.map(p =>
+                            <option key={p} value={p}>{p === combined.palette ? interpolate(_("%(palette)s (the photos')"), {palette: p}) : p}</option>
+                        )}
+                    </select>
+                    <span className="help-block">{_("The palette the task's thermal map opens in, unless you have chosen one in the DJI Thermal Analyzer's preferences. The task's images hold temperatures: the map can show them in any palette later.")}</span>
+                </div>
+            </div>
+        );
+    }
 
     renderFrames(){
         const { frames } = this.state;
@@ -264,6 +287,7 @@ export default class ThermalTaskPanel extends React.Component {
                     <div className={uploading ? "hide" : ""}>
                         <div className="new-task-panel theme-background-highlight form-horizontal dji-thermal-measurement-panel">
                             {this.renderSummary()}
+                            {this.renderPalette()}
                             {this.renderFrames()}
                             <MeasurementSettings combined={combined} values={this.state.values} unit={this.state.unit}
                                 errors={this.state.errors} onChange={this.handleValuesChange} onUnitChange={this.handleUnitChange} />

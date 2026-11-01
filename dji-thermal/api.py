@@ -70,8 +70,8 @@ def keep_in_dataset(dataset, upload):
 
 class Describe(APIView):
     """
-    The camera of one thermal photo, the measurement parameters it recorded and the range of each (see
-    converter.describe), for the upload form. Nothing is kept.
+    The camera of one thermal photo, the measurement parameters it recorded and the range of each, and its palette
+    (see converter.describe), with DJI's palettes, for the upload form. Nothing is kept.
     """
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -85,13 +85,14 @@ class Describe(APIView):
                 info = converter.describe(source)
             except Exception as e:  # noqa: BLE001 - reported to the form as the photo's problem
                 return Response({'thermal': False, 'reason': str(e)})
-        return Response(dict(info, thermal=True))
+        return Response(dict(info, thermal=True, palettes=list(converter.library().PALETTES)))
 
 
 class TaskConvert(APIView):
     """
     Converts one photo into a partial task's images, with the measurement values sent with it (see
-    converter.settings). The answer's status is 'converted' (with the task's image name), 'ignored' (not a DJI
+    converter.settings), and the task's 'palette' (conversion_tasks.task_palette). The answer's status is 'converted'
+    (with the task's image name), 'ignored' (not a DJI
     thermal image: the RGB photos taken with them, another camera's) or 'failed', with the reason. With 'dataset',
     the id of the task's dataset (TaskDataset: the task itself), the photo is also kept in that dataset, whatever
     its status.
@@ -110,6 +111,11 @@ class TaskConvert(APIView):
         upload = single_file(request)
         try:
             measurement_settings = converter.settings(request.data)
+        except ValueError as e:
+            raise exceptions.ValidationError(detail=str(e)) from None
+
+        try:
+            conversion_tasks.set_task_palette(task, request.data.get('palette'))
         except ValueError as e:
             raise exceptions.ValidationError(detail=str(e)) from None
 
@@ -164,7 +170,8 @@ class TaskDataset(APIView):
 class TaskWorkset(APIView):
     """
     A partial task of DJI Thermal Task, normalized or harmonized: its photos, uploaded to the dataset it is (TaskDataset),
-    converted in a workset of it ('settings': the panel's measurement values, normalize and harmonize), whose TIFFs
+    converted in a workset of it ('settings': the panel's measurement values, normalize, harmonize and the task's
+    palette, also the workset's), whose TIFFs
     then go into the task, which is committed (conversion_tasks.commit_parent). The answer is the workset's {id}.
     """
     permission_classes = (permissions.IsAuthenticated,)
@@ -189,9 +196,11 @@ class TaskWorkset(APIView):
         raw = dict(conversions.DEFAULTS, outputs=['temp_c:tiff'], mosaics=True,
                    normalize=bool(sent.get('normalize')) or bool(sent.get('harmonize')), harmonize=bool(sent.get('harmonize')))
         raw.update({k: sent[k] for k in self.MEASUREMENT if k in sent})
+        raw['palette'] = sent.get('palette') or None
         settings, errors = conversions.parse_settings(raw)
         if errors:
             raise exceptions.ValidationError(detail=errors)
+        conversion_tasks.set_task_palette(task, settings.get('palette'))
         if not settings['normalize']:
             raise exceptions.ValidationError(detail="Normalize or harmonize: a task converted as is takes its photos one by one")
         cid = conversions.create(task, "DJI Thermal Task", settings, request.user, then={

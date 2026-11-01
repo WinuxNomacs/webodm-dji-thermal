@@ -27,6 +27,7 @@ colouring = importlib.import_module("coreplugins.dji-thermal.colouring")
 converter = importlib.import_module("coreplugins.dji-thermal.converter")
 conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
 correction = importlib.import_module("coreplugins.dji-thermal.correction")
+conversion_tasks = importlib.import_module("coreplugins.dji-thermal.conversion_tasks")
 
 WIDTH, HEIGHT, PIXEL = 100, 80, 0.5
 ORIGIN = (400000.0, 4660000.0)     # UTM 16N, near Chicago
@@ -258,7 +259,9 @@ class TestInspector(BootTestCase):
 
     def test_measurements_are_saved_with_the_task_measured_here_renamed_and_deleted(self):
         url = self.url(self.task, "measurements")
-        self.assertEqual(self.client.get(url).data, {'measurements': [], 'can_change': True, 'baseline': None})
+        self.assertEqual(self.client.get(url).data, {'measurements': [], 'can_change': True, 'baseline': None, 'palette': ''})
+        conversion_tasks.set_task_palette(self.task, 'ironred')
+        self.assertEqual(self.client.get(url).data['palette'], 'ironred')
         pin = {'name': "Vent", 'comment': "Warm air", 'shape': 'pin',
                'geometry': {'type': 'Point', 'coordinates': list(lonlat(50, 40))}}
         res = self.client.post(url, pin, format="json")

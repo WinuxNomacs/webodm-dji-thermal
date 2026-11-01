@@ -203,7 +203,8 @@ def palette_picture(path, palette):
 def describe(path):
     """
     What the upload form needs to know of an R-JPEG's camera: {'camera': its model, 'recorded': the measurement
-    parameters it recorded, 'ranges': [lowest, highest] each parameter can be set to}, with the Settings names and
+    parameters it recorded, 'ranges': [lowest, highest] each parameter can be set to, 'palette': the DJI palette it
+    was shot in, or ''}, with the Settings names and
     in degrees Celsius. A parameter the camera does not use (the ambient temperature on the H20T and XT S) is in
     neither.
     :raises: the library's errors, for a file that is not a thermal R-JPEG it can measure; sdk.SdkError
@@ -214,7 +215,8 @@ def describe(path):
     used = [key for key, limits in ranges.items() if limits and tuple(limits) != (0, 0)]
     return {'camera': info['camera']['model'],
             'recorded': {PARAM_FIELDS[key]: recorded[key] for key in used if recorded.get(key) is not None},
-            'ranges': {PARAM_FIELDS[key]: list(ranges[key]) for key in used}}
+            'ranges': {PARAM_FIELDS[key]: list(ranges[key]) for key in used},
+            'palette': (info['thermal'].get('palette') or {}).get('name') or ''}
 
 
 def convert(source_path, dest_path, measurement_settings=None):
