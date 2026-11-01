@@ -41,6 +41,15 @@ it's left out and the panel says why; the task processes the others.
 When WebODM has finished, open the task's map. Its orthophoto holds temperatures, and the
 [Thermal Inspector](quickstart-inspector.md) reads them.
 
+## 5. Look at the photos in the DJI Thermal Analyzer
+
+The task keeps only the converted images, not the photos. To check the photos (each frame's temperatures, camera
+and position, and the problems found), or to try other conversion settings, give the task a dataset: in its
+expanded panel on the dashboard, press **Create thermal dataset**. The dataset is made in the task's project, named
+after it, and opens, empty: add the flight's photos with **Add images** (see
+[Checking a flight in the DJI Thermal Analyzer](quickstart-analyzer.md)). From then on the task's panel has a **Thermal
+dataset** button, back to it. Deleting the dataset leaves the task as it was.
+
 ## Good to know
 
 - A GCP file, `geo.txt` and `image_groups.txt` are uploaded with the photos. The image names in them are changed

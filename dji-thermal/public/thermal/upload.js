@@ -8,6 +8,9 @@ export const CONCURRENCY = 3;
 
 export const NO_IMAGES = "None of the photos could be converted: the task was not created.";
 
+// The task's hidden tag (conversion_tasks.THERMAL_TASK_TAG): its panel then offers a dataset for its photos (main.js)
+export const THERMAL_TASK_TAG = ".dji-thermal-task";
+
 // The fields of WebODM's task creation (as its own upload, without resizing)
 export function taskData(taskInfo){
     return {
@@ -16,7 +19,8 @@ export function taskData(taskInfo){
         processing_node: taskInfo.selectedNode.id,
         auto_processing_node: taskInfo.selectedNode.key == "auto",
         partial: true,
-        align_to: taskInfo.alignTo
+        align_to: taskInfo.alignTo,
+        tags: [THERMAL_TASK_TAG]
     };
 }
 

@@ -1,7 +1,8 @@
 """
 The plugin's API, used by its Thermal task button (see public/): the browser creates a partial task with WebODM's
 own API, sends each thermal photo here to be converted into the task's folder, then commits the task with
-WebODM's API. Photos are converted one per request, so the browser can show each one's progress and reason.
+WebODM's API. Photos are converted one per request, so the browser can show each one's progress and reason. A task's
+expanded panel on the dashboard (main.js) makes a DJI Thermal Analyzer dataset for it here, to hold its photos.
 """
 
 import os
@@ -10,7 +11,7 @@ import tempfile
 
 from django.conf import settings as django_settings
 from django.core.exceptions import ObjectDoesNotExist, SuspiciousFileOperation, ValidationError
-from rest_framework import exceptions, permissions
+from rest_framework import exceptions, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -18,7 +19,8 @@ from app.api.common import check_project_perms
 from app.api.tasks import flatten_files
 from app.models import Task
 
-from . import converter
+from . import conversion_tasks, converter, datasets
+from .analyzer_api import OVER_QUOTA
 
 NOT_THERMAL = "not a DJI thermal image"
 
@@ -114,3 +116,25 @@ class TaskConvert(APIView):
             os.makedirs(task.task_path(), exist_ok=True)
             shutil.move(converted, dest)
         return Response({'status': 'converted', 'image': name})
+
+
+class TaskDataset(APIView):
+    """
+    The DJI Thermal Analyzer dataset linked to a task (see conversion_tasks.link_dataset): the one it has, or a new
+    one in its project, named after it. The answer is {id}, with status 201 when it was made.
+    """
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request, project_pk=None, pk=None):
+        try:
+            task = Task.objects.get(pk=pk, project=project_pk, project__deleting=False)
+            check_project_perms(request, task.project, ('change_project',))
+        except (ObjectDoesNotExist, ValidationError):
+            raise exceptions.NotFound() from None
+        if datasets.is_dataset(task):
+            raise exceptions.ValidationError(detail="This task is a dataset's own")
+        found = conversion_tasks.linked_dataset(task)
+        if found is None and datasets.over_quota(task):
+            raise exceptions.ValidationError(detail=OVER_QUOTA)
+        dataset, made = conversion_tasks.link_dataset(task, request.user)
+        return Response({'id': str(dataset.id)}, status=status.HTTP_201_CREATED if made else status.HTTP_200_OK)

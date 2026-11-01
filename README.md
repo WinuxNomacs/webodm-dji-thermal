@@ -67,6 +67,11 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
 The task's name is suggested from the first photo's date. WebODM's own upload also looks the place up on
 OpenStreetMap's Nominatim; the DJI Thermal Task does not, as the plugin calls no outside service.
 
+The DJI Thermal Task keeps only the converted images, not the photos. To look at the photos in the DJI Thermal
+Analyzer, press **Create thermal dataset** in the task's expanded panel on the dashboard: it makes a dataset for the
+task, in its project and named after it, and opens it, to add the flight's photos (**Add images**). The panel then has
+a **Thermal dataset** button, back to it. Deleting the dataset leaves the task as it was.
+
 ## The DJI Thermal Analyzer
 
 **DJI Thermal Analyzer**, in WebODM's menu, lists the thermal datasets of every project you can view, with their

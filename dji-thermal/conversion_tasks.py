@@ -12,7 +12,9 @@ from a conversion are kept as a list of ids in its folder:
 
 Such a task also has a hidden tag naming its dataset, `.dji-thermal-from-<dataset id>`, so the dashboard's Thermal
 dataset button (main.js) links back to it without asking the server; listing the tasks puts it back on one without it
-(made, e.g. a task made before the tag existed), and it goes when the dataset does (unlink_made).
+(made, e.g. a task made before the tag existed), and it goes when the dataset does (unlink_made). A task made by the
+Thermal Task button (tagged THERMAL_TASK_TAG) gets the same tag when a dataset is made for it (link_dataset), to hold
+the flight's photos.
 
 A conversion can also be sent to the dataset's own task, its "parent task" (use_for_parent): its TIFFs replace the
 images sent there before (the folder's root holds no other image: the dataset is under thermal/, which WebODM's
@@ -23,6 +25,7 @@ from a conversion does. One task is processed again and again, rather than a new
 """
 
 import os
+import re
 import shutil
 
 from django.core.exceptions import SuspiciousFileOperation
@@ -40,6 +43,7 @@ PARENT_FILE = 'parent.json'
 TIFF_SUFFIX = '_temp_c.tiff'
 MIN_FRAMES = 2      # as WebODM's own task creation
 FROM_TAG = '.dji-thermal-from-'     # then the dataset's id; hidden, as datasets.TAG
+THERMAL_TASK_TAG = '.dji-thermal-task'  # a task made by the Thermal Task button (public/thermal/upload.js)
 
 
 def plan_of(task):
@@ -180,6 +184,30 @@ def unlink_made(task):
     tag = FROM_TAG + str(task.id)
     for t in Task.objects.filter(tags__contains=tag).exclude(pk=task.pk):
         Task.objects.filter(pk=t.pk).update(tags=" ".join(x for x in (t.tags or "").split() if x != tag))
+
+
+def linked_dataset(task):
+    """The dataset task is linked to by its tag, if it is still there"""
+    for t in (task.tags or "").split():
+        pk = t[len(FROM_TAG):] if t.startswith(FROM_TAG) else ""
+        if re.fullmatch(r'[0-9a-f-]{36}', pk):
+            found = Task.objects.filter(pk=pk, project__deleting=False).first()
+            if found is not None and datasets.is_dataset(found):
+                return found
+    return None
+
+
+def link_dataset(task, user):
+    """(dataset, made): the dataset task is linked to, or a new one in its project named after it, which task is then
+    linked to (its tag, any stale one replaced)"""
+    found = linked_dataset(task)
+    if found is not None:
+        return found, False
+    dataset = datasets.create(task.project, task.name or "Task #{}".format(task.id), user)
+    tags = [t for t in (task.tags or "").split() if not t.startswith(FROM_TAG)] + [FROM_TAG + str(dataset.id)]
+    task.tags = " ".join(tags)
+    Task.objects.filter(pk=task.pk).update(tags=task.tags)
+    return dataset, True
 
 
 def made(task, cid):

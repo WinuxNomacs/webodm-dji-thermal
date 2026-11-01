@@ -1,4 +1,5 @@
-// main.js as WebODM loads it on every page: the Thermal Task button, the Thermal dataset button on a task's panel, and
+// main.js as WebODM loads it on every page: the Thermal Task button, the Thermal dataset and Create thermal dataset
+// buttons on a task's panel, and
 // the DJI Thermal page under Administration
 
 function sideMenu(staff){
@@ -63,6 +64,55 @@ test("other tasks, and a tag naming no dataset, get no button", () => {
     expect(taskButton({id: DATASET, tags: ["survey"]})).toBeNull();
     expect(taskButton({id: DATASET})).toBeNull();
     expect(taskButton({id: DATASET, tags: [".dji-thermal-from-../../admin"]})).toBeNull();
+});
+
+const TASK = "11111111-2222-3333-4444-555555555555";
+
+test("a task made by the Thermal Task button, or with a thermal orthophoto, and no dataset gets Create thermal dataset", () => {
+    for (const task of [{id: TASK, project: 3, tags: [".dji-thermal-task"]},
+                        {id: TASK, project: 3, tags: [], orthophoto_bands: [{description: "lwir"}]}]){
+        const button = taskButton(task);
+        expect(button.type).toBe("button");
+        expect(button.children[1]).toBe(" Create thermal dataset");
+    }
+    expect(taskButton({id: TASK, project: 3, orthophoto_bands: [{description: "red"}, {description: "green"}]})).toBeNull();
+    expect(taskButton({id: TASK, project: 3, tags: [".dji-thermal-task", ".dji-thermal-from-" + DATASET]}).props.href)
+        .toBe("/plugins/dji-thermal/dataset/" + DATASET);
+});
+
+describe("Create thermal dataset", () => {
+    let assign;
+    beforeEach(() => {
+        assign = jest.fn();
+        window.alert = jest.fn();
+        document.cookie = "csrftoken=tok";
+    });
+
+    function click(answer){
+        global.fetch = jest.fn(() => Promise.resolve(answer));
+        const button = taskButton({id: TASK, project: 3, tags: [".dji-thermal-task"]});
+        window.DjiThermalTaskDataset.open = assign;
+        const el = document.createElement("button");
+        button.props.onClick({currentTarget: el});
+        return {el, done: () => new Promise(r => setTimeout(r, 0))};
+    }
+
+    test("makes the task's dataset on the server, then opens its page", async () => {
+        const {el, done} = click({ok: true, status: 201, json: () => Promise.resolve({id: DATASET})});
+        expect(el.disabled).toBe(true);
+        await done();
+        expect(global.fetch).toHaveBeenCalledWith("/api/plugins/dji-thermal/projects/3/tasks/" + TASK + "/dataset",
+            {method: "POST", credentials: "same-origin", headers: {"X-CSRFToken": "tok"}});
+        expect(assign).toHaveBeenCalledWith("/plugins/dji-thermal/dataset/" + DATASET);
+    });
+
+    test("a refusal is said, and the button can be pressed again", async () => {
+        const {el, done} = click({ok: false, status: 400, json: () => Promise.resolve({detail: "Over quota"})});
+        await done();
+        expect(assign).not.toHaveBeenCalled();
+        expect(window.alert).toHaveBeenCalledWith("Could not create the thermal dataset: Over quota");
+        expect(el.disabled).toBe(false);
+    });
 });
 
 test("the Thermal Inspector is added to every map, with WebODM's Leaflet (its button shows when it has something to inspect)", () => {
