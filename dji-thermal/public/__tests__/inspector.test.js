@@ -463,6 +463,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         expect(body).toMatchObject({name: "Warm roof", comment: "Above the boiler", shape: "rectangle", isotherm: null, correction: null});
         expect(body.geometry.type).toBe("Polygon");
         expect(panel().querySelector(".dt-inspector-form")).toBe(null);
+        expect(ins.state.regions).toEqual([]);      // saved: no longer the browser's own
         const shown = panel().querySelector('[data-profile-of="saved"]').textContent;
         ["Warm roof", "Above the boiler", "Roof survey", "Saved by ana, 2026-11-01", "Surroundings26.00 °C"].forEach(t => expect(shown).toContain(t));
         const tips = [];

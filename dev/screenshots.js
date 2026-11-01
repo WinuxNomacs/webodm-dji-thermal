@@ -202,6 +202,32 @@ const SHOTS = {
         await p.waitForTimeout(1000);
         return p;
     },
+    "inspector-saved": async (p, env) => {
+        // A region on the map's thermal orthophoto measured with the correction on, and its Save form filled in (not
+        // sent: the script stays read only)
+        await p.setViewportSize({width: SIZE.width, height: 1100});
+        await p.goto(env.url + need(env, "DT_DOCS_MAP"));
+        await p.waitForSelector(".dt-inspector-button", {timeout: 30000});
+        await p.waitForTimeout(3000);
+        await p.click(".dt-inspector-button");
+        const map = await p.locator(".leaflet-container").first().boundingBox();
+        await p.click('.dt-inspector-modes [data-mode="rectangle"]');
+        await p.mouse.move(map.x + map.width * 0.35, map.y + map.height * 0.4);
+        await p.mouse.down();
+        await p.mouse.move(map.x + map.width * 0.45, map.y + map.height * 0.5, {steps: 5});
+        await p.mouse.up();
+        await p.waitForSelector(".dt-inspector-shown .dt-inspector-stats", {timeout: 30000});
+        await p.check('[data-act="correction-on"]');
+        await p.fill('[data-act="correction-emissivity"]', "0.95");
+        await p.press('[data-act="correction-emissivity"]', "Tab");
+        await p.waitForTimeout(3000);
+        await p.click('[data-region] [data-act="save"]');
+        await p.fill('[data-form="name"]', "Warm roof section");
+        await p.fill('[data-form="comment"]', "Check the insulation above the boiler");
+        await p.locator(".dt-inspector-form").scrollIntoViewIfNeeded();
+        await p.waitForTimeout(500);
+        return p;
+    },
     "inspector-frames": async (p, env) => {
         // The frames that saw a point clicked on the map's thermal orthophoto (its task processed from a workset)
         await p.goto(env.url + need(env, "DT_DOCS_MAP"));

@@ -39,6 +39,8 @@ workset's id (12 hexadecimal characters).
 | GET | `.../mosaics/<tab>/curve?rescale=&gamma=&equalize=` | How the tab's images are drawn, for the colour scale: the palette's share at 65 values evenly across the range. |
 | GET | `.../mosaics/<tab>/point?lon=&lat=` | The temperature, frame, frame pixel (the frame's column and row) and view angle at a point. |
 | GET | `.../mosaics/<tab>/frames?lon=&lat=`, `.../frames/<index>.png` | The frames that saw a point; one frame's picture. |
+| GET, POST | `.../conversions/<workset>/measurements` | The measurements saved on the workset's mosaics, with what they were measured with (`baseline`) and whether you can change them; saves one, as the Thermal Inspector's `measurements`, with the `tab` it was measured on. |
+| PATCH, DELETE | `.../conversions/<workset>/measurements/<id>` | Renames a saved measurement or changes its comment; deletes it. |
 | GET, PUT, DELETE | `preferences` | Your saved workset settings (your defaults); save them; back to dji-thermal-cli's. |
 | GET, PUT | `display` | Your palette and unit, with DJI's palettes and WebODM's colour maps; save them. |
 
@@ -49,7 +51,9 @@ On a task with a thermal orthophoto, under `projects/<project>/tasks/<task>/insp
 | Method | Path | What it does |
 | --- | --- | --- |
 | GET | `point?lon=&lat=` | The temperature at a point, or why there's none. |
-| POST | `region` | The statistics and histogram of a GeoJSON polygon, or of a line (a strip 0.25 m either side, with its length and profile), with the surroundings' mean and ΔT; `isotherm: {low, high}` (°C, either null) adds the share of its pixels within them. Nothing is kept. |
+| POST | `region` | The statistics and histogram of a GeoJSON polygon, or of a line (a strip 0.25 m either side, with its length and profile), with the surroundings' mean and ΔT; `isotherm: {low, high}` (°C, either null) adds the share of its pixels within them; `correction: {emissivity, reflected}` (°C) corrects the temperatures first, from what the orthophoto's TIFFs record (refused when they don't). Nothing is kept. The mosaics' `region` takes the same. |
+| GET, POST | `measurements` | The measurements saved on the task's orthophoto, with what it was measured with (`baseline`: `{emissivity, reflected}` or null) and whether you can change them (`can_change`); saves one (`{name, comment, shape, geometry, circle, isotherm, correction}`: a pin's `geometry` a point), measured on the server. |
+| PATCH, DELETE | `measurements/<id>` | Renames a saved measurement or changes its comment (`{name, comment}`); deletes it. |
 | GET | `tiles/<z>/<x>/<y>` | The orthophoto drawn in one of DJI's palettes. |
 | GET | `isotherm/<z>/<x>/<y>` | An isotherm's tiles. |
 | GET | `palette?name=` | A palette's colours, for the legend. |

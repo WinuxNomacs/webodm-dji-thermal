@@ -11,7 +11,8 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
   workset you choose.
 - **Thermal Inspector**, on WebODM's 2D map of a task with a thermal orthophoto: the temperature under the cursor,
   pinned points, the statistics of regions and lines drawn on it (with their surroundings and ΔT, and a line's
-  profile), isotherms, the map's palette and its legend. It also lays the
+  profile), measurements saved for everyone who can view the project, an approximate correction for another
+  emissivity and reflected temperature, isotherms, the map's palette and its legend. It also lays the
   Analyzer's workset mosaics on the map, to compare them with the project's own layers, and shows the frames that saw
   a point clicked.
 
@@ -246,6 +247,18 @@ Inspector:
   its name to go to it too), can be hidden, removed and downloaded as CSV (a row of statistics per region or line,
   with the hottest and coldest pixels' positions; a line's profile as its own CSV), and are kept in your browser for
   the same tasks.
+- **Saved measurements**: a pin's, region's or line's Save (for those who can change the project) names it, with an
+  optional comment, and keeps it with what it measures: the task, or the workset of a mosaic. It is measured again on
+  the server as it is saved, with the isotherm's limits and the correction then on, and leaves your browser's lists.
+  Everyone who can view the project sees the saved measurements of the layers on the map, dashed in green, with their
+  values as saved, who saved them and when; those who can change it rename them, change their comment and delete
+  them. The list downloads as CSV and GeoJSON (a line's profile as its own CSV).
+- **Correction**: corrects the temperatures shown for another emissivity and reflected temperature than the
+  photos were measured with, from what each layer records: an orthophoto's TIFFs (the values dji-thermal-cli wrote
+  in them), a workset mosaic's settings or its frames. It is approximate (a broadband model, the air's transmission
+  taken as 1), for comparing surfaces, not calibrated values. The readout, pins, regions, lines, the legend's marks
+  and the isotherm's limits change; the map's colours don't. A layer that doesn't record its values (an orthophoto
+  not made from the plugin's TIFFs) isn't corrected, and the panel says so. Kept in your browser for the same tasks.
 - **Palette**: the thermal layer's palette, from the same list as the Analyzer's: DJI's palettes (drawn by the
   plugin, over the range set in WebODM's layer panel) and WebODM's colour maps. It is your palette everywhere: the
   Analyzer's preference, saved when you choose one here or in WebODM's own layer panel, and the one the map opens

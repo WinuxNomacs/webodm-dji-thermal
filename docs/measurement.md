@@ -19,7 +19,9 @@ How well the surface gives off infrared radiation, from 0 to 1. This one matters
   whatever value you set.
 
 Set the emissivity of the surface you care about. With one value for the whole flight, surfaces of other materials
-will be off.
+will be off. To compare surfaces of other materials afterwards, the Thermal Inspector's
+[correction](quickstart-inspector.md#7-correcting-for-another-emissivity) shows approximately what they'd measure
+with another emissivity and reflected temperature.
 
 ## Reflected temperature
 

@@ -923,8 +923,8 @@
                 if (value && !validCorrection(c)) {
                     var layers = thermalLayers(map), t = layers[layers.length - 1];
                     var src = t && state.sources[layerSource(t).key], b = src && src.baseline;
-                    c.emissivity = b ? Math.round(b.emissivity * 100) / 100 : 0.95;
-                    c.reflected = b ? typedTemp(roundShown(b.reflected, unit), unit) : 20;
+                    c.emissivity = b ? b.emissivity : 0.95;
+                    c.reflected = b ? b.reflected : 20;
                 }
             } else {
                 var typed = parseFloat(value);
@@ -1180,10 +1180,17 @@
                 if (region) body.isotherm = isothermLimits(state.isotherm);
                 if (region && region.circle) body.circle = region.circle;
                 if (t.mosaic) body.tab = t.mosaic.tab;
+                // Once saved, it is no longer the browser's own
                 done = request(src.url, "POST", body).then(function (r) {
                     if (r.ok) {
                         src.measurements.push(r.data);
                         state.savedShown = src.key + "|" + r.data.id;
+                        if (pin) { state.pins = state.pins.filter(function (p) { return p !== pin; }); pinsChanged(); }
+                        if (region) {
+                            state.regions = state.regions.filter(function (x) { return x !== region; });
+                            if (state.shown === region.id) state.shown = null;
+                            regionsChanged();
+                        }
                     }
                     return r;
                 });

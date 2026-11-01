@@ -3,7 +3,8 @@
 The Thermal Inspector reads temperatures from a processed thermal task, on WebODM's 2D map. It works on any task
 whose orthophoto holds temperatures: one made with [Thermal Task](quickstart-thermal-task.md), or from a
 [workset](quickstart-worksets.md). It can also lay the mosaics of the Thermal Analyzer's worksets on the map, to
-compare them with the project's own layers, and show the frames that saw a point.
+compare them with the project's own layers, show the frames that saw a point, keep measurements for everyone who
+can view the project, and correct the temperatures for another emissivity.
 
 ## 1. Open it
 
@@ -41,7 +42,7 @@ point's distance and temperature, marked on the map; click it to open the frames
 
 Pins, regions and lines can be hidden, removed, and downloaded as CSV; a line's profile has its own **Profile CSV**
 (distance, position and temperature of each point, and on a workset mosaic its frame). Your browser keeps them for
-the next time you open the same task.
+the next time you open the same task; to share one, save it (section 6).
 
 ## 3. Colours, legend and isotherms
 
@@ -94,3 +95,40 @@ panel, opens them too.
 - The cross closes the window; closing the Inspector closes it too.
 
 On other layers a click in Hover is WebODM's own: its popup with the task's downloads.
+
+## 6. Saving measurements
+
+If you can change the project, each pin, region and line in the panel has a save button (the floppy disk). It opens
+a small form: give the measurement a name (it starts as P1, R1 or L1) and, if you like, a comment, then **Save**.
+
+![A region measured with the correction on, its Save form filled in](images/inspector-saved.png)
+
+The measurement is measured again on the server as it's saved, with the isotherm's limits and the correction
+(section 7) that are on, and kept with what it measures: the task, or the workset of a mosaic laid on the map. It
+leaves your own lists and appears under **Saved measurements**:
+
+- Everyone who can view the project sees the saved measurements of the layers on the map, dashed in green with their
+  names. Click one to see its values as they were saved, its comment, who saved it and when, and the correction it
+  was measured with; its name also zooms to it.
+- If you can change the project, the pencil renames it or changes its comment, and the cross deletes it for
+  everyone.
+- **CSV** and **GeoJSON** download the list: a row or feature per measurement, with its values in your unit. A saved
+  line has its own **Profile CSV**.
+
+Saved measurements go with their task or workset: deleting either deletes them.
+
+## 7. Correcting for another emissivity
+
+The temperatures were measured with the emissivity and reflected temperature the camera recorded, or those set in
+Thermal Task or the workset (see [Measurement settings](measurement.md)). To see what a surface would measure with
+others, tick **Correct for another emissivity and reflected temperature**. The values start from what the topmost
+layer was measured with, and the panel lists what each layer on the map was measured with. Change them, and:
+
+- the readout, pins, regions and lines show corrected temperatures (the regions are measured again);
+- the legend's marks are corrected temperatures, and the isotherm's limits are too;
+- the map's colours stay as they are.
+
+The correction is approximate: a broadband model, with the air's transmission taken as 1, as at drone distances.
+It's for comparing surfaces, not for calibrated values; for exact values, make a workset with the measurement
+settings you want. A layer that doesn't record how it was measured (an orthophoto that wasn't made from the plugin's
+TIFFs) isn't corrected, and the panel says so. Your browser keeps the correction for the same tasks.

@@ -267,7 +267,8 @@
 - **Thermal Analyzer, part 2** (the user, 2026-11-01; details under "Up next: Thermal Analyzer, part 2" below):
   the workset mosaics laid on WebODM's 2D map from the Thermal Inspector (for comparing with any task's layers), the
   source frames window, measuring tools and saved measurements there, and the frame page. In five steps; steps 1
-  (the mosaics on the map), 2 (the source frames window) and 3 (measuring: lines, surroundings, ΔT) done 2026-11-01.
+  (the mosaics on the map), 2 (the source frames window), 3 (measuring: lines, surroundings, ΔT) and 4 (saved
+  measurements, the emissivity correction) done 2026-11-01; step 5 (the frame page) is next.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -443,6 +444,30 @@ last phase did with its colouring.
    in the viewer's browser like the palette: it changes the numbers (readout, pins, regions, lines, the legend's
    labels, the isotherm's limits), not the map's colours; a saved measurement records the correction it was
    measured with.
+   **Done** (2026-11-01, `inspector-saved`): `measurements.py` (the lists, replaced under the folder's lock: a task's
+   `thermal/measurements.json`, a workset's `viewer/measurements.json`), `correction.py` (dji-thermal-ui's broadband
+   model, transmission 1; a layer's baseline: the median of what an orthophoto's TIFFs record in their XMP,
+   dji-thermal-cli's `Emissivity` and `ReflectedTemperatureC`, or a workset's settings, its normalizing's reflected
+   temperature, its mosaic frames' records), `inspector_api.py` (`region_request`'s `correction`, `layer_correction`,
+   `saved_list`, `saved_record` measured on the server, `saved_change`, `saved_removal`, `InspectorMeasurements`,
+   `InspectorMeasurement`), `inspector.py` (`raster_region`'s `correction`, before the isotherm's share),
+   `analyzer_api.py` (`mosaic_region`, `MosaicMeasurements`, `MosaicMeasurement`), `plugin.py`; `inspector.js` (the
+   Correction section, `corrected` / `uncorrected`, `rawIsotherm` for each layer's tiles, the legend's corrected marks,
+   pins keep their layer and are shown corrected, a region measured again when its correction changed, even while it
+   was measured; a Save on each pin and region row, its form, Saved measurements drawn dashed in green, renamed,
+   deleted, `savedCsv`, `savedGeoJson`; a saved one leaves the browser's lists), `inspector.css`. CSV and GeoJSON are
+   made in the browser, of the saved measurements of the layers on the map. Tests: `test_inspector.py` (the model
+   written out, an orthophoto's baseline, a corrected region and its isotherm share, saving, renaming, deleting,
+   refusals, who can only view), `test_analyzer.py` (a mosaic's saved pin, corrected pin and region, its tab
+   refused, renamed, deleted), `inspector.test.js` (changed: a layer's name, the region's body, the layers' order;
+   new: the model and the legend's marks, saving a region with its form, renaming, deleting, exports, a viewer without
+   Save, the correction measuring again with the pins and isotherm tiles, a layer without a baseline). Jest 180,
+   Django 145 (1 skipped), ESLint, Ruff; the JS model's and `raster_region`'s correction each seen failing when broken.
+   Live on project 1 (it wrote, then deleted what it saved and the files it made): HomerunObliqueII's orthophoto
+   (baseline 0.91, 21.06 °C from its TIFFs; a rectangle at emissivity 0.8, mean 40.05 to 42.38 °C; saved with a
+   comment, a pin saved; back after a reload, renamed) and its workset's mosaic (a rectangle saved); deleted through
+   the panel; no console errors. Docs: README, `index.md`, the Inspector quickstart's sections 6 and 7,
+   `measurement.md`, `api.md`; screenshots `inspector` retaken, `inspector-saved` new (the form filled, not sent).
 5. **The frame page**: one frame with the Image and Isotherm sections, the tools in its pixels, and measured again
    exactly by dji-thermal-cli with changed parameters (dji-thermal-ui's `measure_frame`, `parse_changes`).
 
