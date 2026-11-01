@@ -39,9 +39,10 @@ function upload(api, photos, more = {}){
 }
 
 describe("a thermal task's upload", () => {
-    test("the task is created as WebODM's own upload does, without resizing", () => {
+    test("the task is created as WebODM's own upload does, without resizing, with the plugin's hidden tag", () => {
         expect(taskData(TASK_INFO)).toEqual({name: TASK_INFO.name, options: TASK_INFO.options, processing_node: 1,
-                                             auto_processing_node: false, partial: true, align_to: "auto"});
+                                             auto_processing_node: false, partial: true, align_to: "auto",
+                                             tags: [".dji-thermal-task"]});
     });
 
     test("every photo is converted with the measurement values, then the task is committed", async () => {

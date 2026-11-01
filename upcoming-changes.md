@@ -432,6 +432,41 @@
     in the sea (0.5 N, 0.5 E, the same distances between them), `main.test.js` a made-up dataset id; the plan
     scrubbed. Jest 192, ESLint.
 
+- **A dataset for a DJI Thermal Task's task** (the user, 2026-11-01, with a screenshot of a task's expanded panel
+  on the Dashboard): "I created this thermal task using the DJI Thermal Task button. There needs to be a way to
+  create and link a dataset in the thermal analyzer. I propose a button to create and link but navigates to the
+  dataset in the thermal analyzer once linked."
+  - What it builds on: DJI Thermal Task converts each photo on the server into the task's TIFF (`api.py`
+    `TaskConvert`) and keeps no original. A dataset holds the original R-JPEGs (`datasets.IMAGE_EXTENSIONS`: JPEG
+    only), so a dataset made for such a task starts empty. A task made from a workset already has the hidden tag
+    `.dji-thermal-from-<dataset id>` (`conversion_tasks.FROM_TAG`), which gives its expanded panel the **Thermal
+    dataset** button (`main.js`) and is removed when the dataset is deleted (`unlink_made`).
+  - Proposed: on the expanded panel of a task whose images are the plugin's TIFFs and that has no dataset, a
+    **Create thermal dataset** button: the server makes a dataset in the task's project, named after the task,
+    gives the task the `.dji-thermal-from-` tag, and the browser opens the new dataset (empty: its **Add images** uploads
+    the flight's photos). After that the panel shows **Thermal dataset**, as a workset's task does.
+  - Decided (the user, 2026-11-01): **the button, and a tick box in DJI Thermal Task's panel** ("Also keep the
+    photos in a DJI Thermal Analyzer dataset": the same upload fills a new linked dataset, no second upload);
+    **next, before the speed-up**.
+  - Steps:
+    1. `task-dataset`: `POST .../projects/<p>/tasks/<t>/dataset` (`api.py` `TaskDataset`; change permission; not
+       on a dataset's own task; over quota refused): the task's linked dataset if it has one, else a new one named
+       after the task, the task tagged `.dji-thermal-from-<id>` (`conversion_tasks.link_dataset`). DJI Thermal
+       Task's tasks get the hidden tag `.dji-thermal-task` when created. `main.js`: **Create thermal dataset** on
+       the expanded panel of a task with that tag or a thermal orthophoto (older tasks) and no dataset; a click
+       makes it and opens the dataset page. Tests: `test_api.py`, `main.test.js`.
+       Done (2026-11-01): as above (`conversion_tasks.linked_dataset`, `link_dataset`; `main.js`
+       `DjiThermalTaskDataset`; `upload.js` `THERMAL_TASK_TAG`); README, `quickstart-thermal-task.md` section 5,
+       `api.md`; no screenshot (a task's panel shows its CRS). `test_api.py` `TestTaskDataset` (5), `main.test.js`
+       (3), `upload.test.js`. Live on the user's ThermalTest (its thermal orthophoto, no tag): the button shown,
+       a click made the dataset and opened it, the panel then had Thermal dataset; the dataset deleted after, the
+       task's tags back to none.
+    2. `keep-photos`: the tick box in DJI Thermal Task's panel. With it, the upload links a dataset to the new
+       task first (step 1's call), each photo's conversion request also saves the photo (thermal or not, any JPEG)
+       in that dataset (`TaskConvert`, only into the task's own linked dataset), and the dataset's analysis starts
+       once the task is committed; a failed upload removes the dataset with the task. The result names the dataset
+       with a link. Tests: `upload.test.js`, `test_api.py`.
+
 - **Faster image adjustments** (the user, 2026-11-01, from `new.md`): "can anything be done to improve the
   rendering response time of changes to the images sliders? How fast the tiles are rendered? etc.... Looking for it
   to be as seamless and realtime as possible without needing a webodm pr".

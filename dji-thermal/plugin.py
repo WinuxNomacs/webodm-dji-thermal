@@ -5,7 +5,7 @@ from app.plugins import Menu, MountPoint, PluginBase, logger, signals
 
 from . import analyzer_api, converter, datasets, inspector_api
 from .analyzer_pages import dataset_page, datasets_page, version, viewer_page
-from .api import Describe, TaskConvert
+from .api import Describe, TaskConvert, TaskDataset
 from .page import sdk_page
 
 DATASET = r'datasets/(?P<pk>[0-9a-f-]{36})'
@@ -69,6 +69,7 @@ class Plugin(PluginBase):
             MountPoint(r'projects/(?P<project_pk>\d+)/inspector/mosaics$', inspector_api.InspectorMosaics.as_view()),
             MountPoint(r'projects/(?P<project_pk>\d+)/inspector/palette$', inspector_api.InspectorProjectPalette.as_view()),
             MountPoint(r'projects/(?P<project_pk>\d+)/tasks/(?P<pk>[^/.]+)/convert$', TaskConvert.as_view()),
+            MountPoint(TASK + '/dataset$', TaskDataset.as_view()),
             MountPoint('datasets$', analyzer_api.DatasetListCreate.as_view()),
             MountPoint(DATASET + '$', analyzer_api.DatasetDetail.as_view()),
             MountPoint(DATASET + '/upload$', analyzer_api.DatasetUpload.as_view()),
