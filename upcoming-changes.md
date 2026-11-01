@@ -262,7 +262,7 @@
   "How much of this can be built into the mosaic/harmonized/source frame viewers?"; details under "Up next: The
   mosaic viewer's image controls" below): the frame pixel under the cursor, brightness, contrast, gamma,
   sharpening, Linear/Equalized, an isotherm, and a click keeping the readout with "Follow the cursor". In four steps;
-  step 1 done.
+  steps 1 and 2 done.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -373,6 +373,13 @@ HomerunObliqueII, and README and docs (`docs/`, screenshots retaken):
    finds it, none outside), `analyzer.test.js`'s readout test. Django 134 (1 skipped: Windows only), Jest 161,
    ESLint, Ruff; live on HomerunObliqueII: the row shows, matching the frames window's pixel within one.
 2. **A click keeps the point, "Follow the cursor"** (`viewer.js`).
+   **Done** (2026-10-31, `viewer-follow`): `viewer.js` (`pin`, `follow`, `followHtml`, `readoutHtml(res, unit,
+   pinned)`; the marker on its own layer, kept when the frames window closes; Esc outside a field; another tab reads
+   the kept point again), `viewer.html`'s hint; README, `docs/quickstart-worksets.md` (and its frame pixel, missed in
+   step 1), screenshot `mosaic-frames` retaken. Tests (agreed): the frames window's test changed (the click's point
+   replies, the marker on the new layer), a new test "a click keeps the readout on its point until Follow the cursor
+   or Esc", the readout test's button. Jest 162, ESLint; live: kept on moving, closing the window and changing tab;
+   the button and Esc let go.
 3. **The Image section**: brightness, contrast, gamma, sharpening, Linear/Equalized, Reset; tiles, frame pictures
    and the colour bar.
 4. **The Isotherm section**: tiles and frame pictures.
