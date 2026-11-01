@@ -259,10 +259,10 @@
   Done; GitHub Pages is turned on by the user once the repo is public.
 
 - **The mosaic viewer's image controls** (the user, 2026-10-31, from a screenshot of dji-thermal-ui's viewer panel:
-  "How much of this can be built into the mosaic/harmonized/source frame viewers?"; details under "Up next: The
+  "How much of this can be built into the mosaic/harmonized/source frame viewers?"; details under "Done: The
   mosaic viewer's image controls" below): the frame pixel under the cursor, brightness, contrast, gamma,
-  sharpening, Linear/Equalized, an isotherm, and a click keeping the readout with "Follow the cursor". In four steps;
-  steps 1 to 3 done.
+  sharpening, Linear/Equalized, an isotherm, and a click keeping the readout with "Follow the cursor". Done
+  (2026-11-01), in four steps.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -320,7 +320,7 @@
   `ignored/WebODM-Plugins` on their upstream `main`. Ruff passes; Jest and ESLint have nothing to check until
   `dji-thermal/public/` exists.
 
-## Up next: The mosaic viewer's image controls
+## Done: The mosaic viewer's image controls
 
 **Request** (the user, 2026-10-31): dji-thermal-ui's viewer panel (`~/gitrepos/python/dji-thermal-ui`,
 `frontend/src/viewer/panel.tsx`) in the plugin's mosaic viewer (`viewer.html`, `viewer.js`: the Mosaic,
@@ -399,6 +399,15 @@ HomerunObliqueII, and README and docs (`docs/`, screenshots retaken):
    window. The live check left `histogram-as_converted.json` and `histogram-harmonized.json` in that workset's
    `viewer/` folder (a cache; the removal was refused by a safety check).
 4. **The Isotherm section**: tiles and frame pictures.
+   **Done** (2026-11-01, `viewer-isotherm`): `colouring.py` (dji-thermal-ui's `parse_isotherm` and
+   `isotherm_range`), `mosaics.tile` and `frame_image` (the isotherm to `colouring.colour`), `analyzer_api.py`
+   (`mosaic_isotherm`: `isotherm=above,T|below,T|between,A,B` in the mosaic's unit, temperatures only), `viewer.js`
+   (`isothermParam` from its `measure.ts`, `isothermHtml`, `isothermQuery`; shared by the temperature tabs, kept by
+   Reset), `analyzer.css`; README, `docs/quickstart-worksets.md`, `docs/api.md`, screenshots `mosaic-viewer` and
+   `mosaic-frames` retaken. Tests (agreed): `test_analyzer.py` (the isotherm's drawing and parsing; its tile and
+   refusals), `analyzer.test.js` (`isothermParam`; the section in the page test). Django 135 (1 skipped: Windows
+   only), Jest 165, ESLint, Ruff; live on HomerunObliqueII: Above 40 and Between 20–30 on the map and in the frames
+   window, the reversed range's error, shared with Harmonized, none on View angle, None removes it.
 
 ## Evaluation: porting the existing DJI thermal plugin (2026-10-29)
 
