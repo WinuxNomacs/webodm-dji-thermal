@@ -590,6 +590,29 @@
     `inspector-saved`, `inspector-mosaics` retaken (read only). `inspector.test.js` (2: Mosaic Overlays absent
     without mosaics; the heading, and unticking forgetting the values). Jest 206, ESLint.
 
+- **The Thermal Inspector's top stays in view** (the user, 2026-11-01, from `new.md`): "in the Thermal Inspector,
+  make the top section a header area that remains visible when you scroll down. This way the controls and
+  temperature are always visible."
+  - What it builds on (`inspector.js` `panelHtml`, `inspector.css`): the panel (on WebODM's 2D map, the toolbar's
+    Inspector button) scrolls as a whole past 70% of the window's height (`max-height: 70vh; overflow-y: auto`).
+    From the top: the heading (Thermal Inspector, its ×, dragged to move the panel), the mode buttons (Hover, Pin,
+    the region shapes, Line) with the polygon/line hint and any notice, the readout (the temperature under the
+    cursor), then Palette, the colour scale (its bar and range fields), "Legend on the map", Image, Mosaic Overlays,
+    Isotherm, Manual Corrections, Pinned points, Regions and lines, Saved measurements. The whole panel is drawn
+    again on each change (`panel.innerHTML`).
+  - Proposed: one step, `inspector-header`: the heading, mode buttons, hints and readout in a header kept at the
+    top of the panel while the rest scrolls under it (CSS `position: sticky`, a white background and a line under
+    it); the panel's drag by its heading unchanged. README and `quickstart-inspector.md` if they describe it; a
+    screenshot of the panel scrolled down.
+  - Decided (the user, 2026-11-01): **also Palette and the colour scale** in the header; **before Faster image
+    adjustments**.
+  - Done (2026-11-01), `inspector-header`: `inspector.js` `panelHtml` (the heading, modes, hints, readout, Palette
+    and the scale in `.dt-inspector-top`), `inspector.css` (sticky over the panel's padding, above the sections'
+    buttons, a line under it); "Legend on the map", Image and the sections below scroll under it. README ("The
+    panel's top stays in view"), `quickstart-inspector.md` section 2. Screenshots `inspector`, `inspector-line`,
+    `inspector-image`, `inspector-saved`, `inspector-mosaics` retaken (read only; the first three and
+    `inspector-saved` show the panel scrolled under its top). `inspector.test.js` (1). Jest 207, ESLint.
+
 - **Faster image adjustments** (the user, 2026-11-01, from `new.md`): "can anything be done to improve the
   rendering response time of changes to the images sliders? How fast the tiles are rendered? etc.... Looking for it
   to be as seamless and realtime as possible without needing a webodm pr".

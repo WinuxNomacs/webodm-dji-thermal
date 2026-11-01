@@ -298,6 +298,8 @@ Inspector:
   between. When the image's own coldest or hottest temperature lies outside that range (narrowed in the colour scale
   or WebODM's layer panel), a line under the bar gives them. It follows the palette and range, and "Legend on the
   map" hides it. With several thermal tasks on the map, it is the topmost one's.
+- **The panel's top stays in view**: its heading, the mode buttons, the temperature under the cursor, Palette and
+  the colour scale stay at the top while the sections below scroll under them.
 - **Moving them**: drag the panel by its heading, or the legend by any part, to move it out of the way; both stay
   inside the map, and the frames window moves with the panel. Closing the panel, hiding the legend or reloading the
   page puts them back in their places.

@@ -7,6 +7,11 @@
     font-size: 13px; line-height: 1.4; cursor: default;
 }
 .dt-inspector-panel[hidden] { display: none; }
+/* Kept at the top of the scrolling panel, over its padding; above the sections' buttons (Bootstrap's z-index 2) */
+.dt-inspector-top {
+    position: sticky; top: -8px; z-index: 5; margin: -8px -10px 6px; padding: 8px 10px 0;
+    background: #fff; border-bottom: 1px solid #ddd;
+}
 .dt-inspector-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .dt-inspector-modes { margin-bottom: 6px; }
 /* The panel's links are plain text links, not Leaflet's control buttons: Leaflet's `.leaflet-bar a:hover` makes a
