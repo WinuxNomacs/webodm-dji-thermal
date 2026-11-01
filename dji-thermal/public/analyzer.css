@@ -258,6 +258,10 @@
 .ta-viewer .ta-slider-value{ text-align: right; opacity: .75; font-size: 12px; }
 .ta-viewer .ta-viewer-tone{ display: flex; gap: 6px; margin: 6px 0; }
 .ta-viewer .ta-viewer-tone select{ width: auto; }
+.ta-viewer .ta-viewer-isotherm{ display: flex; gap: 6px; align-items: center; margin: 6px 0; }
+.ta-viewer .ta-viewer-isotherm select{ width: auto; }
+.ta-viewer .ta-viewer-isotherm input{ width: 80px; }
+.ta-viewer .ta-viewer-isotherm [hidden]{ display: none; }
 .ta-viewer .ta-legend-ticks{ position: relative; height: 16px; font-size: 11px; line-height: 1; }
 .ta-viewer .ta-tick{ position: absolute; top: 4px; transform: translateX(-50%); white-space: nowrap; }
 .ta-viewer .ta-tick::before{ content: ""; position: absolute; left: 50%; top: -4px; height: 3px; border-left: 1px solid currentColor; }

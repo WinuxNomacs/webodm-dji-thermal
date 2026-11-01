@@ -64,7 +64,8 @@ The panel on the right sets the palette and the colour range (**Auto** uses the 
 **Image** how the image is drawn: **Brightness** and **Contrast** move and narrow the range, **Gamma** brightens the
 cooler part of it (above 1) or the warmer part (below 1), **Sharpening** brings out edges, **Equalized** spreads the
 colours over the temperatures the mosaic has most of, and **Reset** goes back to the Auto range with none of them.
-They only change how the image is drawn, never the temperatures. It shows the
+They only change how the image is drawn, never the temperatures. An **Isotherm** (above, below or between
+temperatures) keeps the palette for the pixels in it and turns the rest grey. It shows the
 temperature, frame, frame pixel and view angle under the cursor, what dji-thermal-cli reports about the mosaic (seams,
 misalignment, frame offsets), and the files to download.
 

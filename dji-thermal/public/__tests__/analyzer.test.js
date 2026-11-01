@@ -2221,6 +2221,17 @@ describe("the mosaic viewer", () => {
         expect(scale.gradientCss([0x000000ff, 0xffffffff]).match(/rgb\(/g).length).toBe(16);
     });
 
+    it("turns an isotherm typed in the user's unit into the server's, in the mosaic's unit", () => {
+        window.localStorage.setItem("unit_system", "imperial");
+        expect(viewer.isothermParam("", "", "", "C")).toEqual({value: ""});
+        expect(viewer.isothermParam("above", "104", "", "C")).toEqual({value: "above,40"});
+        expect(viewer.isothermParam("below", "32", "", "C")).toEqual({value: "below,0"});
+        expect(viewer.isothermParam("between", "50", "68", "C")).toEqual({value: "between,10,20"});
+        expect(viewer.isothermParam("above", "", "", "C").error).toMatch(/needs a temperature/);
+        expect(viewer.isothermParam("between", "50", "", "C").error).toMatch(/needs two temperatures/);
+        expect(viewer.isothermParam("between", "68", "50", "C").error).toMatch(/above the first/);
+    });
+
     it("draws the image as the Image section says: the sliders, Equalized, Reset, and the frames' pictures too", async () => {
         const L = fakeLeaflet();
         const at = "?lon=10.0005&lat=45.0005";
@@ -2272,14 +2283,36 @@ describe("the mosaic viewer", () => {
         await ticks();
         expect($("ta-viewer-pip").querySelector("img").getAttribute("src")).toContain("rescale=-1.6,26.2&gamma=2&equalize=1");
 
-        // View angle: no Equalized
+        // The isotherm: its fields shown for its mode, no error before a temperature is typed, then drawn in the tiles
+        // and the frames window's picture
+        $("ta-viewer-iso-mode").value = "above";
+        change($("ta-viewer-iso-mode"));
+        expect([$("ta-viewer-iso-a").hidden, $("ta-viewer-iso-b").hidden, $("ta-viewer-iso-hint").hidden]).toEqual([false, true, false]);
+        expect($("ta-viewer-iso-error").textContent).toBe("");
+        expect(tile()).not.toContain("isotherm");
+        $("ta-viewer-iso-a").value = "30";
+        change($("ta-viewer-iso-a"));
+        await ticks();
+        expect(tile()).toContain("&isotherm=above%2C30");
+        expect($("ta-viewer-pip").querySelector("img").getAttribute("src")).toContain("&isotherm=above%2C30");
+
+        // View angle: no Equalized, no isotherm
         click($("ta-viewer-tabs").querySelector('[data-tab="view_angle"]'));
         await ticks();
         expect([...$("ta-viewer-tone").options].map(o => o.value)).toEqual(["linear"]);
+        expect($("ta-viewer-iso-mode")).toBeNull();
+        expect(tile()).not.toContain("isotherm");
 
-        // Reset: the Auto range, no adjustments
+        // Back on the temperatures the isotherm is still there; None removes it
         click($("ta-viewer-tabs").querySelector('[data-tab="as_converted"]'));
         await ticks();
+        expect($("ta-viewer-iso-mode").value).toBe("above");
+        $("ta-viewer-iso-mode").value = "";
+        change($("ta-viewer-iso-mode"));
+        expect($("ta-viewer-iso-a").hidden).toBe(true);
+        expect(tile()).not.toContain("isotherm");
+
+        // Reset: the Auto range, no adjustments
         click($("ta-viewer-reset"));
         expect(tile()).toMatch(/rescale=12\.3,40\.1$/);
         expect([$("ta-viewer-gamma-value").textContent, $("ta-viewer-tone").value, $("ta-viewer-brightness").value]).toEqual(["1.00", "linear", "0"]);

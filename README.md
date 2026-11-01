@@ -157,6 +157,8 @@ over WebODM's base layers:
   mosaic has most of; temperatures only) and **Reset**, drawn into the tiles and the frames' pictures, with the colour
   scale drawn to match; the temperatures stay as they are. The temperature tabs share them, and each visit starts
   without them;
+- an **Isotherm** on the temperature tabs (above, below or between temperatures): its pixels keep the palette and the
+  rest turns grey, on the map and in the frames' pictures;
 - the temperature, frame, frame pixel and view angle under the cursor;
 - a click on the map keeps those values at that point, marked, until **Follow the cursor** (or Esc), and opens a
   window over the map with the **frames that saw that point** (the mosaic's own first, the

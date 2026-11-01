@@ -560,6 +560,18 @@ class TestMosaics(AnalyzerTestCase):
         self.assertGreater(sharp[4, 5, 0], plain[4, 5, 0])
         self.assertEqual(sharp[4, 0, 0], plain[4, 0, 0])
         self.assertEqual(colouring.colour(edge, grey, (0, 10), sharpen=2.0, margin=2).shape, (5, 5, 4))
+        # An isotherm keeps the palette for the values in it, and greys the others
+        red = [(i << 24) | 255 for i in range(256)]
+        inside = colouring.isotherm_range(colouring.parse_isotherm("between,4,6"))
+        out = colouring.colour(np.array([[5.0, 2.0]]), red, (0, 10), isotherm=inside)
+        self.assertEqual(out[0, :, :3].tolist(), [[128, 0, 0], [51, 51, 51]])
+        self.assertEqual(colouring.parse_isotherm("above,40"), ("above", 40.0, None))
+        self.assertEqual(colouring.parse_isotherm("below,5"), ("below", None, 5.0))
+        self.assertEqual(colouring.parse_isotherm(""), None)
+        self.assertEqual(colouring.isotherm_range(("above", 40.0, None)), (40.0, 3e38))
+        for bad in ("above", "between,2,1", "near,3", "above,x"):
+            with self.assertRaises(ValueError, msg=bad):
+                colouring.parse_isotherm(bad)
         # The equalization's curve rises from 0 to 1, steepest where most values are
         values = np.concatenate([np.full(900, 20.0), np.linspace(10, 30, 100)])
         curve = colouring.equalization(colouring.value_histogram(values, (10, 30)), 10, 30)
@@ -693,8 +705,14 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual(sharp.status_code, status.HTTP_200_OK)
         self.assertFalse(np.array_equal(drawn(sharp)[..., :3], drawn(toned)[..., :3]))
         self.assertEqual(self.client.get(tile_url, dict(style, gamma=9)).status_code, status.HTTP_400_BAD_REQUEST)
+        # An isotherm greys the temperatures outside it; only temperatures have one
+        iso = self.client.get(tile_url, dict(style, isotherm="above,{}".format((lo + hi) / 2)))
+        self.assertEqual(iso.status_code, status.HTTP_200_OK)
+        self.assertFalse(np.array_equal(drawn(iso)[..., :3], plain[..., :3]))
+        self.assertEqual(self.client.get(tile_url, dict(style, isotherm="between,5,1")).status_code, status.HTTP_400_BAD_REQUEST)
         angles_url = self.url(task, cid, "/view_angle/tiles/{}/{}/{}.png".format(t.z, t.x, t.y))
         self.assertEqual(self.client.get(angles_url, {"rescale": "0,20", "equalize": 1}).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.get(angles_url, {"rescale": "0,20", "isotherm": "above,5"}).status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.client.get(angles_url, {"rescale": "0,20", "gamma": 2, "sharpen": 3}).status_code, status.HTTP_200_OK)
         # The colour scale's curve: linear without adjustments, Equalized from the mosaic's histogram, kept in a file
         # and read again from it

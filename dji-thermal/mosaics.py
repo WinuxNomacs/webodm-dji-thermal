@@ -434,10 +434,10 @@ def png(rgba):
     return render(np.moveaxis(rgba[..., :3], 2, 0), rgba[..., 3], img_format='PNG')
 
 
-def tile(task, cid, tab, z, x, y, cmap, low, high, adjust=None):
+def tile(task, cid, tab, z, x, y, cmap, low, high, adjust=None, isotherm=None):
     """
     A tile of a viewer tab as PNG bytes: temperatures and view angles over low..high in cmap, drawn with the adjustments
-    (colouring); the source frames as the temperatures with black and white lines where one frame meets the next;
+    and the isotherm (colouring: its temperatures in the palette, the rest in grey); the source frames as the temperatures with black and white lines where one frame meets the next;
     never interpolated (nearest pixel).
     :return: None when the tile is outside the mosaic
     :raises ValueError: equalize asked on a tab of no temperatures
@@ -475,7 +475,8 @@ def tile(task, cid, tab, z, x, y, cmap, low, high, adjust=None):
         valid &= data > low_value(built.get('unit') or 'C')
     gsd = ((built.get('kinds') or {}).get(tab_kind(tab)) or {}).get('gsd_m')
     rgba = colouring.colour(np.where(valid, data, np.nan), palette_colors(cmap), (low, high), tone, adjust['sharpen'],
-                            sigma=colouring.sharpen_sigma(gsd, tile_pixel_m(z, y)), margin=buffer)
+                            colouring.isotherm_range(isotherm), sigma=colouring.sharpen_sigma(gsd, tile_pixel_m(z, y)),
+                            margin=buffer)
     if framed:
         frames = np.asarray(t.data[1], dtype=np.float64)
         first, second = seams(np.rint(np.where(np.isfinite(frames), frames, -1)), valid & np.isfinite(frames))
@@ -637,11 +638,11 @@ def frame_values(task, cid, tab, index):
     return values
 
 
-def frame_image(task, cid, tab, index, cmap, low, high, adjust=None):
-    """A frame as frame_values gives it, over low..high in cmap, drawn as the tab's tiles are (its mosaic's curve), as
-    PNG bytes"""
+def frame_image(task, cid, tab, index, cmap, low, high, adjust=None, isotherm=None):
+    """A frame as frame_values gives it, over low..high in cmap, drawn as the tab's tiles are (its mosaic's curve, the
+    isotherm), as PNG bytes"""
     from . import colouring
     adjust = adjust or NO_ADJUST
     tone = shares(task, cid, tab, low, high, adjust)
     return png(colouring.colour(frame_values(task, cid, tab, index), palette_colors(cmap), (low, high), tone,
-                                adjust['sharpen']))
+                                adjust['sharpen'], colouring.isotherm_range(isotherm)))
