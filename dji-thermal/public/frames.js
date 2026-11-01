@@ -17,6 +17,12 @@
         return base + "/mosaics/" + tab + "/frames/" + index + ".png?" + query;
     }
 
+    // A frame's page in the Analyzer (frame.html), from the workset's API URL (base) and the frame's file
+    function framePageUrl(base, file) {
+        return base.replace("/api/plugins/dji-thermal/datasets/", "/plugins/dji-thermal/dataset/").replace("/conversions/", "/conversion/") +
+            "/frame?frame=" + encodeURIComponent(file);
+    }
+
     // The frames as a WebODM orthophoto made from the workset's TIFFs shows them: ODM blended them, so none is the
     // pixel's own, and they come from the one that saw the point closest to straight down
     function orthophotoFrames(frames) {
@@ -30,8 +36,8 @@
 
     // The window of the frames that saw a point (pick: {frames, models, at: the one shown, orthophoto: on a WebODM
     // orthophoto, where the frames are placed from their GPS and gimbal, not ODM's cameras}), the frame drawn from url
-    // with a crosshair on the point
-    function pipHtml(pick, url) {
+    // with a crosshair on the point; base (the workset's API URL): a link to the frame's page
+    function pipHtml(pick, url, base) {
         var close = '<button type="button" class="btn btn-link btn-sm" data-pip="close" title="Close" aria-label="Close">' +
             '<i class="fa fa-times"></i></button>';
         var frames = pick.frames || [];
@@ -55,10 +61,12 @@
             '<div class="ta-pip-foot">' + escapeHtml(f.file) + '<br><span class="ta-message">' +
             (f.source ? "The mosaic's pixel here comes from this frame; " : "") + "seen " + escapeHtml(angle) + " from straight down" +
             (pick.orthophoto ? ". Placed from the frames' GPS and gimbal, not ODM's cameras: the point may be a little off." : "") +
-            "</span></div>";
+            "</span>" + (base ? '<br><a href="' + escapeHtml(framePageUrl(base, f.file)) + '" target="_blank" rel="noopener" data-pip="open" ' +
+                'title="The frame on its own page: measure it, or measure it again with other parameters"><i class="fa fa-external-link-alt"></i> Open this frame</a>' : "") +
+            "</div>";
     }
 
-    var api = {framesUrl: framesUrl, frameUrl: frameUrl, orthophotoFrames: orthophotoFrames, pipHtml: pipHtml};
+    var api = {framesUrl: framesUrl, frameUrl: frameUrl, framePageUrl: framePageUrl, orthophotoFrames: orthophotoFrames, pipHtml: pipHtml};
     root.ThermalFrames = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

@@ -76,6 +76,33 @@ that saw that point**, with the arrows to go through them:
 
 ![The frames that saw a point](images/mosaic-frames.png)
 
+### One frame at a time
+
+**Open this frame**, under the frame in that window, opens it on the frame page in a new tab (a thermal frame's
+name on the Files tab opens it too). The frames are listed on the left in the order they were taken; click one, or
+step with ← and →. Once the mosaics are built, **All**, **In the mosaic** and **Oblique** choose which are listed.
+The panel has the same palette, range, **Image** and **Isotherm** as the mosaic viewer, and the temperature under the
+cursor.
+
+![The frame page, a rectangle measured on the frame](images/frame-page.png)
+
+**Measure** has the Thermal Inspector's tools, in the frame's pixels: **Pin**, **Line**, **Rectangle**, **Circle** and
+**Polygon**. Click a row for its statistics (a line's profile, a region's histogram, the surroundings and ΔT). Those
+who can change the project can **Save** one: it stays with the workset, under **Saved on this frame**, for everyone
+who can view the project.
+
+**Measure again** shows the frame's distance, humidity, emissivity, reflected and ambient temperature: as the camera
+recorded them, as the frame was measured with them, and fields to change them. Change one and press **Measure
+again** (or Enter): dji-thermal-cli measures the frame again, exactly as a workset with those settings would, and
+shows it beside the first, with both temperatures and their difference under the cursor. Pins and regions are
+measured with the new values too.
+
+![The frame measured again with another emissivity, beside the frame as converted](images/frame-measure-again.png)
+
+**New workset with these** opens the Worksets tab with the form filled in with this workset's settings and the
+changed values, ready to convert the whole flight with them. **Download** saves the frame as shown (PNG) or its
+temperatures (CSV, or a 32-bit TIFF without a location), as converted or with the values changed.
+
 **Open on WebODM's map**, at the top (and in the workset's menu), opens WebODM's map of the project with this mosaic
 laid on it, to compare it with the project's tasks: see [Measuring on the map](quickstart-inspector.md#4-mosaic-overlays-on-the-map).
 It's there once WebODM has a map of the project, that is once one of its tasks has finished with an orthophoto or

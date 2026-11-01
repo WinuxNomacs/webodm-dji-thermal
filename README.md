@@ -9,8 +9,8 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
   processes them like any other task.
 - **DJI Thermal Analyzer**, in WebODM's menu: for a flight you want to look at first. It checks the photos (what each one
   is, the problems found, the WebODM options to use), converts them with every dji-thermal-cli setting (several
-  worksets side by side), places the frames into mosaics shown on a map, and makes a WebODM task from the
-  workset you choose.
+  worksets side by side), places the frames into mosaics shown on a map, shows each frame on its own page (measured
+  in its pixels, or measured again with other values), and makes a WebODM task from the workset you choose.
 - **Thermal Inspector**, on WebODM's 2D map of a task with a thermal orthophoto: the temperature under the cursor,
   pinned points, the statistics of regions and lines drawn on it (with their surroundings and ΔT, and a line's
   profile), measurements saved for everyone who can view the project, an approximate correction for another
@@ -118,7 +118,8 @@ Then:
   problems, sorted by any column, with thumbnails if you like (in your preferred DJI palette, if you chose one).
   Click a file to open a detail pane beside the table: its picture (a thermal frame drawn from its temperatures in
   your preferred DJI palette, else in the one it was shot in) and everything the analysis read from it (camera, position, gimbal, temperatures, measurement
-  parameters, warnings), with **Download** (the file as uploaded). Click the picture to view it over the page: a
+  parameters, warnings), with **Download** (the file as uploaded) and, for a thermal frame once a workset has converted,
+  **Open frame** (the frame page, below; a thermal frame's name in the table opens it too). Click the picture to view it over the page: a
   thermal frame in the same palette, a photo as uploaded at its own size, fitted to the window, with zoom (the
   buttons, the mouse wheel where it points, a double click), **Fit** and **1:1**, dragging to pan, the previous and
   next images in the table's order (also ← and →), Download, and × or Esc to close (Ctrl/Cmd-click opens the
@@ -186,13 +187,44 @@ over WebODM's base layers:
 - a click on the map keeps those values at that point, marked, until **Follow the cursor** (or Esc), and opens a
   window over the map with the **frames that saw that point** (the mosaic's own first, the
   others in turn with the arrows), each drawn in the tab's palette and range (on View angle, the angle each of its
-  pixels saw the ground at), with a crosshair on the point and its outline on the map; mosaics built before version
-  1.5.0 of dji-thermal-cli are built again to show them;
+  pixels saw the ground at), with a crosshair on the point and its outline on the map, and **Open this frame** (the
+  frame page, below, in a new tab); mosaics built before version 1.5.0 of dji-thermal-cli are built again to show them;
 - what dji-thermal-cli reports (seams, misalignment, frame offsets, heights) and the mosaic files to download (also
   in the workset's zip);
 - **Open on WebODM's map** (also in the workset's menu): WebODM's map of the project with this mosaic laid on it by
   the Thermal Inspector (below), to compare it with the project's tasks. Shown when WebODM has a map of the project
   (one of its tasks has finished with an orthophoto or an elevation model).
+
+### The frame page
+
+One frame of a workset at a time, as the workset measured it, opened from the frames window (**Open this frame**,
+in the mosaic viewer and the Thermal Inspector) or from the Files tab (a thermal frame's name, or **Open frame** in
+its detail pane: the frame page of the newest workset that converted):
+
+- the dataset's thermal frames listed beside it in the order they were taken, the one shown marked, stepped through
+  with ← and → (or the arrows at the top); once the mosaics are built, **All**, **In the mosaic** or **Oblique**
+  (those the mosaics left out, and why); the frame and the list are in the page's address, to link to;
+- the frame, zoomed and moved like a map, coloured in your browser from its temperatures with the mosaic viewer's
+  palette, range, **Image** and **Isotherm** controls (Equalized from the frame's own histogram), following them as
+  they move;
+- the temperature of the pixel under the cursor;
+- **Measure**: the Thermal Inspector's tools in the frame's pixels: a pin (a pixel's temperature), a line (a strip 1
+  pixel either side of it, with its profile; hovering the profile marks its point), a rectangle, a circle or a
+  polygon (the statistics, the surroundings, a ring 3 to 10 pixels wide, and ΔT, the isotherm's share and a
+  histogram), labelled P1…, L1…, R1…, kept while the page is open and measured again when the isotherm or the
+  parameters change;
+- **Saved on this frame**: a measurement's Save (for those who can change the project) names it, with an optional
+  comment, and keeps it with the workset, with the parameters it was measured with; everyone who can view the project
+  sees them on the frame, dashed in green; those who can change it rename and delete them;
+- **Measure again**: distance, humidity, emissivity, reflected and ambient temperature as the camera recorded them,
+  as the frame was measured with them, and to change to; dji-thermal-cli measures the frame again with them, exactly
+  as a workset converted with them would (not the Inspector's approximate correction), shown in a second pane beside
+  the first, which moves with it, and the readout gives both temperatures and their difference. The changes stay as
+  you step to other frames; **Clear** drops them, and **New workset with these** opens the Worksets tab with the
+  form filled in with the workset's settings and these changes;
+- the frame's size, range and mean, what normalizing or harmonizing did to it, and what dji-thermal-cli noted;
+- **Download**: the frame as shown (PNG, at its own size), its temperatures as CSV (a row per row of pixels) or as a
+  32-bit float TIFF (no location), as converted or with the parameters changed.
 
 ### A WebODM task from a workset
 
@@ -323,8 +355,8 @@ Inspector:
   saw that point beside the panel, as in the mosaic viewer: one at a time with a crosshair on the point, its outline
   on the map, drawn in the layer's palette and range. On a mosaic, its own frame comes first; on an orthophoto, the
   one that saw the point closest to straight down, placed with the workset's camera models (from the frames' GPS and
-  gimbal, not ODM's refined cameras, so the point can be a little off). Elsewhere a click in Hover is still WebODM's
-  (its popup).
+  gimbal, not ODM's refined cameras, so the point can be a little off), and **Open this frame**: the frame page, in a
+  new tab. Elsewhere a click in Hover is still WebODM's (its popup).
 
 Temperatures are read from the orthophoto or mosaic on the server (the plugin's own API, for those who can view the
 task or project) and shown in WebODM's units (°F when imperial), the same setting as the Analyzer's.

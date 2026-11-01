@@ -1,0 +1,74 @@
+{% extends "app/plugins/templates/base.html" %}
+{% block content %}
+<link rel="stylesheet" href="{{ public }}build/Leaflet.css?v={{ v }}">
+<link rel="stylesheet" href="{{ public }}analyzer.css?v={{ v }}">
+<link rel="stylesheet" href="{{ public }}inspector.css?v={{ v }}">
+
+<div id="ta-frame" class="ta-page ta-viewer ta-frame" data-api="{{ api }}" data-public="{{ public }}" data-dataset="{{ dataset.id }}" data-id="{{ conversion.id }}">
+    {% csrf_token %}
+    <div class="ta-breadcrumb"><a href="{{ public }}dataset/{{ dataset.id }}/conversion/{{ conversion.id }}"><i class="fa fa-arrow-left"></i> {{ conversion.name }}</a></div>
+    <div class="ta-header">
+        <div>
+            <h3 id="ta-frame-name">{{ conversion.name }}</h3>
+            <div class="ta-subtitle" id="ta-frame-subtitle"></div>
+        </div>
+        <div class="ta-header-actions">
+            <button type="button" class="btn btn-default btn-sm" id="ta-frame-prev" title="The frame before (←)" aria-label="The frame before" disabled><i class="fa fa-chevron-left"></i></button>
+            <button type="button" class="btn btn-default btn-sm" id="ta-frame-next" title="The frame after (→)" aria-label="The frame after" disabled><i class="fa fa-chevron-right"></i></button>
+        </div>
+    </div>
+    <div class="ta-status" id="ta-frame-status"></div>
+
+    <div id="ta-frame-main" hidden>
+        <div class="ta-viewer-body">
+            <aside class="ta-frame-list" id="ta-frame-list" aria-label="Frames"></aside>
+            <div class="ta-frame-panes">
+                <div class="ta-frame-pane">
+                    <div class="ta-frame-pane-title" id="ta-frame-title-0" hidden>As converted</div>
+                    <div class="ta-frame-map" id="ta-frame-map-0"></div>
+                </div>
+                <div class="ta-frame-pane" id="ta-frame-pane-1" hidden>
+                    <div class="ta-frame-pane-title">With the parameters changed</div>
+                    <div class="ta-frame-map" id="ta-frame-map-1"></div>
+                </div>
+            </div>
+            <div class="ta-viewer-panel">
+                <div id="ta-viewer-controls"></div>
+                <details class="ta-section" open data-section="cursor">
+                    <summary><h5>Under the cursor</h5></summary>
+                    <div class="ta-viewer-readout" id="ta-frame-readout"></div>
+                </details>
+                <details class="ta-section" open data-section="measure">
+                    <summary><h5>Measure</h5></summary>
+                    <div id="ta-frame-measure"></div>
+                </details>
+                <details class="ta-section" open data-section="saved">
+                    <summary><h5>Saved on this frame</h5></summary>
+                    <div id="ta-frame-saved"></div>
+                </details>
+                <details class="ta-section" open data-section="params">
+                    <summary><h5>Measure again</h5></summary>
+                    <div id="ta-frame-params"></div>
+                </details>
+                <details class="ta-section" open data-section="frame">
+                    <summary><h5>The frame</h5></summary>
+                    <div id="ta-frame-info"></div>
+                </details>
+                <details class="ta-section" data-section="download">
+                    <summary><h5>Download</h5></summary>
+                    <div id="ta-frame-download"></div>
+                </details>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ display|json_script:"ta-display" }}
+<script src="{{ public }}analyzer_core.js?v={{ v }}"></script>
+<script src="{{ public }}scale.js?v={{ v }}"></script>
+<script src="{{ public }}recolour.js?v={{ v }}"></script>
+<script src="{{ public }}viewer.js?v={{ v }}"></script>
+<script src="{{ public }}regions.js?v={{ v }}"></script>
+<script src="{{ public }}inspector.js?v={{ v }}"></script>
+<script src="{{ public }}frame.js?v={{ v }}"></script>
+{% endblock %}

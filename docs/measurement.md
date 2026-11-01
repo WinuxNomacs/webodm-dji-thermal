@@ -68,5 +68,13 @@ shows seams. The Workset Creation Settings' Frames section has two settings for 
   overlaps as a mosaic does. It takes longer, and frames that can't be placed (oblique, or without a position) keep
   their drift. Ticking it ticks Normalize. The WebODM plan recommends it for processing into a map.
 
+## Trying other values on one frame
+
+The frame page's **Measure again** measures one frame with other values for the distance, humidity, emissivity,
+reflected and ambient temperature, exactly as a workset with them would, and shows it beside the frame as converted
+(see [One frame at a time](quickstart-worksets.md#one-frame-at-a-time)). It's the quick way to see what a value
+changes before converting the whole flight with it: **New workset with these** then fills in the Workset Creation
+Settings. The Thermal Inspector's correction, on the map, is an approximation instead, for comparing surfaces.
+
 A workset made before Harmonize existed with Normalize ticked did both, and shows both ticked. The mosaic viewer's
 **Harmonized** mosaic is always harmonized, whatever the workset's settings.

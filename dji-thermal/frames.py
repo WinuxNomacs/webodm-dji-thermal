@@ -1,0 +1,296 @@
+"""
+A workset's frames one at a time, for the Analyzer's frame page: the dataset's thermal frames, each measured by
+dji-thermal-cli as the workset converted it (its settings, the flight's medians and each frame's offset when it
+normalized), or again with some of its measurement parameters changed; its values, the statistics of a shape drawn
+in its pixels, and its temperatures to download. Values are in the workset's unit.
+"""
+import functools
+import io
+import math
+import os
+
+from . import conversions, converter, datasets, inspector, mosaics
+
+# The parameters a frame can be measured again with (the temperatures in the workset's unit)
+CHANGES = ('distance', 'humidity', 'emissivity', 'reflected_temp', 'ambient_temp')
+# A shape's sizes in pixels: a line measures a strip LINE_HALF_WIDTH either side, the surroundings are a ring out to
+# the shape's size, RING_MIN to RING_MAX (a band RING_MIN wide beside a line)
+LINE_HALF_WIDTH = 1.0
+RING_MIN = 3.0
+RING_MAX = 10.0
+DOWNLOADS = ('csv', 'tiff')
+CSV_DIGITS = 3
+
+
+class FrameError(ValueError):
+    """What is asked can't be measured (the message is for the user)"""
+
+
+def thermal_rows(task):
+    """The dataset's thermal frames as its analysis lists them"""
+    return [r for r in datasets.analysis(task).get('files') or [] if r.get('kind') == 'thermal']
+
+
+def frame_list(task, cid):
+    """
+    The frames the page lists: [{path, time, pitch, converted (the workset converted it), mosaic (its place among the
+    mosaics' frames, or None)}], in the order they were taken (those without a time last, by name)
+    """
+    converted = {f.get('path'): f for f in conversions.results(task, cid).get('files') or []}
+    in_mosaic = {name: i for i, name in enumerate(mosaics.result(task, cid).get('frames') or [])}
+    rows = [{'path': r['path'], 'time': r.get('time') or "", 'pitch': r.get('pitch'),
+             'converted': bool((converted.get(r['path']) or {}).get('ok')), 'mosaic': in_mosaic.get(r['path'])}
+            for r in thermal_rows(task)]
+    return sorted(rows, key=lambda r: (not r['time'], r['time'], r['path']))
+
+
+def recorded(task, rel):
+    """What the camera recorded of a frame's parameters (the analysis' row): {distance, lrf, humidity, emissivity,
+    reflection (°C), ambient (°C)}"""
+    row = next((r for r in thermal_rows(task) if r.get('path') == rel), {})
+    return {k: row.get(k) for k in ('distance', 'lrf', 'humidity', 'emissivity', 'reflection', 'ambient')}
+
+
+def frame_path(task, rel):
+    """The full path of one of the dataset's thermal frames
+    :raises FrameError: not one, or gone"""
+    from django.core.exceptions import SuspiciousFileOperation
+
+    from app.security import path_traversal_check
+    if not rel or rel not in {r['path'] for r in thermal_rows(task)}:
+        raise FrameError("Not a thermal frame of this dataset")
+    root = datasets.images_path(task)
+    try:
+        found = path_traversal_check(os.path.join(root, rel), root)
+    except SuspiciousFileOperation:
+        raise FrameError("Not a thermal frame of this dataset") from None
+    if not os.path.isfile(found):
+        raise FrameError("The frame is not on the server any more")
+    return found
+
+
+def parse_changes(raw):
+    """
+    The parameters asked to change ({field: value}, CHANGES only, blanks left out), checked as the workset form's
+    :raises FrameError: one that isn't valid
+    """
+    asked = {f: (raw or {}).get(f) for f in CHANGES}
+    asked = {f: v for f, v in asked.items() if not conversions.blank(v)}
+    if not asked:
+        return {}
+    if asked.get('distance') in ('lrf', 'embedded'):
+        raise FrameError("Distance: a number of metres")
+    checked, errors = conversions.parse_settings(asked)
+    errors = {k: v for k, v in errors.items() if k in CHANGES}
+    if errors:
+        field, message = next(iter(errors.items()))
+        raise FrameError("{}: {}".format(field.replace('_', ' ').capitalize(), message))
+    return {f: checked[f] for f in asked}
+
+
+def unit_of(task, cid):
+    return (conversions.record(task, cid).get('settings') or {}).get('unit') or 'C'
+
+
+def frame_settings(task, cid, changes=None):
+    """
+    The settings a frame is measured with: the workset's, as it converted the frame (a normalized workset's frames
+    take the flight's ambient and reflected temperatures where the settings give none), with the changes
+    :raises FrameError: the changes don't go with the workset's settings (a range it replaces in, say)
+    """
+    from . import sdk
+    dtc = converter.library()
+    s = dict(conversions.record(task, cid).get('settings') or conversions.DEFAULTS)
+    unit = s.get('unit') or 'C'
+    norm = conversions.results(task, cid).get('normalization') or {}
+    if s.get('normalize'):
+        for field, key in (('ambient_temp', 'ambient_c'), ('reflected_temp', 'reflected_c')):
+            if s.get(field) is None and norm.get(key) is not None:
+                s[field] = round(float(dtc.units.from_celsius(norm[key], unit)), 4)
+    s.update(changes or {})
+    checked, errors = conversions.parse_settings(s)
+    if errors:
+        raise FrameError(next(iter(errors.values())))
+    return dtc.Settings(sdk=sdk.current(), **{f: checked[f] for f in conversions.SETTINGS_FIELDS})
+
+
+def frame_offset(task, cid, rel):
+    """What a harmonized workset subtracted from a frame, in its unit: (offset, known: False for one it kept none of)"""
+    s = conversions.record(task, cid).get('settings') or {}
+    if not conversions.harmonized(s):
+        return 0.0, True
+    for f in conversions.results(task, cid).get('files') or []:
+        if f.get('path') == rel and f.get('offset_c') is not None:
+            return float(f['offset_c']) * (1.8 if unit_of(task, cid) == 'F' else 1.0), True
+    return 0.0, False
+
+
+@functools.lru_cache(maxsize=16)
+def _measured(path, mtime_ns, settings, unit):
+    """dji-thermal-cli's measurement of a frame (kept: the page asks for its values, figures and shapes in turn)"""
+    import numpy as np
+    m = converter.library().measure(path, settings, unit=unit)
+    values = np.asarray(m.temperature, dtype=np.float64)
+    values[~np.isfinite(values) | (values <= mosaics.low_value(unit))] = np.nan
+    values.setflags(write=False)
+    return values, dict(m.params), m.distance_source or "", list(m.notes or [])
+
+
+def measure(task, cid, rel, changes=None):
+    """
+    A frame measured as the workset converted it, with the changes: {values (float, NaN where none, in the unit),
+    params (what the SDK measured with, °C), distance_source, notes, offset, offset_known}
+    :raises FrameError: not a frame, or one dji-thermal-cli can't measure
+    """
+    found = frame_path(task, rel)
+    settings, unit = frame_settings(task, cid, changes), unit_of(task, cid)
+    try:
+        values, params, source, notes = _measured(found, os.stat(found).st_mtime_ns, settings, unit)
+    except Exception as e:
+        raise FrameError("dji-thermal-cli could not measure the frame: {}".format(e)) from e
+    offset, known = frame_offset(task, cid, rel)
+    return {'values': values - offset if offset else values, 'params': params, 'distance_source': source,
+            'notes': notes, 'offset': offset, 'offset_known': known}
+
+
+def info(task, cid, rel, changes=None):
+    """What the page shows of a frame (measure's, its values summed up): {frame, width, height, unit, params,
+    recorded, distance_source, notes, offset, offset_known, changes, stats: {min, max, mean, percentiles, histogram
+    (the equalization's, colouring.value_histogram)} or None without values}"""
+    import numpy as np
+
+    from . import colouring
+    m = measure(task, cid, rel, changes)
+    values = m.pop('values')
+    found = values[np.isfinite(values)]
+    stats = None
+    if found.size:
+        counts, edges = colouring.value_histogram(found)
+        stats = {'min': float(found.min()), 'max': float(found.max()), 'mean': float(found.mean()),
+                 'percentiles': [float(p) for p in np.percentile(found, mosaics.PERCENTILES)],
+                 'histogram': {'counts': counts.tolist(), 'edges': edges.tolist()}}
+    return dict(m, frame=rel, width=int(values.shape[1]), height=int(values.shape[0]), unit=unit_of(task, cid),
+                recorded=recorded(task, rel), changes=changes or {}, stats=stats)
+
+
+def values_png(task, cid, rel, changes=None):
+    """A frame's values as a value tile (colouring.value_png, no margin): (png, offset, step)"""
+    from . import colouring
+    return colouring.value_png(measure(task, cid, rel, changes)['values'])
+
+
+def _shape(geometry):
+    """A GeoJSON Point, LineString or Polygon in a frame's pixels (x right, y down) as GEOS
+    :raises FrameError: none of those"""
+    import json
+
+    from django.contrib.gis.geos import GEOSGeometry
+    if not isinstance(geometry, dict) or geometry.get('type') not in ('Point', 'LineString', 'Polygon'):
+        raise FrameError("Not a pin, a region or a line")
+    try:
+        shape = GEOSGeometry(json.dumps({'type': geometry['type'], 'coordinates': geometry.get('coordinates')}))
+    except Exception:  # noqa: BLE001 - GEOS refuses what isn't a geometry
+        raise FrameError("Invalid geometry") from None
+    if shape.geom_type == 'LineString' and (len(shape.coords) < 2 or shape.length == 0):
+        raise FrameError("A line needs two points")
+    if shape.geom_type == 'Polygon' and not shape.valid:
+        shape = shape.buffer(0)
+    return shape
+
+
+def _mask(shape, out_shape):
+    """The pixels a GEOS polygon (in pixels) touches, outline pixels included as on the map"""
+    import numpy as np
+    from rasterio import Affine
+    from rasterio.features import geometry_mask
+    polygons = inspector._polygons(shape)
+    if not polygons:
+        return np.zeros(out_shape, dtype=bool)
+    return geometry_mask([polygons], out_shape=out_shape, transform=Affine.identity(), invert=True, all_touched=True)
+
+
+def point_value(values, x, y):
+    """The value of the pixel at (x, y), or None outside the frame or where it has none"""
+    import numpy as np
+    row, col = math.floor(y), math.floor(x)
+    if not (0 <= row < values.shape[0] and 0 <= col < values.shape[1]) or not np.isfinite(values[row, col]):
+        return None
+    return float(values[row, col])
+
+
+def region(values, geometry, percentiles=inspector.PERCENTILES, bins=inspector.HISTOGRAM_BINS, isotherm=None):
+    """
+    What a shape drawn on a frame's values measures, as inspector.raster_region does on a map but in pixels: {valid,
+    reason, statistics (inspector.statistics, the extremes' [x, y]), pixel_size: 1[, length, profile: {distance (px),
+    values, points ([x, y])}]}; a pin's statistics are its pixel's (count 1). isotherm: (low, high) in the unit.
+    :raises FrameError: not a shape
+    """
+    import numpy as np
+    shape = _shape(geometry)
+    kind = shape.geom_type
+    out = {'valid': False, 'reason': None, 'statistics': None, 'pixel_size': 1.0, 'resampled': False}
+    usable = np.isfinite(values)
+    if kind == 'Point':
+        within, ring = np.zeros(values.shape, dtype=bool), None
+        row, col = math.floor(shape.y), math.floor(shape.x)
+        if 0 <= row < values.shape[0] and 0 <= col < values.shape[1]:
+            within[row, col] = True
+    else:
+        inside = shape.buffer(LINE_HALF_WIDTH) if kind == 'LineString' else shape
+        width = RING_MIN if kind == 'LineString' else min(RING_MAX, max(RING_MIN, math.sqrt(inside.area)))
+        ring = inside.buffer(width).difference(inside)
+        within = _mask(inside, values.shape)
+    around = (_mask(ring, values.shape) & ~within) if ring is not None else np.zeros(values.shape, dtype=bool)
+    if kind == 'LineString':
+        out['length'] = float(shape.length)
+    keep = within & usable
+    if not within.any():
+        out['reason'] = 'outside_raster'
+        return out
+    if not keep.any():
+        out['reason'] = 'nodata'
+        return out
+
+    def location(flat_index):
+        r, c = np.unravel_index(flat_index, values.shape)
+        return [float(c) + 0.5, float(r) + 0.5]
+
+    out['valid'] = True
+    out['statistics'] = inspector.statistics(values, keep, around & usable, location, percentiles, bins, isotherm)
+    if kind == 'LineString':
+        out['profile'] = _profile(shape, values)
+    return out
+
+
+def _profile(line, values):
+    """A line's values every pixel along it, at most inspector.MAX_SAMPLES of them"""
+    import numpy as np
+    coords = np.asarray(line.coords, dtype=np.float64)
+    along = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(coords[:, :2], axis=0).T))])
+    n = max(2, min(inspector.MAX_SAMPLES, math.floor(along[-1]) + 1))
+    distances = np.linspace(0.0, along[-1], n)
+    xs, ys = np.interp(distances, along, coords[:, 0]), np.interp(distances, along, coords[:, 1])
+    return {'distance': distances.tolist(), 'values': [point_value(values, x, y) for x, y in zip(xs, ys)],
+            'points': [[float(x), float(y)] for x, y in zip(xs, ys)]}
+
+
+def download(task, cid, rel, fmt, changes=None):
+    """A frame's temperatures in the unit as a file: CSV (a row per pixel row, blank where there is none) or a 32-bit
+    float TIFF (NaN where there is none, no location): (bytes, content type, extension)
+    :raises FrameError: another format"""
+    import numpy as np
+    if fmt not in DOWNLOADS:
+        raise FrameError("The download is csv or tiff")
+    values = measure(task, cid, rel, changes)['values']
+    if fmt == 'csv':
+        text = io.StringIO()
+        for row in values:
+            text.write(",".join("" if not np.isfinite(v) else "{:.{}f}".format(v, CSV_DIGITS) for v in row) + "\r\n")
+        return text.getvalue().encode(), 'text/csv', 'csv'
+    from rasterio.io import MemoryFile
+    with MemoryFile() as mem:
+        with mem.open(driver='GTiff', width=values.shape[1], height=values.shape[0], count=1, dtype='float32',
+                      nodata=float('nan'), compress='deflate') as dst:
+            dst.write(values.astype(np.float32), 1)
+            dst.update_tags(1, unit=unit_of(task, cid))
+        return mem.read(), 'image/tiff', 'tif'

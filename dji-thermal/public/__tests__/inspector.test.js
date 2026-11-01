@@ -1020,6 +1020,8 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(frameBox(map).hidden).toBe(false);
         expect(frameBox(map).textContent).toContain("Frame 1 of 2 that saw this point");
         expect(frameBox(map).textContent).toContain("The mosaic's pixel here comes from this frame");
+        expect(frameBox(map).querySelector('[data-pip="open"]').getAttribute("href"))
+            .toBe("/plugins/dji-thermal/dataset/d-1/conversion/abc123def456/frame?frame=DJI_0003_T.JPG");
         expect(frameBox(map).querySelector("img").getAttribute("src"))
             .toBe(BASE + "as_converted/frames/3.png?v=2026-11-01T10%3A00%3A00%2B00%3A00&color_map=dji_ironred&rescale=50,121");
         pip(map, "next");

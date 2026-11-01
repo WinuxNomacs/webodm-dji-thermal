@@ -295,11 +295,11 @@
   sharpening, Linear/Equalized, an isotherm, and a click keeping the readout with "Follow the cursor". Done
   (2026-11-01), in four steps.
 
-- **Thermal Analyzer, part 2** (the user, 2026-11-01; details under "Up next: Thermal Analyzer, part 2" below):
+- **Thermal Analyzer, part 2** (the user, 2026-11-01; details under "Done: Thermal Analyzer, part 2" below):
   the workset mosaics laid on WebODM's 2D map from the Thermal Inspector (for comparing with any task's layers), the
   source frames window, measuring tools and saved measurements there, and the frame page. In five steps; steps 1
-  (the mosaics on the map), 2 (the source frames window), 3 (measuring: lines, surroundings, ΔT) and 4 (saved
-  measurements, the emissivity correction) done 2026-11-01; step 5 (the frame page) is next.
+  (the mosaics on the map), 2 (the source frames window), 3 (measuring: lines, surroundings, ΔT), 4 (saved
+  measurements, the emissivity correction) and 5 (the frame page) done 2026-11-01. Done.
 
 - **The Thermal Inspector's panel and legend: movable, the legend's ends labelled** (the user, 2026-11-01, from
   `new.md`):
@@ -753,7 +753,7 @@
   `ignored/WebODM-Plugins` on their upstream `main`. Ruff passes; Jest and ESLint have nothing to check until
   `dji-thermal/public/` exists.
 
-## Up next: Thermal Analyzer, part 2
+## Done: Thermal Analyzer, part 2
 
 **The request** (the user, 2026-11-01): the phase after the mosaic viewer's image controls; port as much of
 dji-thermal-ui's code as sensible (its `thermal_measure.py`, `frontend/src/measure/`, `frontend/src/frame/`), as the
@@ -898,6 +898,56 @@ last phase did with its colouring.
    `measurement.md`, `api.md`; screenshots `inspector` retaken, `inspector-saved` new (the form filled, not sent).
 5. **The frame page**: one frame with the Image and Isotherm sections, the tools in its pixels, and measured again
    exactly by dji-thermal-cli with changed parameters (dji-thermal-ui's `measure_frame`, `parse_changes`).
+   Design (2026-11-01): an Analyzer page of its own, `datasets/<id>/worksets/<cid>/frame?frame=…`: the frame list
+   beside it (← and → step), the frame panned and zoomed (Leaflet in pixels), the panel with Image (palette, range,
+   sliders), Isotherm, the readout under the cursor, the frame's figures and histogram. Coloured in the browser from
+   its values (a value PNG and `recolour.js`, as the maps). The Inspector's tools (Pin, Line, Rectangle, Circle,
+   Polygon) in the frame's pixels, with the same statistics, surroundings, ΔT, isotherm share and profile. Measure
+   again: distance, humidity, emissivity, reflected and ambient temperature changed, measured exactly by
+   dji-thermal-cli; a second pane beside it, the readout both values and their difference. Opened from the source
+   frames window ("Open this frame", mosaic viewer and Inspector) and the Files tab's detail pane (the newest ready
+   workset). Left out: dji-thermal-ui's visual pair (the plugin pairs no visual photos) and its locator map (it would
+   show where the flight was).
+   Decided (the user, 2026-11-01): **measurements on a frame are savable** (as the Inspector's, kept with the
+   workset, each with the parameters it was measured with); **all the frames, with a switch** (All / In the mosaic /
+   Oblique once the mosaics are built); **downloads: the PNG as shown, the temperatures as CSV and as a 32-bit TIFF**
+   (no location); **"New workset with these"** after measuring again (the Worksets tab's form filled in).
+   Steps: (a) the server: the frame list, a frame measured (with changes), its values tile, a region in its pixels,
+   the downloads; (b) the page: list, frame, Image, Isotherm, readout, figures, measure again; (c) the tools and saved
+   measurements on frames; (d) the links in, New workset with these, docs and screenshots.
+   **Done** (2026-11-01, `frame-page`, in the four steps): `frames.py` (the list from the analysis, the converted and
+   the mosaics' frames; a frame measured by dji-thermal-cli as the workset converted it: its settings, the flight's
+   medians when it normalized, the frame's offset when it harmonized; `parse_changes` as the workset form; a value
+   PNG with no margin; `region` in pixels: a line's strip 1 px either side, the ring 3 to 10 px, a pin its pixel;
+   CSV and float TIFF downloads), `frames_api.py` (`frames`, `frame`, `frame/values` with an ETag, `frame/region`
+   in °C, `frame/download?kind=` (DRF keeps `format`), `frame/measurements` in the workset's
+   `viewer/frame-measurements.json`, apart from the mosaics' so the Inspector doesn't list them), `inspector.statistics`
+   shared with the map's regions, `values_response`'s margin; `frame.html` and `frame.js` (the list with All / In the
+   mosaic / Oblique, Leaflet in pixels with a canvas overlay coloured by `recolour.js`, the panes moving together,
+   the readout from the values, Measure again with the second pane and the difference, the figures, PNG/CSV/TIFF;
+   the Measure section with regions.js's tools on the first pane, a circle made a pixel polygon, measured again when
+   the changes or the isotherm change, the Inspector's statistics with `pixels`, the profile hovered marking its
+   point; Saved on this frame), `viewer.js` (`bindControls`: the palette, range, Image and Isotherm behaviour, shared
+   by the two pages), `frames.js` (`framePageUrl`, the window's Open this frame, new tab), `dataset.js` (the Files
+   tab's frame links to the newest ready workset, `fromQuery`), `conversions.js` (`useFrom`: the form filled with the
+   workset's settings and the changes), `inspector.css` (the frames window scrolls, its links plain). Tests:
+   `test_frames.py` (new: shapes in pixels, a harmonized workset's settings and offset in °F, changes checked; on the
+   flight a frame equal to the workset's own TIFF, measured again, its value PNG and 304, a rectangle, CSV and TIFF,
+   saving, listing by frame, a viewer's refusal, renaming, deleting; the page for who can see the dataset),
+   `frame.test.js` (new: the lists, the parameters typed, the URLs, the readout, the page's frame from a link, stepping,
+   measuring again with both panes moving together, limits refused locally, downloads, a slider making no request, a
+   pin measured and saved, measuring again on the isotherm and the changes, renaming and deleting, pixels for a
+   circle and a line's sizes), `analyzer.test.js` (Open this frame, the Files tab's frame page, the form from the
+   frame page), `inspector.test.js` (Open this frame). Jest 239, Django 178 (1 skipped), ESLint, Ruff; the panes' syncing
+   seen failing when broken. Live on the test flight's worksets (the measuring check wrote one measurement, renamed and
+   deleted it, and its empty file was removed): 218 frames (42 in the mosaic), hover, a slider with no request,
+   emissivity 0.8 beside the frame, stepping and the Oblique list in the URL, CSV and TIFF; a rectangle, a 360 px line
+   with its profile marking the frame, a circle and a pin; Open this frame from the mosaic viewer and from the
+   Inspector's window, the Files tab's link, the form filled from New workset with these (not sent); no console errors
+   but WebODM's own livereload. Docs: README (the summary, the frames window, the Files tab, The frame page),
+   `index.md`, the worksets quickstart's One frame at a time, the Inspector and Analyzer quickstarts, `measurement.md`,
+   `api.md`; screenshots `frame-page` and `frame-measure-again` new, `mosaic-frames`, `dataset-files` and
+   `inspector-frames` retaken (its viewport taller, for the window's foot).
 
 Open, to check in step 1: the Inspector's palette and range are per thermal layer today; a mosaic laid beside an
 orthophoto takes the same palette, and its own range unless the user links them.

@@ -93,7 +93,7 @@ class InspectorTiles(InspectorView):
         return png(inspector.tile(task, int(z), int(x), int(y), colors, low, high, size, crop, tile_adjust(request)))
 
 
-def values_response(found, cache_control):
+def values_response(found, cache_control, margin=colouring.MARGIN):
     """A value tile (inspector's or mosaics' values_tile: PNG bytes, offset, step, sigma) as the browser decodes it
     (recolour.js): the PNG, with the values' offset and step, its margin and the unsharp mask's sigma in headers"""
     if found is None:
@@ -102,7 +102,7 @@ def values_response(found, cache_control):
     response = HttpResponse(data, content_type='image/png')
     response['X-Values-Offset'] = repr(offset)
     response['X-Values-Step'] = repr(step)
-    response['X-Values-Margin'] = str(colouring.MARGIN)
+    response['X-Values-Margin'] = str(margin)
     response['X-Sharpen-Sigma'] = repr(sigma)
     response['Cache-Control'] = cache_control
     return response

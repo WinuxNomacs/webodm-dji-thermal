@@ -118,6 +118,8 @@ panel, opens them too.
   orthophoto, ODM blended the frames, so they start with the one that saw the point closest to straight down.
 - On an orthophoto the frames are placed with the workset's camera models, from their GPS and gimbal, not the cameras
   ODM refined: the point can be a little off.
+- **Open this frame** opens the frame on its own page in the Analyzer, in a new tab, to measure it in its pixels or
+  measure it again with other values: see [One frame at a time](quickstart-worksets.md#one-frame-at-a-time).
 - The cross closes the window; closing the Inspector closes it too.
 
 On other layers a click in Hover is WebODM's own: its popup with the task's downloads.

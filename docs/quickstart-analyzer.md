@@ -57,6 +57,9 @@ reset the zoom. The arrows (or ← and →) go to the previous and next files; �
 
 To select several files, Ctrl/Cmd-click or Shift-click them; the pane can then download them as a zip.
 
+Once a workset has converted the photos, a thermal frame's name, and **Open frame** in its detail pane, open it on
+the frame page of the newest one: see [One frame at a time](quickstart-worksets.md#one-frame-at-a-time).
+
 ## 4. Check the problems
 
 The **Problems** tab lists what the analysis found: errors, warnings and notes. Each one says how to address it in

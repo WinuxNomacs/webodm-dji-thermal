@@ -328,9 +328,17 @@
 .ta-viewer .ta-params td:first-child{ white-space: normal; }
 .ta-viewer .ta-params th{ white-space: normal; }
 
-/* The frame page: two panes side by side, the frames drawn pixel by pixel */
-.ta-frame .ta-frame-chooser{ display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
-.ta-frame .ta-frame-chooser select{ width: auto; max-width: 100%; min-width: 0; flex: 0 1 auto; }
+/* The frame page: the frames listed beside two panes side by side, the frames drawn pixel by pixel */
+.ta-frame .ta-frame-list{ flex: 0 0 200px; max-height: calc(100vh - 230px); overflow-y: auto; font-size: 12px; }
+.ta-frame .ta-frame-lists{ display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 6px; }
+.ta-frame .ta-frame-lists .btn{ padding: 1px 6px; font-size: 11px; }
+.ta-frame .ta-frame-items{ list-style: none; margin: 0; padding: 0; }
+.ta-frame .ta-frame-items button{ display: block; width: 100%; text-align: left; border: 0; background: none; padding: 3px 6px;
+    border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; }
+.ta-frame .ta-frame-items button:hover{ background: rgba(128, 128, 128, .15); }
+.ta-frame .ta-frame-items button[aria-current=true]{ background: #337ab7; color: #fff; }
+.ta-frame .ta-frame-item-about{ display: block; opacity: .7; font-size: 11px; }
+.ta-frame .ta-frame-download{ display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .ta-frame .ta-frame-panes{ flex: 1 1 auto; min-width: 0; display: flex; gap: 8px; }
 .ta-frame .ta-frame-pane{ flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
 .ta-frame .ta-frame-pane-title{ font-size: 12px; font-weight: bold; margin-bottom: 2px; }
@@ -384,6 +392,7 @@
     .ta-viewer .ta-viewer-panel{ flex-basis: auto; max-height: none; }
     .ta-frame .ta-frame-panes{ flex-direction: column; }
     .ta-frame .ta-frame-map{ height: 50vh; }
+    .ta-frame .ta-frame-list{ flex-basis: auto; max-height: 30vh; }
 }
 .ta-viewer .ta-measurements-head{ display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .ta-viewer .ta-measurements-head > span:first-child{ margin-right: auto; }

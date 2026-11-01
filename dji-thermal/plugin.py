@@ -3,8 +3,8 @@ from django.utils.translation import gettext_lazy as _
 
 from app.plugins import Menu, MountPoint, PluginBase, logger, signals
 
-from . import analyzer_api, converter, datasets, inspector_api
-from .analyzer_pages import dataset_page, datasets_page, version, viewer_page
+from . import analyzer_api, converter, datasets, frames_api, inspector_api
+from .analyzer_pages import dataset_page, datasets_page, frame_page, version, viewer_page
 from .api import Describe, TaskConvert, TaskDataset, TaskWorkset
 from .page import sdk_page
 
@@ -43,6 +43,7 @@ class Plugin(PluginBase):
             MountPoint('$', datasets_page(self)),
             MountPoint(r'dataset/(?P<dataset_id>[0-9a-f-]{36})$', dataset_page(self)),
             MountPoint(r'dataset/(?P<dataset_id>[0-9a-f-]{36})/conversion/(?P<cid>[0-9a-f]{12})$', viewer_page(self)),
+            MountPoint(r'dataset/(?P<dataset_id>[0-9a-f-]{36})/conversion/(?P<cid>[0-9a-f]{12})/frame$', frame_page(self)),
             MountPoint('sdk/$', lambda request: sdk_page(request, template)),
         ]
 
@@ -102,6 +103,13 @@ class Plugin(PluginBase):
             MountPoint(CONVERSION + r'/measurements/(?P<mid>[0-9a-f]{12})$', analyzer_api.MosaicMeasurement.as_view()),
             MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/frames/(?P<index>\d+)\.png$',
                        analyzer_api.MosaicFrame.as_view()),
+            MountPoint(CONVERSION + '/frames$', frames_api.WorksetFrames.as_view()),
+            MountPoint(CONVERSION + '/frame$', frames_api.WorksetFrame.as_view()),
+            MountPoint(CONVERSION + '/frame/values$', frames_api.WorksetFrameValues.as_view()),
+            MountPoint(CONVERSION + '/frame/region$', frames_api.WorksetFrameRegion.as_view()),
+            MountPoint(CONVERSION + '/frame/download$', frames_api.WorksetFrameDownload.as_view()),
+            MountPoint(CONVERSION + '/frame/measurements$', frames_api.WorksetFrameMeasurements.as_view()),
+            MountPoint(CONVERSION + r'/frame/measurements/(?P<mid>[0-9a-f]{12})$', frames_api.WorksetFrameMeasurement.as_view()),
             MountPoint('preferences$', analyzer_api.Preferences.as_view()),
             MountPoint('display$', analyzer_api.Display.as_view()),
         ]
