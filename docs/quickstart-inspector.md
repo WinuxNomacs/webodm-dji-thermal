@@ -15,7 +15,8 @@ button is also on any map of a project with workset mosaics, even one with no th
 
 ## 2. Read temperatures
 
-The panel's buttons choose what a click on the map does:
+The top of the panel (the buttons, the temperature, Palette and the colour scale) stays in view while the sections
+below it scroll. The panel's buttons choose what a click on the map does:
 
 - **Hover**: the temperature under the cursor, beside it and in the panel.
 - **Pin**: a click pins the point with its temperature (P1, P2…). The pins are listed in the panel; click one to go

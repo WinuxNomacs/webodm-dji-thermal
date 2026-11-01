@@ -1113,6 +1113,23 @@ describe("the Thermal Inspector's colour scale and Image section", () => {
         expect(inspector.autoRange({mosaic: {unit: "F", range: [50, 68], auto: [32, 212]}}, "C")).toEqual([0, 100]);
     });
 
+    it("keeps the heading, modes, readout, Palette and the scale in the panel's top, which stays in view as the rest scrolls", async () => {
+        const map = fakeMap([orthophoto()]);
+        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}});
+        await ins.ready;
+        await flush();
+        ins.open();
+        const top = panel().querySelector(".dt-inspector-top");
+        expect(top).toBe(panel().firstElementChild);
+        for (const part of [".dt-inspector-head", ".dt-inspector-modes", ".dt-inspector-readout", '[data-act="palette"]', ".dt-inspector-scale"]) {
+            expect(top.querySelector(part)).not.toBeNull();
+        }
+        // The legend's tickbox, Image and the sections below scroll under it
+        expect(top.querySelector('[data-act="legend"]')).toBeNull();
+        expect(top.querySelector(".dt-inspector-image, .dt-inspector-section")).toBeNull();
+        expect(top.nextElementSibling.querySelector('[data-act="legend"]')).not.toBeNull();
+    });
+
     it("shows the topmost layer's scale, range and lowest and highest temperatures under Palette, the range typed or Auto", async () => {
         const layer = orthophoto();
         const map = fakeMap([layer]);

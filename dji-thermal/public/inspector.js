@@ -870,7 +870,8 @@
         var current = state.palette;
         // One of WebODM's other colour maps, chosen in its layer panel
         if (current && options.length && !options.some(function (o) { return o[0] === current; })) options = options.concat([[current, current]]);
-        return '<div class="dt-inspector-head"><strong><i class="fa fa-thermometer-half"></i> Thermal Inspector</strong>' +
+        // The top (the heading, modes, readout, palette and scale) stays in view while the rest scrolls under it
+        return '<div class="dt-inspector-top"><div class="dt-inspector-head"><strong><i class="fa fa-thermometer-half"></i> Thermal Inspector</strong>' +
             '<a href="javascript:void(0)" class="dt-inspector-close" data-act="close" title="Close"><i class="fa fa-times"></i></a></div>' +
             '<div class="btn-group btn-group-xs dt-inspector-modes">' +
             ["hover", "pin", "rectangle", "circle", "polygon", "line"].map(function (m) {
@@ -886,7 +887,7 @@
             (options.length ? '<label class="dt-inspector-label">Palette <select class="form-control input-sm" data-act="palette">' +
                 options.map(function (o) {
                     return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === current ? " selected" : "") + ">" + escapeHtml(o[1]) + "</option>";
-                }).join("") + "</select></label>" : "") + scaleHtml(state.scale, state, unit) +
+                }).join("") + "</select></label>" : "") + scaleHtml(state.scale, state, unit) + "</div>" +
             '<label class="dt-inspector-label dt-inspector-check"><input type="checkbox" data-act="legend"' + (state.legendVisible ? " checked" : "") +
             "> Legend on the map</label>" + imageHtml(state.scale) +
             mosaicsHtml(state) +
