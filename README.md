@@ -221,8 +221,8 @@ Thermal Task's images or a workset's), a thermometer button opens the Thermal In
   the temperatures inside it: minimum, maximum, mean, median, standard deviation, 2nd and 98th percentiles, the
   number of pixels and the area, and a histogram; the hottest and coldest pixels are marked on the map. Pixels
   outside the task's crop or without data are left out; a region more than 4,096 pixels across is read at a reduced
-  resolution, and the panel says so. Regions are listed (click one to go to it, or its chart icon for its
-  statistics), can be hidden, removed and downloaded as CSV (a row of statistics per region, with the hottest and
+  resolution, and the panel says so. Regions are listed (click one's row for its statistics, or its name to
+  go to it too), can be hidden, removed and downloaded as CSV (a row of statistics per region, with the hottest and
   coldest pixels' positions), and are kept in your browser for the same tasks.
 - **Palette**: the thermal layer's palette, from the same list as the Analyzer's: DJI's palettes (drawn by the
   plugin, over the range set in WebODM's layer panel) and WebODM's colour maps. It is your palette everywhere: the

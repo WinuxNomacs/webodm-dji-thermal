@@ -5,6 +5,13 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **polish, the Thermal Inspector's Regions list: no "Show its statistics" button** (the user, 2026-10-31:
+    it "doesn't appear to do anything"; it only chose whose statistics are shown, which the name did too),
+    `remove-region-chart`. Decided (the user): removed; a click anywhere on a region's row shows its statistics
+    (measured again if they never came), its name also zooms to it, and the row has a pointer cursor.
+    `inspector.js` (`regionsHtml`, `onPanelClick`), `inspector.css`; README; docs screenshot `inspector` retaken.
+    Jest 161 (no tests changed), ESLint; live with two regions: a row click switches the statistics without
+    moving the map, a name click switches and zooms, a × removes its row and the statistics go to the other one.
   - Done: **bug, the Thermal Inspector's Regions list: a region's × (remove) can't be clicked** (the user,
     2026-10-31; a screenshot and a video), `fix-inspector-links`. Hovering the statistics button (or the ×) made
     it a 30px block: WebODM's Leaflet stylesheet has `.leaflet-bar a, .leaflet-bar a:hover { display: block;
