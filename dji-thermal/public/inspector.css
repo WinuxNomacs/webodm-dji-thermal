@@ -8,10 +8,14 @@
 }
 .dt-inspector-panel[hidden] { display: none; }
 .dt-inspector-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.dt-inspector .dt-inspector-head a.dt-inspector-close { width: auto; height: auto; line-height: 1; border: 0; background: none; }
 .dt-inspector-modes { margin-bottom: 6px; }
-.dt-inspector .dt-inspector-panel a { display: inline; width: auto; height: auto; line-height: inherit; border: 0;
-    background: none; text-align: left; }
+/* The panel's links are plain text links, not Leaflet's control buttons: Leaflet's `.leaflet-bar a:hover` makes a
+   hovered link a 30px block (pushing the next one onto a new line) and WebODM's theme sets its background !important */
+.leaflet-bar.dt-inspector .dt-inspector-panel a, .leaflet-bar.dt-inspector .dt-inspector-panel a:hover,
+.leaflet-bar.dt-inspector .dt-inspector-panel a:focus {
+    display: inline; width: auto; height: auto; line-height: inherit; border: 0; background: none !important; text-align: left;
+}
+.leaflet-bar.dt-inspector .dt-inspector-head a.dt-inspector-close { line-height: 1; }
 .dt-inspector-readout { min-height: 22px; margin-bottom: 6px; }
 .dt-inspector-temp { font-size: 16px; font-weight: bold; }
 .dt-inspector-label { display: block; font-weight: normal; margin-bottom: 6px; }
@@ -34,6 +38,7 @@
 .dt-inspector-histogram rect { fill: #ff9800; }
 .dt-inspector-range { display: flex; justify-content: space-between; font-size: 11px; color: #777; }
 .dt-inspector-pins td.text-right { white-space: nowrap; }
+.dt-inspector-pins td.text-right a + a { margin-left: 4px; }
 .dt-inspector-check input { margin: 0 4px 0 0; vertical-align: middle; }
 .dt-inspector-isotherm { margin: 4px 0 6px; }
 .dt-inspector-isotherm-limits { display: flex; align-items: center; gap: 4px; margin-top: 4px; }

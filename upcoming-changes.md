@@ -5,21 +5,18 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
-  - Next: **bug, the Thermal Inspector's Regions list: a region's × (remove) can't be clicked** (the user,
-    2026-10-31; screenshot: R1, a polygon, the × under the statistics button). It jumps away when hovered.
-    Likely cause: Leaflet's own control rules (`.leaflet-bar a:hover`: `display: block`, 26px, a grey background;
-    `.leaflet-touch .leaflet-bar a`: 30px) have the same specificity (0,2,1) as `inspector.css`'s
-    `.dt-inspector .dt-inspector-panel a` override, and Leaflet's stylesheet comes later. So the statistics
-    button is drawn as a 30px grey box (seen in the screenshot), the × wraps under it, and on hover it becomes a
-    block that moves out from under the cursor. The pins' × is the same markup. Plan, branch `fix-inspector-links`:
-    1. Reproduce headless on a thermal task's 2D map (a region drawn: kept in the browser's storage only), reading
-       the ×'s computed style before and on hover.
-    2. `inspector.css`: the panel's link override made more specific than Leaflet's (`.leaflet-bar.dt-inspector
-       .dt-inspector-panel a`, its `:hover` and `:focus` too, `display: inline`, no fixed size, no background),
-       and the row's action cell kept on one line.
-    3. Check the pins' ×, the statistics button, the head's close link and the mode buttons; ESLint, Jest; live
-       check of hover and click on a region's × and a pin's ×; the Inspector's docs screenshot retaken if it
-       changes.
+  - Done: **bug, the Thermal Inspector's Regions list: a region's × (remove) can't be clicked** (the user,
+    2026-10-31; a screenshot and a video), `fix-inspector-links`. Hovering the statistics button (or the ×) made
+    it a 30px block: WebODM's Leaflet stylesheet has `.leaflet-bar a, .leaflet-bar a:hover { display: block;
+    width: 26px; … }` (30px under `.leaflet-touch`), which on hover tied with `inspector.css`'s override (0,2,1)
+    and came later; WebODM's theme also sets those links' background `!important` (white, grey on hover). The
+    block pushed the × onto a new line, away from the cursor, and back when the cursor left. `inspector.css`: the
+    panel's link rule is now `.leaflet-bar.dt-inspector .dt-inspector-panel a` (and `:hover`, `:focus`), with
+    `background: none !important`, and the row's buttons 4px apart. Jest 161, ESLint; live (headless, a region and
+    a pin drawn in a fresh browser): the links keep their size and position on hover, an ordinary click on each ×
+    removes its row, the close link and the toolbar's Inspector button unchanged; docs screenshot `inspector`
+    retaken. `inspector.css` is fetched by WebODM's module loader without a version, so a browser that cached it
+    needs one reload bypassing the cache.
   - Done: **bug, "Could not load the dataset." after an update** (the user, 2026-10-31), `script-versions`: the
     browser ran its cached `analyzer_core.js` (without `optionHtml`) with the new `dataset.js`, drawing the page
     threw, and `load()`'s catch said the request failed. Now `analyzer_pages.version` (a hash of `public/`'s and
