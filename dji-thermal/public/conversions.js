@@ -6,7 +6,7 @@
     var esc = function (t) { return core.escapeHtml(t); };
 
     var STATUS_LABELS = {converting: "Converting", ready: "Converted", failed: "Failed", canceled: "Canceled"};
-    // As the Thermal Task panel names them (thermal/MeasurementSettings.jsx), in its order
+    // As the DJI Thermal Task panel names them (thermal/MeasurementSettings.jsx), in its order
     var DISTANCE_MODES = [["lrf", "Laser rangefinder, else as recorded"], ["embedded", "As recorded"], ["fixed", "Set for all photos"]];
     var UNIT_LABELS = {C: "°C", F: "°F", K: "K"};
     // The measurement parameters with the analysis' column of each image's recorded value (Celsius for temperatures)

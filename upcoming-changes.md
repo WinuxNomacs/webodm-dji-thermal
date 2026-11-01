@@ -382,6 +382,57 @@
       `api.md`; screenshots: `inspector-image` (new), `inspector`, `inspector-line`, `inspector-frames`,
       `inspector-mosaics` retaken (`inspector-saved` retaken, unchanged).
 
+- **Names and the splash image** (the user, 2026-11-01, from `new.md`):
+  - The requests: "make webodm-thermal-analyzer-ui.png the splash image for the readme and docs. Resize a copy if
+    needed and check in the source image and any copies to an appropriate location." "Rename the Thermal Analyzer
+    tab to be the Dji Thermal Analyzer. Same for the title on the main ui page." "Rename "Thermal Task" button to
+    "Dji Thermal Task"."
+  - What it builds on: the image (untracked, at the repo root) is 2185×1930, 2.8 MB: a task's map with the
+    Thermal Inspector open, from before the colour scale and Image section; its sidebar says "Thermal Analyzer";
+    its corner credits "Map data: © Google Maps" (a basemap was loaded under the orthophoto, which the
+    screenshots' rule leaves out). The names: WebODM's sidebar entry (`plugin.py` `main_menu`), the landing page's
+    heading and the dataset page's breadcrumb (`templates/`), the pages' titles (`dataset.js`), the Dashboard's
+    button (`ThermalTaskButton.jsx`, built), links and hints that name them (`ThermalTaskPanel.jsx`,
+    `datasets.js`, `main.js`), and README and docs (about 25 and 25 mentions); screenshots showing the sidebar or
+    the button are retaken.
+  - Proposed: one step, `names-splash`. The image in `docs/images/` (the source, and a copy about 1200 px wide
+    shown at the top of README and `docs/index.md`, linking to the source).
+  - Decided (the user, 2026-11-01): **"DJI Thermal Analyzer" and "DJI Thermal Task"**; **the user's image, the
+    map credit cropped off** (it keeps the earlier panel and name). First of the new phases, before the speed-up
+    and Part 2's step 5.
+  - Done (2026-11-01), `names-splash`: "DJI Thermal Analyzer" in WebODM's sidebar (`plugin.py`), the landing
+    page's heading and title (`analyzer_pages.py`, `datasets.html`), the dataset page's breadcrumb and title
+    (`dataset.html`, `dataset.js`), and "DJI Thermal Task" on the Dashboard's button (`ThermalTaskButton.jsx`,
+    rebuilt), in the links and hints naming them, the manifest's description, README and docs. The image cropped
+    of its bottom 28 px (the map credit): `docs/images/splash-source.png` (2185×1902) and `splash.png` (1200 px,
+    256 colours, 414 KB) at the top of README and `docs/index.md`, linking to the source; `CLAUDE.md` and the
+    `docs` skill say it isn't made by `dev/screenshots.js`. Jest 192, Django 148 (1 skipped), ESLint, Ruff;
+    screenshots showing the sidebar or the button retaken and looked at (`thermal-task-button`,
+    `thermal-task-panel`, `analyzer-list`, `dataset`, `dataset-files`, `picture-viewer`, `mosaic-viewer`,
+    `mosaic-frames`, `dji-sdk` and the six `inspector*`).
+
+- **Faster image adjustments** (the user, 2026-11-01, from `new.md`): "can anything be done to improve the
+  rendering response time of changes to the images sliders? How fast the tiles are rendered? etc.... Looking for it
+  to be as seamless and realtime as possible without needing a webodm pr".
+  - What it builds on, measured on the dev server (Django's runserver; HomerunObliqueII): a plugin tile takes
+    100–180 ms (WebODM's own 70–125 ms), a sharpened one 300–400 ms; a view's 12 tiles together about 0.9 s.
+    Moving a slider only previews the boxes and legends; on release the layer's URL changes and Leaflet's
+    `redraw()` drops every tile first, so the map goes blank until the new ones come. No tile is cached by the
+    browser (no `Cache-Control`), so moving back to a value draws it again.
+  - Two ways, not exclusive:
+    - **Quicker server drawing**: new tiles drawn over the old ones, swapped when loaded (no blank); drawing while
+      the slider moves (throttled); tiles cached by the browser; the raster's values kept in memory per tile so a
+      recolour skips the read. Better, but each change still waits on a round of requests.
+    - **Recoloured in the browser** (realtime): the plugin serves each tile's temperatures once (16-bit), and the
+      browser colours them with the palette, range, brightness, contrast, gamma, Equalized (the server's curve) and
+      the isotherm on every slider movement, with no requests. Sharpening needs neighbouring pixels: drawn by the
+      server on release. On WebODM's orthophoto it replaces how that one layer's tiles are drawn (the layer kept,
+      so WebODM's opacity, swipe and layer panel stay). Changes the earlier "drawn by the server, never in the
+      browser" decision.
+  - Decided (the user, 2026-11-01): **recoloured in the browser**, sharpening still drawn by the server; in **the
+    Thermal Inspector and the Analyzer's mosaic viewer** alike; after the names and splash, before Part 2's step 5.
+    Its design and steps are planned with the user before it is built.
+
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
   (CHANGELOG, README, the zip rebuilt by `dev/package.sh` on the merge, its new sha256, the `release-check` skill);

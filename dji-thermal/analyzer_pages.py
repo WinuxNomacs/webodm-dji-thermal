@@ -1,5 +1,5 @@
 """
-The Thermal Analyzer's pages, at the root of WebODM's menu for every user: the datasets of the projects they can
+The DJI Thermal Analyzer's pages, at the root of WebODM's menu for every user: the datasets of the projects they can
 view, a dataset's page, and a conversion's mosaics on a map (with WebODM's base layers). Their content comes from the Analyzer's API (analyzer_api), drawn by the scripts in
 public/.
 """
@@ -35,7 +35,7 @@ def version(folder):
 
 def common(plugin, request):
     # display: the user's preferences (conversions.display), read by analyzer_core.js
-    return {'title': _("Thermal Analyzer"), 'public': plugin.public_url(""), 'v': version(plugin.get_path("public")),
+    return {'title': _("DJI Thermal Analyzer"), 'public': plugin.public_url(""), 'v': version(plugin.get_path("public")),
             'api': "/api/plugins/{}/".format(plugin.get_name()), 'display': conversions.display(request.user)}
 
 

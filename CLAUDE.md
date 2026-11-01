@@ -39,7 +39,8 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
 - **`docs/` is the plugin's documentation** (Markdown, served by GitHub Pages from `main` `/docs` once the repo is
   public): quickstarts with screenshots, guides, reference. A change to what a user sees updates the page that
   describes it and retakes its screenshots on the same branch (the `docs` skill). The screenshots
-  (`docs/images/*.png`, made by `dev/screenshots.js`) are the only images the repo takes: they never show where a
+  (`docs/images/*.png`, made by `dev/screenshots.js`, but for the user's `splash.png`, kept with its full-size
+  `splash-source.png`) are the only images the repo takes: they never show where a
   flight was (no coordinates, addresses or basemap), nor a camera's serial number, and each is looked at before
   it is committed.
 - Planned in `upcoming-changes.md`; new requests arrive in `new.md` (untracked).

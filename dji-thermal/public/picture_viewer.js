@@ -1,4 +1,4 @@
-// The picture viewer of the Thermal Analyzer's pages: a picture drawn over the page, fitted to it, with zoom (the
+// The picture viewer of the DJI Thermal Analyzer's pages: a picture drawn over the page, fitted to it, with zoom (the
 // buttons, the mouse wheel where it points, a double click), dragging to pan, the previous and next pictures, Download
 // and a close button. The zoom's sums are plain functions (DOM-free), so Jest can test them.
 (function (root) {

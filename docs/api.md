@@ -9,14 +9,14 @@ WebODM's CSRF token when sent from a browser session.
 `<project>` and `<task>` are WebODM's project and task ids, `<dataset>` a dataset's id (a UUID), and `<workset>` a
 workset's id (12 hexadecimal characters).
 
-## Thermal Task
+## DJI Thermal Task
 
 | Method | Path | What it does |
 | --- | --- | --- |
 | POST | `describe` | One thermal photo's camera, recorded measurement values and their ranges. Nothing is kept. |
 | POST | `projects/<project>/tasks/<task>/convert` | Converts one photo into a partial task's images, with the measurement values sent with it. Answers `converted`, `ignored` (not a DJI thermal photo) or `failed` with the reason. |
 
-## Thermal Analyzer
+## DJI Thermal Analyzer
 
 | Method | Path | What it does |
 | --- | --- | --- |

@@ -1,11 +1,13 @@
 # DJI Thermal plugin for WebODM
 
+[![The Thermal Inspector on a thermal orthophoto in WebODM: a pinned point, a measured region and an isotherm](docs/images/splash.png)](docs/images/splash-source.png)
+
 Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature maps. The plugin gives two ways in:
 
-- **Thermal Task**, a button beside WebODM's "Select Images and GCP": the quick path. Each R-JPEG is converted into a
+- **DJI Thermal Task**, a button beside WebODM's "Select Images and GCP": the quick path. Each R-JPEG is converted into a
   temperature image (degrees Celsius) as it is uploaded, with measurement settings you can change, then WebODM
   processes them like any other task.
-- **Thermal Analyzer**, in WebODM's menu: for a flight you want to look at first. It checks the photos (what each one
+- **DJI Thermal Analyzer**, in WebODM's menu: for a flight you want to look at first. It checks the photos (what each one
   is, the problems found, the WebODM options to use), converts them with every dji-thermal-cli setting (several
   worksets side by side), places the frames into mosaics shown on a map, and makes a WebODM task from the
   workset you choose.
@@ -39,12 +41,12 @@ WebODM's own versions. Restart WebODM if it asks you to.
 The plugin calls no outside service: photos are converted, analyzed and mosaicked on your WebODM server. The mosaic
 viewer's base layers are WebODM's own, loaded by your browser as on WebODM's other maps.
 
-## The Thermal Task
+## The DJI Thermal Task
 
-1. In a project on the dashboard, press **Thermal Task** and pick the flight's photos, all of them if you like, and a
+1. In a project on the dashboard, press **DJI Thermal Task** and pick the flight's photos, all of them if you like, and a
    GCP file if you have one. The plugin finds the thermal R-JPEGs among them by their content; the RGB photos taken
    with them are ignored and not uploaded. (To check the flight first or compare settings, the panel points to the
-   Thermal Analyzer.) The Workset Creation Settings ask the same values in the same order and words.
+   DJI Thermal Analyzer.) The Workset Creation Settings ask the same values in the same order and words.
 2. **Measurement**: the values the temperatures are computed with. Each field shows the value the camera recorded
    and the range the camera accepts; left empty, every photo keeps its own recorded value.
    - **Temperature unit** of the values you enter: Celsius, Fahrenheit or Kelvin, by default WebODM's units (°F
@@ -63,16 +65,16 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
    changed to the converted images' (`DJI_0001_T.JPG` becomes `DJI_0001_T.tif`).
 
 The task's name is suggested from the first photo's date. WebODM's own upload also looks the place up on
-OpenStreetMap's Nominatim; the Thermal Task does not, as the plugin calls no outside service.
+OpenStreetMap's Nominatim; the DJI Thermal Task does not, as the plugin calls no outside service.
 
-## The Thermal Analyzer
+## The DJI Thermal Analyzer
 
-**Thermal Analyzer**, in WebODM's menu, lists the thermal datasets of every project you can view, with their
+**DJI Thermal Analyzer**, in WebODM's menu, lists the thermal datasets of every project you can view, with their
 analysis and worksets at a glance (how many worksets, or how many of them are ready while some are not).
 
-**Preferences** (the gear beside the Thermal Analyzer's heading):
+**Preferences** (the gear beside the DJI Thermal Analyzer's heading):
 
-- **Temperature unit**: °C or °F, used throughout the Analyzer and the Thermal Task whatever unit an image or
+- **Temperature unit**: °C or °F, used throughout the Analyzer and the DJI Thermal Task whatever unit an image or
   workset holds. It is WebODM's own units setting (the Metric/Imperial selector on its map, kept in your browser):
   changing it in either place changes it in both, °F with imperial lengths.
 - **Palette**, kept for your WebODM account: one of DJI's palettes or of WebODM's colour maps, and also the palette
@@ -209,7 +211,7 @@ A dataset is kept in a task of its project, named "Thermal dataset: *name*": its
 task's folder, apart from the images WebODM processes, so the task holds no image until a workset is sent to it
 (**Use for parent task**). It shows in the project's task list with "Set a processing node"; leave it unset until it
 holds a workset's TIFFs. Its expanded panel on the dashboard has a **Thermal dataset** button that opens the
-dataset in the Thermal Analyzer. It is shared as the project is:
+dataset in the DJI Thermal Analyzer. It is shared as the project is:
 
 - viewing the project shows the dataset, its worksets and mosaics, and downloads them;
 - changing the project allows adding images, analyzing, converting and making tasks;
@@ -224,7 +226,7 @@ Temperatures are shown in the unit of your preferences (see above).
 ## The Thermal Inspector
 
 On WebODM's 2D map of a task whose orthophoto holds temperatures (a single thermal band, as ODM makes from the
-Thermal Task's images or a workset's), or of a project with workset mosaics, a thermometer button opens the Thermal
+DJI Thermal Task's images or a workset's), or of a project with workset mosaics, a thermometer button opens the Thermal
 Inspector:
 
 - **Hover**: the temperature under the cursor, beside it and in the panel; outside the task's crop, outside the
@@ -348,7 +350,7 @@ takes the documentation's screenshots from it.
 The plugin's parts: `converter.py` (R-JPEG to TIFF), `api.py` (its API, under `/api/plugins/dji-thermal/`: `describe` a
 photo's camera, recorded values and ranges; `projects/<id>/tasks/<id>/convert` one photo into a partial task, with
 WebODM's project permission), `sdk.py` with `page.py` and `templates/sdk.html` (DJI's own SDK and the DJI Thermal page,
-`/plugins/dji-thermal/sdk/`), the Thermal Analyzer (`datasets.py`: the holder tasks and their records; `analysis.py`:
+`/plugins/dji-thermal/sdk/`), the DJI Thermal Analyzer (`datasets.py`: the holder tasks and their records; `analysis.py`:
 the analysis job, run by WebODM's worker; `conversions.py`: the conversions, their settings and job, and each user's
 defaults; `mosaics.py`: a conversion's mosaics, their job, and the viewer's tiles and values with WebODM's rio-tiler;
 `conversion_tasks.py`: a WebODM task from a conversion, or the dataset's own task given its TIFFs; `analyzer_api.py`:

@@ -1,11 +1,13 @@
 # DJI Thermal plugin for WebODM
 
+[![The Thermal Inspector on a thermal orthophoto in WebODM: a pinned point, a measured region and an isotherm](images/splash.png)](images/splash-source.png)
+
 The DJI Thermal plugin turns the radiometric thermal photos of a DJI drone (R-JPEGs) into temperature maps in
 [WebODM](https://github.com/WebODM/WebODM). It adds three things to WebODM:
 
-- **Thermal Task**, a button on each project of the dashboard. It's the quick way: the photos are converted into
+- **DJI Thermal Task**, a button on each project of the dashboard. It's the quick way: the photos are converted into
   temperature images as they upload, then WebODM processes them like any other task.
-- **Thermal Analyzer**, in WebODM's menu, for a flight you want to look at first. It checks the photos, converts
+- **DJI Thermal Analyzer**, in WebODM's menu, for a flight you want to look at first. It checks the photos, converts
   them with the settings you choose (several worksets side by side), shows quick mosaics on a map, and makes a
   WebODM task from the workset you pick.
 - **Thermal Inspector**, on WebODM's map of a processed thermal task. It shows the temperature under the cursor,
@@ -20,9 +22,9 @@ a pure-Python version of DJI's Thermal SDK. The plugin calls no outside service.
 
 Each one walks through a task from start to finish.
 
-1. [A thermal map with Thermal Task](quickstart-thermal-task.md): from the flight's photos to an orthophoto
+1. [A thermal map with DJI Thermal Task](quickstart-thermal-task.md): from the flight's photos to an orthophoto
    of temperatures.
-2. [Checking a flight in the Thermal Analyzer](quickstart-analyzer.md): upload the photos, read the problems
+2. [Checking a flight in the DJI Thermal Analyzer](quickstart-analyzer.md): upload the photos, read the problems
    found and the settings WebODM should use.
 3. [Worksets, mosaics and a task](quickstart-worksets.md): convert the photos, look at the mosaics, and make a
    WebODM task from them.

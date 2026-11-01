@@ -1,13 +1,13 @@
-# Checking a flight in the Thermal Analyzer
+# Checking a flight in the DJI Thermal Analyzer
 
-The Thermal Analyzer looks at a flight's photos before you process them. It tells you what each photo is, what
+The DJI Thermal Analyzer looks at a flight's photos before you process them. It tells you what each photo is, what
 problems it found, and which WebODM settings to use.
 
 ## 1. Make a dataset
 
-Open **Thermal Analyzer** in WebODM's menu. It lists the thermal datasets of every project you can view.
+Open **DJI Thermal Analyzer** in WebODM's menu. It lists the thermal datasets of every project you can view.
 
-![The Thermal Analyzer's list of datasets](images/analyzer-list.png)
+![The DJI Thermal Analyzer's list of datasets](images/analyzer-list.png)
 
 Press **New Dataset**. Give it a name, choose the project, and choose the flight's photos or their folder (you can
 also drop them on the page).
@@ -87,5 +87,5 @@ you're asked before it's replaced.
 
 - **Add images** adds photos to the dataset; run **Analyze again** afterwards.
 - The pencil renames the dataset and the bin deletes it. The link icon beside its name copies a link to the page.
-- The gear beside the Thermal Analyzer's heading sets your preferences: the temperature unit and the palette
+- The gear beside the DJI Thermal Analyzer's heading sets your preferences: the temperature unit and the palette
   (see [Palettes and units](palettes.md)).

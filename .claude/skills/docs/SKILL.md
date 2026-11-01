@@ -19,7 +19,8 @@ kramdown-only syntax, which github.com shows as text.
 ## After a change a user sees
 
 1. Update the page that describes it (and `troubleshooting.md` for a new message, `api.md` for a new endpoint).
-2. Retake the screenshots it changes, with the dev stack up (`dev/webodm.sh ps`):
+2. Retake the screenshots it changes (`splash.png`, at the top of README and `index.md`, is the user's own and
+   isn't retaken), with the dev stack up (`dev/webodm.sh ps`):
    `node dev/screenshots.js <name> ...` (no name: all of them; an unknown name lists them). It reads
    `DT_DOCS_USER`, `DT_DOCS_PASSWORD`, `DT_DOCS_DATASET`, `DT_DOCS_MAP` and `DT_FLIGHT_DIR` from the environment or
    `.env` (see the script's header). Pass the login on the command line from what the user gave; never write it in

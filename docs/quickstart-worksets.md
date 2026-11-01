@@ -2,7 +2,7 @@
 
 A **workset** is the dataset's photos converted with one set of settings. You can make several and compare them
 side by side. Then you look at a workset's mosaics, and make a WebODM task from the one you like. This follows
-[Checking a flight in the Thermal Analyzer](quickstart-analyzer.md).
+[Checking a flight in the DJI Thermal Analyzer](quickstart-analyzer.md).
 
 ## 1. Choose the settings
 

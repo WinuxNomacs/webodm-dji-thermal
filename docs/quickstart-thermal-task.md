@@ -1,7 +1,7 @@
-# A thermal map with Thermal Task
+# A thermal map with DJI Thermal Task
 
 From a DJI flight's photos to a WebODM orthophoto of temperatures, in one go. To look at the flight before
-processing it, or to compare settings, see [Checking a flight in the Thermal Analyzer](quickstart-analyzer.md)
+processing it, or to compare settings, see [Checking a flight in the DJI Thermal Analyzer](quickstart-analyzer.md)
 instead.
 
 You need the photos of a flight made with a [supported camera](index.md#cameras), and a WebODM project you can
@@ -9,9 +9,9 @@ change.
 
 ## 1. Choose the photos
 
-On WebODM's dashboard, press **Thermal Task** on your project, beside **Select Images and GCP**.
+On WebODM's dashboard, press **DJI Thermal Task** on your project, beside **Select Images and GCP**.
 
-![A project on the dashboard, with the Thermal Task button](images/thermal-task-button.png)
+![A project on the dashboard, with the DJI Thermal Task button](images/thermal-task-button.png)
 
 Pick the flight's photos. You can pick all of them: the plugin finds the thermal R-JPEGs by their content and leaves
 out the visible (RGB) photos taken with them. You can add a GCP file too.
@@ -20,7 +20,7 @@ out the visible (RGB) photos taken with them. You can add a GCP file too.
 
 The panel shows how many thermal photos it found, then the values the temperatures are computed with.
 
-![The Thermal Task panel, with the measurement values and WebODM's task options](images/thermal-task-panel.png)
+![The DJI Thermal Task panel, with the measurement values and WebODM's task options](images/thermal-task-panel.png)
 
 Each field shows the value the camera recorded and the range it accepts. Leave a field empty to keep each photo's
 own recorded value; this is usually right. Fill one in when you know better, for example the emissivity of the
@@ -46,5 +46,5 @@ When WebODM has finished, open the task's map. Its orthophoto holds temperatures
 - A GCP file, `geo.txt` and `image_groups.txt` are uploaded with the photos. The image names in them are changed
   to the converted images' names (`DJI_0001_T.JPG` becomes `DJI_0001_T.tif`).
 - The task's name comes from the first photo's date. WebODM's own upload looks the place up on OpenStreetMap; the
-  Thermal Task doesn't, because the plugin calls no outside service.
+  DJI Thermal Task doesn't, because the plugin calls no outside service.
 - [The converted images](converted-images.md) describes what each uploaded TIFF holds.

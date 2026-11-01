@@ -2,7 +2,7 @@
 
 The messages you may meet, and what to do about them.
 
-## Thermal Task
+## DJI Thermal Task
 
 **"None of the files picked is a DJI thermal photo."**
 
@@ -18,12 +18,12 @@ They're R-JPEGs from a camera dji-thermal-cli doesn't decode. See [Cameras](inde
 
 Those photos are left out and the task goes on with the others. The reason says what went wrong with the photo.
 
-**No Thermal Task button on the dashboard**
+**No DJI Thermal Task button on the dashboard**
 
 The plugin's scripts didn't load. Install the plugin from a release zip or WebODM's plugin list, which include the
 built scripts (see [Installing](installing.md)), and reload the page.
 
-## Thermal Analyzer
+## DJI Thermal Analyzer
 
 **"The project's owner is over their storage quota: free some space first"**
 
@@ -62,7 +62,7 @@ the dataset, so the next views are quick.
 **No thermometer button on the map**
 
 The Inspector appears on a task whose orthophoto holds temperatures: a single thermal band, as ODM makes from the
-Thermal Task's or a workset's temperature TIFFs. An orthophoto of colour pictures has no temperatures to read.
+DJI Thermal Task's or a workset's temperature TIFFs. An orthophoto of colour pictures has no temperatures to read.
 
 **"This task has no thermal orthophoto"**
 
