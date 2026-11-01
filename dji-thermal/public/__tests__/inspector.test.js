@@ -428,7 +428,9 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
                                           {wanted: {emissivity: 0.5, reflected: 21}, baseline: BASELINE});
         const ticks = [...html.matchAll(/left: ([\d.]+)%;">([^<]+)</g)].map(m => [Number(m[1]), Number(m[2])]);
         const half = {wanted: {emissivity: 0.5, reflected: 21}, baseline: BASELINE};
-        expect(ticks[0][1]).toBeGreaterThanOrEqual(inspector.corrected(10, half) - 1e-9);
+        // The ends say the corrected range's own values, the marks between sit where the layer has those values
+        expect(ticks[0]).toEqual([0, Number(inspector.corrected(10, half).toFixed(1))]);
+        expect(ticks[ticks.length - 1]).toEqual([100, Number(inspector.corrected(40, half).toFixed(1))]);
         ticks.forEach(([at, label]) => expect(at).toBeCloseTo((inspector.uncorrected(label, half) - 10) / 30 * 100, 0));
     });
 
@@ -604,7 +606,8 @@ describe("the Thermal Inspector's isotherms and legend", () => {
         expect([mark.style.left, mark.style.width]).toEqual(["75%", "25%"]);
         expect(mark.title).toBe("Above 32.50 °C");
         document.body.innerHTML = inspector.legendHtml(INFERNO, [10, 40], "magma", "F", {mode: "below", high: 0, color: "red"});
-        expect([...document.querySelectorAll(".dt-tick")].map(t => t.textContent)).toEqual(["50", "60", "70", "80", "90", "100"]);
+        // 10 to 40 °C is 50 to 104 °F: the ends say so, 100 would crowd 104
+        expect([...document.querySelectorAll(".dt-tick")].map(t => t.textContent)).toEqual(["50", "60", "70", "80", "90", "104"]);
         expect(document.querySelector(".dt-legend-isotherm")).toBeNull();      // below the range: nothing painted
         expect(inspector.legendHtml(INFERNO, null, "magma", "C", null)).toBe("");
     });
@@ -674,6 +677,132 @@ describe("the Thermal Inspector's isotherms and legend", () => {
         const again = start(map2, {[PALETTE]: {name: "magma", color_map: INFERNO}});
         await again.ins.ready;
         expect(again.ins.legend().hidden).toBe(true);
+    });
+
+    it("says the image's own lowest and highest temperatures under the legend when they reach beyond its colours", async () => {
+        const extent = html => { document.body.innerHTML = html; const e = document.querySelector(".dt-legend-extent"); return e && e.textContent; };
+        expect(extent(inspector.legendHtml(INFERNO, [10, 40], "magma", "C", null, null, [5.04, 45]))).toBe("Image: 5–45 °C");
+        expect(extent(inspector.legendHtml(INFERNO, [10, 40], "magma", "F", null, null, [5, 45]))).toBe("Image: 41–113 °F");
+        expect(extent(inspector.legendHtml(INFERNO, [10, 40], "magma", "C", null, null, [10.01, 39.98]))).toBeNull();
+        expect(extent(inspector.legendHtml(INFERNO, [10, 40], "magma", "C", null, null, null))).toBeNull();
+        // From what WebODM's tiles say of the orthophoto, its range narrowed in WebODM's layer panel
+        const layer = tileLayer(TILES, THERMAL_TASK);
+        layer[Symbol.for("tile-meta")] = {statistics: {1: {min: 2.5, max: 51.25}}};
+        const {ins} = start(fakeMap([layer]), {[PALETTE]: {name: "magma", color_map: INFERNO}});
+        await ins.ready;
+        await flush();
+        expect(ins.legend().querySelector(".dt-legend-extent").textContent).toBe("Image: 2.5–51.3 °C");
+        layer.setUrl(TILES.replace("rescale=10,40", "rescale=2.5,51.25"));
+        expect(ins.legend().querySelector(".dt-legend-extent")).toBeNull();
+        expect([...ins.legend().querySelectorAll(".dt-tick")].map(t => t.textContent)).toEqual(["2.5", "20", "30", "40", "51.3"]);
+    });
+});
+
+describe("the Thermal Inspector's panel and legend dragged over the map", () => {
+    const PALETTE = "GET /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/palette";
+    const rect = (el, r) => {
+        el.getBoundingClientRect = () => {
+            const m = /translate\((-?\d+)px, (-?\d+)px\)/.exec(el.style.transform) || [0, 0, 0];
+            const left = r.left + Number(m[1]), top = r.top + Number(m[2]);
+            return {left, top, right: left + r.width, bottom: top + r.height, width: r.width, height: r.height};
+        };
+    };
+    const press = (el, x, y, button = 0) => el.dispatchEvent(new MouseEvent("pointerdown", {clientX: x, clientY: y, button, bubbles: true, cancelable: true}));
+    const move = (x, y) => document.dispatchEvent(new MouseEvent("pointermove", {clientX: x, clientY: y, bubbles: true, cancelable: true}));
+    const release = () => document.dispatchEvent(new MouseEvent("pointerup", {bubbles: true}));
+
+    it("moves a box by where it is grabbed, keeping it inside the map, and puts it back", () => {
+        const area = document.createElement("div"), corner = document.createElement("div"), box = document.createElement("div"), link = document.createElement("a");
+        corner.className = "leaflet-bottom leaflet-left";
+        box.appendChild(link);
+        corner.appendChild(box);
+        document.body.append(area, corner);
+        rect(area, {left: 0, top: 0, width: 1000, height: 600});
+        rect(box, {left: 700, top: 10, width: 280, height: 300});
+        const moved = [];
+        const mover = inspector.movable(box, area, t => !t.closest("a"), o => moved.push(o));
+        press(box, 800, 20);
+        move(600, 120);
+        expect(box.style.transform).toBe("translate(-200px, 100px)");
+        expect(box.classList.contains("dt-moving")).toBe(true);
+        const z = Number(corner.style.zIndex);
+        expect(z).toBeGreaterThan(1000);                    // over the map's other controls
+        move(2000, -500);                                   // kept inside the map: right and top edges
+        expect(box.style.transform).toBe("translate(20px, -10px)");
+        release();
+        expect(box.classList.contains("dt-moving")).toBe(false);
+        move(100, 100);                                     // released: no longer follows
+        expect(mover.offset()).toEqual({x: 20, y: -10});
+        press(link, 800, 20);                               // a link is not a handle
+        move(0, 0);
+        expect(mover.offset()).toEqual({x: 20, y: -10});
+        release();
+        press(box, 800, 20, 2);                             // nor the right button
+        move(0, 0);
+        expect(mover.offset()).toEqual({x: 20, y: -10});
+        release();
+        rect(area, {left: 0, top: 0, width: 900, height: 600});
+        mover.keep();                                       // the map grew narrower
+        expect(mover.offset()).toEqual({x: -80, y: -10});
+        press(box, 800, 20);
+        release();
+        expect(Number(corner.style.zIndex)).toBeGreaterThan(z);     // grabbed again: over the one grabbed since
+        mover.reset();
+        expect(box.style.transform).toBe("");
+        expect(corner.style.zIndex).toBe("");
+        expect(moved[moved.length - 1]).toEqual({x: 0, y: 0});
+    });
+
+    it("drags the panel by its heading, the frames window with it, back in its place when opened again", async () => {
+        const map = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
+        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: [0, 1]}});
+        await ins.ready;
+        ins.open();
+        const frames = map.el.querySelector(".dt-inspector-frames");
+        rect(map.el, {left: 0, top: 0, width: 1200, height: 800});
+        rect(panel(), {left: 880, top: 10, width: 280, height: 400});
+        press(panel().querySelector(".dt-inspector-head strong"), 900, 20);
+        move(600, 60);
+        release();
+        expect(panel().style.transform).toBe("translate(-300px, 40px)");
+        expect(frames.style.transform).toBe("translate(-300px, 40px)");
+        expect(frames.classList.contains("dt-inspector-frames-right")).toBe(false);
+        press(panel().querySelector(".dt-inspector-head strong"), 600, 60);
+        move(0, 60);                                        // to the map's left edge: no room left of it for the frames
+        release();
+        expect(panel().getBoundingClientRect().left).toBe(0);
+        expect(frames.classList.contains("dt-inspector-frames-right")).toBe(true);
+        press(panel().querySelector(".dt-inspector-readout") || panel().lastElementChild, 100, 300);   // not by its body
+        move(500, 300);
+        release();
+        expect(panel().getBoundingClientRect().left).toBe(0);
+        ins.close();
+        ins.open();
+        expect(panel().style.transform).toBe("");
+        expect(frames.style.transform).toBe("");
+        expect(frames.classList.contains("dt-inspector-frames-right")).toBe(false);
+    });
+
+    it("drags the legend by any part, back in its place when it is hidden and shown again", async () => {
+        const map = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
+        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: [0, 1]}});
+        await ins.ready;
+        await flush();
+        const legend = ins.legend();
+        rect(map.el, {left: 0, top: 0, width: 1200, height: 800});
+        rect(legend, {left: 50, top: 10, width: 220, height: 40});
+        press(legend.querySelector(".dt-legend-bar"), 100, 20);
+        move(400, 620);
+        release();
+        expect(legend.style.transform).toBe("translate(300px, 600px)");
+        ins.open();
+        const box = panel().querySelector('[data-act="legend"]');
+        box.checked = false;
+        box.dispatchEvent(new Event("change", {bubbles: true}));
+        box.checked = true;
+        box.dispatchEvent(new Event("change", {bubbles: true}));
+        expect(legend.hidden).toBe(false);
+        expect(legend.style.transform).toBe("");
     });
 });
 

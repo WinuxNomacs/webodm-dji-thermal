@@ -1,6 +1,8 @@
 // Colour scales, shared by the mosaic viewer (viewer.js) and the Thermal Inspector's legend (inspector.js): a palette
-// (encoded as WebODM's tiler gives colour maps: 0xRRGGBBAA integers) as a CSS gradient, and round values to mark on it.
+// (encoded as WebODM's tiler gives colour maps: 0xRRGGBBAA integers) as a CSS gradient, and the values to mark on it.
 (function (root) {
+    var END_ROOM = 0.18;        // a round value this close to an end of the scale (a share of it) is left to the end's label
+
     function colorCss(encoded) {
         var c = encoded >>> 0;
         return "rgb(" + ((c >>> 24) & 255) + "," + ((c >>> 16) & 255) + "," + ((c >>> 8) & 255) + ")";
@@ -46,7 +48,21 @@
         return out;
     }
 
-    var api = {colorCss: colorCss, paletteCss: paletteCss, gradientCss: gradientCss, scaleTicks: scaleTicks};
+    // The marks of a colour scale from lo to hi (as shown): its ends with their own values (to the round values'
+    // decimals, a tenth when that would round them), and the round values between them that don't crowd an end
+    function rangeTicks(lo, hi, count) {
+        var inner = scaleTicks(lo, hi, count);
+        if (!(hi > lo)) return [];
+        var digits = inner.length ? (inner[0].label.split(".")[1] || "").length : 1;
+        var label = function (v) {
+            var d = Math.abs(Number(v.toFixed(digits)) - v) < 1e-9 ? digits : Math.max(digits, 1);
+            return v.toFixed(d).replace(/^-(0\.?0*)$/, "$1");
+        };
+        var between = inner.filter(function (t) { return t.at > END_ROOM && t.at < 1 - END_ROOM; });
+        return [{value: lo, label: label(lo), at: 0, end: true}].concat(between, [{value: hi, label: label(hi), at: 1, end: true}]);
+    }
+
+    var api = {colorCss: colorCss, paletteCss: paletteCss, gradientCss: gradientCss, scaleTicks: scaleTicks, rangeTicks: rangeTicks};
     root.ThermalScale = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

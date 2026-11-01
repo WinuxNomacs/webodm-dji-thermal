@@ -83,3 +83,12 @@
 .dt-inspector-form textarea { resize: vertical; }
 .dt-inspector-comment { white-space: pre-wrap; margin: 2px 0; }
 .leaflet-tooltip.dt-inspector-saved-tip { border-color: #2e7d32; }
+
+/* The panel (by its heading) and the legend are dragged over the map; the frames window follows the panel, on its
+   right when the left has no room */
+.dt-inspector-head { cursor: move; touch-action: none; user-select: none; }
+.dt-inspector-head a { cursor: pointer; }
+.dt-legend { cursor: move; touch-action: none; user-select: none; }
+.dt-moving { opacity: 0.9; }
+.dt-inspector-frames.dt-inspector-frames-right { right: auto; left: calc(100% - 28px); }
+.dt-legend-extent { margin-top: 1px; }

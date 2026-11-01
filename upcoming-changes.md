@@ -298,6 +298,23 @@
     - **A moved panel or legend goes back to its place** when the panel is closed and opened again, the legend
       hidden and shown again, or the page reloaded; nothing is remembered.
     - **The source frames window moves with the panel**, beside it, on the other side when there is no room.
+  - Done (2026-11-01), `inspector-move`:
+    - `scale.js` `rangeTicks`: the ends with the range's own values (to the round values' decimals, a tenth when
+      that would round them), round values between that are more than 18% of the bar from an end; used by both
+      legends (`inspector.js` `legendHtml`, `viewer.js` `legendHtml`).
+    - `inspector.js`: `layerExtent` (WebODM's tile metadata's statistics for an orthophoto, the tab's stats for a
+      mosaic: `laidMosaic`'s `extent`) and `extentHtml` ("Image: low–high", corrected with the correction).
+      `movable` (pointer events, a CSS translate kept inside the map, re-fitted after a redraw or the map's
+      resize; the box grabbed last raises its Leaflet corner over WebODM's other controls); the panel by its
+      heading (not its links), the legend anywhere; `placeFrames` moves the frames window with the panel and puts
+      it on the panel's right when only that side has room. Reset on close, on the legend's tickbox, on reload.
+    - Tests: Jest 185 (`rangeTicks`, the image line, `movable`, the panel with the frames window, the legend; four
+      tests' expected ticks updated). Mutation checks (no reset on close, the frames not following, no end
+      labels) fail them. Live (read only, no writes, no console errors): both dragged inside the map without
+      panning it, the frames window flipped right at the map's left edge, both back after close/hide; legends
+      "9.9 20 30 40 51.5 / Image: -42.5–56.6 °C", the mosaic viewer "9.5 20 30 40 51.9". README, quickstart
+      section 3; screenshots retaken: `inspector`, `inspector-line`, `inspector-saved`, `inspector-frames`,
+      `inspector-mosaics`, `mosaic-viewer`, `mosaic-frames`.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
