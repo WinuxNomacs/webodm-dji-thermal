@@ -581,7 +581,14 @@
     unticking forgets the values typed, so the next tick starts again from the topmost layer's own; the
     "Approximate…" line and the layers' measured-with lines kept. README, `quickstart-inspector.md` (sections 4 and
     7), screenshots `inspector-saved`, `inspector-mosaics` and any showing the panel's sections retaken.
-  - Open: the order.
+  - Decided (the user, 2026-11-01): **before Faster image adjustments**.
+  - Done (2026-11-01), `inspector-names`: `inspector.js` `mosaicsHtml` ("Mosaic Overlays"), `correctionHtml` (the
+    tick box in the "Manual Corrections" heading, `.dt-inspector-heading` in `inspector.css`; its label gone),
+    `correctionInput` (unticked, the correction is just `{on: false}`, so the browser's copy is removed and the next
+    tick starts from the topmost layer's own values). README, `quickstart-inspector.md` sections 4 and 7 (its
+    section 4 anchor, linked from `quickstart-worksets.md`). Screenshots `inspector`, `inspector-image`,
+    `inspector-saved`, `inspector-mosaics` retaken (read only). `inspector.test.js` (2: Mosaic Overlays absent
+    without mosaics; the heading, and unticking forgetting the values). Jest 206, ESLint.
 
 - **Faster image adjustments** (the user, 2026-11-01, from `new.md`): "can anything be done to improve the
   rendering response time of changes to the images sliders? How fast the tiles are rendered? etc.... Looking for it

@@ -77,9 +77,10 @@ the page puts them back where they started.
 Temperatures are shown in WebODM's units: °F when its map is set to Imperial, °C otherwise. See
 [Palettes and units](palettes.md).
 
-## 4. Workset mosaics on the map
+## 4. Mosaic Overlays on the map
 
-**Workset mosaics** in the panel lists the mosaics of every workset in the project's datasets. Tick one to lay it
+**Mosaic Overlays** in the panel lists the mosaics of every workset in the project's datasets; the section is there
+only when a workset has built mosaics. Tick one to lay it
 on the map, above WebODM's layers, or open the map from the workset's **Open on WebODM's map**, which lays it for
 you.
 
@@ -143,7 +144,7 @@ Saved measurements go with their task or workset: deleting either deletes them.
 
 The temperatures were measured with the emissivity and reflected temperature the camera recorded, or those set in
 DJI Thermal Task or the workset (see [Measurement settings](measurement.md)). To see what a surface would measure with
-others, tick **Correct for another emissivity and reflected temperature**. The values start from what the topmost
+others, tick the box beside **Manual Corrections**. The values start from what the topmost
 layer was measured with, and the panel lists what each layer on the map was measured with. Change them, and:
 
 - the readout, pins, regions and lines show corrected temperatures (the regions are measured again);
@@ -153,4 +154,5 @@ layer was measured with, and the panel lists what each layer on the map was meas
 The correction is approximate: a broadband model, with the air's transmission taken as 1, as at drone distances.
 It's for comparing surfaces, not for calibrated values; for exact values, make a workset with the measurement
 settings you want. A layer that doesn't record how it was measured (an orthophoto that wasn't made from the plugin's
-TIFFs) isn't corrected, and the panel says so. Your browser keeps the correction for the same tasks.
+TIFFs) isn't corrected, and the panel says so. Your browser keeps the correction for the same tasks. Untick the box
+to go back: the values you typed are forgotten and the fields close, so ticking it again starts from the layer's own.

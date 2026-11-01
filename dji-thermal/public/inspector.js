@@ -265,11 +265,11 @@
         return inspectorUrl(t, "curve") + "?rescale=" + r[0] + "," + r[1] + Scale.adjustQuery(adjust);
     }
 
-    // The panel's Workset mosaics: each workset of the project's datasets, with a tickbox laying it on the map; once
+    // The panel's Mosaic Overlays: each workset of the project's datasets, with a tickbox laying it on the map; once
     // laid, its tab, opacity, Swipe (WebODM's split control) and Zoom to
     function mosaicsHtml(state) {
         if (!state.mosaics || !state.mosaics.length) return "";
-        return '<div class="dt-inspector-section"><strong>Workset mosaics</strong>' + state.mosaics.map(function (m) {
+        return '<div class="dt-inspector-section"><strong>Mosaic Overlays</strong>' + state.mosaics.map(function (m) {
             var id = mosaicId(m), laid = state.laid[id];
             var head = '<label class="dt-inspector-check dt-inspector-mosaic-name"><input type="checkbox" data-act="mosaic-on"' + (laid ? " checked" : "") +
                 "> " + escapeHtml(m.dataset.name) + ' <span class="text-muted">›</span> ' + escapeHtml(m.workset.name) + "</label>";
@@ -435,10 +435,11 @@
         return out;
     }
 
-    // The Correction section: the parameters wanted, and what each layer on the map was measured with
+    // The Manual Corrections section, its tick box in the heading: ticked, the parameters wanted, and what each layer
+    // on the map was measured with
     function correctionHtml(c, unit, sources, notice) {
-        var head = '<label class="dt-inspector-check"><input type="checkbox" data-act="correction-on"' + (c.on ? " checked" : "") +
-            "> Correct for another emissivity and reflected temperature</label>";
+        var head = '<label class="dt-inspector-check dt-inspector-heading"><input type="checkbox" data-act="correction-on"' + (c.on ? " checked" : "") +
+            "><strong>Manual Corrections</strong></label>";
         if (!c.on) return head;
         var measured = (sources || []).map(function (src) {
             if (src.loading) return "";
@@ -891,7 +892,7 @@
             mosaicsHtml(state) +
             '<div class="dt-inspector-section"><strong>Isotherm</strong>' + isothermHtml(state.isotherm, unit) +
             (state.isothermNotice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.isothermNotice) + "</div>" : "") + "</div>" +
-            '<div class="dt-inspector-section"><strong>Correction</strong>' + correctionHtml(state.correction, unit, (state.onMap || []).map(function (k) { return state.sources[k]; }).filter(Boolean), state.correctionNotice) + "</div>" +
+            '<div class="dt-inspector-section">' + correctionHtml(state.correction, unit, (state.onMap || []).map(function (k) { return state.sources[k]; }).filter(Boolean), state.correctionNotice) + "</div>" +
             '<div class="dt-inspector-section"><strong>Pinned points</strong>' + pinsHtml(state, unit) + "</div>" +
             '<div class="dt-inspector-section"><strong>Regions and lines</strong>' + regionsHtml(state, unit) + "</div>" +
             ((state.onMap || []).length ? '<div class="dt-inspector-section"><strong>Saved measurements</strong>' + savedHtml(state, unit) + "</div>" : "");
@@ -1074,9 +1075,9 @@
             var c = assign({}, state.correction), unit = userUnit();
             state.correctionNotice = "";
             if (what === "on") {
-                c.on = value;
-                // Starting from what the topmost layer was measured with
-                if (value && !validCorrection(c)) {
+                // Unticked, the values typed are forgotten; ticked, they start from what the topmost layer was measured with
+                c = {on: value};
+                if (value) {
                     var layers = thermalLayers(map), t = layers[layers.length - 1];
                     var src = t && state.sources[layerSource(t).key], b = src && src.baseline;
                     c.emissivity = b ? b.emissivity : 0.95;

@@ -272,12 +272,13 @@ Inspector:
   Everyone who can view the project sees the saved measurements of the layers on the map, dashed in green, with their
   values as saved, who saved them and when; those who can change it rename them, change their comment and delete
   them. The list downloads as CSV and GeoJSON (a line's profile as its own CSV).
-- **Correction**: corrects the temperatures shown for another emissivity and reflected temperature than the
-  photos were measured with, from what each layer records: an orthophoto's TIFFs (the values dji-thermal-cli wrote
+- **Manual Corrections**: its tick box, beside the heading, opens the fields that correct the temperatures shown for
+  another emissivity and reflected temperature than the photos were measured with, from what each layer records: an orthophoto's TIFFs (the values dji-thermal-cli wrote
   in them), a workset mosaic's settings or its frames. It is approximate (a broadband model, the air's transmission
   taken as 1), for comparing surfaces, not calibrated values. The readout, pins, regions, lines, the legend's marks
   and the isotherm's limits change; the map's colours don't. A layer that doesn't record its values (an orthophoto
-  not made from the plugin's TIFFs) isn't corrected, and the panel says so. Kept in your browser for the same tasks.
+  not made from the plugin's TIFFs) isn't corrected, and the panel says so. Kept in your browser for the same tasks;
+  unticking it forgets the values and closes the fields.
 - **Palette**: the thermal layer's palette, from the same list as the Analyzer's: DJI's palettes (drawn by the
   plugin) and WebODM's colour maps. It is your palette everywhere: the
   Analyzer's preference, saved when you choose one here or in WebODM's own layer panel, and the one the map opens
@@ -303,8 +304,8 @@ Inspector:
 - **Isotherm**: paints the temperatures above, below or between limits (typed in your unit) in a colour of six,
   over each thermal layer, hidden with it, within the task's crop; the legend marks the part painted. Kept in your
   browser for the same tasks; Off removes it.
-- **Workset mosaics**: the mosaics of the Analyzer's worksets in the project's datasets (for those who can view the
-  project), each with a tickbox that lays it on the map above WebODM's layers: **Mosaic**, **Harmonized** or **Source
+- **Mosaic Overlays**: the mosaics of the Analyzer's worksets in the project's datasets (for those who can view the
+  project; shown only when one has built mosaics), each with a tickbox that lays it on the map above WebODM's layers: **Mosaic**, **Harmonized** or **Source
   frame**, in your palette over its own 2nd to 98th percentile, with its opacity, **Swipe** (WebODM's own divider:
   the mosaic on the right, WebODM's layers on the left) and zoom to it. Hover, pins, regions, the isotherm and the
   legend read the topmost thermal layer, a mosaic or an orthophoto. They are the plugin's layers, not entries of
