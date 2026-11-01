@@ -180,6 +180,22 @@ const SHOTS = {
         await p.waitForTimeout(1500);
         return p;
     },
+    "inspector-mosaics": async (p, env) => {
+        // WebODM's map of the dataset's project, its first workset's mosaic laid by the link, swiped against the
+        // project's own layers
+        const dataset = need(env, "DT_DOCS_DATASET");
+        const d = await p.evaluate(async (id) => (await fetch("/api/plugins/dji-thermal/datasets/" + id)).json(), dataset);
+        const list = await p.evaluate(async (id) => (await fetch("/api/plugins/dji-thermal/datasets/" + id + "/conversions")).json(), dataset);
+        const conversion = (list.conversions || list).filter((c) => c.mosaic_status === "ready")[0];
+        await p.goto(env.url + "/map/project/" + d.project.id + "/?dt-mosaic=" + dataset + "/" + conversion.id + "/harmonized");
+        await p.waitForSelector(".dt-inspector-mosaic input:checked", {timeout: 30000});
+        await p.click('[data-act="mosaic-swipe"]');
+        await p.waitForTimeout(3000);
+        const map = await p.locator(".leaflet-container").first().boundingBox();
+        await p.mouse.move(map.x + map.width * 0.6, map.y + map.height * 0.5);
+        await p.waitForTimeout(1500);
+        return p;
+    },
     "dji-sdk": async (p, env) => {
         await p.goto(env.url + "/plugins/dji-thermal/sdk/");
         await p.waitForLoadState("networkidle");

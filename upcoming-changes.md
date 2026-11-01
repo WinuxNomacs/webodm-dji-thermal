@@ -266,7 +266,8 @@
 
 - **Thermal Analyzer, part 2** (the user, 2026-11-01; details under "Up next: Thermal Analyzer, part 2" below):
   the workset mosaics laid on WebODM's 2D map from the Thermal Inspector (for comparing with any task's layers), the
-  source frames window, measuring tools and saved measurements there, and the frame page. Planned; in five steps.
+  source frames window, measuring tools and saved measurements there, and the frame page. In five steps; step 1
+  (the mosaics on the map) done 2026-11-01.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -368,6 +369,24 @@ last phase did with its colouring.
    opacity, and "Swipe" (`sideBySideChanged`); hover and pins read the topmost thermal layer, a mosaic or an
    orthophoto. `main.js` creates the control on every map and shows its button when `hasThermal` or the project
    has mosaics. The workset's "Open on the map" link. Not on WebODM's public maps (the plugin's API needs a login).
+   **Done** (2026-11-01, `inspector-mosaics`): `inspector_api.py` (`InspectorMosaics`, `map_mosaics`,
+   `InspectorProjectPalette`; `region_request`, `isotherm_request`, `palette_response` shared), `inspector.py`
+   (`raster_region`, `raster_isotherm`: any raster, a mosaic's unit and no-data marker, nearest pixel as its tiles),
+   `analyzer_api.py` (`MosaicRegion`, `MosaicIsotherm`, `has_map` and a workset's `project` / `project_map`),
+   `inspector.js` (a mosaic is a thermal layer: `laidMosaic`, `mosaicTileUrl`, `paletteKey`, the panel's Workset
+   mosaics; each isotherm overlay mirrors its layer's clip, `mirrorClip`), `main.js` (the Inspector on every map),
+   `conversions.js` and `viewer.js` / `viewer.html` (Open on WebODM's map). Found: WebODM shows a project's map only
+   when one of its tasks finished with an orthophoto or elevation model (`Project.get_map_items`; otherwise "A map is
+   not available", no plugin runs), so the link shows only then; WebODM's divider clips one layer on its right, so
+   an isotherm copies its layer's clip (this also fixes an orthophoto swiped from WebODM's panel). Laid mosaics are
+   not remembered between visits. Tests (the user, 2026-11-01: meaningful tests need no asking now):
+   `inspector.test.js` (the button, laying, hover in °C, a region, tab, opacity, Swipe, the clipped isotherm, a
+   link, the helpers), `main.test.js` (changed: every map), `analyzer.test.js` (the map link), `test_inspector.py`
+   (a °F mosaic's region and isotherm), `test_analyzer.py` (the list, its 404s, region, isotherm, refusals). Jest 170,
+   Django 135 (1 skipped), ESLint, Ruff; live on HomerunObliqueII (project 1's map): laid by the link, hover, the
+   legend, Harmonized, opacity, Swipe against WebODM's thermal orthophoto, the isotherm (clipped), a region, a pin,
+   lifted; a scratch project without a map (made and deleted). Docs: the Inspector quickstart's section 4, the
+   worksets quickstart, `api.md`, README; screenshots `inspector` retaken, `inspector-mosaics` new.
 2. **The source frames window in the Inspector**: `viewer.js`'s frames window shared (moved to a script both
    load), on a click or a pin; on an ODM orthophoto from the workset its task records (`conversions/<id>/tasks.json`).
 3. **Measuring tools**: dji-thermal-ui's tools (Spot, Line, Area, Box, Circle: `measure.ts`, `drawing.ts`) beside

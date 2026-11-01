@@ -554,12 +554,26 @@
 
         // -- isotherms and the legend ------------------------------------------------------------------------------
 
-        // An isotherm layer over each thermal layer on the map, hidden with it
+        // An overlay clipped as its thermal layer is: WebODM's divider clips the one layer on its right (a mosaic
+        // swiped, or an orthophoto from WebODM's layer panel), by its container's style
+        function mirrorClip(o) {
+            var src = o.layer.getContainer && o.layer.getContainer(), dst = o.overlay.getContainer && o.overlay.getContainer();
+            if (!src || !dst || !root.MutationObserver) return;
+            var copy = function () { dst.style.clip = src.style.clip; };
+            o.observer = new root.MutationObserver(copy);
+            o.observer.observe(src, {attributes: true, attributeFilter: ["style"]});
+            copy();
+        }
+
+        // An isotherm layer over each thermal layer on the map, hidden and clipped with it
         function drawIsotherms() {
             var wanted = validIsotherm(state.isotherm) ? thermalLayers(map, true) : [];
             overlays = overlays.filter(function (o) {
                 var kept = wanted.some(function (t) { return t.layer === o.layer; });
-                if (!kept) map.removeLayer(o.overlay);
+                if (!kept) {
+                    if (o.observer) o.observer.disconnect();
+                    map.removeLayer(o.overlay);
+                }
                 return kept;
             });
             wanted.forEach(function (t) {
@@ -571,6 +585,7 @@
                     o = {layer: t.layer, overlay: L.tileLayer(url, options)};
                     overlays.push(o);
                     o.overlay.addTo(map);
+                    mirrorClip(o);
                 } else if (o.overlay._url !== url) o.overlay.setUrl(url);
                 var c = o.overlay.getContainer && o.overlay.getContainer();
                 if (c) c.style.display = t.layer.isHidden && t.layer.isHidden() ? "none" : "";

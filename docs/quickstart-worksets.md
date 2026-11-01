@@ -74,6 +74,11 @@ that saw that point**, with the arrows to go through them:
 
 ![The frames that saw a point](images/mosaic-frames.png)
 
+**Open on WebODM's map**, at the top (and in the workset's menu), opens WebODM's map of the project with this mosaic
+laid on it, to compare it with the project's tasks: see [Measuring on the map](quickstart-inspector.md#4-workset-mosaics-on-the-map).
+It's there once WebODM has a map of the project, that is once one of its tasks has finished with an orthophoto or
+an elevation model.
+
 ## 4. A WebODM task
 
 **Create task** makes a WebODM task in the dataset's project from the workset's temperature TIFFs in °C, without

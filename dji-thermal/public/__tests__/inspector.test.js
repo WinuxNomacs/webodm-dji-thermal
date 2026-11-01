@@ -518,6 +518,13 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(layer.options.opacity).toBe(0.4);
         panel().querySelector('[data-act="mosaic-swipe"]').click();
         expect(plugins.Map.sideBySideChanged).toHaveBeenLastCalledWith(layer, true);
+        // Its isotherm is clipped as WebODM's divider clips it
+        change(panel().querySelector('[data-act="isotherm-mode"]'), "above");
+        const overlay = ins.overlays().find(o => o.layer === layer).overlay;
+        expect(overlay._url).toContain(BASE + "harmonized/isotherm/{z}/{x}/{y}.png?low=");
+        layer.getContainer().style.clip = "rect(0px, 500px, 400px, 200px)";
+        await flush();
+        expect(overlay.getContainer().style.clip).toBe("rect(0px, 500px, 400px, 200px)");
         // Lifted while swiped: off WebODM's split control first
         change(panel().querySelector('[data-act="mosaic-on"]'), false);
         expect(plugins.Map.sideBySideChanged).toHaveBeenLastCalledWith(layer, false);

@@ -9,7 +9,8 @@ The DJI Thermal plugin turns the radiometric thermal photos of a DJI drone (R-JP
   them with the settings you choose (several worksets side by side), shows quick mosaics on a map, and makes a
   WebODM task from the workset you pick.
 - **Thermal Inspector**, on WebODM's map of a processed thermal task. It shows the temperature under the cursor,
-  pinned points, region statistics, isotherms and a legend.
+  pinned points, region statistics, isotherms and a legend, and lays the Analyzer's mosaics on the map to compare
+  them with the project's own layers.
 
 Temperatures are computed on your WebODM server by [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/),
 a pure-Python version of DJI's Thermal SDK. The plugin calls no outside service.
