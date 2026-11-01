@@ -1,7 +1,8 @@
 """
 The Thermal Inspector's reads of a task's thermal orthophoto, for the control on WebODM's 2D map: the temperature at a
 point and the statistics of a region, in degrees Celsius (the orthophoto's first band, as WebODM's Celsius formula
-reads it). Pixels outside the task's crop are left out, as WebODM's map draws them.
+reads it). Pixels outside the task's crop are left out, as WebODM's map draws them. The regions and isotherms of a
+workset's mosaics laid on the map read them alike (raster_region, raster_isotherm), in °C from the mosaic's unit.
 """
 import json
 import math
@@ -11,6 +12,8 @@ REGION_MAX_SIZE = 4096        # pixels along the longer side; a larger region is
 PERCENTILES = (2, 98)
 HISTOGRAM_BINS = 64
 MAX_HISTOGRAM_BINS = 255
+# dji-thermal-cli's no-data marker: absolute zero, in each unit (a mosaic's pixels at or below it hold none)
+ABSOLUTE_ZERO = {'C': -273.15, 'F': -459.67, 'K': 0.0}
 
 
 def thermal_orthophoto(task):
@@ -25,6 +28,21 @@ def thermal_orthophoto(task):
 
 def _crop(task):
     return task.crop if task.crop is not None and not task.crop.empty else None
+
+
+def to_celsius(values, unit):
+    """Temperatures in unit (C, F or K) in °C"""
+    if unit == 'F':
+        return (values - 32.0) / 1.8
+    if unit == 'K':
+        return values - 273.15
+    return values
+
+
+def _measured(values, unit):
+    """Where values (in unit) are temperatures, not dji-thermal-cli's no-data marker"""
+    import numpy as np
+    return np.isfinite(values) & (values > ABSOLUTE_ZERO.get(unit, ABSOLUTE_ZERO['C']) + 1)
 
 
 def point(task, lon, lat):
@@ -69,6 +87,15 @@ def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS):
     REGION_MAX_SIZE pixels a side.
     :raises ValueError: not a polygon
     """
+    return raster_region(thermal_orthophoto(task), geometry, _crop(task), percentiles=percentiles, bins=bins)
+
+
+def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILES, bins=HISTOGRAM_BINS):
+    """
+    region of a raster's first band, within crop (a GEOS geometry) when given; with unit (a mosaic's), its no-data
+    marker left out and the statistics in °C
+    :raises ValueError: not a polygon
+    """
     import numpy as np
     import rasterio
     from django.contrib.gis.geos import GEOSGeometry
@@ -82,7 +109,6 @@ def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS):
         raise ValueError("Not a polygon")
     if not shape.valid:
         shape = shape.buffer(0)
-    crop = _crop(task)
     if crop is not None:
         shape = shape.intersection(crop)
     out = {'valid': False, 'reason': None, 'statistics': None, 'pixel_size': None, 'resampled': False}
@@ -91,7 +117,7 @@ def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS):
         out['reason'] = 'excluded'
         return out
 
-    with rasterio.open(thermal_orthophoto(task)) as src:
+    with rasterio.open(raster) as src:
         west, south, east, north = _lonlat_bounds(src)
         lons = [c[0] for polygon in polygons['coordinates'] for ring in polygon for c in ring]
         lats = [c[1] for polygon in polygons['coordinates'] for ring in polygon for c in ring]
@@ -125,6 +151,9 @@ def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS):
         out['resampled'] = scale > 1.0
 
     keep = inside & valid & np.isfinite(data)
+    if unit is not None:
+        keep &= _measured(data, unit)
+        data = to_celsius(data, unit)
     values = data[keep]
     if values.size == 0:
         out['reason'] = 'nodata'
@@ -155,7 +184,7 @@ def tile(task, z, x, y, lut, low, high, size=256, crop=False):
     task's crop when crop), in a colour table (256 RGB colours), as PNG bytes; None outside the orthophoto. Where it
     has no data comes from its alpha band.
     """
-    data = _tile_data(task, z, x, y, size, crop)
+    data = _raster_tile(thermal_orthophoto(task), z, x, y, size, _crop(task) if crop else None)
     if data is None:
         return None
     cmap = {i: (int(c[0]), int(c[1]), int(c[2]), 255) for i, c in enumerate(lut)}
@@ -167,16 +196,25 @@ def isotherm(task, z, x, y, low, high, rgb, size=256, crop=False):
     A tile over the thermal orthophoto's (as tile reads it) painting in rgb the temperatures at or above low and at or
     below high (°C; either may be None), transparent elsewhere, as PNG bytes; None outside the orthophoto
     """
+    return raster_isotherm(thermal_orthophoto(task), z, x, y, low, high, rgb, size, _crop(task) if crop else None)
+
+
+def raster_isotherm(raster, z, x, y, low, high, rgb, size=256, crop=None, unit=None):
+    """isotherm of a raster's first band, within crop (a GEOS geometry) when given; with unit (a mosaic's), low and
+    high are still °C, its no-data marker is left out and it is read as its own tiles are (nearest pixel)"""
     import io
 
     import numpy as np
     from PIL import Image
 
-    data = _tile_data(task, z, x, y, size, crop)
+    data = _raster_tile(raster, z, x, y, size, crop, 'bilinear' if unit is None else 'nearest')
     if data is None:
         return None
     values = data.data[0].astype(np.float64)
     inside = (data.mask > 0) & np.isfinite(values)
+    if unit is not None:
+        inside &= _measured(values, unit)
+        values = to_celsius(values, unit)
     if low is not None:
         inside &= values >= low
     if high is not None:
@@ -188,8 +226,9 @@ def isotherm(task, z, x, y, low, high, rgb, size=256, crop=False):
     return buf.getvalue()
 
 
-def _tile_data(task, z, x, y, size, crop):
-    """A tile of the thermal orthophoto's first band as WebODM's map reads it (rio-tiler's ImageData), None outside it"""
+def _raster_tile(raster, z, x, y, size, crop=None, resampling='bilinear'):
+    """A tile of a raster's first band as WebODM's map reads the thermal orthophoto (rio-tiler's ImageData), within crop
+    (a GEOS geometry) when given; None outside it"""
     from rio_tiler.errors import TileOutsideBounds
     from rio_tiler.io import COGReader
 
@@ -199,18 +238,18 @@ def _tile_data(task, z, x, y, size, crop):
 
     if size == 512:     # as WebODM's map asks for them: a tile of the zoom level above
         z -= 1
-    with COGReader(thermal_orthophoto(task)) as src:
+    with COGReader(raster) as src:
         if not src.tile_exists(z, x, y):
             return None
         minzoom, maxzoom = get_zoom_safe(src)
         if z < minzoom - ZOOM_EXTRA_LEVELS or z > maxzoom + ZOOM_EXTRA_LEVELS:
             return None
         vrt_options = None
-        if crop and _crop(task) is not None:
-            cutline, _bounds = geom_transform_wkt_bbox(task.crop, src.dataset)
+        if crop is not None:
+            cutline, _bounds = geom_transform_wkt_bbox(crop, src.dataset)
             vrt_options = {'cutline': cutline}
         try:
-            return src.tile(x, y, z, indexes=(1,), tilesize=size, resampling_method="bilinear", vrt_options=vrt_options)
+            return src.tile(x, y, z, indexes=(1,), tilesize=size, resampling_method=resampling, vrt_options=vrt_options)
         except TileOutsideBounds:
             return None
 

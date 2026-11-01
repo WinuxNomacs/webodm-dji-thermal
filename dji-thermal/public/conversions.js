@@ -486,6 +486,11 @@
             esc(taskUrl(dashboard, parent)) + '">' + esc(parent.name) + "</a> (" + esc(parent.images_count + " images, " + taskStatusLabel(parent)) + ")</div>";
     }
 
+    // WebODM's map of the dataset's project with a workset's mosaic laid on it by the Thermal Inspector (inspector.js)
+    function mapUrl(c) {
+        return "/map/project/" + encodeURIComponent(c.project) + "/?dt-mosaic=" + encodeURIComponent(c.dataset + "/" + c.id);
+    }
+
     // A conversion's actions: the one its state calls for, and the others in its menu (menu: open; viewer: the URL of
     // its mosaics' page; taskless: in no task yet, so Create task, the next step, is shown beside it)
     function actionsHtml(c, canChange, base, menu, viewer, taskless) {
@@ -517,6 +522,7 @@
         if (createTask && taskless) main += " " + task(mainCls);
         if (download && !(ready && !view && !building)) items.push(link(download, "download", "Download all"));
         if (viewer && building) items.push(link(viewer, "map", "Mosaics"));
+        if (view && !building && c.project_map) items.push(link(mapUrl(c), "globe", "Open on WebODM's map"));
         if (ready || busy) items.push(button("use", "copy", "Copy settings to form", USE_TITLE));
         if (createTask) {
             items.push(button("mosaics", "th", c.mosaic_status === "ready" ? "Build mosaics again" : "Build mosaics",
@@ -1054,7 +1060,7 @@
 
     var api = {recorded: recorded, settingsIn: settingsIn, formHtml: formHtml, readForm: readForm, formProblem: formProblem, planSettings: planSettings, statusLabel: statusLabel,
                differences: differences, chipsHtml: chipsHtml, markForm: markForm, resetSetting: resetSetting,
-               mosaicHtml: mosaicHtml, actionsHtml: actionsHtml, listHtml: listHtml, parentHtml: parentHtml, taskStatusLabel: taskStatusLabel, tasksHtml: tasksHtml,
+               mosaicHtml: mosaicHtml, mapUrl: mapUrl, actionsHtml: actionsHtml, listHtml: listHtml, parentHtml: parentHtml, taskStatusLabel: taskStatusLabel, tasksHtml: tasksHtml,
                taskHtml: taskHtml, readTaskForm: readTaskForm, optionsFormHtml: optionsFormHtml, readOptions: readOptions, skipReasons: skipReasons, resultsHtml: resultsHtml, init: init};
     root.ThermalAnalyzerConversions = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

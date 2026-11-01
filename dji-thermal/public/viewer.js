@@ -530,6 +530,9 @@
 
         function renderTab() {
             var t = current();
+            // WebODM's map with this mosaic (the tab shown, a temperature's) laid on it by the Thermal Inspector
+            if (v.project) $("ta-viewer-webodm-map").href = "/map/project/" + encodeURIComponent(v.project) + "/?dt-mosaic=" +
+                encodeURIComponent(v.dataset + "/" + v.id) + (isTemperature(tab) ? "/" + tab : "");
             $("ta-viewer-tabs").innerHTML = tabsHtml(v.tabs, tab);
             $("ta-viewer-controls").innerHTML = controlsHtml(t, style(), v.palettes || [], v.unit);
             loadCurve();
@@ -562,6 +565,7 @@
             $("ta-viewer-cancel").hidden = !v.can_change || !busy;
             var ready = v.mosaic_status === "ready" && (v.tabs || []).length;
             $("ta-viewer-main").hidden = !ready;
+            $("ta-viewer-webodm-map").hidden = !ready || busy || !v.project_map;
             if (timer) root.clearTimeout(timer);
             timer = busy ? root.setTimeout(load, POLL_MS) : null;
             if (!ready) return Promise.resolve();

@@ -779,6 +779,35 @@ class TestMosaics(AnalyzerTestCase):
                          status.HTTP_404_NOT_FOUND)
         self.assertEqual(self.client.get(self.url(task, cid, "/harmonized/frames"), {"lon": 0, "lat": 0}).data["frames"], [])
 
+        # The Thermal Inspector lays the project's mosaics on WebODM's map: listed for who can view the project, their
+        # temperature tabs only; a region and an isotherm read them. This project has no map in WebODM (no finished task
+        # with an orthophoto), so no link to one
+        self.assertFalse(v["project_map"])
+        listed_url = "/api/plugins/dji-thermal/projects/{}/inspector/mosaics".format(task.project.id)
+        listed = self.client.get(listed_url).data["mosaics"]
+        self.assertEqual([(m["dataset"]["id"], m["workset"]["id"]) for m in listed], [(str(task.id), cid)])
+        self.assertEqual([t["tab"] for t in listed[0]["tabs"]], ["as_converted", "harmonized", "source_frame"])
+        self.assertIn(listed[0]["default_palette"], listed[0]["palettes"])
+        other = APIClient()
+        other.login(username="testuser2", password="test1234")
+        self.assertEqual(other.get(listed_url).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(APIClient().get(listed_url).status_code, status.HTTP_404_NOT_FOUND)
+        d = (east - west) / 10
+        square = {"type": "Polygon", "coordinates": [[[lon - d, lat - d], [lon + d, lat - d], [lon + d, lat + d],
+                                                      [lon - d, lat + d], [lon - d, lat - d]]]}
+        region = self.client.post(self.url(task, cid, "/harmonized/region"), {"geometry": square}, format="json").data
+        self.assertTrue(region["valid"], region)
+        st = region["statistics"]
+        self.assertTrue(tab["stats"]["min"] - 0.01 <= st["min"] <= p["temperature"] <= st["max"] <= tab["stats"]["max"] + 0.01)
+        self.assertEqual(self.client.post(self.url(task, cid, "/view_angle/region"), {"geometry": square}, format="json").status_code,
+                         status.HTTP_400_BAD_REQUEST)
+        isotherm_url = self.url(task, cid, "/harmonized/isotherm/{}/{}/{}.png".format(t.z, t.x, t.y))
+        painted = drawn(self.client.get(isotherm_url, {"low": (lo + hi) / 2, "color": "e53935"}))[..., 3]
+        self.assertTrue(0 < (painted == 255).sum() < (plain[..., 3] > 0).sum())
+        self.assertEqual(self.client.get(isotherm_url, {"low": 30}).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.get(self.url(task, cid, "/view_angle/isotherm/{}/{}/{}.png".format(t.z, t.x, t.y)),
+                                         {"low": 5, "color": "e53935"}).status_code, status.HTTP_400_BAD_REQUEST)
+
         download = "{}/{}/conversions/{}/download".format(API, task.id, cid)
         name = v["kinds"]["harmonized"]["files"][0]
         self.assertEqual(self.client.get(download, {"mosaic": "harmonized/" + name}).status_code, status.HTTP_200_OK)

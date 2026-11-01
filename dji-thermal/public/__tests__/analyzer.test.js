@@ -1635,6 +1635,19 @@ describe("a conversion's mosaics on the dataset page", () => {
         expect(el.querySelector('[data-act="mosaics"]')).toBe(null);
     });
 
+    it("links a workset's mosaics to WebODM's map of its project, only when the project has a map", () => {
+        const el = document.createElement("div");
+        const ready = Object.assign({}, CONVERSION, {mosaic_status: "ready", dataset: "d-1", id: "abc123", project: 4});
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, ready, {project_map: true}), false, C9.replace(/9$/, ""), null, "/viewer");
+        const link = [...el.querySelectorAll(".dropdown-menu a")].find(a => a.textContent.includes("Open on WebODM's map"));
+        expect(link.getAttribute("href")).toBe("/map/project/4/?dt-mosaic=d-1%2Fabc123");
+        // WebODM shows no map of a project without a finished orthophoto or elevation model
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, ready, {project_map: false}), false, C9.replace(/9$/, ""), null, "/viewer");
+        expect(el.textContent).not.toContain("Open on WebODM's map");
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, ready, {project_map: true, mosaic_status: "building"}), true, C9.replace(/9$/, ""), null, "/viewer");
+        expect(el.textContent).not.toContain("Open on WebODM's map");
+    });
+
     it("builds the mosaics of a conversion without them, and polls until they are built", async () => {
         jest.useFakeTimers();
         const d = mosaic => Object.assign({}, DATASET, {analysis: ANALYSIS, defaults: DEFAULTS,

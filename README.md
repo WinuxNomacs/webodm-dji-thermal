@@ -10,7 +10,8 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
   worksets side by side), places the frames into mosaics shown on a map, and makes a WebODM task from the
   workset you choose.
 - **Thermal Inspector**, on WebODM's 2D map of a task with a thermal orthophoto: the temperature under the cursor,
-  pinned points, the statistics of regions drawn on it, isotherms, the map's palette and its legend.
+  pinned points, the statistics of regions drawn on it, isotherms, the map's palette and its legend. It also lays the
+  Analyzer's workset mosaics on the map, to compare them with the project's own layers.
 
 Temperatures are computed with [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/), a pure-Python
 implementation of DJI's Thermal SDK: no native library and no outside service. An administrator can have DJI's own
@@ -166,7 +167,10 @@ over WebODM's base layers:
   pixels saw the ground at), with a crosshair on the point and its outline on the map; mosaics built before version
   1.5.0 of dji-thermal-cli are built again to show them;
 - what dji-thermal-cli reports (seams, misalignment, frame offsets, heights) and the mosaic files to download (also
-  in the workset's zip).
+  in the workset's zip);
+- **Open on WebODM's map** (also in the workset's menu): WebODM's map of the project with this mosaic laid on it by
+  the Thermal Inspector (below), to compare it with the project's tasks. Shown when WebODM has a map of the project
+  (one of its tasks has finished with an orthophoto or an elevation model).
 
 ### A WebODM task from a workset
 
@@ -217,7 +221,8 @@ Temperatures are shown in the unit of your preferences (see above).
 ## The Thermal Inspector
 
 On WebODM's 2D map of a task whose orthophoto holds temperatures (a single thermal band, as ODM makes from the
-Thermal Task's images or a workset's), a thermometer button opens the Thermal Inspector:
+Thermal Task's images or a workset's), or of a project with workset mosaics, a thermometer button opens the Thermal
+Inspector:
 
 - **Hover**: the temperature under the cursor, beside it and in the panel; outside the task's crop, outside the
   orthophoto and where it has no data it says so.
@@ -243,9 +248,16 @@ Thermal Task's images or a workset's), a thermometer button opens the Thermal In
 - **Isotherm**: paints the temperatures above, below or between limits (typed in your unit) in a colour of six,
   over each thermal layer, hidden with it, within the task's crop; the legend marks the part painted. Kept in your
   browser for the same tasks; Off removes it.
+- **Workset mosaics**: the mosaics of the Analyzer's worksets in the project's datasets (for those who can view the
+  project), each with a tickbox that lays it on the map above WebODM's layers: **Mosaic**, **Harmonized** or **Source
+  frame**, in your palette over its own 2nd to 98th percentile, with its opacity, **Swipe** (WebODM's own divider:
+  the mosaic on the right, WebODM's layers on the left) and zoom to it. Hover, pins, regions, the isotherm and the
+  legend read the topmost thermal layer, a mosaic or an orthophoto. They are the plugin's layers, not entries of
+  WebODM's layer panel (a plugin can't add those), and are laid again on each visit; the workset's **Open on
+  WebODM's map** opens the project's map with its mosaic laid. Not on WebODM's public maps.
 
-Temperatures are read from the orthophoto on the server (the plugin's own API, for those who can view the task) and
-shown in WebODM's units (°F when imperial), the same setting as the Analyzer's.
+Temperatures are read from the orthophoto or mosaic on the server (the plugin's own API, for those who can view the
+task or project) and shown in WebODM's units (°F when imperial), the same setting as the Analyzer's.
 
 ## The converted images
 
