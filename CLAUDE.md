@@ -79,5 +79,8 @@ The `test`, `live-check`, `release-check` and `docs` skills in `.claude/skills` 
 - Ruff: `.venv/bin/ruff check .`
 - Live checks: headless Playwright (Node) against http://localhost:8002 with a dev account from the user, read
   only unless the check must write (the `live-check` skill).
+- The worker (`dt-worker`) keeps the plugin's Python as it was when it started: after changing it, it runs old code,
+  and WebODM's `run_function_async` sends a function's lines from the changed file (a `KeyError` naming the
+  function). Ask the user to restart it (`docker restart dt-worker`) before a check that runs jobs.
 - After changing `requirements.txt`, reload the dev server (touch `dji-thermal/plugin.py`) and check the version it
   installed in `app/media/plugins/dji-thermal/site-packages` (in `dt-webapp`).
