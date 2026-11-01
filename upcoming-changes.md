@@ -436,6 +436,13 @@ last phase did with its colouring.
    `viewer/measurements.json`, a task's `thermal/measurements.json`, replaced atomically), listed in the panel,
    renamed and deleted, exported as CSV and GeoJSON; the approximate emissivity / reflected-temperature correction
    (`mosaic_correction`). The Inspector's own pins and regions stay in the browser as now.
+   Decided (the user, 2026-11-01): each region, line and pin row of the Thermal Inspector's panel gets a Save
+   action (a name and an optional comment); the saved ones are a "Saved measurements" section every viewer of the
+   project sees, renamed, commented, deleted and exported (CSV, GeoJSON) by those who can change it; unsaved drawings
+   stay in the browser. The correction (emissivity, reflected temperature) is a Correction section of the panel, kept
+   in the viewer's browser like the palette: it changes the numbers (readout, pins, regions, lines, the legend's
+   labels, the isotherm's limits), not the map's colours; a saved measurement records the correction it was
+   measured with.
 5. **The frame page**: one frame with the Image and Isotherm sections, the tools in its pixels, and measured again
    exactly by dji-thermal-cli with changed parameters (dji-thermal-ui's `measure_frame`, `parse_changes`).
 

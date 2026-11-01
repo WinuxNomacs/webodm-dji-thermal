@@ -30,7 +30,8 @@ from app.models import Project, Task
 from app.security import path_traversal_check
 from nodeodm import status_codes
 
-from . import conversion_tasks, conversions, converter, datasets, inspector, inspector_api, mosaics, portable
+from . import (conversion_tasks, conversions, converter, correction, datasets, inspector, inspector_api, measurements,
+               mosaics, portable)
 
 THUMBNAIL_SIZE = (96, 96)
 LARGE_SIZE = (1280, 1280)      # the Files tab's detail pane (?size=large): a frame at its own size, up to this
@@ -757,14 +758,20 @@ class MosaicRegion(DatasetView):
         Inspector's regions of an orthophoto (inspector_api.region_request); a line's profile names each sample's
         source frame"""
         task = get_conversion(request, pk, cid)
-        raster = temperature_raster(task, cid, tab)
-        geometry, percentiles, bins, isotherm = inspector_api.region_request(request)
-        built = mosaics.result(task, cid)
-        source = mosaics.tab_raster(task, cid, 'source_frame')
-        frames = source + (built.get('frames') or [],) if source else None
+        temperature_raster(task, cid, tab)
+        geometry, percentiles, bins, isotherm, wanted = inspector_api.region_request(request)
+        fix = inspector_api.layer_correction(wanted, lambda: correction.workset_baseline(task, cid))
         return inspector_api.region_response(
-            lambda: inspector.raster_region(raster, geometry, unit=built.get('unit') or 'C', percentiles=percentiles,
-                                            bins=bins, isotherm=isotherm, frames=frames))
+            lambda: mosaic_region(task, cid, tab, geometry, percentiles, bins, isotherm, fix))
+
+
+def mosaic_region(task, cid, tab, geometry, percentiles, bins, isotherm, fix):
+    """inspector.raster_region of a temperature tab, a line's profile naming each sample's source frame"""
+    built = mosaics.result(task, cid)
+    source = mosaics.tab_raster(task, cid, 'source_frame')
+    frames = source + (built.get('frames') or [],) if source else None
+    return inspector.raster_region(temperature_raster(task, cid, tab), geometry, unit=built.get('unit') or 'C',
+                                   percentiles=percentiles, bins=bins, isotherm=isotherm, frames=frames, correction=fix)
 
 
 class MosaicIsotherm(DatasetView):
@@ -807,3 +814,42 @@ class MosaicFrame(DatasetView):
         except Exception as e:  # noqa: BLE001 - a frame the library cannot measure (or the SDK gone) is reported
             raise NotFound({'error': "The frame could not be measured: {}".format(e)}) from None
         return png_response(content)
+
+
+class MosaicMeasurements(DatasetView):
+    def get(self, request, pk, cid):
+        """The measurements saved on the workset's mosaics (inspector_api.saved_list)"""
+        task = get_conversion(request, pk, cid)
+        return inspector_api.saved_list(measurements.workset_path(task, cid),
+                                        lambda: correction.workset_baseline(task, cid),
+                                        request.user.has_perm('change_project', task.project))
+
+    def post(self, request, pk, cid):
+        """A pin, region or line measured on a tab of temperatures ({tab, ...}) and saved (inspector_api.saved_record)"""
+        task = get_conversion(request, pk, cid, 'change_project')
+        tab = request.data.get('tab') if isinstance(request.data, dict) else None
+        temperature_raster(task, cid, tab)
+        unit = mosaics.result(task, cid).get('unit') or 'C'
+
+        def point(lon, lat):
+            found = mosaics.point(task, cid, tab, lon, lat)
+            t = found.get('temperature')
+            return (None, found.get('reason') or 'nodata') if t is None else (float(inspector.to_celsius(t, unit)), None)
+
+        record = inspector_api.saved_record(
+            request.data, point, lambda *a: mosaic_region(task, cid, tab, *a),
+            lambda: correction.workset_baseline(task, cid))
+        record['tab'] = tab
+        return Response(measurements.add(task, measurements.workset_path(task, cid), record, request.user),
+                        status=status.HTTP_201_CREATED)
+
+
+class MosaicMeasurement(DatasetView):
+    def patch(self, request, pk, cid, mid):
+        """A saved measurement's name or comment changed"""
+        task = get_conversion(request, pk, cid, 'change_project')
+        return inspector_api.saved_change(task, measurements.workset_path(task, cid), mid, request.data)
+
+    def delete(self, request, pk, cid, mid):
+        task = get_conversion(request, pk, cid, 'change_project')
+        return inspector_api.saved_removal(task, measurements.workset_path(task, cid), mid)

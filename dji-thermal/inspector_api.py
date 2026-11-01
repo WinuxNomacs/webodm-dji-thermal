@@ -5,13 +5,13 @@ import math
 import re
 
 from django.http import HttpResponse
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from app.api.tasks import TaskNestedView
 from app.models import Project
 
-from . import conversion_tasks, conversions, converter, datasets, inspector, mosaics
+from . import conversion_tasks, conversions, converter, correction, datasets, inspector, measurements, mosaics
 
 # The mosaics' tabs laid on the map: those of temperatures (View angle stays in the Analyzer's viewer)
 MAP_TABS = ('as_converted', 'harmonized', 'source_frame')
@@ -129,9 +129,14 @@ class InspectorPalette(InspectorView):
 
 def region_request(request):
     """What a region's statistics are asked with: {"geometry": a GeoJSON polygon or line (or a Feature of one), "bins",
-    "percentiles", "isotherm": {"low", "high"} (°C, either null) or null}, as (geometry, percentiles, bins, isotherm:
-    (low, high) or None)"""
-    data = request.data if isinstance(request.data, dict) else {}
+    "percentiles", "isotherm": {"low", "high"} (°C, either null) or null, "correction": {"emissivity", "reflected"
+    (°C)} or null}, as (geometry, percentiles, bins, isotherm: (low, high) or None, the correction wanted:
+    (emissivity, reflected) or None)"""
+    return region_data(request.data if isinstance(request.data, dict) else {})
+
+
+def region_data(data):
+    """region_request of a request's data"""
     geometry = data.get('geometry')
     if isinstance(geometry, dict) and geometry.get('type') == 'Feature':
         geometry = geometry.get('geometry')
@@ -144,7 +149,24 @@ def region_request(request):
         raise ValidationError({'error': "Invalid bins or percentiles"}) from None
     if not (1 <= bins <= inspector.MAX_HISTOGRAM_BINS) or not all(0 <= p <= 100 for p in percentiles):
         raise ValidationError({'error': "Invalid bins or percentiles"})
-    return geometry, percentiles, bins, region_isotherm(data.get('isotherm'))
+    try:
+        wanted = correction.parse(data.get('correction'))
+    except ValueError as e:
+        raise ValidationError({'error': str(e)}) from None
+    return geometry, percentiles, bins, region_isotherm(data.get('isotherm')), wanted
+
+
+def layer_correction(wanted, baseline):
+    """The correction wanted ((emissivity, reflected) or None) of a layer measured with baseline() (correction.py's
+    baselines), as (wanted, baseline), or None
+    :raises ValidationError: the layer doesn't say what it was measured with"""
+    if wanted is None:
+        return None
+    base = baseline()
+    if base is None:
+        raise ValidationError({'error': "This layer doesn't record the emissivity and reflected temperature it was "
+                                        "measured with, so it can't be corrected"})
+    return wanted, base
 
 
 def region_isotherm(value):
@@ -180,8 +202,9 @@ class InspectorRegion(InspectorView):
     def post(self, request, pk=None, project_pk=None):
         """The statistics of the temperatures (°C) inside a polygon or along a line (region_request)"""
         task = self.thermal_task(request, pk)
-        geometry, percentiles, bins, isotherm = region_request(request)
-        return region_response(lambda: inspector.region(task, geometry, percentiles, bins, isotherm))
+        geometry, percentiles, bins, isotherm, wanted = region_request(request)
+        fix = layer_correction(wanted, lambda: correction.task_baseline(task))
+        return region_response(lambda: inspector.region(task, geometry, percentiles, bins, isotherm, fix))
 
 
 def map_mosaics(task, user):
@@ -244,3 +267,129 @@ class InspectorProjectPalette(InspectorProjectView):
         """The colours of ?name= for the legend of a workset mosaic (palette_response)"""
         self.project(request, project_pk)
         return palette_response(request.query_params.get('name') or '')
+
+
+# -- saved measurements (measurements.py) ---------------------------------------------------------------------------
+
+def saved_list(path, baseline, can_change):
+    """The measurements saved at path, with what the layer was measured with (for the correction) and whether the
+    user may save, rename and delete them"""
+    base = baseline()
+    return Response({'measurements': measurements.listed(path), 'can_change': can_change,
+                     'baseline': {'emissivity': base[0], 'reflected': base[1]} if base else None})
+
+
+def saved_record(data, point, region, baseline):
+    """A measurement to save from a request's data ({name, comment, shape, geometry, circle, isotherm, correction}),
+    measured here: a pin with point(lon, lat) (its temperature in °C, or None, and why), a region or line with
+    region(geometry, percentiles, bins, isotherm, correction)"""
+    data = data if isinstance(data, dict) else {}
+    try:
+        name, comment = measurements.name_of(data.get('name')), measurements.comment_of(data.get('comment'))
+    except ValueError as e:
+        raise ValidationError({'error': str(e)}) from None
+    shape = data.get('shape')
+    if shape not in measurements.SHAPES:
+        raise ValidationError({'error': "Not a pin, a region or a line"})
+    geometry = data.get('geometry')
+    if shape == 'pin':
+        coordinates = geometry.get('coordinates') if isinstance(geometry, dict) and geometry.get('type') == 'Point' else None
+        try:
+            lon, lat = (float(c) for c in coordinates[:2])
+        except (TypeError, ValueError):
+            raise ValidationError({'error': "A pin is a point"}) from None
+        if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+            raise ValidationError({'error': "Coordinates out of range"})
+        try:
+            wanted = correction.parse(data.get('correction'))
+        except ValueError as e:
+            raise ValidationError({'error': str(e)}) from None
+        fix = layer_correction(wanted, baseline)
+        measured, reason = point(lon, lat)
+        values = {'valid': measured is not None, 'measured': measured, 'reason': reason,
+                  'temperature': correction.value(measured, *fix) if fix else measured}
+        record = {'geometry': {'type': 'Point', 'coordinates': [lon, lat]}, 'isotherm': None}
+    else:
+        geometry, percentiles, bins, isotherm, wanted = region_data(data)
+        fix = layer_correction(wanted, baseline)
+        try:
+            values = region(geometry, percentiles, bins, isotherm, fix)
+        except ValueError as e:
+            raise ValidationError({'error': str(e)}) from None
+        except Exception:  # noqa: BLE001 - GEOS refuses what isn't a geometry
+            raise ValidationError({'error': "Invalid geometry"}) from None
+        record = {'geometry': geometry,
+                  'isotherm': {'low': isotherm[0], 'high': isotherm[1]} if isotherm else None}
+    circle = data.get('circle')
+    if shape == 'circle' and isinstance(circle, dict):
+        try:
+            record['circle'] = {k: float(circle[k]) for k in ('lat', 'lng', 'radius')}
+        except (KeyError, TypeError, ValueError):
+            raise ValidationError({'error': "Invalid circle"}) from None
+    return dict(record, name=name, comment=comment, shape=shape, values=values,
+                correction=correction.described(*fix) if fix else None)
+
+
+def saved_change(task, path, mid, data):
+    """A saved measurement renamed or its comment changed, as the response"""
+    data = data if isinstance(data, dict) else {}
+    fields = {}
+    try:
+        if 'name' in data:
+            fields['name'] = measurements.name_of(data.get('name'))
+        if 'comment' in data:
+            fields['comment'] = measurements.comment_of(data.get('comment'))
+    except ValueError as e:
+        raise ValidationError({'error': str(e)}) from None
+    if not fields:
+        raise ValidationError({'error': "Give a name or a comment"})
+    changed = measurements.update(task, path, mid, **fields)
+    if changed is None:
+        raise NotFound()
+    return Response(changed)
+
+
+def saved_removal(task, path, mid):
+    if not measurements.remove(task, path, mid):
+        raise NotFound()
+    return Response(status=204)
+
+
+class InspectorMeasurementsView(InspectorView):
+    def editable_task(self, request, pk):
+        """The thermal task, when the user may change its project"""
+        task = self.thermal_task(request, pk)
+        if not request.user.has_perm('change_project', task.project):
+            raise PermissionDenied({'error': "Only those who can change the project can save measurements"})
+        return task
+
+
+class InspectorMeasurements(InspectorMeasurementsView):
+    def get(self, request, pk=None, project_pk=None):
+        """The measurements saved on the task's thermal orthophoto (saved_list)"""
+        task = self.thermal_task(request, pk)
+        return saved_list(measurements.task_path(task), lambda: correction.task_baseline(task),
+                          request.user.has_perm('change_project', task.project))
+
+    def post(self, request, pk=None, project_pk=None):
+        """A pin, region or line measured and saved (saved_record)"""
+        task = self.editable_task(request, pk)
+
+        def point(lon, lat):
+            found = inspector.point(task, lon, lat)
+            return (found['temperature'] if found['valid'] else None), found['reason']
+
+        record = saved_record(request.data, point, lambda *a: inspector.region(task, *a),
+                              lambda: correction.task_baseline(task))
+        return Response(measurements.add(task, measurements.task_path(task), record, request.user), status=201)
+
+
+class InspectorMeasurement(InspectorMeasurementsView):
+    def patch(self, request, pk=None, project_pk=None, mid=""):
+        """A saved measurement's name or comment changed"""
+        task = self.editable_task(request, pk)
+        return saved_change(task, measurements.task_path(task), mid, request.data)
+
+    def delete(self, request, pk=None, project_pk=None, mid=""):
+        task = self.editable_task(request, pk)
+        return saved_removal(task, measurements.task_path(task), mid)
