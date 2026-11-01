@@ -83,7 +83,8 @@ The DJI Thermal Task keeps only the converted images, not the photos, unless you
 DJI Thermal Analyzer dataset**. To look at a task's photos in the Analyzer afterwards, press **Create thermal
 dataset** in the task's expanded panel on the dashboard: the task becomes a dataset too, under its own name (no
 other task is added), and the dataset opens, to add the flight's photos (**Add images**). The panel then has a
-**Thermal dataset** button, back to it. Deleting the dataset leaves the task as it was, with its images and results.
+**Thermal dataset** button, back to it. Deleting the dataset leaves the task as it was, with its images and results,
+and the Thermal Inspector's measurements saved on its map.
 
 ## The DJI Thermal Analyzer
 
@@ -275,7 +276,7 @@ Its photos and worksets count toward the project owner's storage quota (no uploa
 the owner is over it); a task made from a workset counts its own images too. The dataset goes when its task or the
 project is deleted. Deleting the dataset deletes its task too, unless a workset was sent to it or it is kept in a
 DJI Thermal Task's task: the task is then kept as an ordinary WebODM task (named without "Thermal dataset:") with its
-images and what it processed.
+images and what it processed, and the Thermal Inspector's measurements saved on its map and its palette.
 Temperatures are shown in the unit of your preferences (see above).
 
 ## The Thermal Inspector

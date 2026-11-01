@@ -71,7 +71,8 @@ and position, and the problems found), or to try other conversion settings, give
 expanded panel on the dashboard, press **Create thermal dataset**. The task becomes a dataset too, under its own
 name (no other task is added), and the dataset opens, empty: add the flight's photos with **Add images** (see
 [Checking a flight in the DJI Thermal Analyzer](quickstart-analyzer.md)). From then on the task's panel has a **Thermal
-dataset** button, back to it. Deleting the dataset leaves the task as it was, with its images and results.
+dataset** button, back to it. Deleting the dataset leaves the task as it was, with its images and results,
+and the Thermal Inspector's measurements saved on its map.
 
 ## Good to know
 

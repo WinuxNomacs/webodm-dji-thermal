@@ -41,7 +41,7 @@ from app.security import path_traversal_check
 from nodeodm import status_codes
 from pyodx.exceptions import GenericError
 
-from . import conversions, datasets
+from . import conversions, datasets, measurements
 
 TASKS_FILE = 'tasks.json'
 PARENT_FILE = 'parent.json'
@@ -50,6 +50,7 @@ MIN_FRAMES = 2      # as WebODM's own task creation
 FROM_TAG = '.dji-thermal-from-'     # then the dataset's id; hidden, as datasets.TAG
 THERMAL_TASK_TAG = '.dji-thermal-task'  # a task made by the Thermal Task button (public/thermal/upload.js)
 TASK_FILE = 'task.json'
+TASK_KEEPS = (TASK_FILE, measurements.FILE)    # what the task's thermal orthophoto keeps when its dataset goes (release)
 
 
 def task_palette(task):
@@ -386,12 +387,23 @@ def commit_parent(task, cid, then):
 
 def release(task):
     """The dataset deleted, its task kept as an ordinary WebODM task with the images sent to it and what it processed:
-    the dataset's jobs canceled, its folder removed, its tag and name prefix dropped"""
+    the dataset's jobs canceled, its folder removed, but for what belongs to the task's thermal orthophoto (its
+    measurements and palette, TASK_KEEPS), its tag and name prefix dropped"""
     from . import conversions as conversions_
     datasets.cancel_analysis(task)
     for c in conversions_.ids(task):
         conversions_.cancel(task, c)
-    shutil.rmtree(datasets.data_path(task), ignore_errors=True)
+    root = datasets.data_path(task)
+    for name in (os.listdir(root) if os.path.isdir(root) else []):
+        if name in TASK_KEEPS:
+            continue
+        path = os.path.join(root, name)
+        if os.path.isdir(path) and not os.path.islink(path):
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            os.remove(path)
+    if os.path.isdir(root) and not os.listdir(root):
+        os.rmdir(root)
     unlink_made(task)
     task.tags = " ".join(t for t in (task.tags or "").split() if t != datasets.TAG)
     task.name = datasets.name_of(task)[:255]

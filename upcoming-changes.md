@@ -5,6 +5,12 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **bug, deleting a dataset kept in a task removes the task's saved measurements and palette** (found
+    building `task-palette`, the user agreed, 2026-11-01), `fix-release-keeps-measurements`. `conversion_tasks.release`
+    removed the whole `thermal/` folder, though the task, its orthophoto and the Thermal Inspector on it stay; a
+    workset's measurements belong to the dataset and still go with it. `release` keeps `TASK_KEEPS`
+    (`task.json`, `measurements.json`) and removes the folder only when nothing is left. README, the
+    `quickstart-thermal-task.md` paragraph. `test_analyzer.py` (1); Django 180 OK, Ruff.
   - Done: **bug, the Thermal Inspector's Manual Corrections: Emissivity and Reflected change nothing on the map**
     (the user, 2026-11-01: "no visible impact on the image. Something's amiss"), `fix-correction-colours`. The
     correction changed only the numbers shown: a layer's range is kept in its own values, so the scale's labels
