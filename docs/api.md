@@ -54,7 +54,8 @@ On a task with a thermal orthophoto, under `projects/<project>/tasks/<task>/insp
 | POST | `region` | The statistics and histogram of a GeoJSON polygon, or of a line (a strip 0.25 m either side, with its length and profile), with the surroundings' mean and ΔT; `isotherm: {low, high}` (°C, either null) adds the share of its pixels within them; `correction: {emissivity, reflected}` (°C) corrects the temperatures first, from what the orthophoto's TIFFs record (refused when they don't). Nothing is kept. The mosaics' `region` takes the same. |
 | GET, POST | `measurements` | The measurements saved on the task's orthophoto, with what it was measured with (`baseline`: `{emissivity, reflected}` or null) and whether you can change them (`can_change`); saves one (`{name, comment, shape, geometry, circle, isotherm, correction}`: a pin's `geometry` a point), measured on the server. |
 | PATCH, DELETE | `measurements/<id>` | Renames a saved measurement or changes its comment (`{name, comment}`); deletes it. |
-| GET | `tiles/<z>/<x>/<y>` | The orthophoto drawn in one of DJI's palettes. |
+| GET | `tiles/<z>/<x>/<y>` | The orthophoto drawn in a palette (`palette=`: one of DJI's or WebODM's colour maps) over `rescale=` (°C), with WebODM's `size` and `crop` and the mosaics' adjustments (`gamma`, `equalize=1`, from the orthophoto's histogram, kept in the task's `thermal/` folder, and `sharpen`). |
+| GET | `curve?rescale=` | How the tiles share the palette out over the range with `gamma` and `equalize=1`, for the legend. |
 | GET | `isotherm/<z>/<x>/<y>` | An isotherm's tiles. |
 | GET | `palette?name=` | A palette's colours, for the legend. |
 

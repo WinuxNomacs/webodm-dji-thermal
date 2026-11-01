@@ -62,6 +62,7 @@ class Plugin(PluginBase):
             MountPoint(TASK + '/inspector/region$', inspector_api.InspectorRegion.as_view()),
             MountPoint(TASK + r'/inspector/tiles/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)$', inspector_api.InspectorTiles.as_view()),
             MountPoint(TASK + r'/inspector/isotherm/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)$', inspector_api.InspectorIsotherm.as_view()),
+            MountPoint(TASK + '/inspector/curve$', inspector_api.InspectorCurve.as_view()),
             MountPoint(TASK + '/inspector/palette$', inspector_api.InspectorPalette.as_view()),
             MountPoint(TASK + '/inspector/measurements$', inspector_api.InspectorMeasurements.as_view()),
             MountPoint(TASK + r'/inspector/measurements/(?P<mid>[0-9a-f]{12})$', inspector_api.InspectorMeasurement.as_view()),

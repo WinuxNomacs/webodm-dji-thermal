@@ -188,26 +188,29 @@
         return hi > lo ? [lo, hi] : [lo, lo + 1];
     }
 
-    // What a mosaic laid on the map draws: {project, dataset, workset, tab, unit, built_at, key, range (its unit),
-    // extent (its lowest and highest temperatures, its unit; or null), name}
+    // What a mosaic laid on the map draws: {project, dataset, workset, tab, unit, built_at, key, range and auto (its
+    // Auto range; its unit), adjust (the Image section's), extent (its lowest and highest temperatures, its unit; or
+    // null), name}
     function laidMosaic(project, m, tab, palette, display) {
         var t = (m.tabs || []).filter(function (x) { return x.tab === tab; })[0] || m.tabs[0];
         var s = t.stats || {};
         return {project: String(project), dataset: m.dataset.id, workset: m.workset.id, tab: t.tab, unit: m.unit || "C",
-                built_at: m.built_at || "", key: paletteKey(m, palette, display), range: mosaicRange(t),
+                built_at: m.built_at || "", key: paletteKey(m, palette, display), range: mosaicRange(t), auto: mosaicRange(t),
+                adjust: Scale.defaultAdjust(),
                 extent: typeof s.min === "number" && typeof s.max === "number" ? [s.min, s.max] : null,
                 name: m.dataset.name + " › " + m.workset.name, bounds: t.bounds, maxzoom: t.maxzoom};
     }
 
-    // A mosaic's tiles and its frames are drawn alike: build time, palette and range (its unit)
+    // A mosaic's tiles and its frames are drawn alike: build time, palette, range (its unit) and adjustments
     function mosaicQuery(info) {
-        return "v=" + encodeURIComponent(info.built_at) + "&color_map=" + encodeURIComponent(info.key) + "&rescale=" + info.range[0] + "," + info.range[1];
+        return "v=" + encodeURIComponent(info.built_at) + "&color_map=" + encodeURIComponent(info.key) + "&rescale=" + info.range[0] + "," + info.range[1] +
+            Scale.adjustQuery(info.adjust);
     }
     function mosaicTileUrl(info) { return mosaicBase(info) + "/mosaics/" + info.tab + "/tiles/{z}/{x}/{y}.png?" + mosaicQuery(info); }
 
     // Where a thermal layer's source frames come from: a mosaic's own; for a WebODM orthophoto, the workset (of
     // mosaics, the Inspector's list) whose TIFFs its task processed, drawn as its as-converted mosaic in the layer's
-    // palette and range ({base, tab, query, orthophoto}); null for an orthophoto from elsewhere
+    // palette, range and adjustments ({base, tab, query, orthophoto}); null for an orthophoto from elsewhere
     function framesSource(t, mosaics, palette, display) {
         if (!t) return null;
         if (t.mosaic) return {base: mosaicBase(t.mosaic), tab: t.mosaic.tab, query: mosaicQuery(t.mosaic), orthophoto: false};
@@ -216,6 +219,7 @@
         var info = laidMosaic(t.project, m, "as_converted", palette || paletteOf(t.layer._url), display);
         var range = rangeOf(t.layer._url);
         if (range) info.range = range.map(function (c) { return fromCelsius(c, info.unit); });
+        info.adjust = adjustOf(t.layer._url);
         return {base: mosaicBase(info), tab: info.tab, query: mosaicQuery(info), orthophoto: true};
     }
     function mosaicIsothermUrl(info, iso) {
@@ -242,6 +246,24 @@
         return s && typeof s.min === "number" && typeof s.max === "number" ? [s.min, s.max] : null;
     }
     function layerPalette(t) { return !t ? "" : t.mosaic ? keyPalette(t.mosaic.key) : paletteOf(t.layer._url); }
+    // A thermal layer's adjustments (the Image section's)
+    function layerAdjust(t) { return !t ? Scale.defaultAdjust() : t.mosaic ? t.mosaic.adjust || Scale.defaultAdjust() : adjustOf(t.layer._url); }
+    // A thermal layer's Auto range (°C): a mosaic's 2nd to 98th percentile (as it starts); what WebODM's tiles say of the
+    // orthophoto's, rounded outwards to a tenth in the user's unit; null when unknown
+    function autoRange(t, unit) {
+        if (!t) return null;
+        if (t.mosaic) return (t.mosaic.auto || t.mosaic.range).map(function (v) { return toCelsius(v, t.mosaic.unit); });
+        var s = t.layer[TILE_META] && t.layer[TILE_META].statistics && t.layer[TILE_META].statistics["1"];
+        var p = s && s.percentiles;
+        if (!p || p.length < 2 || !isFinite(p[0]) || !isFinite(p[1])) return null;
+        var lo = Math.floor(shownTemp(p[0], unit) * 10) / 10, hi = Math.ceil(shownTemp(p[1], unit) * 10) / 10;
+        return [typedTemp(lo, unit), typedTemp(hi > lo ? hi : lo + 1, unit)];
+    }
+    // The legend's curve with equalization: the server's (from the whole image's histogram) for a range (°C)
+    function curveUrl(t, range, adjust) {
+        var r = t.mosaic ? range.map(function (c) { return fromCelsius(c, t.mosaic.unit); }) : range;
+        return inspectorUrl(t, "curve") + "?rescale=" + r[0] + "," + r[1] + Scale.adjustQuery(adjust);
+    }
 
     // The panel's Workset mosaics: each workset of the project's datasets, with a tickbox laying it on the map; once
     // laid, its tab, opacity, Swipe (WebODM's split control) and Zoom to
@@ -282,17 +304,32 @@
     }
     function colorMapOf(url) { return paramOf(url, "color_map"); }
 
-    // A thermal layer's tile URL in a palette: one of DJI's (display.palettes) drawn by the plugin's tiles, one of
-    // WebODM's colour maps by WebODM's; the range, size and crop kept
-    function withPalette(url, name, display) {
-        if (((display && display.palettes) || []).indexOf(name) !== -1) {
+    // A thermal layer's tile URL in a palette, drawn with adjustments (the Image section's): drawn by the plugin's
+    // tiles in one of DJI's (display.palettes) or with adjustments, else by WebODM's; the range, size and crop kept
+    function withPalette(url, name, display, adjust) {
+        var a = adjust || {};
+        if (((display && display.palettes) || []).indexOf(name) !== -1 || Scale.adjusted(adjust)) {
             url = url.replace(WEBODM_TILES, API + "projects/$1/inspector/tiles/");
-            return withParam(withParam(url, "color_map", ""), "palette", name);
+            url = withParam(withParam(url, "color_map", ""), "palette", name);
+            url = withParam(url, "gamma", a.gamma && a.gamma !== 1 ? String(a.gamma) : "");
+            url = withParam(url, "equalize", a.equalize ? "1" : "");
+            return withParam(url, "sharpen", a.sharpen ? String(a.sharpen) : "");
         }
         url = url.replace(PLUGIN_TILES, "/api/projects/$1/orthophoto/tiles/");
-        return withColorMap(withParam(url, "palette", ""), name);
+        ["palette", "gamma", "equalize", "sharpen"].forEach(function (k) { url = withParam(url, k, ""); });
+        return withColorMap(url, name);
+    }
+    // The adjustments a thermal layer's tile URL draws with
+    function adjustOf(url) {
+        if (!PLUGIN_TILES.test(url || "")) return Scale.defaultAdjust();
+        return {gamma: parseFloat(paramOf(url, "gamma")) || 1, equalize: paramOf(url, "equalize") === "1", sharpen: parseFloat(paramOf(url, "sharpen")) || 0};
     }
     function paletteOf(url) { return PLUGIN_TILES.test(url || "") ? paramOf(url, "palette") : colorMapOf(url); }
+    // A tile URL drawn over another range (°C)
+    function withRange(url, range) {
+        var rest = withParam(url, "rescale", "");
+        return rest + (rest.indexOf("?") === -1 ? "?" : "&") + "rescale=" + range[0] + "," + range[1];
+    }
     // The range (°C) a thermal layer is drawn over, [lo, hi], or null
     function rangeOf(url) {
         var p = paramOf(url, "rescale").split(",").map(parseFloat);
@@ -424,9 +461,16 @@
     // correction (fix), the marks are of corrected temperatures where the layer's own values are drawn, and the
     // isotherm's limits corrected ones too. extent, the image's lowest and highest temperatures (°C), is said under the
     // bar when it reaches beyond the range
-    function legendHtml(colors, range, label, unit, iso, fix, extent) {
+    function legendHtml(colors, range, label, unit, iso, fix, extent, shares) {
         if (!colors || !colors.length || !range) return "";
         unit = unit || userUnit();
+        return '<div class="dt-legend-title">' + escapeHtml(label) + ' <span class="text-muted">°' + unit + "</span></div>" +
+            barHtml(colors, range, unit, iso, fix, shares) + extentHtml(range, unit, fix, extent);
+    }
+
+    // A colour scale: the palette's gradient over the range (°C; along shares: how the image is drawn), its marks, and
+    // the part an isotherm paints (legendHtml)
+    function barHtml(colors, range, unit, iso, fix, shares) {
         var lo = shownTemp(corrected(range[0], fix), unit), hi = shownTemp(corrected(range[1], fix), unit);
         var at = function (celsius) { return (uncorrected(celsius, fix) - range[0]) / (range[1] - range[0]); };
         var ticks = Scale.rangeTicks(lo, hi, 4).map(function (t) {
@@ -445,9 +489,39 @@
                     ((to - from) / (range[1] - range[0]) * 100).toFixed(1) + "%; border-color: #" + ISOTHERM_COLORS[iso.color] + ';"></div>';
             }
         }
-        return '<div class="dt-legend-title">' + escapeHtml(label) + ' <span class="text-muted">°' + unit + "</span></div>" +
-            '<div class="dt-legend-bar" style="background: ' + Scale.gradientCss(colors) + ';">' + mark + "</div>" +
-            '<div class="dt-legend-ticks">' + ticks + "</div>" + extentHtml(range, unit, fix, extent);
+        return '<div class="dt-legend-bar" style="background: ' + Scale.gradientCss(colors, shares) + ';">' + mark + "</div>" +
+            '<div class="dt-legend-ticks">' + ticks + "</div>";
+    }
+
+    // The panel's colour scale of the topmost thermal layer (s: {name (when several are shown), colors, range, auto,
+    // extent (°C), adjust, shares, fix}): the scale, its range typed in the user's unit (corrected temperatures with a
+    // correction), Auto, and the layer's lowest and highest temperatures
+    function scaleHtml(s, state, unit) {
+        if (!s || !s.range) return "";
+        var shown = function (c) { return roundShown(corrected(c, s.fix), unit); };
+        return '<div class="dt-inspector-scale">' +
+            (s.name ? '<div class="text-muted dt-inspector-hint">Of ' + escapeHtml(s.name) + "</div>" : "") +
+            '<div class="dt-inspector-scale-bar">' + (s.colors ? barHtml(s.colors, s.range, unit, state.isotherm, s.fix, s.shares) : "") + "</div>" +
+            '<div class="dt-inspector-range">' +
+            '<input type="number" step="0.1" class="form-control input-sm" data-act="range-min" value="' + shown(s.range[0]) + '" title="Minimum">' +
+            '<span class="text-muted">to</span>' +
+            '<input type="number" step="0.1" class="form-control input-sm" data-act="range-max" value="' + shown(s.range[1]) + '" title="Maximum">' +
+            '<span class="text-muted">°' + unit + "</span>" +
+            '<button type="button" class="btn btn-default btn-xs" data-act="range-auto"' + (s.auto ? "" : " disabled") +
+            ' title="The 2nd to 98th percentile of this layer">Auto</button></div>' +
+            (state.rangeError ? '<div class="text-danger dt-inspector-hint">' + escapeHtml(state.rangeError) + "</div>" : "") +
+            (s.extent ? '<div class="text-muted dt-inspector-hint">This layer: ' + escapeHtml(shown(s.extent[0]).toFixed(1)) + " to " +
+                escapeHtml(shown(s.extent[1]).toFixed(1)) + " °" + unit + "</div>" : "") + "</div>";
+    }
+
+    // The Image section of the topmost thermal layer (s: scaleHtml's): brightness and contrast move its range from its
+    // Auto one, gamma, the tone curve and sharpening change how it is drawn (the mosaic viewer's)
+    function imageHtml(s) {
+        if (!s || !s.range) return "";
+        var at = s.auto ? Scale.sliderPositions(s.auto, s.range) : {brightness: 0, contrast: 0};
+        return '<div class="dt-inspector-section dt-inspector-image"><strong>Image</strong>' +
+            Scale.imageControlsHtml(s.adjust, at, {field: function (name) { return 'data-act="image-' + name + '"'; }, equalize: true, whole: "layer"}) +
+            '<div class="text-muted dt-inspector-hint">How the image is drawn: the temperatures stay as they are.</div></div>';
     }
 
     // The image's lowest and highest temperatures, when either lies outside the legend's range (as shown, to a tenth)
@@ -811,9 +885,9 @@
             (options.length ? '<label class="dt-inspector-label">Palette <select class="form-control input-sm" data-act="palette">' +
                 options.map(function (o) {
                     return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === current ? " selected" : "") + ">" + escapeHtml(o[1]) + "</option>";
-                }).join("") + "</select></label>" : "") +
+                }).join("") + "</select></label>" : "") + scaleHtml(state.scale, state, unit) +
             '<label class="dt-inspector-label dt-inspector-check"><input type="checkbox" data-act="legend"' + (state.legendVisible ? " checked" : "") +
-            "> Legend on the map</label>" +
+            "> Legend on the map</label>" + imageHtml(state.scale) +
             mosaicsHtml(state) +
             '<div class="dt-inspector-section"><strong>Isotherm</strong>' + isothermHtml(state.isotherm, unit) +
             (state.isothermNotice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.isothermNotice) + "</div>" : "") + "</div>" +
@@ -905,13 +979,14 @@
                      notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
                      legendVisible: legendShown(), mosaics: null, laid: {}, frames: false, pick: null,
                      correction: loadCorrection(storage, ckey), correctionNotice: "", sources: {}, onMap: [], savedVisible: true,
-                     savedShown: null, form: null, savable: {}};
+                     savedShown: null, form: null, savable: {}, scale: null, rangeError: "", preview: null};
         var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
         var search = deps.search !== undefined ? deps.search : root.location && root.location.search;
         var container, panel, frameBox, panelMove, legendMove, cursor, pinLayer, regionLayer, savedLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
         var profileMarker = null, profileAt = null;     // the point of the profile hovered, on the map
         var pickSeq = 0;                    // the frames asked for last
         var overlays = [], colors = {};     // the isotherm's layer over each thermal layer; each palette's colours
+        var curves = {};                    // the legends' curves with equalization, by their URL
 
         function render() {
             if (!state.open) { panel.hidden = true; return; }
@@ -922,6 +997,7 @@
             state.savable = {};
             state.pins.forEach(function (p) { state.savable[p.id] = canSaveAt({lat: p.lat, lng: p.lng}); });
             state.regions.forEach(function (r) { state.savable[r.id] = !!r.statistics && canSaveAt(regionBounds(r).getCenter()); });
+            state.scale = scaleState();
             panel.innerHTML = panelHtml(state);
             // Within the map, above its bottom controls
             var room = map.getContainer().clientHeight - container.offsetTop - 60;
@@ -1065,21 +1141,154 @@
         function renderLegend() {
             restylePick();
             if (!legend) return;
-            var layers = thermalLayers(map), t = layers[layers.length - 1];
-            var range = layerRange(t), name = layerPalette(t);
-            if (!state.legendVisible || !range || !name) { legend.hidden = true; return; }
+            var t = topLayer(), name = layerPalette(t), look = t && lookOf(t);
+            if (!state.legendVisible || !look || !look.range || !name) { legend.hidden = true; return; }
+            var c = paletteColors(t, name);
+            if (!c) { legend.hidden = true; return; }
+            var label = ((state.display && state.display.palettes) || []).indexOf(name) !== -1 ? "DJI " + name : name;
+            legend.innerHTML = legendHtml(c, look.range, label, userUnit(), state.isotherm, fixFor(t), layerExtent(t), sharesOf(t, look));
+            legend.hidden = false;
+            legendMove.keep();
+        }
+
+        // -- the colour scale and the Image section: the topmost thermal layer's ------------------------------------
+
+        function topLayer() { var layers = thermalLayers(map); return layers[layers.length - 1] || null; }
+
+        // A palette's colours, asked for once; the legend and the panel's scale drawn again when they come
+        function paletteColors(t, name) {
             if (colors[name] === undefined) {
                 colors[name] = null;
                 fetchFn(paletteUrl(t, name), {credentials: "same-origin"}).then(readJson).then(function (r) {
                     colors[name] = r.ok && r.data.color_map ? r.data.color_map : false;
                     renderLegend();
+                    showScale();
                 }, function () { colors[name] = false; });
             }
-            if (!colors[name]) { legend.hidden = true; return; }
-            var label = ((state.display && state.display.palettes) || []).indexOf(name) !== -1 ? "DJI " + name : name;
-            legend.innerHTML = legendHtml(colors[name], range, label, userUnit(), state.isotherm, fixFor(t), layerExtent(t));
-            legend.hidden = false;
-            legendMove.keep();
+            return colors[name] || null;
+        }
+
+        // How a thermal layer is drawn, {range (°C), adjust}: while a slider moves, as it would be drawn
+        function lookOf(t) {
+            if (state.preview && state.preview.layer === t.layer) return state.preview;
+            return {range: layerRange(t), adjust: layerAdjust(t)};
+        }
+
+        // The scale's shares as a layer is drawn: with equalization, its server's curve (asked for once per range)
+        function sharesOf(t, look) {
+            if (!look.adjust.equalize || !look.range) return Scale.adjustShares(look.adjust);
+            var url = curveUrl(t, look.range, look.adjust);
+            if (curves[url] === undefined) {
+                curves[url] = null;
+                fetchFn(url, {credentials: "same-origin"}).then(readJson).then(function (r) {
+                    curves[url] = r.ok && r.data.shares ? r.data.shares : false;
+                    renderLegend();
+                    showScale();
+                }, function () { curves[url] = false; });
+            }
+            return curves[url] || null;
+        }
+
+        function layerName(t) {
+            return t.mosaic ? t.mosaic.name + " › " + (MOSAIC_TABS[t.mosaic.tab] || t.mosaic.tab) : t.name || "This task";
+        }
+
+        // What the panel's scale and Image section show (scaleHtml's), or null without a thermal layer shown
+        function scaleState() {
+            var t = topLayer();
+            if (!t) return null;
+            var look = lookOf(t), name = layerPalette(t);
+            return {name: thermalLayers(map).length > 1 ? layerName(t) : "", colors: name ? paletteColors(t, name) : null,
+                    range: look.range, auto: autoRange(t, userUnit()), extent: layerExtent(t), adjust: look.adjust,
+                    shares: look.range ? sharesOf(t, look) : null, fix: fixFor(t)};
+        }
+
+        // The panel's scale, range boxes and sliders as the layer is (or would be) drawn, without drawing the panel
+        // again (the slider moved keeps its place)
+        function showScale(moved) {
+            var box = state.open && panel.querySelector(".dt-inspector-scale");
+            if (!box) return;
+            var s = state.scale = scaleState(), unit = userUnit();
+            if (!s || !s.range) return render();
+            var shown = function (c) { return roundShown(corrected(c, s.fix), unit); };
+            box.querySelector(".dt-inspector-scale-bar").innerHTML = s.colors ? barHtml(s.colors, s.range, unit, state.isotherm, s.fix, s.shares) : "";
+            var field = function (act) { return panel.querySelector('[data-act="' + act + '"]'); };
+            field("range-min").value = shown(s.range[0]);
+            field("range-max").value = shown(s.range[1]);
+            var at = s.auto ? Scale.sliderPositions(s.auto, s.range) : {brightness: 0, contrast: 0};
+            var sliders = {brightness: at.brightness, contrast: at.contrast, gamma: Scale.gammaSlider(s.adjust.gamma), sharpen: s.adjust.sharpen};
+            Object.keys(sliders).forEach(function (k) {
+                var input = field("image-" + k);
+                if (input && input !== moved) input.value = sliders[k];
+            });
+            field("image-gamma-value").textContent = s.adjust.gamma.toFixed(2);
+            field("image-sharpen-value").textContent = Number(s.adjust.sharpen).toFixed(1);
+            field("image-tone").value = s.adjust.equalize ? "equalize" : "linear";
+        }
+
+        // The topmost layer drawn over a range (°C) with adjustments: a mosaic's tile URL, an orthophoto's (the
+        // plugin's tiles once it is adjusted, WebODM's again when it is not, in one of WebODM's colour maps)
+        function setLook(t, range, adjust) {
+            var said = state.rangeError;
+            state.preview = null;
+            state.rangeError = "";
+            if (t.mosaic) {
+                restyleMosaic(t.layer, {range: range.map(function (c) { return fromCelsius(c, t.mosaic.unit); }), adjust: adjust});
+            } else {
+                var url = withPalette(withRange(t.layer._url, range), state.palette || paletteOf(t.layer._url), state.display, adjust);
+                if (url !== t.layer._url) {
+                    applying = true;
+                    t.layer.setUrl(url, true);
+                    if (t.layer._removeAllTiles) t.layer._removeAllTiles();
+                    if (t.layer.redraw) t.layer.redraw();
+                    applying = false;
+                }
+            }
+            if (said) render();
+            else showScale();
+        }
+
+        // The range typed, in the user's unit (corrected temperatures with a correction)
+        function typedRange() {
+            var t = topLayer(), fix = fixFor(t), unit = userUnit();
+            var lo = parseFloat(panel.querySelector('[data-act="range-min"]').value), hi = parseFloat(panel.querySelector('[data-act="range-max"]').value);
+            if (isNaN(lo) || isNaN(hi)) return {error: "The range needs a minimum and a maximum"};
+            if (!(hi > lo)) return {error: "The maximum must be above the minimum"};
+            var raw = function (v) { return Math.round(uncorrected(typedTemp(v, unit), fix) * 1e4) / 1e4; };
+            return {range: [raw(lo), raw(hi)]};
+        }
+
+        // A slider moved: brightness and contrast move the range from the Auto one, gamma and sharpening the
+        // adjustments; shown at once, drawn when let go (commit)
+        function slide(input, commit) {
+            var t = topLayer();
+            if (!t) return;
+            var look = lookOf(t), name = input.getAttribute("data-act").slice("image-".length);
+            var next = {layer: t.layer, range: look.range, adjust: assign({}, look.adjust)};
+            var auto = autoRange(t, userUnit());
+            if (name === "brightness" || name === "contrast") {
+                if (!auto) return;
+                var value = function (k) { return parseFloat(panel.querySelector('[data-act="image-' + k + '"]').value) || 0; };
+                next.range = Scale.slidRange(auto, value("brightness"), value("contrast"));
+            } else if (name === "gamma") next.adjust.gamma = Scale.sliderGamma(input.value);
+            else next.adjust.sharpen = Math.round((parseFloat(input.value) || 0) * 100) / 100;
+            if (commit) return setLook(t, next.range, next.adjust);
+            state.preview = next;
+            showScale(input);
+            renderLegend();
+        }
+
+        function onScaleInput(what, target) {
+            var t = topLayer();
+            if (!t) return;
+            var look = lookOf(t);
+            if (what === "range-min" || what === "range-max") {
+                var r = typedRange();
+                if (r.error) { state.rangeError = r.error; return render(); }
+                return setLook(t, r.range, look.adjust);
+            }
+            if (what === "image-tone") return setLook(t, look.range, assign({}, look.adjust, {equalize: target.value === "equalize"}));
+            if (/^image-(brightness|contrast|gamma|sharpen)$/.test(what)) return slide(target, true);
         }
 
         function isothermChanged(iso) {
@@ -1501,7 +1710,7 @@
         function applyPalette(t) {
             if (!state.palette) return;
             if (t.mosaic) return restyleMosaic(t.layer, {key: paletteKey(mosaicOf(t.mosaic), state.palette, state.display)});
-            var url = withPalette(t.layer._url, state.palette, state.display);
+            var url = withPalette(t.layer._url, state.palette, state.display, adjustOf(t.layer._url));
             if (url === t.layer._url) return;
             applying = true;
             t.layer.setUrl(url, true);
@@ -1512,11 +1721,13 @@
 
         // WebODM's layer panel sets the URL from its own colour map (its list shows what it was given) and range: a
         // colour map chosen there is the user's (saved when it is one of the palettes offered, else drawn on this page
-        // only); a range alone keeps the user's palette, DJI's too
+        // only); a range alone keeps the user's palette, DJI's too, and the Image section's adjustments. A range set
+        // there is the layer's; the panel's own range, sent again with another change, doesn't undo the Inspector's
         function watch(t) {
             if (t.mosaic || t.layer.__dtWatched) return;
             t.layer.__dtWatched = true;
             t.layer.__dtPanelMap = colorMapOf(t.layer._url);
+            t.layer.__dtPanelRange = paramOf(t.layer._url, "rescale");
             var setUrl = t.layer.setUrl;
             t.layer.setUrl = function (url) {
                 var args = Array.prototype.slice.call(arguments);
@@ -1527,11 +1738,16 @@
                         if (paletteNames(state.display).indexOf(chosen) !== -1) choosePalette(chosen, t.layer);
                         else showPalette(chosen, t.layer);
                     }
-                    if (state.palette) args[0] = withPalette(url, state.palette, state.display);
+                    var range = paramOf(url, "rescale");
+                    if (range && range === t.layer.__dtPanelRange && rangeOf(t.layer._url)) args[0] = withRange(args[0], rangeOf(t.layer._url));
+                    else t.layer.__dtPanelRange = range;
+                    var name = state.palette || chosen || paletteOf(t.layer._url);
+                    if (name) args[0] = withPalette(args[0], name, state.display, adjustOf(t.layer._url));
                 }
                 var out = setUrl.apply(this, args);
                 drawIsotherms();
                 renderLegend();
+                if (!applying) render();
                 return out;
             };
             ["show", "hide"].forEach(function (name) {
@@ -1573,10 +1789,11 @@
             return (state.mosaics || []).filter(function (m) { return m.dataset.id === info.dataset && m.workset.id === info.workset; })[0] || {};
         }
 
-        // A mosaic laid on the map drawn with changes ({tab, key}): its tile URL, and a tab's own range
+        // A mosaic laid on the map drawn with changes ({tab, key, range, adjust}): its tile URL, and a tab's own range
         function restyleMosaic(layer, change) {
             var info = layer.__dtMosaic, m = mosaicOf(info);
-            var next = change.tab && change.tab !== info.tab ? laidMosaic(project, m, change.tab, state.palette, state.display) : assign({}, info, change);
+            var next = change.tab && change.tab !== info.tab ? assign(laidMosaic(project, m, change.tab, state.palette, state.display), {adjust: info.adjust}) :
+                assign({}, info, change);
             layer.__dtMosaic = next;
             var url = mosaicTileUrl(next);
             if (url !== layer._url) layer.setUrl(url);
@@ -1662,6 +1879,11 @@
             var what = act && act.getAttribute("data-act");
             var mrow = e.target.closest("[data-mosaic]");
             if (mrow && (what === "mosaic-swipe" || what === "mosaic-zoom")) return onMosaicInput(mrow, what.slice("mosaic-".length));
+            if (what === "range-auto" || what === "image-reset") {
+                var top = topLayer(), auto = top && autoRange(top, userUnit());
+                if (!top) return;
+                return setLook(top, auto || lookOf(top).range, what === "image-reset" ? Scale.defaultAdjust() : lookOf(top).adjust);
+            }
             if (what === "form-save") return submitForm();
             if (what === "form-cancel") { state.form = null; return render(); }
             // A saved measurement's row: shown (its name also zooms to it), edited or deleted
@@ -1767,6 +1989,7 @@
                 try { storage.setItem(LEGEND_KEY, state.legendVisible ? "1" : "0"); } catch (err) { /* this page only */ }
                 renderLegend();
             } else if (what.indexOf("isotherm-") === 0) isothermInput(what.slice("isotherm-".length), e.target.value);
+            else if (what.indexOf("range-") === 0 || what.indexOf("image-") === 0) onScaleInput(what, e.target);
             else if (what.indexOf("correction-") === 0) {
                 correctionInput(what.slice("correction-".length), what === "correction-on" ? e.target.checked : e.target.value);
             }
@@ -1824,6 +2047,8 @@
                 panel.addEventListener("input", function (e) {
                     var field = e.target.getAttribute && e.target.getAttribute("data-form");
                     if (field && state.form) state.form[field] = e.target.value;
+                    // While a slider moves, only the scale, the boxes and the legend follow
+                    if (/^image-(brightness|contrast|gamma|sharpen)$/.test((e.target.getAttribute && e.target.getAttribute("data-act")) || "")) slide(e.target);
                 });
                 panel.addEventListener("keydown", function (e) {
                     if (e.key === "Enter" && e.target.getAttribute && e.target.getAttribute("data-form") === "name") submitForm();
@@ -1926,7 +2151,8 @@
                framesSource: framesSource, fromCelsius: fromCelsius, corrected: corrected, uncorrected: uncorrected,
                rawIsotherm: rawIsotherm, correctionHtml: correctionHtml, loadCorrection: loadCorrection, correctionKey: correctionKey,
                savedHtml: savedHtml, savedCsv: savedCsv, savedGeoJson: savedGeoJson, formHtml: formHtml, pinsHtml: pinsHtml,
-               mosaicsHtml: mosaicsHtml, toCelsius: toCelsius, movable: movable, create: create};
+               mosaicsHtml: mosaicsHtml, toCelsius: toCelsius, movable: movable, adjustOf: adjustOf, autoRange: autoRange,
+               scaleHtml: scaleHtml, imageHtml: imageHtml, create: create};
     root.ThermalInspector = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

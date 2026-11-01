@@ -1036,3 +1036,168 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(inspector.toCelsius(300, "K")).toBeCloseTo(26.85);
     });
 });
+
+describe("the Thermal Inspector's colour scale and Image section", () => {
+    const PALETTE = "GET /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/palette";
+    const CURVE = "GET /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/curve";
+    const PLUGIN = "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/tiles/";
+    const INFERNO = Array.from({length: 256}, (_, i) => ((i << 24) | ((255 - i) << 8) | 255) >>> 0);
+    const change = (el, value) => { el.value = value; el.dispatchEvent(new Event("change", {bubbles: true})); };
+    const slide = (el, value) => { el.value = value; el.dispatchEvent(new Event("input", {bubbles: true})); };
+    const field = (panel, act) => panel.querySelector('[data-act="' + act + '"]');
+    const ticks = el => [...el.querySelectorAll(".dt-tick")].map(t => t.textContent);
+    // WebODM's tiles say the orthophoto's 2nd and 98th percentiles and its lowest and highest temperatures
+    const orthophoto = () => {
+        const layer = tileLayer(TILES, THERMAL_TASK);
+        layer[Symbol.for("tile-meta")] = {statistics: {1: {min: 2.5, max: 51.25, percentiles: [12.34, 38.01]}}};
+        return layer;
+    };
+
+    it("draws an orthophoto with adjustments by the plugin's tiles, and by WebODM's again in its colour maps without", () => {
+        const adjusted = inspector.withPalette(TILES, "magma", DISPLAY, {gamma: 1.5, equalize: true, sharpen: 2});
+        expect(adjusted).toBe(PLUGIN + "{z}/{x}/{y}.png?formula=Celsius&bands=L&rescale=10,40&palette=magma&gamma=1.5&equalize=1&sharpen=2");
+        expect(inspector.adjustOf(adjusted)).toEqual({gamma: 1.5, equalize: true, sharpen: 2});
+        expect(inspector.withPalette(adjusted, "magma", DISPLAY, {gamma: 1, equalize: false, sharpen: 0})).toBe(TILES.replace("color_map=magma&", "") + "&color_map=magma");
+        expect(inspector.withPalette(adjusted, "ironred", DISPLAY)).toBe(PLUGIN + "{z}/{x}/{y}.png?formula=Celsius&bands=L&rescale=10,40&palette=ironred");
+        expect(inspector.adjustOf(TILES)).toEqual({gamma: 1, equalize: false, sharpen: 0});
+    });
+
+    it("finds a layer's Auto range: an orthophoto's percentiles rounded outwards in the user's unit, a mosaic's own", () => {
+        const t = inspector.thermalLayer(orthophoto());
+        expect(inspector.autoRange(t, "C")).toEqual([12.3, 38.1]);
+        // 54.212 to 100.418 °F, rounded to 54.2 and 100.5 °F
+        expect(inspector.autoRange(t, "F")).toEqual([12.333333, 38.055556]);
+        expect(inspector.autoRange(inspector.thermalLayer(tileLayer(TILES, THERMAL_TASK)), "C")).toBeNull();
+        expect(inspector.autoRange({mosaic: {unit: "F", range: [50, 68], auto: [32, 212]}}, "C")).toEqual([0, 100]);
+    });
+
+    it("shows the topmost layer's scale, range and lowest and highest temperatures under Palette, the range typed or Auto", async () => {
+        const layer = orthophoto();
+        const map = fakeMap([layer]);
+        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}});
+        await ins.ready;
+        await flush();
+        ins.open();
+        const scale = panel().querySelector(".dt-inspector-scale");
+        expect(ticks(scale)).toEqual(["10", "20", "30", "40"]);
+        expect([field(panel(), "range-min").value, field(panel(), "range-max").value]).toEqual(["10", "40"]);
+        expect(scale.textContent).toContain("This layer: 2.5 to 51.3 °C");
+        expect(scale.textContent).not.toContain("Of ");       // one thermal layer: no need to say which
+        // Under the scale, after the legend's tickbox: the Image section
+        expect(panel().querySelector(".dt-inspector-image").previousElementSibling.querySelector('[data-act="legend"]')).not.toBeNull();
+        field(panel(), "range-min").value = "15";
+        change(field(panel(), "range-max"), "35");
+        expect(inspector.rangeOf(layer._url)).toEqual([15, 35]);
+        expect(layer._url).toContain("color_map=magma");      // still WebODM's tiles
+        expect(ticks(ins.legend())).toEqual(["15", "20", "25", "30", "35"]);
+        change(field(panel(), "range-max"), "12");
+        expect(panel().textContent).toContain("The maximum must be above the minimum");
+        expect(inspector.rangeOf(layer._url)).toEqual([15, 35]);
+        field(panel(), "range-auto").click();
+        expect(inspector.rangeOf(layer._url)).toEqual([12.3, 38.1]);
+        expect(panel().textContent).not.toContain("The maximum must be above the minimum");
+        expect([field(panel(), "range-min").value, field(panel(), "range-max").value]).toEqual(["12.3", "38.1"]);
+    });
+
+    it("moves the range with brightness and contrast while a slider moves, and draws it when let go", async () => {
+        const layer = orthophoto();
+        const map = fakeMap([layer]);
+        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}});
+        await ins.ready;
+        await flush();
+        ins.open();
+        field(panel(), "range-auto").click();
+        const contrast = field(panel(), "image-contrast");
+        slide(contrast, "1");       // half as wide around Auto's middle: 18.75 to 31.65 °C
+        expect([field(panel(), "range-min").value, field(panel(), "range-max").value]).toEqual(["18.8", "31.7"]);
+        expect(ticks(ins.legend())[0]).toBe("18.8");
+        expect(inspector.rangeOf(layer._url)).toEqual([12.3, 38.1]);       // not drawn yet
+        expect(field(panel(), "image-contrast")).toBe(contrast);          // the panel isn't drawn again under the cursor
+        change(contrast, "1");
+        expect(inspector.rangeOf(layer._url)).toEqual([18.75, 31.65]);
+        const gamma = field(panel(), "image-gamma");
+        slide(gamma, "1");
+        expect(field(panel(), "image-gamma-value").textContent).toBe("2.00");
+        expect(layer._url).not.toContain("gamma=");
+        change(gamma, "1");
+        expect(layer._url).toContain(PLUGIN);
+        expect(inspector.adjustOf(layer._url)).toEqual({gamma: 2, equalize: false, sharpen: 0});
+        expect(inspector.paletteOf(layer._url)).toBe("magma");
+        expect(ins.legend().querySelector(".dt-legend-bar").style.background).toMatch(/linear-gradient/);
+    });
+
+    it("equalizes with the server's curve on the scale, and Reset draws Auto's range without adjustments on WebODM's tiles again", async () => {
+        const layer = orthophoto();
+        const map = fakeMap([layer]);
+        const curve = jest.fn(() => jsonResponse({shares: Array.from({length: 65}, (_, i) => Math.sqrt(i / 64))}));
+        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}, [CURVE]: curve});
+        await ins.ready;
+        await flush();
+        ins.open();
+        change(field(panel(), "image-tone"), "equalize");
+        expect(inspector.adjustOf(layer._url).equalize).toBe(true);
+        expect(curve.mock.calls[0][0]).toBe("/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/curve?rescale=10,40&equalize=1");
+        await flush();
+        const stops = ins.legend().querySelector(".dt-legend-bar").style.background.match(/rgb\(/g) || [];
+        expect(stops.length).toBe(65);      // one stop per share of the curve
+        expect(field(panel(), "image-tone").value).toBe("equalize");
+        field(panel(), "image-reset").click();
+        expect(layer._url).toBe(TILES.replace("color_map=magma&rescale=10,40", "rescale=12.3,38.1&color_map=magma"));
+        expect(field(panel(), "image-tone").value).toBe("linear");
+    });
+
+    it("keeps the range in step with WebODM's layer panel both ways, and its adjustments when a colour map is chosen there", async () => {
+        const layer = orthophoto();
+        const map = fakeMap([layer]);
+        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}});
+        await ins.ready;
+        await flush();
+        ins.open();
+        const panelSets = (colorMap, rescale) => layer.setUrl(layer._url.replace(/\?.*$/, "") +
+            "?color_map=" + colorMap + "&formula=Celsius&bands=L&rescale=" + rescale + "&size=512&crop=1", true);
+        panelSets("magma", "5,45");     // a range set in WebODM's panel shows in the Inspector's
+        expect([field(panel(), "range-min").value, field(panel(), "range-max").value]).toEqual(["5", "45"]);
+        change(field(panel(), "range-max"), "30");
+        change(field(panel(), "image-sharpen"), "1.5");
+        expect(layer._url).toContain(PLUGIN);
+        // WebODM's panel sends its own range again with a colour map chosen there: the Inspector's range and
+        // adjustments stay
+        panelSets("jet", "5,45");
+        expect(inspector.paletteOf(layer._url)).toBe("jet");
+        expect(inspector.rangeOf(layer._url)).toEqual([5, 30]);
+        expect(inspector.adjustOf(layer._url).sharpen).toBe(1.5);
+        panelSets("jet", "0,50");
+        expect(inspector.rangeOf(layer._url)).toEqual([0, 50]);
+        expect(field(panel(), "range-max").value).toBe("50");
+    });
+
+    it("gives each thermal layer its own range and adjustments, the topmost's shown, a mosaic's in its tiles and frames", async () => {
+        const below = orthophoto();
+        const map = fakeMap([below]);
+        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO},
+                                         "GET /api/plugins/dji-thermal/projects/2/inspector/palette": {name: "magma", color_map: INFERNO}});
+        await ins.ready;
+        await flush();
+        ins.open();
+        change(field(panel(), "image-sharpen"), "2");
+        expect(inspector.adjustOf(below._url).sharpen).toBe(2);
+        // A mosaic laid above it: its own range (°F) and no adjustments
+        const info = {project: "2", dataset: "d-1", workset: "w-1", tab: "as_converted", unit: "F", built_at: "b", key: "magma",
+                      range: [50, 104], auto: [50, 104], adjust: {gamma: 1, equalize: false, sharpen: 0}, extent: null, name: "Roof › W"};
+        const mosaic = fakeLeaflet().tileLayer(inspector.mosaicTileUrl(info), {zIndex: 1000});
+        mosaic.__dtMosaic = info;
+        ins.state.mosaics = [{dataset: {id: "d-1", name: "Roof"}, workset: {id: "w-1", name: "W"}, palettes: ["magma"], default_palette: "magma", tabs: []}];
+        map.add(mosaic);
+        expect(panel().querySelector(".dt-inspector-scale").textContent).toContain("Of Roof › W › Mosaic");
+        expect([field(panel(), "range-min").value, field(panel(), "range-max").value]).toEqual(["10", "40"]);
+        expect(field(panel(), "image-sharpen").value).toBe("0");
+        change(field(panel(), "image-gamma"), "-1");
+        expect(mosaic._url).toBe("/api/plugins/dji-thermal/datasets/d-1/conversions/w-1/mosaics/as_converted/tiles/{z}/{x}/{y}.png?v=b&color_map=magma&rescale=50,104&gamma=0.5");
+        expect(inspector.framesSource(inspector.thermalLayer(mosaic)).query).toContain("&gamma=0.5");
+        expect(inspector.adjustOf(below._url)).toEqual({gamma: 1, equalize: false, sharpen: 2});
+        // The orthophoto's frames are drawn with its adjustments too
+        const frames = inspector.framesSource(inspector.thermalLayer(below), [{dataset: {id: "d-1", name: "Roof"}, workset: {id: "w-1", name: "W"},
+            unit: "C", built_at: "b", palettes: ["magma"], default_palette: "magma", tasks: ["abc-1"], tabs: [{tab: "as_converted", stats: {}}]}], "magma", DISPLAY);
+        expect(frames.query).toContain("&sharpen=2");
+    });
+});

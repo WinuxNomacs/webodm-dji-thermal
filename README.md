@@ -12,9 +12,9 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
 - **Thermal Inspector**, on WebODM's 2D map of a task with a thermal orthophoto: the temperature under the cursor,
   pinned points, the statistics of regions and lines drawn on it (with their surroundings and ΔT, and a line's
   profile), measurements saved for everyone who can view the project, an approximate correction for another
-  emissivity and reflected temperature, isotherms, the map's palette and its legend. It also lays the
-  Analyzer's workset mosaics on the map, to compare them with the project's own layers, and shows the frames that saw
-  a point clicked.
+  emissivity and reflected temperature, isotherms, the map's palette, colour range and image adjustments (as the
+  mosaic viewer's), and its legend. It also lays the Analyzer's workset mosaics on the map, to compare them with the
+  project's own layers, and shows the frames that saw a point clicked.
 
 Temperatures are computed with [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/), a pure-Python
 implementation of DJI's Thermal SDK: no native library and no outside service. An administrator can have DJI's own
@@ -260,15 +260,24 @@ Inspector:
   and the isotherm's limits change; the map's colours don't. A layer that doesn't record its values (an orthophoto
   not made from the plugin's TIFFs) isn't corrected, and the panel says so. Kept in your browser for the same tasks.
 - **Palette**: the thermal layer's palette, from the same list as the Analyzer's: DJI's palettes (drawn by the
-  plugin, over the range set in WebODM's layer panel) and WebODM's colour maps. It is your palette everywhere: the
+  plugin) and WebODM's colour maps. It is your palette everywhere: the
   Analyzer's preference, saved when you choose one here or in WebODM's own layer panel, and the one the map opens
   in. WebODM's layer panel lists only its own colour maps; one it has that the Analyzer doesn't is drawn but not
   saved.
-- **Legend**: a colour bar of the thermal layer's palette over its range, in your unit, at the map's top left: its
-  ends say the range's lowest and highest temperatures, with round values between. When the image's own coldest or
-  hottest temperature lies outside that range (WebODM's layer panel narrowed it), a line under the bar gives them.
-  It follows the palette and range, and "Legend on the map" hides it. With several thermal tasks on the map, it is
-  the topmost one's.
+- **Colour scale**: under Palette, the topmost thermal layer's palette over its range, the range in your unit (typed,
+  or **Auto**: its 2nd to 98th percentile) and the layer's own coldest and hottest temperatures. It is the range
+  WebODM's layer panel sets, kept in step both ways (WebODM's panel shows a range set in the Inspector once the page
+  is loaded again).
+- **Image**: the mosaic viewer's controls for how the topmost thermal layer is drawn: Brightness and Contrast (moving
+  and narrowing the range from Auto's), Gamma, Linear or Equalized (from the whole layer's histogram) and Sharpening,
+  and Reset. An adjusted orthophoto is drawn by the plugin (its histogram, for Equalized, kept in the task's folder);
+  the frames window draws its pictures alike. Each thermal layer keeps its own range and adjustments, for this visit
+  only.
+- **Legend**: a colour bar of the thermal layer's palette over its range (shared out as the Image section draws it),
+  in your unit, at the map's top left: its ends say the range's lowest and highest temperatures, with round values
+  between. When the image's own coldest or hottest temperature lies outside that range (narrowed in the colour scale
+  or WebODM's layer panel), a line under the bar gives them. It follows the palette and range, and "Legend on the
+  map" hides it. With several thermal tasks on the map, it is the topmost one's.
 - **Moving them**: drag the panel by its heading, or the legend by any part, to move it out of the way; both stay
   inside the map, and the frames window moves with the panel. Closing the panel, hiding the legend or reloading the
   page puts them back in their places.
