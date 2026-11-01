@@ -91,7 +91,7 @@ describe("the Thermal Inspector", () => {
         expect(inspector.thermalLayers(map).map(t => t.task)).toEqual(["abc-1", "abc-2"]);
         expect(inspector.thermalLayerAt(map, {lat: 1, lng: 2}).task).toBe("abc-2");
         high.options.bounds = {contains: () => false};
-        expect(inspector.thermalLayerAt(map, {lat: 1, lng: 2})).toEqual({project: "2", task: "abc-1", layer: low});
+        expect(inspector.thermalLayerAt(map, {lat: 1, lng: 2})).toEqual({project: "2", task: "abc-1", layer: low, name: ""});
         expect(inspector.pointUrl({project: "2", task: "abc-1"}, {lat: 42.1, lng: -88.07})).toBe(
             "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/point?lon=-88.07000000&lat=42.10000000");
     });
@@ -157,7 +157,7 @@ describe("the Thermal Inspector", () => {
         expect(click({latlng: {lat: 42.1, lng: -88.07}})).toBe(true);
         await flush(); await flush();
         expect(panel().querySelector(".dt-inspector-pins").textContent).toContain("P130.00 °C");
-        const pins = map.added[1];      // above the regions
+        const pins = map.added[2];      // above the saved measurements and the regions
         expect(pins.layers.map(m => m.tooltip)).toEqual(["P1: 30.00 °C"]);
         const key = inspector.pinsKey(["abc-1"]);
         expect(JSON.parse(window.localStorage.getItem(key))[0]).toMatchObject({label: "P1", lat: 42.1, lng: -88.07, temperature: 30});
@@ -313,7 +313,7 @@ describe("the Thermal Inspector's regions", () => {
         map.fire("click", {latlng: L.latLng(42, -88.0697)});
         map.fire("dblclick", {latlng: L.latLng(42, -88.0697)});
         await flush(); await flush();
-        expect(posts(fetchFn)).toEqual([{geometry: {type: "LineString", coordinates: [[-88.07, 42], [-88.0697, 42]]}, isotherm: null}]);
+        expect(posts(fetchFn)).toEqual([{geometry: {type: "LineString", coordinates: [[-88.07, 42], [-88.0697, 42]]}, isotherm: null, correction: null}]);
         const shown = panel().querySelector(".dt-inspector-shown");
         ["L1", "Line", "Length12.5 m", "ΔT+4.00 °C"].forEach(t => expect(shown.textContent).toContain(t));
         expect(shown.textContent).not.toContain("Area");
@@ -378,6 +378,186 @@ describe("the Thermal Inspector's regions", () => {
         expect(fetchFn.mock.calls.filter(c => c[1] && c[1].method === "POST").length).toBe(1);
         ins.open();
         expect(panel().querySelector(".dt-inspector-shown").textContent).toContain("Outside the task's crop");
+        map.remove();
+    });
+});
+
+describe("the Thermal Inspector's saved measurements and correction", () => {
+    const L = require("leaflet");
+    const REGION = "POST /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/region";
+    const SAVED = "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/measurements";
+    const BASELINE = {emissivity: 0.91, reflected: 21};
+    const STATS = {valid: true, reason: null, pixel_size: 0.5, resampled: false, correction: null, statistics: {
+        count: 400, min: 10, max: 50, mean: 30, std: 5, median: 29.5, percentiles: {"2": 12, "98": 48},
+        histogram: {counts: [100, 200, 100], edges: [10, 23, 36, 50]}, min_location: [-88.0701, 42.0001], max_location: [-88.0702, 42.0002],
+        surroundings: 26, delta_t: 4}};
+    const change = (el, value) => { el.value = value; el.dispatchEvent(new Event("change", {bubbles: true})); };
+    const type = (el, value) => { el.value = value; el.dispatchEvent(new Event("input", {bubbles: true})); };
+    const calls = (fetchFn, method) => fetchFn.mock.calls.filter(c => c[1] && c[1].method === method);
+    // The broadband model written out: the radiance seen with the baseline, solved for the parameters wanted
+    const model = (c, e, r, e0, r0) => {
+        const k = 273.15, seen = e0 * (c + k) ** 4 + (1 - e0) * (r0 + k) ** 4;
+        return ((seen - (1 - e) * (r + k) ** 4) / e) ** 0.25 - k;
+    };
+
+    function leafletMap() {
+        const div = document.createElement("div");
+        document.body.appendChild(div);
+        const map = L.map(div, {zoomControl: false, renderer: new L.SVG()}).setView([42, -88.07], 18);
+        const layer = L.tileLayer(TILES);
+        layer[META] = {raster: true, task: Object.assign({name: "Roof survey"}, THERMAL_TASK)};
+        layer.addTo(map);
+        map.el = div;
+        return map;
+    }
+
+    function drawRectangle(map) {
+        const a = map.containerPointToLatLng(L.point(10, 10));
+        map.fire("mousedown", {latlng: a, originalEvent: {button: 0}});
+        document.dispatchEvent(new MouseEvent("mouseup", {clientX: 60, clientY: 50}));
+    }
+
+    it("corrects a temperature for another emissivity and reflected temperature, and back", () => {
+        const fix = {wanted: {emissivity: 0.8, reflected: 10}, baseline: BASELINE};
+        expect(inspector.corrected(30, fix)).toBeCloseTo(model(30, 0.8, 10, 0.91, 21), 6);
+        expect(inspector.uncorrected(inspector.corrected(30, fix), fix)).toBeCloseTo(30, 6);
+        expect(inspector.corrected(30, null)).toBe(30);
+        expect(inspector.rawIsotherm({mode: "above", low: inspector.corrected(25, fix), color: "red"}, fix).low).toBeCloseTo(25, 5);
+        // The legend's marks are corrected temperatures, where the layer's own values are drawn
+        const html = inspector.legendHtml(["ff0000ff", "0000ffff"], [10, 40], "inferno", "C", null,
+                                          {wanted: {emissivity: 0.5, reflected: 21}, baseline: BASELINE});
+        const ticks = [...html.matchAll(/left: ([\d.]+)%;">([^<]+)</g)].map(m => [Number(m[1]), Number(m[2])]);
+        const half = {wanted: {emissivity: 0.5, reflected: 21}, baseline: BASELINE};
+        expect(ticks[0][1]).toBeGreaterThanOrEqual(inspector.corrected(10, half) - 1e-9);
+        ticks.forEach(([at, label]) => expect(at).toBeCloseTo((inspector.uncorrected(label, half) - 10) / 30 * 100, 0));
+    });
+
+    it("saves a region named, with a comment, for everyone who can view the project; renames, deletes and exports it", async () => {
+        const map = leafletMap();
+        let saved = null;
+        const confirm = jest.fn(() => true);
+        const {ins, fetchFn, panel} = start(map, {
+            [REGION]: STATS,
+            ["GET " + SAVED]: {measurements: [], can_change: true, baseline: BASELINE},
+            ["POST " + SAVED]: (url, opts) => {
+                saved = Object.assign({}, JSON.parse(opts.body), {id: "0123456789ab", values: STATS, created_by: "ana", created_at: "2026-11-01T10:00:00Z"});
+                return jsonResponse(saved);
+            },
+            ["PATCH " + SAVED + "/0123456789ab"]: (url, opts) => jsonResponse(Object.assign({}, saved, JSON.parse(opts.body))),
+            ["DELETE " + SAVED + "/0123456789ab"]: () => Promise.resolve({ok: true, json: () => Promise.reject(new Error("no content"))})
+        }, {L, confirm});
+        await ins.ready; await flush();
+        ins.open();
+        expect(panel().textContent).toContain("None yet");
+        panel().querySelector('[data-mode="rectangle"]').click();
+        drawRectangle(map);
+        await flush(); await flush();
+        panel().querySelector('[data-region] [data-act="save"]').click();
+        expect(panel().querySelector('[data-form="name"]').value).toBe("R1");
+        type(panel().querySelector('[data-form="name"]'), "Warm roof");
+        type(panel().querySelector('[data-form="comment"]'), "Above the boiler");
+        ins.state.regionsVisible = true;
+        panel().querySelector('[data-act="form-save"]').click();
+        await flush(); await flush();
+        const body = JSON.parse(calls(fetchFn, "POST").filter(c => c[0] === SAVED)[0][1].body);
+        expect(body).toMatchObject({name: "Warm roof", comment: "Above the boiler", shape: "rectangle", isotherm: null, correction: null});
+        expect(body.geometry.type).toBe("Polygon");
+        expect(panel().querySelector(".dt-inspector-form")).toBe(null);
+        const shown = panel().querySelector('[data-profile-of="saved"]').textContent;
+        ["Warm roof", "Above the boiler", "Roof survey", "Saved by ana, 2026-11-01", "Surroundings26.00 °C"].forEach(t => expect(shown).toContain(t));
+        const tips = [];
+        map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) tips.push(l.getTooltip()._content); });
+        expect(tips).toContain("Warm roof");
+
+        const item = {source: {name: "Roof survey"}, m: saved};
+        expect(inspector.savedCsv([item], "C").split("\n")[1]).toMatch(/^Warm roof,Above the boiler,rectangle,Roof survey,,2026-11-01T10:00:00Z,ana,,,,400,100,,10,50,30,5,29.5,12,48,26,4,,,,,,,$/);
+        const geo = JSON.parse(inspector.savedGeoJson([item], "F"));
+        expect(geo.features[0].geometry).toEqual(saved.geometry);
+        expect(geo.features[0].properties).toMatchObject({name: "Warm roof", mean_f: 86, delta_t_f: 7.2});
+
+        panel().querySelector('[data-saved] [data-act="edit"]').click();
+        type(panel().querySelector('[data-form="name"]'), "Boiler roof");
+        panel().querySelector('[data-act="form-save"]').click();
+        await flush(); await flush();
+        expect(JSON.parse(calls(fetchFn, "PATCH")[0][1].body)).toEqual({name: "Boiler roof", comment: "Above the boiler"});
+        expect(panel().querySelector("[data-saved]").textContent).toContain("Boiler roof");
+        panel().querySelector('[data-saved] [data-act="delete"]').click();
+        await flush(); await flush();
+        expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Boiler roof"));
+        expect(calls(fetchFn, "DELETE").length).toBe(1);
+        expect(panel().querySelector("[data-saved]")).toBe(null);
+        map.remove();
+    });
+
+    it("shows who can only view the project the saved measurements, with no Save, rename or delete", async () => {
+        const map = leafletMap();
+        const m = {id: "0123456789ab", name: "Vent", comment: "", shape: "pin", geometry: {type: "Point", coordinates: [-88.07, 42]},
+                   values: {valid: true, temperature: 41.5, measured: 41.5}, isotherm: null, correction: null, created_by: "ana"};
+        const {ins, panel} = start(map, {[REGION]: STATS, ["GET " + SAVED]: {measurements: [m], can_change: false, baseline: null}}, {L});
+        await ins.ready; await flush();
+        ins.open();
+        panel().querySelector('[data-mode="rectangle"]').click();
+        drawRectangle(map);
+        await flush(); await flush();
+        expect(panel().querySelector('[data-act="save"]')).toBe(null);
+        expect(panel().querySelector("[data-saved]").textContent).toContain("41.50 °C");
+        expect(panel().querySelector('[data-saved] [data-act="edit"]')).toBe(null);
+        expect(panel().querySelector('[data-saved] [data-act="delete"]')).toBe(null);
+        map.remove();
+    });
+
+    it("corrects the temperatures shown from what the layer was measured with, measuring the regions again", async () => {
+        const map = leafletMap();
+        const {ins, fetchFn, panel, plugins} = start(map, {
+            [REGION]: STATS, [POINT]: {valid: true, temperature: 30, reason: null},
+            ["GET " + SAVED]: {measurements: [], can_change: true, baseline: BASELINE}
+        }, {L});
+        await ins.ready; await flush();
+        ins.open();
+        ins.setMode("pin");
+        plugins.Map.onHandleClick.mock.calls[0][0]({latlng: L.latLng(42, -88.07)});
+        await flush(); await flush();
+        expect(panel().querySelector("[data-pin]").textContent).toContain("30.00 °C");
+        panel().querySelector('[data-mode="rectangle"]').click();
+        drawRectangle(map);
+        await flush(); await flush();
+
+        // Turned on: from what it was measured with, then another emissivity
+        const on = panel().querySelector('[data-act="correction-on"]');
+        on.checked = true;
+        on.dispatchEvent(new Event("change", {bubbles: true}));
+        expect(ins.state.correction).toEqual({on: true, emissivity: 0.91, reflected: 21});
+        expect(panel().textContent).toContain("Roof survey: measured with emissivity 0.91, reflected 21.00 °C");
+        change(panel().querySelector('[data-act="correction-emissivity"]'), "0.8");
+        await flush(); await flush();
+        const bodies = calls(fetchFn, "POST").map(c => JSON.parse(c[1].body));
+        expect(bodies[bodies.length - 1].correction).toEqual({emissivity: 0.8, reflected: 21});
+        const want = model(30, 0.8, 21, 0.91, 21);
+        expect(panel().querySelector("[data-pin]").textContent).toContain(want.toFixed(2) + " °C");
+        expect(JSON.parse(window.localStorage.getItem(inspector.correctionKey(["abc-1"])))).toEqual({on: true, emissivity: 0.8, reflected: 21});
+        change(panel().querySelector('[data-act="correction-emissivity"]'), "1.5");
+        expect(panel().textContent).toContain("The emissivity is between 0.1 and 1");
+        expect(ins.state.correction.emissivity).toBe(0.8);
+
+        // The isotherm's limits are corrected temperatures: its tiles get the layer's own
+        change(panel().querySelector('[data-act="isotherm-mode"]'), "above");
+        const iso = ins.state.isotherm, tile = ins.overlays()[0].overlay._url;
+        const raw = inspector.uncorrected(iso.low, {wanted: {emissivity: 0.8, reflected: 21}, baseline: BASELINE});
+        expect(Number(/low=([\d.-]+)/.exec(tile)[1])).toBeCloseTo(raw, 4);
+        map.remove();
+    });
+
+    it("says when a layer doesn't record how it was measured, and doesn't correct it", async () => {
+        const map = leafletMap();
+        window.localStorage.setItem(inspector.correctionKey(["abc-1"]), JSON.stringify({on: true, emissivity: 0.8, reflected: 21}));
+        const {ins, fetchFn, panel} = start(map, {[REGION]: STATS, ["GET " + SAVED]: {measurements: [], can_change: true, baseline: null}}, {L});
+        await ins.ready; await flush();
+        ins.open();
+        expect(panel().textContent).toContain("Roof survey: doesn't record how it was measured, so isn't corrected");
+        panel().querySelector('[data-mode="rectangle"]').click();
+        drawRectangle(map);
+        await flush(); await flush();
+        expect(calls(fetchFn, "POST").map(c => JSON.parse(c[1].body).correction)).toEqual([null]);
         map.remove();
     });
 });
