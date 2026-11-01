@@ -306,8 +306,7 @@
                 '<a href="javascript:void(0)" data-act="goto" title="Show on the map">' + escapeHtml(r.label) + "</a></td><td>" +
                 (s ? escapeHtml(formatTemp(s.mean, unit)) + ' <span class="text-muted">mean</span>' :
                     '<span class="text-muted">' + escapeHtml(r.loading ? "…" : REASONS[r.reason] || "none") + "</span>") +
-                '</td><td class="text-right"><a href="javascript:void(0)" data-act="show" title="Show its statistics"><i class="fa fa-chart-bar"></i></a> ' +
-                '<a href="javascript:void(0)" data-act="remove" title="Remove"><i class="fa fa-times"></i></a></td></tr>';
+                '</td><td class="text-right"><a href="javascript:void(0)" data-act="remove" title="Remove"><i class="fa fa-times"></i></a></td></tr>';
         }).join("") + "</tbody></table>" +
             (shown ? '<div class="dt-inspector-shown"><strong>' + escapeHtml(shown.label) + "</strong> " +
                 '<span class="text-muted">' + escapeHtml(SHAPE_NAMES[shown.shape] || "") + "</span>" + statisticsHtml(shown, unit) + "</div>" : "") +
@@ -766,21 +765,24 @@
             var mode = e.target.closest("[data-mode]");
             if (mode) return setMode(mode.getAttribute("data-mode"));
             var act = e.target.closest("[data-act]");
-            if (!act) return;
-            var what = act.getAttribute("data-act");
-            var row = act.closest("[data-pin]");
-            var pin = row && state.pins.filter(function (p) { return p.id === row.getAttribute("data-pin"); })[0];
-            var rrow = act.closest("[data-region]");
+            var what = act && act.getAttribute("data-act");
+            // A click anywhere on a region's row shows its statistics (measured again if they never came)
+            var rrow = e.target.closest("[data-region]");
             var region = rrow && state.regions.filter(function (r) { return r.id === rrow.getAttribute("data-region"); })[0];
             if (region) {
                 if (what === "goto") map.fitBounds(regionBounds(region), {maxZoom: map.getZoom()});
                 if (what === "remove") {
                     state.regions = state.regions.filter(function (r) { return r !== region; });
                     if (state.shown === region.id) state.shown = state.regions.length ? state.regions[state.regions.length - 1].id : null;
-                } else state.shown = region.id;
-                if (what === "show" && !region.statistics && !region.loading) measure(region);
+                } else {
+                    state.shown = region.id;
+                    if (!region.statistics && !region.loading) measure(region);
+                }
                 return regionsChanged();
             }
+            if (!act) return;
+            var row = act.closest("[data-pin]");
+            var pin = row && state.pins.filter(function (p) { return p.id === row.getAttribute("data-pin"); })[0];
             if (what === "close") close();
             else if (what === "goto" && pin) map.panTo([pin.lat, pin.lng]);
             else if (what === "remove" && pin) { state.pins = state.pins.filter(function (p) { return p !== pin; }); pinsChanged(); }

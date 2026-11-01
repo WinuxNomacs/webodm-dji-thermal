@@ -30,6 +30,7 @@
 }
 .leaflet-tooltip.dt-inspector-tip { padding: 1px 4px; font-size: 11px; }
 .dt-inspector-modes .btn { padding: 1px 6px; }
+.dt-inspector-regions tr { cursor: pointer; }
 .dt-inspector-regions tr.active td { background: #fff3e0; }
 .dt-inspector-shown { margin: 4px 0; }
 .dt-inspector-stats { margin: 2px 0 4px; }
@@ -38,7 +39,6 @@
 .dt-inspector-histogram rect { fill: #ff9800; }
 .dt-inspector-range { display: flex; justify-content: space-between; font-size: 11px; color: #777; }
 .dt-inspector-pins td.text-right { white-space: nowrap; }
-.dt-inspector-pins td.text-right a + a { margin-left: 4px; }
 .dt-inspector-check input { margin: 0 4px 0 0; vertical-align: middle; }
 .dt-inspector-isotherm { margin: 4px 0 6px; }
 .dt-inspector-isotherm-limits { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
