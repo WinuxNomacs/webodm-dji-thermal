@@ -25,7 +25,8 @@
             "higher or lower overall.",
         source_frame: "Where each frame was placed: the mosaic, with a line where one frame meets the next (each pixel " +
             "comes from the frame that saw it closest to straight down).",
-        view_angle: "How far from straight down each pixel was seen, in degrees."
+        view_angle: "How far from straight down each pixel was seen, in degrees.",
+        frame: "The frame's temperatures, as the workset measured it."
     };
 
     // How the image is drawn: shared with the Thermal Inspector (scale.js)
@@ -56,8 +57,11 @@
     // The legend's shares as the image is drawn: the server's curve with equalization, else gamma's, else none (linear)
     function styleShares(style) { return scale.adjustShares(style.adjust, style.curve); }
 
-    // The source frames are shown over the as-converted temperatures
-    function isTemperature(tab) { return tab === "as_converted" || tab === "harmonized" || tab === "source_frame"; }
+    // The source frames are shown over the as-converted temperatures; the frame page shows one frame's
+    function isTemperature(tab) { return tab === "as_converted" || tab === "harmonized" || tab === "source_frame" || tab === "frame"; }
+
+    // What a tab shows, in the controls' words
+    function wholeName(tab) { return tab === "frame" ? "frame" : "mosaic"; }
 
     // The tabs that share a palette and range: the temperature mosaics show the same scale, to compare them
     function styleGroup(tab) { return isTemperature(tab) ? "temperature" : tab; }
@@ -155,10 +159,10 @@
             "<span>to</span>" +
             '<input type="number" step="0.1" class="form-control input-sm" id="ta-viewer-max" value="' + shown(style.range[1]) + '" title="Maximum">' +
             "<span>" + esc(symbol) + "</span>" +
-            '<button type="button" class="btn btn-default btn-sm" id="ta-viewer-auto" title="The 2nd to 98th percentile of this mosaic">Auto</button></div>';
+            '<button type="button" class="btn btn-default btn-sm" id="ta-viewer-auto" title="The 2nd to 98th percentile of this ' + wholeName(tab.tab) + '">Auto</button></div>';
         out += '<div class="ta-viewer-range-error text-danger" id="ta-viewer-range-error"></div>';
         var s = tab.stats;
-        if (s) out += '<div class="ta-message">This mosaic: ' +
+        if (s) out += '<div class="ta-message">This ' + wholeName(tab.tab) + ": " +
             core.formatNumber(temperature ? core.convertTemp(s.min, unit) : s.min, 1) + " to " +
             core.formatNumber(temperature ? core.convertTemp(s.max, unit) : s.max, 1, " " + symbol) + "</div>";
         return out + imageHtml(tab, style, unit) + (temperature ? isothermHtml(style) : "");
@@ -187,7 +191,7 @@
         var temperature = isTemperature(tab.tab);
         return '<details class="ta-section" open data-section="image"><summary><h5>Image</h5></summary>' +
             scale.imageControlsHtml(style.adjust, sliderPositions(defaultRange(tab, unit), style.range),
-                                    {field: function (name) { return 'id="ta-viewer-' + name + '"'; }, equalize: temperature, whole: "mosaic"}) +
+                                    {field: function (name) { return 'id="ta-viewer-' + name + '"'; }, equalize: temperature, whole: wholeName(tab.tab)}) +
             '<p class="ta-message">How the image is drawn: the ' + (temperature ? "temperatures" : "values") + " stay as they are.</p></details>";
     }
 
@@ -279,6 +283,102 @@
         return {layers: layers, shown: shown || layers.None};
     }
 
+    // What the palette, range, Image and Isotherm controls (controlsHtml, drawn in el) do, on the mosaic viewer and the
+    // frame page. o: {doc, el, current() (the tab: {tab, stats}), style() (its style), unit(), palettes(), recolour()
+    // (a slider moving), restyle() (anything else changed, or a slider let go of), onPalette(key)}
+    function bindControls(o) {
+        var $ = function (i) { return o.doc.getElementById(i); };
+
+        // The range boxes and the brightness and contrast sliders, as the range is
+        function showRange() {
+            var r = o.style().range, temperature = isTemperature(o.current().tab);
+            var at = sliderPositions(defaultRange(o.current(), o.unit()), r);
+            $("ta-viewer-min").value = temperature ? shownTemp(r[0], o.unit()) : r[0];
+            $("ta-viewer-max").value = temperature ? shownTemp(r[1], o.unit()) : r[1];
+            $("ta-viewer-brightness").value = at.brightness;
+            $("ta-viewer-contrast").value = at.contrast;
+        }
+
+        // The isotherm typed: its fields shown for its mode, drawn once it is complete
+        function isotherm() {
+            var iso = o.style().isotherm, mode = $("ta-viewer-iso-mode").value;
+            iso.mode = mode;
+            iso.a = $("ta-viewer-iso-a").value;
+            iso.b = $("ta-viewer-iso-b").value;
+            $("ta-viewer-iso-a").hidden = $("ta-viewer-iso-unit").hidden = $("ta-viewer-iso-hint").hidden = !mode;
+            $("ta-viewer-iso-b").hidden = mode !== "between";
+            var r = isothermParam(mode, iso.a, iso.b, o.unit());
+            // Not an error yet while a temperature is still to be typed
+            $("ta-viewer-iso-error").textContent = r.error && (iso.a !== "" || mode === "between" && iso.b !== "") ? r.error : "";
+            if (r.error || r.value === iso.value) return;
+            iso.value = r.value;
+            o.restyle();
+        }
+
+        // A slider moved: brightness and contrast move the range from the Auto one, gamma and sharpening the adjustments
+        function slide(input) {
+            var s = o.style(), name = input.id.replace("ta-viewer-", "");
+            if (name === "brightness" || name === "contrast") {
+                s.range = slidRange(defaultRange(o.current(), o.unit()), parseFloat($("ta-viewer-brightness").value) || 0,
+                                    parseFloat($("ta-viewer-contrast").value) || 0);
+                $("ta-viewer-range-error").textContent = "";
+                var temperature = isTemperature(o.current().tab);
+                $("ta-viewer-min").value = temperature ? shownTemp(s.range[0], o.unit()) : s.range[0];
+                $("ta-viewer-max").value = temperature ? shownTemp(s.range[1], o.unit()) : s.range[1];
+            } else if (name === "gamma") {
+                s.adjust.gamma = sliderGamma(input.value);
+                $("ta-viewer-gamma-value").textContent = s.adjust.gamma.toFixed(2);
+            } else {
+                s.adjust.sharpen = Math.round((parseFloat(input.value) || 0) * 100) / 100;
+                $("ta-viewer-sharpen-value").textContent = core.formatNumber(s.adjust.sharpen, 1);
+            }
+        }
+
+        o.el.addEventListener("change", function (e) {
+            if (e.target.id === "ta-viewer-palette") {
+                o.style().palette = e.target.value;
+                o.onPalette(e.target.value);
+                return o.restyle();
+            }
+            if (e.target.id === "ta-viewer-min" || e.target.id === "ta-viewer-max") {
+                var r = parseRange($("ta-viewer-min").value, $("ta-viewer-max").value, o.current().tab, o.unit());
+                $("ta-viewer-range-error").textContent = r.error || "";
+                if (r.error) return;
+                o.style().range = r.range;
+                showRange();
+                return o.restyle();
+            }
+            if (/^ta-viewer-iso-(mode|a|b)$/.test(e.target.id)) return isotherm();
+            if (e.target.id === "ta-viewer-tone") {
+                o.style().adjust.equalize = e.target.value === "equalize";
+                return o.restyle();
+            }
+            // A slider let go of draws what the server draws again too (while it moves, the image follows)
+            if (/^ta-viewer-(brightness|contrast|gamma|sharpen)$/.test(e.target.id)) {
+                slide(e.target);
+                o.restyle();
+            }
+        });
+
+        o.el.addEventListener("input", function (e) {
+            if (!/^ta-viewer-(brightness|contrast|gamma|sharpen)$/.test(e.target.id)) return;
+            slide(e.target);
+            o.recolour();
+        });
+
+        // Auto: the range from the tab's percentiles; Reset: that range, and no adjustments
+        o.el.addEventListener("click", function (e) {
+            if (e.target.id !== "ta-viewer-auto" && e.target.id !== "ta-viewer-reset") return;
+            o.style().range = defaultRange(o.current(), o.unit());
+            if (e.target.id === "ta-viewer-reset") {
+                o.style().adjust = defaultAdjust();
+                o.style().curve = null;
+            }
+            o.el.innerHTML = controlsHtml(o.current(), o.style(), o.palettes(), o.unit());
+            o.restyle();
+        });
+    }
+
     // ctx: {doc, fetchFn, loadLeaflet (resolves to Leaflet), basemaps (WebODM's)}
     function init(ctx) {
         var doc = ctx.doc, fetchFn = ctx.fetchFn;
@@ -336,15 +436,6 @@
         function showScale() {
             var p = (v.palettes || []).filter(function (x) { return x.key === style().palette; })[0];
             $("ta-viewer-scale").innerHTML = legendHtml(p && p.color_map, shownRange(tab, style().range, v.unit), styleShares(style()));
-        }
-
-        // The range boxes and the brightness and contrast sliders, as the range is
-        function showRange() {
-            var r = style().range, temperature = isTemperature(tab), at = sliderPositions(defaultRange(current(), v.unit), r);
-            $("ta-viewer-min").value = temperature ? shownTemp(r[0], v.unit) : r[0];
-            $("ta-viewer-max").value = temperature ? shownTemp(r[1], v.unit) : r[1];
-            $("ta-viewer-brightness").value = at.brightness;
-            $("ta-viewer-contrast").value = at.contrast;
         }
 
         function ensureMap() {
@@ -545,85 +636,12 @@
             e.target.parentNode.outerHTML = '<div class="text-danger">Could not draw this frame.</div>';
         }, true);
 
-        $("ta-viewer-controls").addEventListener("change", function (e) {
-            if (e.target.id === "ta-viewer-palette") {
-                style().palette = e.target.value;
-                // A temperature palette is the user's, everywhere (DJI's keys carry the viewer's prefix)
-                if (isTemperature(tab)) core.savePalette(fetchFn, page.getAttribute("data-api"), csrf, e.target.value.replace(/^dji_/, "")).catch(function () {});
-                return restyle();
-            }
-            if (e.target.id === "ta-viewer-min" || e.target.id === "ta-viewer-max") {
-                var r = parseRange($("ta-viewer-min").value, $("ta-viewer-max").value, tab, v.unit);
-                $("ta-viewer-range-error").textContent = r.error || "";
-                if (r.error) return;
-                style().range = r.range;
-                showRange();
-                return restyle();
-            }
-            if (/^ta-viewer-iso-(mode|a|b)$/.test(e.target.id)) return isotherm();
-            if (e.target.id === "ta-viewer-tone") {
-                style().adjust.equalize = e.target.value === "equalize";
-                return restyle();
-            }
-            // A slider let go of draws the frames window's picture again too (while it moves, the tiles follow)
-            if (/^ta-viewer-(brightness|contrast|gamma|sharpen)$/.test(e.target.id)) {
-                slide(e.target);
-                restyle();
-            }
-        });
-
-        // The isotherm typed: its fields shown for its mode, drawn once it is complete
-        function isotherm() {
-            var iso = style().isotherm, mode = $("ta-viewer-iso-mode").value;
-            iso.mode = mode;
-            iso.a = $("ta-viewer-iso-a").value;
-            iso.b = $("ta-viewer-iso-b").value;
-            $("ta-viewer-iso-a").hidden = $("ta-viewer-iso-unit").hidden = $("ta-viewer-iso-hint").hidden = !mode;
-            $("ta-viewer-iso-b").hidden = mode !== "between";
-            var r = isothermParam(mode, iso.a, iso.b, v.unit);
-            // Not an error yet while a temperature is still to be typed
-            $("ta-viewer-iso-error").textContent = r.error && (iso.a !== "" || mode === "between" && iso.b !== "") ? r.error : "";
-            if (r.error || r.value === iso.value) return;
-            iso.value = r.value;
-            restyle();
-        }
-
-        // A slider moved: brightness and contrast move the range from the Auto one, gamma and sharpening the adjustments
-        function slide(input) {
-            var s = style(), name = input.id.replace("ta-viewer-", "");
-            if (name === "brightness" || name === "contrast") {
-                s.range = slidRange(defaultRange(current(), v.unit), parseFloat($("ta-viewer-brightness").value) || 0,
-                                    parseFloat($("ta-viewer-contrast").value) || 0);
-                $("ta-viewer-range-error").textContent = "";
-                var temperature = isTemperature(tab);
-                $("ta-viewer-min").value = temperature ? shownTemp(s.range[0], v.unit) : s.range[0];
-                $("ta-viewer-max").value = temperature ? shownTemp(s.range[1], v.unit) : s.range[1];
-            } else if (name === "gamma") {
-                s.adjust.gamma = sliderGamma(input.value);
-                $("ta-viewer-gamma-value").textContent = s.adjust.gamma.toFixed(2);
-            } else {
-                s.adjust.sharpen = Math.round((parseFloat(input.value) || 0) * 100) / 100;
-                $("ta-viewer-sharpen-value").textContent = core.formatNumber(s.adjust.sharpen, 1);
-            }
-        }
-
-        $("ta-viewer-controls").addEventListener("input", function (e) {
-            if (!/^ta-viewer-(brightness|contrast|gamma|sharpen)$/.test(e.target.id)) return;
-            slide(e.target);
-            recolour();
-        });
-
-        // Auto: the range from the mosaic's percentiles; Reset: that range, and no adjustments
-        $("ta-viewer-controls").addEventListener("click", function (e) {
-            if (e.target.id !== "ta-viewer-auto" && e.target.id !== "ta-viewer-reset") return;
-            style().range = defaultRange(current(), v.unit);
-            if (e.target.id === "ta-viewer-reset") {
-                style().adjust = defaultAdjust();
-                style().curve = null;
-            }
-            $("ta-viewer-controls").innerHTML = controlsHtml(current(), style(), v.palettes || [], v.unit);
-            restyle();
-        });
+        bindControls({doc: doc, el: $("ta-viewer-controls"), current: current, style: style, unit: function () { return v.unit; },
+                      palettes: function () { return v.palettes || []; }, recolour: recolour, restyle: restyle,
+                      // A temperature palette is the user's, everywhere (DJI's keys carry the viewer's prefix)
+                      onPalette: function (key) {
+                          if (isTemperature(tab)) core.savePalette(fetchFn, page.getAttribute("data-api"), csrf, key.replace(/^dji_/, "")).catch(function () {});
+                      }});
 
         $("ta-viewer-readout").addEventListener("click", function (e) {
             if (e.target.closest && e.target.closest("#ta-viewer-follow")) follow();
@@ -655,7 +673,8 @@
                frameUrl: frameUrl, pipHtml: pipHtml, READOUT_HINT: READOUT_HINT, tabsHtml: tabsHtml, controlsHtml: controlsHtml, readoutHtml: readoutHtml, reportHtml: reportHtml, statusHtml: statusHtml,
                baseLayers: baseLayers, loadLeaflet: loadLeaflet, init: init, adjustQuery: adjustQuery, toneShares: toneShares,
                slidRange: slidRange, sliderPositions: sliderPositions, sliderGamma: sliderGamma, gammaSlider: gammaSlider,
-               SLIDERS: SLIDERS, imageHtml: imageHtml, isothermParam: isothermParam, isothermHtml: isothermHtml};
+               SLIDERS: SLIDERS, imageHtml: imageHtml, isothermParam: isothermParam, isothermHtml: isothermHtml,
+               bindControls: bindControls, isTemperature: isTemperature, shownTemp: shownTemp};
     root.ThermalAnalyzerViewer = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

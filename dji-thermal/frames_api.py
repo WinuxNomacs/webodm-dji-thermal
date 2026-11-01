@@ -12,7 +12,7 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from . import conversions, converter, datasets, frames, inspector_api, measurements, mosaics
+from . import conversions, converter, datasets, frames, inspector, inspector_api, measurements, mosaics
 from .analyzer_api import DatasetView, download_name, get_conversion
 
 # What a frame's values tile is made of, in its ETag
@@ -120,14 +120,16 @@ class WorksetFrameValues(DatasetView):
 
 
 def frame_region(task, cid, data):
-    """A shape's statistics on a frame from a request's data ({frame, changes: {...}, geometry (pixels), bins,
-    percentiles, isotherm: {low, high} in the unit}), and what it was measured with: (result, rel, changes)"""
+    """A shape's statistics on a frame (°C, as the map's regions) from a request's data ({frame, changes: {...},
+    geometry (pixels), bins, percentiles, isotherm: {low, high} (°C)}), and what it was measured with: (result, rel,
+    changes)"""
     data = data if isinstance(data, dict) else {}
     rel, changes = query(dict(data.get('changes') or {}, frame=data.get('frame')))
     geometry, percentiles, bins, isotherm, _wanted = inspector_api.region_data(
         {k: v for k, v in data.items() if k != 'correction'})
     m = measured(lambda: frames.measure(task, cid, rel, changes))
-    return measured(lambda: frames.region(m['values'], geometry, percentiles, bins, isotherm)), rel, changes
+    celsius = inspector.to_celsius(m['values'], frames.unit_of(task, cid))
+    return measured(lambda: frames.region(celsius, geometry, percentiles, bins, isotherm)), rel, changes
 
 
 class WorksetFrameRegion(DatasetView):
@@ -174,7 +176,7 @@ class WorksetFrameMeasurements(DatasetView):
         values, rel, changes = frame_region(task, cid, data)
         isotherm = inspector_api.region_isotherm(data.get('isotherm'))
         record = {'name': name, 'comment': comment, 'shape': shape, 'frame': rel, 'changes': changes,
-                  'unit': frames.unit_of(task, cid), 'geometry': data.get('geometry'), 'values': values,
+                  'geometry': data.get('geometry'), 'values': values,
                   'isotherm': {'low': isotherm[0], 'high': isotherm[1]} if isotherm else None}
         return Response(measurements.add(task, measurements_path(task, cid), record, request.user),
                         status=status.HTTP_201_CREATED)

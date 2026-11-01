@@ -1,0 +1,261 @@
+// The Analyzer's frame page (frame.js): a workset's frames one at a time, against a fake server and Leaflet
+const fs = require('fs');
+const path = require('path');
+const core = require('../analyzer_core');
+window.ThermalAnalyzerCore = core;
+window.ThermalScale = require('../scale');
+window.ThermalRecolour = require('../recolour');
+window.ThermalAnalyzerViewer = require('../viewer');
+const frame = require('../frame');
+
+function page() {
+    const t = fs.readFileSync(path.join(__dirname, '..', '..', 'templates', 'frame.html'), 'utf8');
+    return t.slice(t.indexOf('{% block content %}') + 19, t.indexOf('{% endblock %}'))
+        .replace(/<script[^>]*><\/script>/g, '')
+        .replace('{% csrf_token %}', '<input name="csrfmiddlewaretoken" value="tok">')
+        .replace(/\{\{ api \}\}/g, '/api/plugins/dji-thermal/')
+        .replace(/\{\{ public \}\}/g, '/plugins/dji-thermal/')
+        .replace(/\{\{ dataset\.id \}\}/g, 'd1')
+        .replace(/\{\{ conversion\.id \}\}/g, 'c1')
+        .replace(/\{\{[^}]*\}\}/g, '');
+}
+
+const BASE = "/api/plugins/dji-thermal/datasets/d1/conversions/c1";
+const INFERNO = Array.from({length: 256}, (_, i) => ((i << 24) | ((255 - i) << 8) | 255) >>> 0);
+const FRAMES = {
+    name: "Nadir", dataset_name: "Roof", unit: "C", normalized: false, harmonized: false, max_pitch: -80, built: true,
+    can_change: true, default_palette: "inferno", palettes: [{key: "inferno", label: "inferno", color_map: INFERNO}],
+    frames: [{path: "a_T.JPG", time: "2026:10:12 18:29:50", pitch: -90, converted: true, mosaic: 0},
+             {path: "sub/b_T.JPG", time: "2026:10:12 18:29:52", pitch: -90, converted: true, mosaic: 1},
+             {path: "c_T.JPG", time: "2026:10:12 18:29:54", pitch: -45, converted: true, mosaic: null}]
+};
+const INFO = {frame: "a_T.JPG", width: 2, height: 1, unit: "C", distance_source: "rangefinder", notes: [], offset: 0, offset_known: true,
+              params: {distance: 18.1, humidity: 50, emissivity: 0.91, reflection: 22.8, ambient_temp: 22.8},
+              recorded: {distance: 5, lrf: 18.1, humidity: 50, emissivity: 0.91, reflection: 22.8, ambient: 22.8},
+              changes: {}, stats: {min: 15, max: 15, mean: 15, percentiles: [15, 15], histogram: {counts: [1], edges: [15, 16]}}};
+
+describe("the frame page's helpers", () => {
+    afterEach(() => window.localStorage.clear());
+
+    it("lists all the frames, those in the mosaic or the oblique ones, and says why the mosaics left one out", () => {
+        const all = FRAMES.frames;
+        expect(frame.listFrames(all, "mosaic").map(f => f.path)).toEqual(["a_T.JPG", "sub/b_T.JPG"]);
+        expect(frame.listFrames(all, "oblique").map(f => f.path)).toEqual(["c_T.JPG"]);
+        expect(frame.listFrames(all, "").length).toBe(3);
+        // Before the mosaics placed any frame, there is one list
+        const unplaced = all.map(f => Object.assign({}, f, {mosaic: null}));
+        expect(frame.listFrames(unplaced, "mosaic").length).toBe(3);
+        expect(frame.frameTag(all[2], "", -80, true)).toBe("oblique, -45°");
+        expect(frame.frameTag(all[0], "", -80, true)).toBe("in the mosaic");
+        expect(frame.frameTag(all[0], "mosaic", -80, true)).toBe("");
+        expect(frame.frameTag(Object.assign({}, all[0], {mosaic: null}), "", -80, true)).toBe("left out as unusable");
+        expect(frame.frameTag(Object.assign({}, all[0], {converted: false}), "", -80, false)).toBe("not converted");
+    });
+
+    it("reads the parameters typed: only those moved from where they started, temperatures in the workset's unit", () => {
+        const starts = frame.changeStarts(INFO);
+        expect(starts).toEqual({distance: "18.1", humidity: "50.0", emissivity: "0.91", reflected_temp: "22.8", ambient_temp: "22.8"});
+        expect(frame.readChanges({emissivity: "0.80", humidity: "50", distance: ""}, starts, "C")).toEqual({changes: {emissivity: 0.8}});
+        expect(frame.readChanges({emissivity: "2"}, starts, "C")).toEqual({error: "The emissivity is between 0.1 and 1", field: "emissivity"});
+        expect(frame.readChanges({humidity: "wet"}, starts, "C").field).toBe("humidity");
+        window.localStorage.setItem("unit_system", "imperial");
+        const f = frame.changeStarts(INFO);
+        expect(f.reflected_temp).toBe("73.0");
+        // 86 °F typed, a workset in °C: 30 °C
+        expect(frame.readChanges({reflected_temp: "86"}, f, "C")).toEqual({changes: {reflected_temp: 30}});
+        expect(frame.readChanges({reflected_temp: "-500"}, f, "C").error).toMatch(/absolute zero/);
+        expect(frame.changesTyped({reflected_temp: 30, emissivity: 0.8}, "C")).toEqual({reflected_temp: "86", emissivity: "0.8"});
+    });
+
+    it("asks for a frame measured with the changes, and opens the Worksets form filled in with them", () => {
+        expect(frame.frameApiUrl(BASE, "frame/values", "sub/b T.JPG", {emissivity: 0.8}))
+            .toBe(BASE + "/frame/values?frame=sub%2Fb%20T.JPG&emissivity=0.8");
+        expect(frame.newWorksetUrl("/plugins/dji-thermal/", "d1", "c1", {emissivity: 0.8, distance: 12}))
+            .toBe("/plugins/dji-thermal/dataset/d1?from=c1&emissivity=0.8&distance=12#convert");
+    });
+
+    it("reads the values under the cursor, and the difference the changes make", () => {
+        const tile = {width: 2, height: 1, values: Float32Array.from([15, NaN])};
+        const changed = {width: 2, height: 1, values: Float32Array.from([16.5, NaN])};
+        expect(frame.valueAt(tile, 0.7, 0.2)).toBe(15);
+        expect(frame.valueAt(tile, 1.2, 0.2)).toBeNull();
+        expect(frame.valueAt(tile, 2, 0)).toBeNull();
+        const el = document.createElement("div");
+        el.innerHTML = frame.readoutHtml({x: 0.5, y: 0.5, inside: true}, [tile, changed], "C");
+        expect(el.textContent).toContain("15.00 °C");
+        expect(el.textContent).toContain("+1.50 °C");
+        el.innerHTML = frame.readoutHtml({x: 1.5, y: 0.5, inside: true}, [tile, null], "C");
+        expect(el.textContent).toContain("no data");
+        expect(frame.readoutHtml({inside: false}, [tile], "C")).toContain("Outside the frame");
+    });
+});
+
+describe("the frame page", () => {
+    // A Leaflet stand-in: the panes' maps and the canvas each shows
+    function fakeLeaflet() {
+        const L = {maps: [], CRS: {Simple: {}}, DomUtil: {addClass() {}}, Util: {falseFn() {}}, latLngBounds: b => b};
+        L.map = (el, opts) => {
+            const handlers = {};
+            const m = {el, opts, layers: [], center: [0, 0], zoom: 0, on(ev, f) { (handlers[ev] = handlers[ev] || []).push(f); return m; },
+                       fire(ev, e) { (handlers[ev] || []).forEach(f => f(e)); }, fitBounds(b) { m.fitted = b; },
+                       invalidateSize() {}, removeLayer(l) { m.layers = m.layers.filter(x => x !== l); },
+                       setView(c, z) { m.center = c; m.zoom = z; m.fire("move"); }, getCenter: () => m.center, getZoom: () => m.zoom};
+            L.maps.push(m);
+            return m;
+        };
+        L.ImageOverlay = {extend(proto) {
+            return function (url, bounds) {
+                this.bounds = bounds;
+                proto._initImage.call(this);
+                this.addTo = m => { m.layers.push(this); return this; };
+                this.setBounds = b => { this.bounds = b; };
+            };
+        }};
+        return L;
+    }
+
+    // The server: the frames, a frame's figures and its values (a 2 × 1 frame: 15 and no data; 16.5 with the changes)
+    function fakeServer() {
+        const calls = [];
+        const fetchFn = jest.fn((url, opts) => {
+            calls.push([url, opts]);
+            if (url === BASE + "/frames") return Promise.resolve({ok: true, status: 200, json: () => Promise.resolve(FRAMES)});
+            const u = new URL(url, "http://x"), changed = u.searchParams.has("emissivity");
+            if (u.pathname.endsWith("/frame")) {
+                return Promise.resolve({ok: true, status: 200, json: () => Promise.resolve(Object.assign({}, INFO, {
+                    frame: u.searchParams.get("frame"), changes: changed ? {emissivity: 0.8} : {}}))});
+            }
+            const headers = {"X-Values-Offset": changed ? "16.5" : "15", "X-Values-Step": "1", "X-Values-Margin": "0", "X-Sharpen-Sigma": "1"};
+            return Promise.resolve({ok: true, status: 200, headers: {get: k => headers[k]}, blob: () => Promise.resolve("blob")});
+        });
+        return {fetchFn, calls};
+    }
+
+    let puts;
+    beforeEach(() => {
+        document.body.innerHTML = page();
+        puts = [];
+        window.createImageBitmap = jest.fn(() => Promise.resolve({width: 2, height: 1}));
+        jest.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function () {
+            const canvas = this;
+            return {drawImage() {}, getImageData: () => ({data: new Uint8ClampedArray([0, 0, 0, 255, 0, 0, 0, 0])}),
+                    createImageData: (w, h) => ({width: w, height: h, data: new Uint8ClampedArray(w * h * 4)}),
+                    putImageData(image) { puts.push([canvas, Array.from(image.data)]); }};
+        });
+        window.requestAnimationFrame = f => setTimeout(f, 0);
+    });
+    afterEach(() => {
+        jest.restoreAllMocks();
+        window.localStorage.clear();
+    });
+    const $ = id => document.getElementById(id);
+    const settle = () => new Promise(r => setTimeout(r, 0)).then(() => new Promise(r => setTimeout(r, 0)));
+
+    function start(search) {
+        const server = fakeServer(), L = fakeLeaflet();
+        const location = {search: search || "", assign: jest.fn()}, history = {replaceState: jest.fn()};
+        const done = frame.init({doc: document, fetchFn: server.fetchFn, loadLeaflet: () => Promise.resolve(L), location, history});
+        return done.then(settle).then(() => ({server, L, location, history}));
+    }
+
+    it("shows the frame a link asks for, listed among the frames of its list, coloured from its values", async () => {
+        const {server, L} = await start("?frame=sub%2Fb_T.JPG&list=mosaic");
+        expect($("ta-frame-name").textContent).toBe("b_T.JPG");
+        expect($("ta-frame-subtitle").textContent).toBe("Roof · Nadir · 2026-10-12 18:29:52 · sub/b_T.JPG");
+        expect(server.calls.map(c => c[0])).toContain(BASE + "/frame/values?frame=sub%2Fb_T.JPG");
+        const items = Array.from(document.querySelectorAll("#ta-frame-list [data-path]"));
+        expect(items.map(b => b.getAttribute("data-path"))).toEqual(["a_T.JPG", "sub/b_T.JPG"]);
+        expect(document.querySelector("#ta-frame-list [aria-current=true]").getAttribute("data-path")).toBe("sub/b_T.JPG");
+        expect(document.querySelector("[data-list=oblique]").textContent).toBe("Oblique 1");
+        expect($("ta-frame-next").disabled).toBe(true);
+        expect($("ta-frame-prev").disabled).toBe(false);
+        // One pane, the frame on it at its size; the pixel with a value coloured, the other clear
+        expect(L.maps.length).toBe(1);
+        expect(L.maps[0].fitted).toEqual([[-1, 0], [0, 2]]);
+        expect($("ta-frame-pane-1").hidden).toBe(true);
+        const last = puts[puts.length - 1][1];
+        expect(last[3]).toBe(255);
+        expect(last[7]).toBe(0);
+        expect($("ta-viewer-controls").textContent).toContain("This frame: 15.0 to 15.0 °C");
+    });
+
+    it("reads the pixel under the cursor, and steps through the list with the arrow keys, keeping the frame in the URL", async () => {
+        const {L, history} = await start();
+        L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 0.5}});
+        expect($("ta-frame-readout").textContent).toContain("15.00 °C");
+        L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 5}});
+        expect($("ta-frame-readout").textContent).toContain("Outside the frame");
+        document.dispatchEvent(new KeyboardEvent("keydown", {key: "ArrowRight"}));
+        await settle();
+        expect($("ta-frame-name").textContent).toBe("b_T.JPG");
+        expect(history.replaceState).toHaveBeenLastCalledWith(null, "", "?frame=sub%2Fb_T.JPG");
+        document.querySelector("[data-list=oblique]").click();
+        await settle();
+        expect($("ta-frame-name").textContent).toBe("c_T.JPG");
+        expect(history.replaceState).toHaveBeenLastCalledWith(null, "", "?frame=c_T.JPG&list=oblique");
+    });
+
+    it("measures the frame again with the parameters changed beside it, the panes moving together, and clears them", async () => {
+        const {server, L} = await start();
+        const field = document.querySelector("#ta-frame-params input[name=emissivity]");
+        field.value = "0.8";
+        field.dispatchEvent(new Event("input", {bubbles: true}));
+        $("ta-frame-apply").click();
+        await settle();
+        expect(server.calls.map(c => c[0])).toContain(BASE + "/frame?frame=a_T.JPG&emissivity=0.8");
+        expect($("ta-frame-pane-1").hidden).toBe(false);
+        expect(L.maps.length).toBe(2);
+        L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 0.5}});
+        expect($("ta-frame-readout").textContent).toContain("+1.50 °C");
+        L.maps[0].setView([-3, 4], 2);
+        expect([L.maps[1].center, L.maps[1].zoom]).toEqual([[-3, 4], 2]);
+        expect($("ta-frame-new-workset").getAttribute("href")).toBe("/plugins/dji-thermal/dataset/d1?from=c1&emissivity=0.8#convert");
+        // The changes stay as the next frame is shown
+        $("ta-frame-next").click();
+        await settle();
+        expect(server.calls.map(c => c[0])).toContain(BASE + "/frame?frame=sub%2Fb_T.JPG&emissivity=0.8");
+        expect(document.querySelector("#ta-frame-params input[name=emissivity]").value).toBe("0.8");
+        $("ta-frame-clear").click();
+        await settle();
+        expect($("ta-frame-pane-1").hidden).toBe(true);
+        expect($("ta-frame-new-workset")).toBeNull();
+    });
+
+    it("refuses parameters out of their limits without asking the server", async () => {
+        const {server} = await start();
+        const before = server.calls.length;
+        const field = document.querySelector("#ta-frame-params input[name=emissivity]");
+        field.value = "3";
+        field.dispatchEvent(new Event("input", {bubbles: true}));
+        field.dispatchEvent(new KeyboardEvent("keydown", {key: "Enter", bubbles: true}));
+        expect($("ta-frame-change-error").textContent).toBe("The emissivity is between 0.1 and 1");
+        expect(server.calls.length).toBe(before);
+    });
+
+    it("downloads the temperatures as measured, or with the changes when asked", async () => {
+        const {location} = await start();
+        document.querySelector("[data-download=csv]").click();
+        expect(location.assign).toHaveBeenLastCalledWith(BASE + "/frame/download?frame=a_T.JPG&kind=csv");
+        const field = document.querySelector("#ta-frame-params input[name=emissivity]");
+        field.value = "0.8";
+        field.dispatchEvent(new Event("input", {bubbles: true}));
+        $("ta-frame-apply").click();
+        await settle();
+        const withChanges = document.querySelector("input[name=ta-frame-measured][value='1']");
+        withChanges.checked = true;
+        withChanges.dispatchEvent(new Event("change", {bubbles: true}));
+        document.querySelector("[data-download=tiff]").click();
+        expect(location.assign).toHaveBeenLastCalledWith(BASE + "/frame/download?frame=a_T.JPG&emissivity=0.8&kind=tiff");
+    });
+
+    it("recolours the frame as a slider moves, without asking the server", async () => {
+        const {server} = await start();
+        const before = server.calls.length, drawn = puts.length;
+        const gamma = $("ta-viewer-gamma");
+        gamma.value = "1";
+        gamma.dispatchEvent(new Event("input", {bubbles: true}));
+        await settle();
+        expect(server.calls.length).toBe(before);
+        expect(puts.length).toBeGreaterThan(drawn);
+    });
+});
