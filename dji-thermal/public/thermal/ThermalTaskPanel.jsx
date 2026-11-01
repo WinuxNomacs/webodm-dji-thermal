@@ -15,9 +15,9 @@ function readExif(file){
     return exifr.parse(file, EXIF_OPTIONS).then(exif => exif || {}, () => ({}));
 }
 
-// The panel of a new thermal task, for the files picked with the DJI Thermal Task button: the Measurement section,
-// whether to keep the photos in a DJI Thermal Analyzer dataset too, then WebODM's own task panel (name, processing
-// node, options, the photos on the map; no resizing).
+// The panel of a new thermal task, for the files picked with the DJI Thermal Task button: Normalize and Harmonize, the
+// Measurement section, whether to keep the photos in a DJI Thermal Analyzer dataset too, then WebODM's own task panel
+// (name, processing node, options, the photos on the map; no resizing).
 export default class ThermalTaskPanel extends React.Component {
     static propTypes = {
         projectId: PropTypes.number.isRequired,
@@ -42,6 +42,7 @@ export default class ThermalTaskPanel extends React.Component {
             unit: defaultUnit(unitSystem()),
             errors: {},
             keepPhotos: false,
+            frames: {normalize: false, harmonize: false},
             error: "",
             progress: null
         };
@@ -138,8 +139,9 @@ export default class ThermalTaskPanel extends React.Component {
             measurement: requestData(this.state.values, this.state.unit),
             api: this.props.api,
             onProgress: progress => this.update({progress}),
-            keepPhotos: this.state.keepPhotos,
-            otherPhotos: this.otherPhotos()
+            keepPhotos: this.keepsPhotos(),
+            otherPhotos: this.otherPhotos(),
+            frames: this.state.frames
         });
         this.setState({phase: "uploading", error: "", progress: {done: 0, total: this.state.photos.length, converted: [], ignored: [], failed: []}});
         this.upload.start().then(result => {
@@ -157,6 +159,43 @@ export default class ThermalTaskPanel extends React.Component {
             }
         });
     };
+
+    // Normalizing or harmonizing goes through a workset of the task's dataset, which keeps the photos
+    keepsPhotos(){
+        return this.state.keepPhotos || this.state.frames.normalize;
+    }
+
+    handleFramesChange = e => {
+        const frames = Object.assign({}, this.state.frames, {[e.target.name]: e.target.checked});
+        if (e.target.name === "harmonize" && e.target.checked) frames.normalize = true;
+        if (e.target.name === "normalize" && !e.target.checked) frames.harmonize = false;
+        this.setState({frames});
+    };
+
+    renderFrames(){
+        const { frames } = this.state;
+        return (
+            <div className="dji-thermal-frames">
+                <div className="checkbox">
+                    <label>
+                        <input type="checkbox" name="normalize" checked={frames.normalize} onChange={this.handleFramesChange} />
+                        {" "}{_("Normalize: one ambient and reflected temperature for every frame")}
+                    </label>
+                    <span className="help-block">{_("The flight's medians of the values the camera recorded, unless given below: no jumps between frames where the recorded values change.")}</span>
+                </div>
+                <div className="checkbox">
+                    <label>
+                        <input type="checkbox" name="harmonize" checked={frames.harmonize} onChange={this.handleFramesChange} />
+                        {" "}{_("Harmonize: each frame's drift against its overlapping neighbours removed")}
+                    </label>
+                    <span className="help-block">{_("The camera drifts between its recalibrations: removing it leaves no seams in the map. Compares the frames' overlaps, which takes a while. Normalizes too.")}</span>
+                </div>
+                {frames.normalize ?
+                    <p className="help-block">{_("All the photos are uploaded first, to the task's DJI Thermal Analyzer dataset; WebODM's worker then converts them in a workset of it, and the task starts processing once they are converted. You can close the page once the upload is done.")}</p>
+                : ""}
+            </div>
+        );
+    }
 
     // The photos picked that are not converted: the RGB ones, and those of a camera the plugin cannot convert
     otherPhotos(){
@@ -178,7 +217,7 @@ export default class ThermalTaskPanel extends React.Component {
         const others = this.props.files.ignored.length;
         let text = interpolate(_("%(count)s thermal photos."), {count: photos.length});
         if (unsupported.length) text += " " + interpolate(_("%(count)s photos of a camera this plugin cannot convert are left out."), {count: unsupported.length});
-        if (others) text += " " + interpolate(this.state.keepPhotos ? _("%(count)s other files (RGB photos, ...) go only in the dataset.") :
+        if (others) text += " " + interpolate(this.keepsPhotos() ? _("%(count)s other files (RGB photos, ...) go only in the dataset.") :
                                               _("%(count)s other files (RGB photos, ...) are ignored."), {count: others});
         return <p>{text} <span className="text-muted">{_("To check the flight first or compare settings, use the")}{" "}
             <a href="/plugins/dji-thermal/">{_("DJI Thermal Analyzer")}</a>.</span></p>;
@@ -189,7 +228,7 @@ export default class ThermalTaskPanel extends React.Component {
         const percent = p.total ? Math.round(p.done / p.total * 100) : 100;
         return (
             <div className="dji-thermal-progress">
-                <p>{interpolate(_("Converting the thermal photos: %(done)s of %(total)s"), {done: p.done, total: p.total})}
+                <p>{interpolate(p.uploading ? _("Uploading the photos: %(done)s of %(total)s") : _("Converting the thermal photos: %(done)s of %(total)s"), {done: p.done, total: p.total})}
                     {p.failed.length ? " " + interpolate(_("(%(count)s failed)"), {count: p.failed.length}) : ""}</p>
                 <div className="progress">
                     <div className="progress-bar progress-bar-striped active" role="progressbar" style={{width: percent + "%"}}>{percent}%</div>
@@ -225,11 +264,12 @@ export default class ThermalTaskPanel extends React.Component {
                     <div className={uploading ? "hide" : ""}>
                         <div className="new-task-panel theme-background-highlight form-horizontal dji-thermal-measurement-panel">
                             {this.renderSummary()}
+                            {this.renderFrames()}
                             <MeasurementSettings combined={combined} values={this.state.values} unit={this.state.unit}
                                 errors={this.state.errors} onChange={this.handleValuesChange} onUnitChange={this.handleUnitChange} />
                             <div className="checkbox">
                                 <label>
-                                    <input type="checkbox" name="keepPhotos" checked={this.state.keepPhotos}
+                                    <input type="checkbox" name="keepPhotos" checked={this.keepsPhotos()} disabled={this.state.frames.normalize}
                                            onChange={e => this.setState({keepPhotos: e.target.checked})} />
                                     {" "}{_("Also keep the photos in a DJI Thermal Analyzer dataset")}
                                 </label>

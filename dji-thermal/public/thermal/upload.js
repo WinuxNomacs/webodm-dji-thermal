@@ -6,7 +6,11 @@
 // With keepPhotos, the task is first made a DJI Thermal Analyzer dataset too, each photo's conversion also keeps it
 // there (no second upload), the other photos (otherPhotos: the RGB ones, another camera's) are uploaded to it, and
 // its analysis starts once the task is committed. The dataset goes with the task if the upload fails.
-import { tiffName, withImagesRenamed } from './textFiles';
+//
+// Normalized or harmonized (frames), every photo is needed before any is converted: the task is made a dataset, the
+// photos are uploaded to it, and the server converts them in a workset of the dataset (the panel's measurement values
+// and frames settings), whose TIFFs then go into the task, which the server commits (api.py TaskWorkset).
+import { tiffName, withImagesRenamed, worksetTiffName } from './textFiles';
 
 export const CONCURRENCY = 3;
 export const DATASET_BATCH = 10;    // other photos per request to the dataset, as the Analyzer's own upload
@@ -32,7 +36,8 @@ export function taskData(taskInfo){
 // api: the server calls (see serverApi.js), each returning a promise. onProgress({done, total, converted,
 // ignored, failed}) after each photo.
 export default class ThermalUpload {
-    constructor({projectId, taskInfo, photos, textFiles, measurement, api, onProgress, concurrency, keepPhotos, otherPhotos}){
+    constructor({projectId, taskInfo, photos, textFiles, measurement, api, onProgress, concurrency, keepPhotos, otherPhotos,
+                 frames}){
         this.projectId = projectId;
         this.taskInfo = taskInfo;
         this.photos = photos;
@@ -43,6 +48,7 @@ export default class ThermalUpload {
         this.concurrency = concurrency || CONCURRENCY;
         this.keepPhotos = !!keepPhotos;
         this.otherPhotos = otherPhotos || [];
+        this.frames = {normalize: !!(frames && (frames.normalize || frames.harmonize)), harmonize: !!(frames && frames.harmonize)};
         this.canceled = false;
         this.task = null;
         this.dataset = null;
@@ -53,6 +59,7 @@ export default class ThermalUpload {
     // or null, analysisError}) once the task is committed; rejects with an Error if it could not be (the task, and
     // its dataset, are then removed).
     start(){
+        if (this.frames.normalize) return this.startWorkset();
         return this.api.createTask(this.projectId, taskData(this.taskInfo))
             .then(task => {
                 this.task = task;
@@ -74,6 +81,44 @@ export default class ThermalUpload {
                 return this.api.analyzeDataset(this.dataset).then(() => result,
                     e => Object.assign(result, {analysisError: e.message}));
             })
+            .catch(e => this.removeTask().then(() => { throw e; }));
+    }
+
+    // Normalized or harmonized: resolves to {task, dataset, workset: its id, done, total} once the photos are on the
+    // server and the workset started; the task processes once the workset is converted
+    startWorkset(){
+        const photos = this.photos.concat(this.otherPhotos.filter(f => /\.jpe?g$/i.test(f.name || "")));
+        const progress = {done: 0, total: photos.length, converted: [], ignored: [], failed: [], uploading: true};
+        return this.api.createTask(this.projectId, taskData(this.taskInfo))
+            .then(task => {
+                this.task = task;
+                return this.api.taskDataset(this.projectId, task.id);
+            })
+            .then(d => {
+                this.dataset = d.id;
+                let chain = Promise.resolve();
+                for (let i = 0; i < photos.length; i += DATASET_BATCH){
+                    const batch = photos.slice(i, i + DATASET_BATCH);
+                    chain = chain.then(() => this.checkCanceled())
+                        .then(() => this.api.uploadToDataset(this.dataset, batch))
+                        .then(() => {
+                            progress.done += batch.length;
+                            this.onProgress(Object.assign({}, progress));
+                        });
+                }
+                return chain;
+            })
+            .then(() => this.checkCanceled())
+            .then(() => {
+                if (!this.textFiles.length) return null;
+                const names = this.photos.map(p => p.name);
+                return Promise.all(this.textFiles.map(f => withImagesRenamed(f, names, worksetTiffName)))
+                    .then(files => this.api.uploadFiles(this.projectId, this.task.id, files));
+            })
+            .then(() => this.checkCanceled())
+            .then(() => this.api.startWorkset(this.projectId, this.task.id, Object.assign({}, this.measurement, this.frames)))
+            .then(w => ({task: this.task, dataset: this.dataset, workset: w.id, frames: this.frames, done: progress.done,
+                         total: progress.total, converted: [], ignored: [], failed: []}))
             .catch(e => this.removeTask().then(() => { throw e; }));
     }
 

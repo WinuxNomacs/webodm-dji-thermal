@@ -1,4 +1,4 @@
-import { renameImages, tiffName, withImagesRenamed } from "../thermal/textFiles";
+import { renameImages, tiffName, withImagesRenamed, worksetTiffName } from "../thermal/textFiles";
 
 // jsdom's File has no text()
 function readText(file){
@@ -19,6 +19,12 @@ describe("the photos' names in the GCP file and WebODM's text files", () => {
         const gcp = "EPSG:4326\n0.50 0.60 223.8 320 256 DJI_0001_T.JPG gcp1\n0.50 0.60 223.8 100 80 DJI_0002_T.JPG gcp2\n";
         expect(renameImages(gcp, ["DJI_0001_T.JPG", "DJI_0002_T.JPG"])).toBe(
             "EPSG:4326\n0.50 0.60 223.8 320 256 DJI_0001_T.tif gcp1\n0.50 0.60 223.8 100 80 DJI_0002_T.tif gcp2\n");
+    });
+
+    test("normalized or harmonized, the names are a workset's °C TIFFs'", () => {
+        expect(worksetTiffName("DJI_0001_T.JPG")).toBe("DJI_0001_T_temp_c.tiff");
+        expect(renameImages("EPSG:4326\n0.50 0.60 223.8 320 256 DJI_0001_T.JPG gcp1\n", ["DJI_0001_T.JPG"], worksetTiffName))
+            .toBe("EPSG:4326\n0.50 0.60 223.8 320 256 DJI_0001_T_temp_c.tiff gcp1\n");
     });
 
     test("geo.txt and image_groups.txt, which start lines with the name, are renamed too", () => {

@@ -410,14 +410,16 @@ def output_files(task, cid):
     return out
 
 
-def create(task, name, settings, user):
-    """A new conversion of the dataset, started in WebODM's worker: :return: its id"""
+def create(task, name, settings, user, then=None):
+    """A new conversion of the dataset, started in WebODM's worker; then: what to do once it is converted (see
+    conversion_tasks.commit_parent). :return: its id"""
     cid = uuid.uuid4().hex[:12]
+    record_ = {'name': name, 'settings': settings, 'created_by': user.username, 'created_at': datasets.now()}
+    if then:
+        record_['then'] = then
     with datasets.locked(task):
         os.makedirs(output_path(task, cid))
-        datasets.write_json(path(task, cid, RECORD_FILE), {'name': name, 'settings': settings,
-                                                            'created_by': user.username,
-                                                            'created_at': datasets.now()})
+        datasets.write_json(path(task, cid, RECORD_FILE), record_)
         datasets.write_json(path(task, cid, JOB_FILE), {'status': 'converting'})
     datasets.start_job(task, 'conversions', 'convert', cid, rel=rel(cid, JOB_FILE), running='converting', stage={})
     return cid
@@ -547,6 +549,10 @@ def convert(task_id, run_id, cid):
         left_behind(task, cid)
         return {'canceled': True}
     datasets.update_size(task)
+    then = record(task, cid).get('then')
+    if ok and then:
+        from . import conversion_tasks
+        conversion_tasks.commit_parent(task, cid, then)
     if ok and (record(task, cid).get('settings') or {}).get('mosaics'):
         from . import mosaics
         mosaics.start(task, cid)

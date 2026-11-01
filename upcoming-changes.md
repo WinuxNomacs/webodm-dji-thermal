@@ -549,6 +549,39 @@
        processing node; the mosaics are built after. The panel's message says the task processes once the workset
        is converted, with a link to the dataset. Tests: `upload.test.js`, `test_api.py`. Docs: the Thermal Task
        quickstart, README.
+       Done (2026-11-01): `ThermalTaskPanel.jsx` (`renderFrames` after the photo count, Harmonize ticks Normalize,
+       "Also keep the photos" ticked and locked), `upload.js` (`startWorkset`: the photos 10 per request to the
+       dataset with their progress, the text files with `worksetTiffName`), `textFiles.js`, `serverApi.js`
+       (`startWorkset`), `ThermalTaskButton.jsx` (the message); `api.py` `TaskWorkset` (a partial task that is a
+       dataset with photos; °C TIFFs and mosaics, the panel's values, `then` with the task's node),
+       `conversions.create(then=)` and `run` (`commit_parent` once converted, before the mosaics),
+       `conversion_tasks.commit_parent` (the text files kept through `use_for_parent`, committed as WebODM's
+       commit does; a failure is the task's error). README (step 2), `quickstart-thermal-task.md` section 2;
+       screenshot `thermal-task-panel` retaken. `test_api.py` `TestTaskWorkset` (4, one converting 3 frames of the
+       M4T flight end to end), `upload.test.js` (2), `textFiles.test.js` (1). Live (2 thermal and 1 RGB photo, a GCP
+       file; the workset request intercepted): Harmonize ticked Normalize and locked the photos kept, the photos
+       went to the dataset (no conversion requests), the request carried the settings, the message; the task and
+       dataset removed after.
+
+- **The Thermal Inspector's Mosaic Overlays and Manual Corrections** (the user, 2026-11-01, from `new.md`):
+  - The requests: "in the Thermal Inspector, change "Workset mosaics" to "Mosaic Overlays". Also make sure it's only
+    visible when any workset mosaics actually exist." "in the Thermal Inspector, change Correction to Manual
+    Corrections. Place the checkbox directly next to it and remove the "Corrector for another...." description
+    entirely. This way when someone wants to make manual corrections they can check the box which expands them.
+    Unchecking returns to defaults and collapses the options again."
+  - What it builds on (`inspector.js`): `mosaicsHtml` already returns nothing when the project has no mosaics, and
+    the server lists only worksets whose mosaics are built (`inspector_api.map_mosaics`, a workset without a built
+    Mosaic, Harmonized or Source frame raster is left out), so the section already shows only when one exists.
+    `correctionHtml`: the heading "Correction", under it a tick box labelled "Correct for another emissivity and
+    reflected temperature"; ticked, the emissivity and reflected fields, what each layer was measured with, and the
+    "Approximate (a broadband model)…" line. Unticking keeps the values typed (`correctionInput`), so ticking again
+    brings them back; the correction is kept in the browser per task (`saveCorrection`).
+  - Proposed: one step, `inspector-names`: "Mosaic Overlays" for the section (its visibility unchanged; a test that
+    it's absent without mosaics); "Manual Corrections" as the heading, with the tick box in it and no label;
+    unticking forgets the values typed, so the next tick starts again from the topmost layer's own; the
+    "Approximate…" line and the layers' measured-with lines kept. README, `quickstart-inspector.md` (sections 4 and
+    7), screenshots `inspector-saved`, `inspector-mosaics` and any showing the panel's sections retaken.
+  - Open: the order.
 
 - **Faster image adjustments** (the user, 2026-11-01, from `new.md`): "can anything be done to improve the
   rendering response time of changes to the images sliders? How fast the tiles are rendered? etc.... Looking for it

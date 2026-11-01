@@ -159,3 +159,41 @@ class TaskDataset(APIView):
             raise exceptions.ValidationError(detail=OVER_QUOTA)
         dataset, made = conversion_tasks.link_dataset(task, request.user)
         return Response({'id': str(dataset.id)}, status=status.HTTP_201_CREATED if made else status.HTTP_200_OK)
+
+
+class TaskWorkset(APIView):
+    """
+    A partial task of DJI Thermal Task, normalized or harmonized: its photos, uploaded to the dataset it is (TaskDataset),
+    converted in a workset of it ('settings': the panel's measurement values, normalize and harmonize), whose TIFFs
+    then go into the task, which is committed (conversion_tasks.commit_parent). The answer is the workset's {id}.
+    """
+    permission_classes = (permissions.IsAuthenticated,)
+    MEASUREMENT = ('distance', 'unit', 'emissivity', 'reflected_temp', 'ambient_temp', 'humidity')
+
+    def post(self, request, project_pk=None, pk=None):
+        from . import conversions
+        try:
+            task = Task.objects.get(pk=pk, project=project_pk, project__deleting=False)
+            check_project_perms(request, task.project, ('change_project',))
+        except (ObjectDoesNotExist, ValidationError):
+            raise exceptions.NotFound() from None
+        if not task.partial:
+            raise exceptions.ValidationError(detail="The task's images have already been committed")
+        if not datasets.is_dataset(task):
+            raise exceptions.ValidationError(detail="The task is not a dataset: make it one first")
+        if not datasets.image_files(task):
+            raise exceptions.ValidationError(detail="Add the photos to the task's dataset first")
+        if datasets.over_quota(task):
+            raise exceptions.ValidationError(detail=OVER_QUOTA)
+        sent = request.data.get('settings') if isinstance(request.data.get('settings'), dict) else {}
+        raw = dict(conversions.DEFAULTS, outputs=['temp_c:tiff'], mosaics=True,
+                   normalize=bool(sent.get('normalize')) or bool(sent.get('harmonize')), harmonize=bool(sent.get('harmonize')))
+        raw.update({k: sent[k] for k in self.MEASUREMENT if k in sent})
+        settings, errors = conversions.parse_settings(raw)
+        if errors:
+            raise exceptions.ValidationError(detail=errors)
+        if not settings['normalize']:
+            raise exceptions.ValidationError(detail="Normalize or harmonize: a task converted as is takes its photos one by one")
+        cid = conversions.create(task, "DJI Thermal Task", settings, request.user, then={
+            'processing_node': task.processing_node_id, 'auto_processing_node': task.auto_processing_node})
+        return Response({'id': cid}, status=status.HTTP_201_CREATED)
