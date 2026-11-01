@@ -24,7 +24,8 @@ that task). So it's shared as the project is, and its photos count toward the pr
 ## 2. Read the summary
 
 The dataset's page opens with a summary: a row per camera with its frames, how many have GPS, the temperatures, when
-they were taken, the height and the size.
+they were taken, the height and the size. Under the name, a dataset kept in a WebODM task with images (one made with
+DJI Thermal Task, or sent a workset) names that task, with a link to it on the dashboard.
 
 ![A dataset's page: the summary, the steps and the Worksets tab](images/dataset.png)
 

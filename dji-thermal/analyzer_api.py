@@ -79,6 +79,7 @@ def summary(task, user):
         'conversions_ready': sum(1 for j in jobs if j['status'] == 'ready'),
         # The dataset's own task, as conversions are sent to it
         'parent': conversion_tasks.parent(task),
+        'in_task': datasets.in_task(task),
         # A conversion of the dataset running, or its mosaics being built
         'busy': any(j['status'] == 'converting' for j in jobs) or
         any(mosaics.job(task, cid)['status'] == 'building' for cid in conversions.ids(task)),
