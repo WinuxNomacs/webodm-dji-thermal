@@ -37,7 +37,7 @@
     `analyzer_core.optionHtml` (the sections), `conversions.optionsFormHtml` / `readOptions` (Create task's
     tickboxes, shared), `dataset.js` (`presetOptions`, `presetHtml`, `readPresetForm`, the panel); docs: the
     Analyzer quickstart, screenshots `dataset-plan` and `dataset-preset`. Jest 161 (no tests added); live check on
-    HomerunObliqueII: a preset saved, saved again with a box unticked (asked, replaced, still one), then deleted
+    the test flight: a preset saved, saved again with a box unticked (asked, replaced, still one), then deleted
     (10 presets before and after). WebODM's task
     options dialog (a task's Options > Edit) lists options by their ODM name, in collapsible sections, so the names
     are right; what's missing is where to find them. Decided (the user):
@@ -64,7 +64,7 @@
     Detail** beside Thumbnails (remembered in the browser): the pane follows the row under the mouse while nothing
     is selected. Found on the way: the Files table's frame links (`view.frames`) were never set, so rows opened no
     frame page; the hook is kept (an Open frame button in the pane) for when one exists. Tests: Jest 161,
-    `test_analyzer.py` `TestDatasetFiles` (3). Live check on HomerunObliqueII (GETs and the zip only): hover, a
+    `test_analyzer.py` `TestDatasetFiles` (3). Live check on the test flight (GETs and the zip only): hover, a
     selection kept while hovering, a single download (872 KB), a Shift range of 4 and its zip, Esc.
     Then (the user, 2026-10-31, `detail-pane-palette`): the pane shows the palette picture, not DJI's embedded one:
     `thumbnail?size=large` (the frame's own size, cached beside the thumbnails), in the user's DJI palette, or the
@@ -73,7 +73,7 @@
     Harmonized wording agreed with "made to agree on temperature" (so it doesn't suggest other attributes change);
     the WebODM plan's "Convert with these" became "Use these settings" (it fills the form, it doesn't create);
     `analyzer_core.sortRows` (moved from `dataset.js`) sorts both the Files tab and a workset's Files (Image and
-    Result; Outputs and Notes not). Jest 159; live check on HomerunObliqueII (GETs only, a fresh browser profile):
+    Result; Outputs and Notes not). Jest 159; live check on the test flight (GETs only, a fresh browser profile):
     the new labels, Files collapsed then open and kept across a reload, sorting both ways, the new Harmonized note:
     1. The Convert form's button **Convert** becomes **Create Workset** (`public/conversions.js`; also the
        messages that say "Convert", e.g. the WebODM plan's "Convert with these" and the task hint "Convert, then
@@ -131,7 +131,7 @@
     (6.7 to 32.2 °C), and sent with Use for parent task as the bad run was (6.2 to 32.0 °C); every visible pixel
     within the frames' range, the masked area 0. Not seam leveling, not the route. The bad run (511 s against
     295-330 s) had a different reconstruction, likely ODM's own once-off; its task is gone, so nothing more to read.
-    The user's own orthophotos are within their frames' range (HomerunObliqueII's frames -45.4 to 65.0 °C with sky in
+    The user's own orthophotos are within their frames' range (the test flight's frames -45.4 to 65.0 °C with sky in
     the oblique views; its orthophoto -42.5 to 56.7 °C). Decided (the user): no warning for an orthophoto outside the
     frames' range; closed.
   - Done: **a link from a WebODM task to its thermal dataset** (the user, 2026-10-30), `task-dataset-link`: a
@@ -149,7 +149,7 @@
   - Done: **bug, tasks made from a workset before the tag had no Thermal dataset button** (the user, 2026-10-30),
     `link-older-tasks`: listing a workset's tasks (`conversion_tasks.made`, called by the Analyzer's datasets list
     and dataset page) now adds the tag to a task without it. Test: Django 118. Live check: opening the Analyzer
-    tagged the user's "HomerunObliqueII - default-webodm-recommendations", whose panel now has the button.
+    tagged the test flight's task, whose panel now has the button.
   - Done: **viewer and header polish** (the user, `new.md`, 2026-10-30), `viewer-header-polish`:
     1. The viewer's **"As converted" tab becomes "Mosaic"** (as converted is what's expected); README to match.
     2. **Source frame shows the mosaic with lines between frames** instead of a random colour per frame: the
@@ -221,7 +221,7 @@
     the viewer opened in DJI ironred, new worksets' palette ironred, the Thermal task panel in K; the admin's
     preferences restored, the dataset removed.
   - Closed: WebODM answers 404 for a processed thermal task's dashboard thumbnail (`/thumbnail?size=164`,
-    seen on the user's "HomerunObliqueII - default-webodm-recommendations" and a check task). **WebODM's own, by
+    seen on the test flight's task and a check task). **WebODM's own, by
     design** (2026-10-30): `TaskThumbnail` (`app/api/tasks.py`) raises NotFound for an orthophoto with fewer than 3
     bands, and a °C orthophoto has one (and alpha); the dashboard's `TaskListItem` hides the thumbnail on error, so
     only the console shows the 404. Nothing for the plugin: the Dashboard hooks (`addTaskActionButton`,
@@ -237,7 +237,7 @@
     `dataset.js`); "workset" in the pages, scripts and the server's messages (the default name "Workset N"), the
     verb kept (Convert, Converting, Converted); **Settings:** a toggle with a caret (`ta-collapse`), its chips shown
     open or closed; **Outputs** a closed `details` section whose header shows its own chips when closed; every
-    section's caret drawn by the plugin (WebODM hid the browser's). Jest 122; live check on HomerunObliqueII (read
+    section's caret drawn by the plugin (WebODM hid the browser's). Jest 122; live check on the test flight (read
     only): the tabs Worksets, Files, Problems, WebODM plan, opened on Worksets; no console error.
 
 - **Thermal Inspector** (the user, 2026-10-30): the earlier Pixel Inspector ported as a control on WebODM's 2D map,
@@ -375,7 +375,7 @@
       kept, sharpened; the curve); Jest 192 (URLs, Auto, the panel's range typed and Auto, sliders previewed then
       drawn, equalized with the curve and Reset, in step with WebODM's panel, per-layer state with a mosaic and
       its frames). Mutation checks (WebODM's panel's resent range undoing the Inspector's, a mosaic's adjustments
-      left out of its query) fail them. Live on HomerunObliqueII (no writes, no console errors): Auto, contrast,
+      left out of its query) fail them. Live on the test flight (no writes, no console errors): Auto, contrast,
       Equalized (the curve asked), gamma and sharpening reach the tiles; the frame picture drawn with the
       orthophoto's gamma; the laid mosaic with its own range and gamma; the mosaic viewer's gamma unchanged. The
       histogram the check made in the task's folder removed. README, quickstart section 3, `palettes.md`,
@@ -411,10 +411,31 @@
     `thermal-task-panel`, `analyzer-list`, `dataset`, `dataset-files`, `picture-viewer`, `mosaic-viewer`,
     `mosaic-frames`, `dji-sdk` and the six `inspector*`).
 
+- **Ready to be public** (the user, 2026-11-01, from `new.md`): "this repo will be made public soon, be sure to
+  scan anything checked in that might be considered personal or secret."
+  - The scan (2026-11-01), of the 121 tracked files and every commit on every branch (225; 222 pushed):
+    - No secret: no key, token, password (but the tests' own `test1234` users), `.env`, private path or address;
+      commits carry only GitHub's noreply address. No DJI file or flight image, now or ever (the only file ever
+      removed is `exiftool_camera.config`). No PNG holds text or EXIF chunks. No mention of the earlier port's
+      source.
+    - `webodm-thermal-analyzer-ui.png` at the repo root, committed by mistake with the Inspector image step
+      (98f4abc, pushed): the user's uncropped splash, with Google's map credit (no coordinates or place). A
+      duplicate of `docs/images/splash-source.png`.
+    - Test fixtures at real-looking places: `inspector.test.js`'s points, `textFiles.test.js`'s GCPs and `test_converter.py`'s GPS (history
+      only, removed 2026-10-31); `main.test.js` used the dev dataset's id.
+    - `upcoming-changes.md`: the user's dataset name (about 30 times), two paths in the user's home folder, the
+      native Windows install's checks, and the user's words quoted.
+  - Decided (the user, 2026-11-01): **`upcoming-changes.md` kept, the dataset's name and the home paths scrubbed**
+    ("the test flight", "its own repository"); **the history left as it is** (nothing in it is secret; no
+    force-push).
+  - Done (2026-11-01), `public-scan`: the root image removed; `inspector.test.js`'s points and `textFiles.test.js`'s GCPs moved to a made-up place
+    in the sea (0.5 N, 0.5 E, the same distances between them), `main.test.js` a made-up dataset id; the plan
+    scrubbed. Jest 192, ESLint.
+
 - **Faster image adjustments** (the user, 2026-11-01, from `new.md`): "can anything be done to improve the
   rendering response time of changes to the images sliders? How fast the tiles are rendered? etc.... Looking for it
   to be as seamless and realtime as possible without needing a webodm pr".
-  - What it builds on, measured on the dev server (Django's runserver; HomerunObliqueII): a plugin tile takes
+  - What it builds on, measured on the dev server (Django's runserver; the test flight): a plugin tile takes
     100–180 ms (WebODM's own 70–125 ms), a sharpened one 300–400 ms; a view's 12 tiles together about 0.9 s.
     Moving a slider only previews the boxes and legends; on release the layer's URL changes and Leaflet's
     `redraw()` drops every tile first, so the map goes blank until the new ones come. No tile is cached by the
@@ -463,7 +484,7 @@
   thermal frame and 17 ms (37 at worst) per 2.8 MB RGB photo, so no header-only check in front; exiftool 12.40
   (WebODM's) copies only the DJI XMP tags it can write, which include all ODM and OpenSfM read (the test checks
   them), not `ImageSource` or the rangefinder's tags.
-- **dji-thermal-cli 1.7.0 for Python 3.9** — 2026-10-29, in `~/gitrepos/python/dji-thermal-cli`: branch
+- **dji-thermal-cli 1.7.0 for Python 3.9** — 2026-10-29, in its own repository: branch
   `python-3.9` (b8eeb28) and `release/1.7.0` (5223ac1), merged to its `main` (fd5e0ea), not pushed. No code
   change: on Python 3.9 with numpy 1.26.2 and Pillow 11.3.0 its full suite passes with the SDK and flight data
   (903 passed; 3 skipped: `math.fma`, 3.13+, has an exact fallback; one native SDK crash). `requires-python >=3.9`,
@@ -547,7 +568,7 @@ last phase did with its colouring.
    `inspector.test.js` (the button, laying, hover in °C, a region, tab, opacity, Swipe, the clipped isotherm, a
    link, the helpers), `main.test.js` (changed: every map), `analyzer.test.js` (the map link), `test_inspector.py`
    (a °F mosaic's region and isotherm), `test_analyzer.py` (the list, its 404s, region, isotherm, refusals). Jest 170,
-   Django 135 (1 skipped), ESLint, Ruff; live on HomerunObliqueII (project 1's map): laid by the link, hover, the
+   Django 135 (1 skipped), ESLint, Ruff; live on the test flight (project 1's map): laid by the link, hover, the
    legend, Harmonized, opacity, Swipe against WebODM's thermal orthophoto, the isotherm (clipped), a region, a pin,
    lifted; a scratch project without a map (made and deleted). Docs: the Inspector quickstart's section 4, the
    worksets quickstart, `api.md`, README; screenshots `inspector` retaken, `inspector-mosaics` new.
@@ -565,7 +586,7 @@ last phase did with its colouring.
    from GPS and gimbal. Tests: `inspector.test.js` (a mosaic's frames: the click, the URL, next, the palette, another
    tab keeping the frame, closed, lifted; an orthophoto's: by view angle, its palette and range in °F, a pin; an
    orthophoto from elsewhere left to WebODM), `main.test.js` (changed: frames.css), `test_analyzer.py` (`holding`;
-   the list's `tasks`). Jest 173, Django 137 (1 skipped), ESLint, Ruff; live on project 1: HomerunObliqueII's task
+   the list's `tasks`). Jest 173, Django 137 (1 skipped), ESLint, Ruff; live on project 1: the test flight's task
    (from workset `324fe5774f35`, 49 frames at the point, by view angle, next, inferno), its mosaic laid by the link (61
    frames, the mosaic's own first, Harmonized), the mosaic viewer's window unchanged; no console errors (the palette
    put back to ironred after). Docs: the Inspector quickstart's section 5, README, `index.md`, `api.md`; screenshot
@@ -591,7 +612,7 @@ last phase did with its colouring.
    line along a hot band; the isotherm share, refused limits), `test_analyzer.py` (a mosaic line's frames),
    `inspector.test.js` (changed: the CSV's columns and the new rows; new: a line drawn, its profile hovered, its CSV,
    L/R numbering; the isotherm share measured again). Jest 175, Django 140 (1 skipped), ESLint, Ruff; the isotherm
-   share's test seen failing with the upper limit ignored. Live on project 1 (read only): HomerunObliqueII's
+   share's test seen failing with the upper limit ignored. Live on project 1 (read only): the test flight's
    orthophoto (a line: 13.1 m, surroundings and ΔT, the profile hovered and clicked to the frames window; a rectangle
    with the isotherm Above: 19.3 %) and its workset's mosaic (a line, each sample's frame named); no console errors.
    Docs: README, `index.md`, the Inspector quickstart's section 2, `api.md`; screenshots `inspector` retaken (the
@@ -626,7 +647,7 @@ last phase did with its colouring.
    new: the model and the legend's marks, saving a region with its form, renaming, deleting, exports, a viewer without
    Save, the correction measuring again with the pins and isotherm tiles, a layer without a baseline). Jest 180,
    Django 145 (1 skipped), ESLint, Ruff; the JS model's and `raster_region`'s correction each seen failing when broken.
-   Live on project 1 (it wrote, then deleted what it saved and the files it made): HomerunObliqueII's orthophoto
+   Live on project 1 (it wrote, then deleted what it saved and the files it made): the test flight's orthophoto
    (baseline 0.91, 21.06 °C from its TIFFs; a rectangle at emissivity 0.8, mean 40.05 to 42.38 °C; saved with a
    comment, a pin saved; back after a reload, renamed) and its workset's mosaic (a rectangle saved); deleted through
    the panel; no console errors. Docs: README, `index.md`, the Inspector quickstart's sections 6 and 7,
@@ -639,7 +660,7 @@ orthophoto takes the same palette, and its own range unless the user links them.
 
 ## Done: The mosaic viewer's image controls
 
-**Request** (the user, 2026-10-31): dji-thermal-ui's viewer panel (`~/gitrepos/python/dji-thermal-ui`,
+**Request** (the user, 2026-10-31): dji-thermal-ui's viewer panel (a separate repository,
 `frontend/src/viewer/panel.tsx`) in the plugin's mosaic viewer (`viewer.html`, `viewer.js`: the Mosaic,
 Harmonized, Source frame and View angle tabs). Its "Open this frame" is left out for now (the plugin has no frame
 page; the user, 2026-10-31).
@@ -680,7 +701,7 @@ is drawn by WebODM's tiler.
   "Under the cursor" and "The mosaic" as now.
 
 **Steps**, each on its branch, with its tests (agreed with the user before they are written), a live check on
-HomerunObliqueII, and README and docs (`docs/`, screenshots retaken):
+the test flight, and README and docs (`docs/`, screenshots retaken):
 1. **Frame pixel**: `mosaics.point` reads bands 4 and 5 (`source_u`, `source_v`, written by dji-thermal-cli since
    1.4.0; the dev server's mosaics have them) as `frame_pixel`; the readout shows "Frame pixel x, y" (none for a
    mosaic without them).
@@ -688,7 +709,7 @@ HomerunObliqueII, and README and docs (`docs/`, screenshots retaken):
    `readoutHtml` (as its `panel.tsx`); README, `docs/quickstart-worksets.md`, `docs/api.md`, screenshot
    `mosaic-viewer` retaken. Tests (agreed): `test_analyzer.py`'s mosaic test (the frame pixel as the frames window
    finds it, none outside), `analyzer.test.js`'s readout test. Django 134 (1 skipped: Windows only), Jest 161,
-   ESLint, Ruff; live on HomerunObliqueII: the row shows, matching the frames window's pixel within one.
+   ESLint, Ruff; live on the test flight: the row shows, matching the frames window's pixel within one.
 2. **A click keeps the point, "Follow the cursor"** (`viewer.js`).
    **Done** (2026-10-31, `viewer-follow`): `viewer.js` (`pin`, `follow`, `followHtml`, `readoutHtml(res, unit,
    pinned)`; the marker on its own layer, kept when the frames window closes; Esc outside a field; another tab reads
@@ -712,7 +733,7 @@ HomerunObliqueII, and README and docs (`docs/`, screenshots retaken):
    Tests (agreed): `test_analyzer.py` (the drawing without images; in the mosaic test the adjusted tiles, the
    curve, the refusals and the kept histogram), `analyzer.test.js` (the helpers; the page's sliders, Equalized,
    Reset and frame pictures). Django 135 (1 skipped: Windows only), Jest 164, ESLint, Ruff; live on
-   HomerunObliqueII: each slider, Equalized and Reset, on Mosaic, Harmonized and View angle, and the frames
+   the test flight: each slider, Equalized and Reset, on Mosaic, Harmonized and View angle, and the frames
    window. The live check's `histogram-as_converted.json` and `histogram-harmonized.json` (a cache) were removed
    from that workset's `viewer/` folder afterwards (2026-11-01), leaving it as found.
 4. **The Isotherm section**: tiles and frame pictures.
@@ -723,7 +744,7 @@ HomerunObliqueII, and README and docs (`docs/`, screenshots retaken):
    Reset), `analyzer.css`; README, `docs/quickstart-worksets.md`, `docs/api.md`, screenshots `mosaic-viewer` and
    `mosaic-frames` retaken. Tests (agreed): `test_analyzer.py` (the isotherm's drawing and parsing; its tile and
    refusals), `analyzer.test.js` (`isothermParam`; the section in the page test). Django 135 (1 skipped: Windows
-   only), Jest 165, ESLint, Ruff; live on HomerunObliqueII: Above 40 and Between 20–30 on the map and in the frames
+   only), Jest 165, ESLint, Ruff; live on the test flight: Above 40 and Between 20–30 on the map and in the frames
    window, the reversed range's error, shared with Harmonized, none on View angle, None removes it.
 
 ## Evaluation: porting the existing DJI thermal plugin (2026-10-29)
@@ -1186,7 +1207,7 @@ zoom shown in percent, a double click zooming in where it points (to 100% at lea
 becomes the selected one, its row scrolled to, so closing leaves the table on it; Ctrl/Cmd-click on the picture still
 opens it in a new tab. The viewer is on the page's body, above WebODM's top bar (z-index 99999), which covered it
 inside the page. Tests: no new ones (the user's rule: tests are added only after asking); Jest 161 and ESLint pass,
-`test_analyzer` (58). Live check on HomerunObliqueII (GETs only, no thumbnail added to the cache): opened at frame 2
+`test_analyzer` (58). Live check on the test flight (GETs only, no thumbnail added to the cache): opened at frame 2
 of 327 fitted (186%), zoom in, 1:1, the wheel (the point under the mouse kept), a drag, Fit, → and ← (Previous
 disabled at the first, the selection following), Esc and a click beside the picture closing it; a 4032x3024 photo of
 the M4T flight served to the browser only (fitted at 32%, refitted when the window shrank).
@@ -1266,7 +1287,7 @@ on the map, the DJI Thermal page under Administration.
 2. **The user chooses** which to build; the chosen ones become steps here, each on its branch, tested and checked
    live.
 
-**The review** (2026-10-31): every page walked through in a headless browser at 1440×900 on HomerunObliqueII, read
+**The review** (2026-10-31): every page walked through in a headless browser at 1440×900 on the test flight, read
 only. It found one bug, fixed first (the mosaic viewer page drawn over WebODM's menus, `fix-picture-viewer-classes`
 above). Proposals, the most useful first; the numbers are for choosing.
 
@@ -1442,7 +1463,7 @@ WebODM 3.3.2 lacks: the `point` and `region-stats` endpoints, the highlight colo
    thermal layer as it is added and followed through its tile URL, so a colour map chosen in WebODM's layer panel
    is saved too; clicks while pinning taken from WebODM's popup with `PluginsAPI.Map.onHandleClick`),
    `public/inspector.css`. Tests: `tests/test_inspector.py` (an orthophoto they write, UTM, known values: 7),
-   `__tests__/inspector.test.js` (8) and `main.test.js`. Live check on HomerunObliqueII's task map (the preference PUT
+   `__tests__/inspector.test.js` (8) and `main.test.js`. Live check on the test flight's task map (the preference PUT
    intercepted): 30.41 °C under the cursor, two pins (33.77 and 50.36 °C) with no WebODM popup, jet chosen and drawn.
 4. **Region statistics**: rectangle, circle and polygon; minimum, maximum, mean, percentiles, histogram, the
    hottest and coldest pixels marked; CSV; read at native resolution up to a size limit; the task's crop respected.
@@ -1452,7 +1473,7 @@ WebODM 3.3.2 lacks: the `point` and `region-stats` endpoints, the highlight colo
    endpoint at the region's centre, a table and an SVG histogram; the hottest and coldest pixels as markers; CSV of
    a row per region; WebODM's popup kept off while drawing and for the click Leaflet fires after a drag; the panel
    kept within the map). Leaflet 1.3.1 (WebODM's) added to the dev dependencies for the tests. Tests:
-   `__tests__/regions.test.js` (8, on real Leaflet), `inspector.test.js` (10). Live check on HomerunObliqueII's
+   `__tests__/regions.test.js` (8, on real Leaflet), `inspector.test.js` (10). Live check on the test flight's
    map (read only; the regions removed afterwards): a rectangle (84,376 pixels, 11.48–53.99 °C, mean 30.32 °C), a
    circle and a polygon partly off the orthophoto, kept across a reload, no WebODM popup.
 3b. **DJI's palettes on the map**: **Done** (2026-10-31, `inspector-dji-palettes`, a bug the user reported):
@@ -1465,7 +1486,7 @@ WebODM 3.3.2 lacks: the `point` and `region-stats` endpoints, the highlight colo
    too), a colour map chosen there is saved, one of WebODM's not in the list (rdylgn, spectral…) is drawn but not
    saved and shown in the inspector's list. Fixed on the way: a range change in WebODM's panel used to reset the
    palette to the one that panel showed. Tests: `test_inspector.py` (11: the tables, the tiles' colours, alpha, crop,
-   512, refusals), `inspector.test.js` (13). Live check on HomerunObliqueII's map (preference PUTs intercepted):
+   512, refusals), `inspector.test.js` (13). Live check on the test flight's map (preference PUTs intercepted):
    19 palettes listed as the Analyzer's, DJI hotiron drawn by the plugin's tiles (200s), viridis chosen in WebODM's
    panel saved and back on WebODM's tiles, spectral drawn and not saved.
 5. **Isotherms and the legend**: above, below or between limits, drawn by the plugin's tiles; the colour bar of the
@@ -1481,7 +1502,7 @@ WebODM 3.3.2 lacks: the `point` and `region-stats` endpoints, the highlight colo
    left (WebODM's buttons cover the bottom corners) for the topmost thermal layer shown: palette, range from its
    URL, ticks in the user's unit, the isotherm's part outlined in its colour; "Legend on the map" remembered.
    Tests: `test_inspector.py` (14: the isotherm's colours, alpha and crop, its refusals, the palette's colours),
-   `inspector.test.js` (18). Live check on HomerunObliqueII's map (preference PUTs intercepted; a fresh browser
+   `inspector.test.js` (18). Live check on the test flight's map (preference PUTs intercepted; a fresh browser
    profile, so nothing kept): the legend of the saved palette (DJI arctic, 10–50 °C); above 40 °C painted in red,
    then 40–45 °C in blue over DJI hotiron, isotherm tiles all 200s; in imperial the legend in °F (60–120) and the
    limits 104 and 113 °F; the legend hidden; Off removed the overlay; no console errors.
@@ -1493,7 +1514,7 @@ within 4 of the uncompressed output, and on the flight's first frame compression
 compares with that JPEG (`fix-rjpeg-picture-test`, merged in its `main`; its full suite: 1191 passed, 10 skipped).
 Released as 1.10.0 (the user, 2026-10-31: 1.9.2, never published, folded in; published by its release workflow,
 which now runs CI first, see below); the plugin pins it and `converter.palette_luts` is the library's alone
-(`pin-cli-1.10.0`; Django 135 on 1.10.0, live check on HomerunObliqueII: DJI palettes and isotherms drawn).
+(`pin-cli-1.10.0`; Django 135 on 1.10.0, live check on the test flight: DJI palettes and isotherms drawn).
 
 **Fixed** (2026-10-31, the user agreed to the plugin doing it): WebODM installs a plugin's requirements with `pip
 install -U --target`, which leaves the old version's `dji_thermal_cli-X.dist-info` beside the new one when the pin

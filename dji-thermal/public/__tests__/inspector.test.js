@@ -92,8 +92,8 @@ describe("the Thermal Inspector", () => {
         expect(inspector.thermalLayerAt(map, {lat: 1, lng: 2}).task).toBe("abc-2");
         high.options.bounds = {contains: () => false};
         expect(inspector.thermalLayerAt(map, {lat: 1, lng: 2})).toEqual({project: "2", task: "abc-1", layer: low, name: ""});
-        expect(inspector.pointUrl({project: "2", task: "abc-1"}, {lat: 42.1, lng: -88.07})).toBe(
-            "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/point?lon=-88.07000000&lat=42.10000000");
+        expect(inspector.pointUrl({project: "2", task: "abc-1"}, {lat: 0.6, lng: 0.5})).toBe(
+            "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/point?lon=0.50000000&lat=0.60000000");
     });
 
     it("shows temperatures in WebODM's units", () => {
@@ -135,13 +135,13 @@ describe("the Thermal Inspector", () => {
         const map = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
         const {ins, fetchFn, panel} = start(map, {[POINT]: {valid: true, temperature: 52.5}});
         ins.open();
-        map.fire("mousemove", {latlng: {lat: 42.1, lng: -88.07}});
-        map.fire("mousemove", {latlng: {lat: 42.2, lng: -88.07}});
+        map.fire("mousemove", {latlng: {lat: 0.6, lng: 0.5}});
+        map.fire("mousemove", {latlng: {lat: 0.7, lng: 0.5}});
         jest.advanceTimersByTime(100);
         jest.useRealTimers();
         await flush(); await flush();
         expect(fetchFn.mock.calls.filter(c => c[0].indexOf("/point") >= 0).map(c => c[0])).toEqual([
-            "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/point?lon=-88.07000000&lat=42.20000000"]);
+            "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/point?lon=0.50000000&lat=0.70000000"]);
         expect(panel().querySelector(".dt-inspector-readout").textContent).toBe("52.50 °C");
         expect(map.el.querySelector(".dt-inspector-cursor").textContent).toBe("52.50 °C");
     });
@@ -151,20 +151,20 @@ describe("the Thermal Inspector", () => {
         const {ins, plugins, panel} = start(map, {[POINT]: {valid: true, temperature: 30}});
         ins.open();
         const click = plugins.Map.onHandleClick.mock.calls[0][0];
-        expect(click({latlng: {lat: 42.1, lng: -88.07}})).toBe(false);        // hovering: WebODM's click
+        expect(click({latlng: {lat: 0.6, lng: 0.5}})).toBe(false);        // hovering: WebODM's click
         panel().querySelector('[data-mode="pin"]').click();
         expect(map.el.style.cursor).toBe("crosshair");
-        expect(click({latlng: {lat: 42.1, lng: -88.07}})).toBe(true);
+        expect(click({latlng: {lat: 0.6, lng: 0.5}})).toBe(true);
         await flush(); await flush();
         expect(panel().querySelector(".dt-inspector-pins").textContent).toContain("P130.00 °C");
         const pins = map.added[2];      // above the saved measurements and the regions
         expect(pins.layers.map(m => m.tooltip)).toEqual(["P1: 30.00 °C"]);
         const key = inspector.pinsKey(["abc-1"]);
-        expect(JSON.parse(window.localStorage.getItem(key))[0]).toMatchObject({label: "P1", lat: 42.1, lng: -88.07, temperature: 30});
+        expect(JSON.parse(window.localStorage.getItem(key))[0]).toMatchObject({label: "P1", lat: 0.6, lng: 0.5, temperature: 30});
 
         window.localStorage.setItem("unit_system", "imperial");
         expect(inspector.pinsCsv(inspector.loadPins(window.localStorage, key), "F")).toBe(
-            "label,latitude,longitude,temperature_f\nP1,42.10000000,-88.07000000,86.000\n");
+            "label,latitude,longitude,temperature_f\nP1,0.60000000,0.50000000,86.000\n");
         panel().querySelector('[data-act="toggle"]').click();
         expect(pins.layers).toEqual([]);
         panel().querySelector('[data-act="remove"]').click();
@@ -241,10 +241,10 @@ describe("the Thermal Inspector's regions", () => {
     const REGION = "POST /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/region";
     const STATS = {valid: true, reason: null, pixel_size: 0.5, resampled: false, statistics: {
         count: 400, min: 10, max: 50, mean: 30, std: 5, median: 29.5, percentiles: {"2": 12, "98": 48},
-        histogram: {counts: [100, 200, 100], edges: [10, 23, 36, 50]}, min_location: [-88.0701, 42.0001], max_location: [-88.0702, 42.0002],
+        histogram: {counts: [100, 200, 100], edges: [10, 23, 36, 50]}, min_location: [0.4999, 0.5001], max_location: [0.4998, 0.5002],
         surroundings: 26, delta_t: 4}};
     const LINE = Object.assign({}, STATS, {length: 12.5, profile: {distance: [0, 5, 10, 12.5], values: [20, null, 40, 30],
-        points: [[-88.07, 42], [-88.0699, 42], [-88.0698, 42], [-88.0697, 42]]}});
+        points: [[0.5, 0.5], [0.5001, 0.5], [0.5002, 0.5], [0.5003, 0.5]]}});
     const change = (el, value) => { el.value = value; el.dispatchEvent(new Event("change", {bubbles: true})); };
     const posts = fetchFn => fetchFn.mock.calls.filter(c => c[1] && c[1].method === "POST").map(c => JSON.parse(c[1].body));
 
@@ -252,7 +252,7 @@ describe("the Thermal Inspector's regions", () => {
     function leafletMap() {
         const div = document.createElement("div");
         document.body.appendChild(div);
-        const map = L.map(div, {zoomControl: false, renderer: new L.SVG()}).setView([42, -88.07], 18);
+        const map = L.map(div, {zoomControl: false, renderer: new L.SVG()}).setView([0.5, 0.5], 18);
         const layer = L.tileLayer(TILES);
         layer[META] = {raster: true, task: THERMAL_TASK};
         layer.addTo(map);
@@ -292,7 +292,7 @@ describe("the Thermal Inspector's regions", () => {
         expect(saved[0]).toMatchObject({label: "R1", shape: "rectangle", statistics: {mean: 30}});
         expect(saved[0].loading).toBeUndefined();
         expect(inspector.regionsCsv(saved, "F").split("\n")[1]).toBe(
-            "R1,rectangle,400,100.000,,50.000,122.000,86.000,9.000,85.100,53.600,118.400,78.800,7.200,,42.00010000,-88.07010000,42.00020000,-88.07020000");
+            "R1,rectangle,400,100.000,,50.000,122.000,86.000,9.000,85.100,53.600,118.400,78.800,7.200,,0.50010000,0.49990000,0.50020000,0.49980000");
         window.localStorage.setItem("unit_system", "imperial");
         expect(inspector.statisticsHtml(saved[0], "F")).toContain("1076 ft²");
         panel().querySelector('[data-region] [data-act="remove"]').click();
@@ -307,13 +307,13 @@ describe("the Thermal Inspector's regions", () => {
         ins.open();
         panel().querySelector('[data-mode="line"]').click();
         expect(panel().textContent).toContain("Click the line's points");
-        map.fire("click", {latlng: L.latLng(42, -88.07)});
-        map.fire("dblclick", {latlng: L.latLng(42, -88.07)});
+        map.fire("click", {latlng: L.latLng(0.5, 0.5)});
+        map.fire("dblclick", {latlng: L.latLng(0.5, 0.5)});
         expect(ins.state.notice).toBe("A line needs two points");
-        map.fire("click", {latlng: L.latLng(42, -88.0697)});
-        map.fire("dblclick", {latlng: L.latLng(42, -88.0697)});
+        map.fire("click", {latlng: L.latLng(0.5, 0.5003)});
+        map.fire("dblclick", {latlng: L.latLng(0.5, 0.5003)});
         await flush(); await flush();
-        expect(posts(fetchFn)).toEqual([{geometry: {type: "LineString", coordinates: [[-88.07, 42], [-88.0697, 42]]}, isotherm: null, correction: null}]);
+        expect(posts(fetchFn)).toEqual([{geometry: {type: "LineString", coordinates: [[0.5, 0.5], [0.5003, 0.5]]}, isotherm: null, correction: null}]);
         const shown = panel().querySelector(".dt-inspector-shown");
         ["L1", "Line", "Length12.5 m", "ΔT+4.00 °C"].forEach(t => expect(shown.textContent).toContain(t));
         expect(shown.textContent).not.toContain("Area");
@@ -326,16 +326,16 @@ describe("the Thermal Inspector's regions", () => {
         svg.getBoundingClientRect = () => ({left: 0, width: 100});
         svg.dispatchEvent(new MouseEvent("mousemove", {clientX: 100, bubbles: true}));
         const markers = () => { const found = []; map.eachLayer(l => { if (l.getLatLng && l.options.fillColor === "#ff9800") found.push(l.getLatLng()); }); return found; };
-        expect(markers()).toEqual([L.latLng(42, -88.0697)]);
+        expect(markers()).toEqual([L.latLng(0.5, 0.5003)]);
         expect(panel().querySelector(".dt-inspector-profile-read").textContent).toContain("12.5 m: 30.00 °C");
         panel().dispatchEvent(new MouseEvent("mouseleave"));
         expect(markers()).toEqual([]);
         const labels = [];
         map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) labels.push([l.getTooltip()._content, l.getLatLng ? l.getLatLng() : null]); });
-        expect(labels).toContainEqual(["L1", L.latLng(42, -88.07)]);     // at its start
+        expect(labels).toContainEqual(["L1", L.latLng(0.5, 0.5)]);     // at its start
 
         expect(inspector.profileCsv(ins.state.regions[0], "C").split("\n").slice(0, 3)).toEqual(
-            ["distance_m,latitude,longitude,temperature_c", "0.000,42.00000000,-88.07000000,20.000", "5.000,42.00000000,-88.06990000,"]);
+            ["distance_m,latitude,longitude,temperature_c", "0.000,0.50000000,0.50000000,20.000", "5.000,0.50000000,0.50010000,"]);
         expect(inspector.regionsCsv(ins.state.regions, "C").split("\n")[1]).toMatch(/^L1,line,400,,12\.500,/);
         // Lines and regions are numbered apart
         panel().querySelector('[data-mode="rectangle"]').click();
@@ -370,7 +370,7 @@ describe("the Thermal Inspector's regions", () => {
 
     it("says when a region has no temperatures, and reads one the page left before its statistics", async () => {
         window.localStorage.setItem(inspector.regionsKey(["abc-1"]), JSON.stringify([
-            {id: "a", label: "R1", shape: "polygon", geometry: {type: "Polygon", coordinates: [[[-88.07, 42], [-88.069, 42], [-88.069, 42.001], [-88.07, 42]]]},
+            {id: "a", label: "R1", shape: "polygon", geometry: {type: "Polygon", coordinates: [[[0.5, 0.5], [0.501, 0.5], [0.501, 0.501], [0.5, 0.5]]]},
              statistics: null, reason: null}]));
         const map = leafletMap();
         const {ins, fetchFn, panel} = start(map, {[REGION]: {valid: false, reason: "excluded", statistics: null}}, {L});
@@ -389,7 +389,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
     const BASELINE = {emissivity: 0.91, reflected: 21};
     const STATS = {valid: true, reason: null, pixel_size: 0.5, resampled: false, correction: null, statistics: {
         count: 400, min: 10, max: 50, mean: 30, std: 5, median: 29.5, percentiles: {"2": 12, "98": 48},
-        histogram: {counts: [100, 200, 100], edges: [10, 23, 36, 50]}, min_location: [-88.0701, 42.0001], max_location: [-88.0702, 42.0002],
+        histogram: {counts: [100, 200, 100], edges: [10, 23, 36, 50]}, min_location: [0.4999, 0.5001], max_location: [0.4998, 0.5002],
         surroundings: 26, delta_t: 4}};
     const change = (el, value) => { el.value = value; el.dispatchEvent(new Event("change", {bubbles: true})); };
     const type = (el, value) => { el.value = value; el.dispatchEvent(new Event("input", {bubbles: true})); };
@@ -403,7 +403,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
     function leafletMap() {
         const div = document.createElement("div");
         document.body.appendChild(div);
-        const map = L.map(div, {zoomControl: false, renderer: new L.SVG()}).setView([42, -88.07], 18);
+        const map = L.map(div, {zoomControl: false, renderer: new L.SVG()}).setView([0.5, 0.5], 18);
         const layer = L.tileLayer(TILES);
         layer[META] = {raster: true, task: Object.assign({name: "Roof survey"}, THERMAL_TASK)};
         layer.addTo(map);
@@ -494,7 +494,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
 
     it("shows who can only view the project the saved measurements, with no Save, rename or delete", async () => {
         const map = leafletMap();
-        const m = {id: "0123456789ab", name: "Vent", comment: "", shape: "pin", geometry: {type: "Point", coordinates: [-88.07, 42]},
+        const m = {id: "0123456789ab", name: "Vent", comment: "", shape: "pin", geometry: {type: "Point", coordinates: [0.5, 0.5]},
                    values: {valid: true, temperature: 41.5, measured: 41.5}, isotherm: null, correction: null, created_by: "ana"};
         const {ins, panel} = start(map, {[REGION]: STATS, ["GET " + SAVED]: {measurements: [m], can_change: false, baseline: null}}, {L});
         await ins.ready; await flush();
@@ -518,7 +518,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         await ins.ready; await flush();
         ins.open();
         ins.setMode("pin");
-        plugins.Map.onHandleClick.mock.calls[0][0]({latlng: L.latLng(42, -88.07)});
+        plugins.Map.onHandleClick.mock.calls[0][0]({latlng: L.latLng(0.5, 0.5)});
         await flush(); await flush();
         expect(panel().querySelector("[data-pin]").textContent).toContain("30.00 °C");
         panel().querySelector('[data-mode="rectangle"]').click();
@@ -810,7 +810,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
     const L = require("leaflet");
     const BASE = "/api/plugins/dji-thermal/datasets/d-1/conversions/abc123def456/mosaics/";
     const LIST = "GET /api/plugins/dji-thermal/projects/2/inspector/mosaics";
-    const BOUNDS = [-88.071, 41.999, -88.069, 42.001];
+    const BOUNDS = [0.499, 0.499, 0.501, 0.501];
     const MOSAICS = [{dataset: {id: "d-1", name: "Roof"}, workset: {id: "abc123def456", name: "Normalized"}, unit: "F",
                       built_at: "2026-11-01T10:00:00+00:00", palettes: ["dji_ironred", "inferno"], default_palette: "inferno",
                       tabs: [{tab: "as_converted", bounds: BOUNDS, minzoom: 15, maxzoom: 21, stats: {percentiles: [50.04, 120.96]}},
@@ -823,7 +823,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
     function leafletMap(task) {
         const div = document.createElement("div");
         document.body.appendChild(div);
-        const map = L.map(div, {zoomControl: false, renderer: new L.SVG()}).setView([42, -88.07], 18);
+        const map = L.map(div, {zoomControl: false, renderer: new L.SVG()}).setView([0.5, 0.5], 18);
         if (task) {
             const layer = L.tileLayer(TILES);
             layer[META] = {raster: true, task};
@@ -869,7 +869,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
         const point = jest.fn(() => jsonResponse({valid: true, temperature: 104, unit: "F", frame: "DJI_0001_T.JPG"}));
         const region = jest.fn(() => jsonResponse({valid: true, reason: null, pixel_size: 0.1, resampled: false, statistics: {
             count: 4, min: 20, max: 40, mean: 30, std: 2, median: 30, percentiles: {"2": 21, "98": 39},
-            histogram: {counts: [2, 2], edges: [20, 30, 40]}, min_location: [-88.07, 42], max_location: [-88.07, 42]}}));
+            histogram: {counts: [2, 2], edges: [20, 30, 40]}, min_location: [0.5, 0.5], max_location: [0.5, 0.5]}}));
         const {ins, plugins, panel, laid} = begin(map, [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}],
                                                   {["GET " + BASE + "as_converted/point"]: point, ["POST " + BASE + "as_converted/region"]: region});
         await ins.mosaicsReady;
@@ -881,11 +881,11 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(layer._url).toBe(BASE + "as_converted/tiles/{z}/{x}/{y}.png?v=2026-11-01T10%3A00%3A00%2B00%3A00&color_map=dji_ironred&rescale=50,121");
         expect(layer.options.zIndex).toBeGreaterThan(100);
 
-        map.setView([42, -88.07], 18);
-        map.fire("mousemove", {latlng: L.latLng(42, -88.07)});
+        map.setView([0.5, 0.5], 18);
+        map.fire("mousemove", {latlng: L.latLng(0.5, 0.5)});
         await new Promise(r => setTimeout(r, 120));
         await flush();
-        expect(point.mock.calls[0][0]).toContain(BASE + "as_converted/point?lon=-88.07000000&lat=42.00000000");
+        expect(point.mock.calls[0][0]).toContain(BASE + "as_converted/point?lon=0.50000000&lat=0.50000000");
         expect(panel().querySelector(".dt-inspector-readout").textContent).toBe("40.00 °C");
 
         // A region over it reads the mosaic's
@@ -928,7 +928,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
     });
 
     // The frames that saw a point, as the Analyzer's API lists them
-    const FOOTPRINT = [[-88.071, 41.999], [-88.069, 41.999], [-88.069, 42.001], [-88.071, 42.001]];
+    const FOOTPRINT = [[0.499, 0.499], [0.501, 0.499], [0.501, 0.501], [0.499, 0.501]];
     const FRAMES = {models: true, frames: [
         {index: 3, file: "DJI_0003_T.JPG", x: 100, y: 50, width: 640, height: 512, view_angle: 8.25, footprint: FOOTPRINT, source: true},
         {index: 5, file: "DJI_0005_T.JPG", x: 300, y: 250, width: 640, height: 512, view_angle: 2.5, footprint: FOOTPRINT, source: false}]};
@@ -945,9 +945,9 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(panel().querySelector(".dt-inspector-readout").textContent).toContain("Click it to see the frames that saw the point");
 
         // A click in Hover is the Inspector's, not WebODM's popup
-        expect(ins.click({latlng: L.latLng(42, -88.07)})).toBe(true);
+        expect(ins.click({latlng: L.latLng(0.5, 0.5)})).toBe(true);
         await flush(); await flush();
-        expect(frames.mock.calls[0][0]).toBe(BASE + "as_converted/frames?lon=-88.07&lat=42");
+        expect(frames.mock.calls[0][0]).toBe(BASE + "as_converted/frames?lon=0.5&lat=0.5");
         expect(frameBox(map).hidden).toBe(false);
         expect(frameBox(map).textContent).toContain("Frame 1 of 2 that saw this point");
         expect(frameBox(map).textContent).toContain("The mosaic's pixel here comes from this frame");
@@ -968,7 +968,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
         pip(map, "close");
         expect(frameBox(map).hidden).toBe(true);
         // Gone with the mosaic lifted
-        ins.click({latlng: L.latLng(42, -88.07)});
+        ins.click({latlng: L.latLng(0.5, 0.5)});
         await flush(); await flush();
         expect(frameBox(map).hidden).toBe(false);
         change(panel().querySelector('[data-act="mosaic-on"]'), false);
@@ -986,7 +986,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
         const {ins} = begin(map, tiles, {[LIST]: {mosaics: made}, ["GET " + BASE + "as_converted/frames"]: frames, [POINT]: point});
         await ins.mosaicsReady;
         ins.open();
-        expect(ins.click({latlng: L.latLng(42, -88.07)})).toBe(true);
+        expect(ins.click({latlng: L.latLng(0.5, 0.5)})).toBe(true);
         await flush(); await flush();
         // ODM blended the frames: none is the pixel's own, the one closest to straight down first, placed approximately
         expect(frameBox(map).querySelector("img").getAttribute("src"))
@@ -996,9 +996,9 @@ describe("the Thermal Inspector's workset mosaics", () => {
 
         // A pin shows them too
         ins.setMode("pin");
-        ins.click({latlng: L.latLng(42.0005, -88.0705)});
+        ins.click({latlng: L.latLng(0.5005, 0.4995)});
         await flush(); await flush();
-        expect(frames.mock.calls[1][0]).toContain("lat=42.0005");
+        expect(frames.mock.calls[1][0]).toContain("lat=0.5005");
         expect(ins.state.pins.length).toBe(1);
         map.remove();
     });
@@ -1010,7 +1010,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
         await ins.mosaicsReady;
         ins.open();
         expect(panel().querySelector(".dt-inspector-readout").textContent).toBe("Move the cursor over a thermal layer.");
-        expect(ins.click({latlng: L.latLng(42, -88.07)})).toBe(false);
+        expect(ins.click({latlng: L.latLng(0.5, 0.5)})).toBe(false);
         expect(fetchFn.mock.calls.some(c => c[0].includes("/frames"))).toBe(false);
         map.remove();
     });
