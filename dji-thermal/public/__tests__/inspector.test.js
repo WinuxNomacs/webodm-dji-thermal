@@ -550,6 +550,35 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         map.remove();
     });
 
+    it("has Manual Corrections, its tick box in the heading: unticked, the values typed are forgotten and the fields hidden", async () => {
+        const map = leafletMap();
+        const {ins, panel} = start(map, {["GET " + SAVED]: {measurements: [], can_change: true, baseline: BASELINE}}, {L});
+        await ins.ready; await flush();
+        ins.open();
+        const heading = () => panel().querySelector(".dt-inspector-heading");
+        const tick = on => {
+            const box = heading().querySelector('[data-act="correction-on"]');
+            box.checked = on;
+            box.dispatchEvent(new Event("change", {bubbles: true}));
+        };
+        expect(heading().textContent).toBe("Manual Corrections");
+        expect(heading().querySelector('[data-act="correction-on"]').checked).toBe(false);
+        expect(panel().textContent).not.toContain("Correct for another");
+        expect(panel().querySelector('[data-act="correction-emissivity"]')).toBe(null);
+
+        tick(true);
+        change(panel().querySelector('[data-act="correction-emissivity"]'), "0.8");
+        expect(ins.state.correction).toEqual({on: true, emissivity: 0.8, reflected: 21});
+        tick(false);
+        expect(ins.state.correction).toEqual({on: false});
+        expect(panel().querySelector('[data-act="correction-emissivity"]')).toBe(null);
+        expect(window.localStorage.getItem(inspector.correctionKey(["abc-1"]))).toBe(null);
+        // Ticked again: from what the layer was measured with
+        tick(true);
+        expect(ins.state.correction).toEqual({on: true, emissivity: 0.91, reflected: 21});
+        map.remove();
+    });
+
     it("says when a layer doesn't record how it was measured, and doesn't correct it", async () => {
         const map = leafletMap();
         window.localStorage.setItem(inspector.correctionKey(["abc-1"]), JSON.stringify({on: true, emissivity: 0.8, reflected: 21}));
@@ -843,6 +872,19 @@ describe("the Thermal Inspector's workset mosaics", () => {
         return {ins, fetchFn, plugins, panel: () => map.el.querySelector(".dt-inspector-panel"),
                 button: () => map.el.querySelector(".dt-inspector"), laid: () => Object.values(map._layers).filter(l => l.__dtMosaic)};
     }
+
+    it("shows Mosaic Overlays only when the project has built workset mosaics", async () => {
+        const tasks = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}];
+        let s = begin(leafletMap(THERMAL_TASK), tasks, {[LIST]: {mosaics: []}});
+        await s.ins.mosaicsReady;
+        s.ins.open();
+        expect(s.panel().textContent).not.toContain("Mosaic Overlays");
+        expect(s.panel().querySelector(".dt-inspector-mosaic")).toBe(null);
+        s = begin(leafletMap(THERMAL_TASK), tasks);
+        await s.ins.mosaicsReady;
+        s.ins.open();
+        expect(s.panel().textContent).toContain("Mosaic Overlays");
+    });
 
     it("shows its button when the map has a thermal orthophoto or the project has workset mosaics, and not on public maps", async () => {
         const rgb = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, RGB_TASK)}}];

@@ -45,6 +45,8 @@
 .dt-inspector-profile-read { min-height: 2.6em; }
 .dt-inspector-pins td.text-right { white-space: nowrap; }
 .dt-inspector-check input { margin: 0 4px 0 0; vertical-align: middle; }
+.dt-inspector-heading { display: block; margin: 0; }
+.dt-inspector-heading input { vertical-align: baseline; }
 .dt-inspector-isotherm { margin: 4px 0 6px; }
 .dt-inspector-isotherm-limits { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
 .dt-inspector-isotherm-limits input { width: 64px; padding: 2px 4px; }
