@@ -2,6 +2,7 @@
 {% block content %}
 <link rel="stylesheet" href="{{ public }}build/Leaflet.css?v={{ v }}">
 <link rel="stylesheet" href="{{ public }}analyzer.css?v={{ v }}">
+<link rel="stylesheet" href="{{ public }}inspector.css?v={{ v }}">
 
 <div id="ta-frame" class="ta-page ta-viewer ta-frame" data-api="{{ api }}" data-public="{{ public }}" data-dataset="{{ dataset.id }}" data-id="{{ conversion.id }}">
     {% csrf_token %}
@@ -37,6 +38,14 @@
                     <summary><h5>Under the cursor</h5></summary>
                     <div class="ta-viewer-readout" id="ta-frame-readout"></div>
                 </details>
+                <details class="ta-section" open data-section="measure">
+                    <summary><h5>Measure</h5></summary>
+                    <div id="ta-frame-measure"></div>
+                </details>
+                <details class="ta-section" open data-section="saved">
+                    <summary><h5>Saved on this frame</h5></summary>
+                    <div id="ta-frame-saved"></div>
+                </details>
                 <details class="ta-section" open data-section="params">
                     <summary><h5>Measure again</h5></summary>
                     <div id="ta-frame-params"></div>
@@ -59,5 +68,7 @@
 <script src="{{ public }}scale.js?v={{ v }}"></script>
 <script src="{{ public }}recolour.js?v={{ v }}"></script>
 <script src="{{ public }}viewer.js?v={{ v }}"></script>
+<script src="{{ public }}regions.js?v={{ v }}"></script>
+<script src="{{ public }}inspector.js?v={{ v }}"></script>
 <script src="{{ public }}frame.js?v={{ v }}"></script>
 {% endblock %}

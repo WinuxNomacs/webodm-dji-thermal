@@ -8,6 +8,8 @@
     var scale = root.ThermalScale || (typeof require !== "undefined" ? require("./scale") : null);
     var Recolour = root.ThermalRecolour || (typeof require !== "undefined" ? require("./recolour") : null);
     var Viewer = root.ThermalAnalyzerViewer || (typeof require !== "undefined" ? require("./viewer") : null);
+    var Inspector = root.ThermalInspector || (typeof require !== "undefined" ? require("./inspector") : null);
+    var Regions = root.ThermalRegions || (typeof require !== "undefined" ? require("./regions") : null);
     var esc = function (t) { return core.escapeHtml(t); };
     var READOUT_HINT = "Move the cursor over the frame.";
 
@@ -220,6 +222,116 @@
             '<p class="ta-message">The temperatures in the workset\'s unit; the PNG in the palette, range and image adjustments shown.</p>';
     }
 
+    // The tools drawn on the frame, as the Thermal Inspector's (regions.js): [shape, icon, name]
+    var TOOLS = [["pin", "fa fa-map-pin", "Pin"], ["line", "fa fa-route", "Line"], ["rectangle", "far fa-square", "Rectangle"],
+                 ["circle", "far fa-circle", "Circle"], ["polygon", "fa fa-draw-polygon", "Polygon"]];
+    var LABELS = {pin: "P", line: "L"};         // a pin's label, P1…, a line's L1…, the rest R1…
+    var REASONS = {outside_raster: "Outside the frame", nodata: "No data here", too_few_points: "A polygon needs three corners",
+                   self_intersecting: "The polygon's edges cross", no_area: "The polygon has no area", line_too_short: "A line needs two points"};
+    var CIRCLE_SEGMENTS = 64;
+
+    // A shape drawn on a pane (regions.js's GeoJSON, in the map's [lng, lat]) in the frame's pixels ([x, y], y down)
+    function toPixels(geometry) {
+        var flip = function (c) { return [c[0], -c[1]]; };
+        if (geometry.type === "Point") return {type: "Point", coordinates: flip(geometry.coordinates)};
+        if (geometry.type === "LineString") return {type: "LineString", coordinates: geometry.coordinates.map(flip)};
+        return {type: "Polygon", coordinates: geometry.coordinates.map(function (ring) { return ring.map(flip); })};
+    }
+
+    // A circle drawn on a pane ({lat, lng, radius} in the map's units) as a polygon in the frame's pixels
+    function circlePixels(circle) {
+        var ring = [];
+        for (var i = 0; i < CIRCLE_SEGMENTS; i++) {
+            var a = 2 * Math.PI * i / CIRCLE_SEGMENTS;
+            ring.push([circle.lng + circle.radius * Math.cos(a), -circle.lat + circle.radius * Math.sin(a)]);
+        }
+        ring.push(ring[0].slice());
+        return {type: "Polygon", coordinates: [ring]};
+    }
+
+    // A pixel ([x, y]) as a place on a pane
+    function latLng(c) { return [-c[1], c[0]]; }
+
+    // The isotherm shown (an isotherm value in the workset's unit, as viewer.js keeps it) as a region asks for it:
+    // {low, high} in °C, either null; null for none
+    function isothermLimits(value, unit) {
+        var r = Recolour.isothermRange(value);
+        if (!r) return null;
+        var c = function (v) { return Math.round(core.convertTemp(v, unit, "C") * 1e4) / 1e4; };
+        return {low: r[0] > -1e38 ? c(r[0]) : null, high: r[1] < 1e38 ? c(r[1]) : null};
+    }
+
+    // The changes a measurement was made with, in words: "emissivity 0.8, reflected temperature 30.0 °C"
+    function changesText(changes, unit) {
+        return CHANGES.filter(function (c) { return (changes || {})[c[0]] !== undefined; }).map(function (c) {
+            var v = changes[c[0]];
+            return c[1].replace(/ \(.*\)$/, "").toLowerCase() + " " + (c[3] ? core.formatTemp(v, unit, 1) : core.formatNumber(v, c[0] === "emissivity" ? 2 : 1));
+        }).join(", ");
+    }
+
+    // A measurement's value in a list: a pin's temperature, a region's or line's mean (°C)
+    function itemValue(res, unit, loading) {
+        if (loading) return '<span class="text-muted">…</span>';
+        if (!res) return "";
+        if (res.error) return '<span class="text-danger">' + esc(res.error) + "</span>";
+        var s = res.statistics;
+        if (!s) return '<span class="text-muted">' + esc(REASONS[res.reason] || "none") + "</span>";
+        return s.count === 1 && !res.profile ? esc(core.formatTemp(s.mean, "C", 2)) : esc(core.formatTemp(s.mean, "C", 2)) + ' <span class="text-muted">mean</span>';
+    }
+
+    // What a measurement found, in full: the Inspector's statistics (sizes in pixels); a pin's own temperature
+    function detailHtml(res, Inspector) {
+        if (!res) return "";
+        if (res.error) return '<div class="text-danger">' + esc(res.error) + "</div>";
+        if (!res.statistics) return '<div class="text-muted">' + esc(REASONS[res.reason] || "No temperatures here") + "</div>";
+        if (res.statistics.count === 1 && !res.profile) return "";
+        return Inspector.statisticsHtml(res, Inspector.userUnit(), true, true);
+    }
+
+    // The Measure section: the tools, the shapes drawn on this frame (state: {tool, items, shown, form, canChange,
+    // changed, message}), the one shown in full
+    function measureHtml(state, Inspector) {
+        var tools = '<div class="btn-group btn-group-sm dt-inspector-modes" role="group" aria-label="Draw">' + TOOLS.map(function (t) {
+            return '<button type="button" class="btn btn-default' + (state.tool === t[0] ? " active" : "") + '" data-tool="' + t[0] + '" title="' +
+                t[2] + '"' + (state.tool === t[0] ? ' aria-pressed="true"' : "") + '><i class="' + t[1] + '"></i></button>';
+        }).join("") + "</div>";
+        var hint = state.message ? '<div class="text-danger dt-inspector-hint">' + esc(state.message) + "</div>" :
+            state.tool === "pin" ? '<div class="text-muted dt-inspector-hint">Click the frame to pin a pixel.</div>' :
+            state.tool ? '<div class="text-muted dt-inspector-hint">' + (state.tool === "polygon" || state.tool === "line" ?
+                "Click each point; double-click or Enter to finish, Esc to cancel." : "Press and drag on the frame; Esc to cancel.") + "</div>" : "";
+        var items = state.items, shown = items.filter(function (i) { return i.id === state.shown; })[0];
+        var rows = items.length ? '<table class="table table-condensed dt-inspector-pins dt-inspector-regions"><tbody>' + items.map(function (i) {
+            return '<tr data-item="' + i.id + '"' + (i === shown ? ' class="active"' : "") + '><td><i class="' + TOOLS.filter(function (t) { return t[0] === i.shape; })[0][1] +
+                '"></i> <a href="javascript:void(0)" data-act="show">' + esc(i.label) + "</a></td><td>" + itemValue(i.res, "C", i.loading) +
+                '</td><td class="text-right">' + (state.canChange && i.res && i.res.statistics ?
+                    '<a href="javascript:void(0)" data-act="save" title="Save it, named, for everyone who can view the project"><i class="fa fa-save"></i></a>' : "") +
+                '<a href="javascript:void(0)" data-act="remove" title="Remove"><i class="fa fa-times"></i></a></td></tr>';
+        }).join("") + "</tbody></table>" : '<div class="text-muted dt-inspector-hint">Choose a tool, then draw on the frame to read its temperatures.</div>';
+        return tools + hint + rows + Inspector.formHtml(state.form, "region") +
+            (shown ? '<div class="dt-inspector-shown"><strong>' + esc(shown.label) + "</strong>" + detailHtml(shown.res, Inspector) + "</div>" : "") +
+            (state.changed && items.length ? '<div class="text-muted dt-inspector-hint">Measured with the parameters changed.</div>' : "");
+    }
+
+    // The measurements saved on this frame (state: {saved, savedShown, form, canChange})
+    function savedHtml(state, Inspector) {
+        if (!state.saved.length) {
+            return '<div class="text-muted dt-inspector-hint">' + (state.canChange ? "None yet: a measurement's Save keeps it here for everyone who can view the project." : "None.") + "</div>";
+        }
+        var shown = state.saved.filter(function (m) { return m.id === state.savedShown; })[0];
+        return '<table class="table table-condensed dt-inspector-pins dt-inspector-regions"><tbody>' + state.saved.map(function (m) {
+            var tool = TOOLS.filter(function (t) { return t[0] === m.shape; })[0] || TOOLS[0];
+            return '<tr data-saved="' + esc(m.id) + '"' + (m === shown ? ' class="active"' : "") + '><td><i class="' + tool[1] + '"></i> ' +
+                '<a href="javascript:void(0)" data-act="show">' + esc(m.name) + "</a></td><td>" + itemValue(m.values, "C") + '</td><td class="text-right">' +
+                (state.canChange ? '<a href="javascript:void(0)" data-act="edit" title="Rename it or change its comment"><i class="fa fa-pencil-alt"></i></a>' +
+                    '<a href="javascript:void(0)" data-act="delete" title="Delete it for everyone"><i class="fa fa-times"></i></a>' : "") + "</td></tr>";
+        }).join("") + "</tbody></table>" + Inspector.formHtml(state.form, "saved") +
+            (shown ? '<div class="dt-inspector-shown"><strong>' + esc(shown.name) + "</strong>" +
+                (shown.comment ? '<div class="dt-inspector-hint">' + esc(shown.comment) + "</div>" : "") +
+                detailHtml(shown.values, Inspector) +
+                '<div class="text-muted dt-inspector-hint">' + (Object.keys(shown.changes || {}).length ? "Measured with " + esc(changesText(shown.changes, state.unit)) + ". " : "As converted. ") +
+                "Saved by " + esc(shown.created_by) + ", " + esc(core.formatDate(shown.created_at)) + ".</div></div>" : "");
+    }
+
     // A Leaflet layer of a canvas over bounds, as an image overlay is (Leaflet 1.3 has no canvas overlay)
     function canvasOverlay(L, canvas, bounds) {
         var Overlay = L.ImageOverlay.extend({
@@ -249,6 +361,10 @@
         var infos = [null, null], tiles = [null, null], changes = {}, typed = {}, changeError = null, withChanges = false;
         var style = null, L = null, maps = [null, null], canvases = [null, null], overlays = [null, null], fitted = false;
         var point = null, drawing = null, syncing = false, n = 0;
+        // The tools: the one on, the shapes drawn on each frame (kept while the page is open), the one shown in full,
+        // the measurements saved on the frame and the form naming one
+        var tool = null, drawTool = null, drawn = {}, counts = {}, shownItem = null, saved = [], savedShown = null, form = null;
+        var message = "", groups = [null, null], marker = null, savedAsked = 0, ids = 0;
 
         function status(text, cls) {
             $("ta-frame-status").className = "ta-status" + (cls ? " " + cls : "");
@@ -310,6 +426,11 @@
                 showReadout();
             });
             map.on("mouseout", function () { point = null; showReadout(); });
+            if (i === 0) {
+                map.on("click", function (e) {
+                    if (tool === "pin") add("pin", {type: "Point", coordinates: [e.latlng.lng, -e.latlng.lat]}, null);
+                });
+            }
             map.on("move", function () {
                 var other = maps[1 - i];
                 if (syncing || !other) return;
@@ -343,6 +464,170 @@
         }
 
         function showReadout() { $("ta-frame-readout").innerHTML = readoutHtml(point, tiles, unit()); }
+
+        function items() { return drawn[frame] || (drawn[frame] = []); }
+        function limits() { return style ? isothermLimits(style.isotherm && style.isotherm.value, unit()) : null; }
+        // What a shape is measured with: the changes applied and the isotherm shown
+        function measuredWith() { return JSON.stringify([changes, limits()]); }
+
+        function showMeasure() {
+            $("ta-frame-measure").innerHTML = measureHtml({tool: tool, items: items(), shown: shownItem, form: form, canChange: meta.can_change,
+                                                           changed: changed(), message: message}, Inspector);
+        }
+        function showSaved() {
+            $("ta-frame-saved").innerHTML = savedHtml({saved: saved, savedShown: savedShown, form: form, canChange: meta.can_change, unit: unit()}, Inspector);
+        }
+
+        // The shapes on both panes: those drawn (the one shown bolder) and those saved (dashed, green)
+        function drawShapes() {
+            if (!L) return;
+            var shapes = items().map(function (i) { return {g: i.geometry, circle: i.circle, shown: i.id === shownItem, color: "#ff9800"}; })
+                .concat(saved.map(function (m) { return {g: m.geometry, circle: m.circle, shown: m.id === savedShown, color: "#2e7d32", dash: "5 4"}; }));
+            [0, 1].forEach(function (i) {
+                if (!maps[i]) return;
+                if (!groups[i]) groups[i] = L.layerGroup().addTo(maps[i]);
+                groups[i].clearLayers();
+                shapes.forEach(function (sh) {
+                    var o = {color: sh.color, weight: sh.shown ? 3 : 2, dashArray: sh.dash, fillOpacity: sh.shown ? 0.15 : 0.05, interactive: false};
+                    var g = sh.g;
+                    if (!g) return;
+                    var layer = g.type === "Point" ? L.circleMarker(latLng(g.coordinates), {radius: 5, color: "#000", weight: 1, fillColor: sh.color, fillOpacity: 1, interactive: false}) :
+                        sh.circle ? L.circle([sh.circle.lat, sh.circle.lng], Object.assign({radius: sh.circle.radius}, o)) :
+                        g.type === "LineString" ? L.polyline(g.coordinates.map(latLng), o) : L.polygon(g.coordinates[0].map(latLng), o);
+                    layer.addTo(groups[i]);
+                });
+            });
+        }
+
+        // A shape measured on the frame (with the changes and the isotherm); a reply for one changed since is dropped
+        function measureItem(item) {
+            var mine = item.asked = (item.asked || 0) + 1, rel = frame;
+            item.loading = true;
+            item.with = measuredWith();
+            var body = {frame: rel, changes: changes, geometry: item.geometry, isotherm: limits()};
+            return fetchFn(base + "/frame/region", {method: "POST", credentials: "same-origin",
+                                                    headers: {"Content-Type": "application/json", "X-CSRFToken": csrf}, body: JSON.stringify(body)})
+                .then(core.readJson).then(function (r) {
+                    if (mine !== item.asked) return;
+                    item.loading = false;
+                    item.res = r.ok ? r.data : {error: core.errorText(r.data, "Could not measure it.")};
+                    if (rel === frame) showMeasure();
+                }, function () {
+                    if (mine !== item.asked) return;
+                    item.loading = false;
+                    item.res = {error: "Could not measure it."};
+                    if (rel === frame) showMeasure();
+                });
+        }
+        // The shapes measured with other changes or another isotherm, measured again
+        function remeasure() {
+            var now = measuredWith();
+            items().forEach(function (i) { if (i.with !== now) measureItem(i); });
+        }
+
+        function add(shape, geometry, circle) {
+            var key = LABELS[shape] || "R";
+            counts[key] = (counts[key] || 0) + 1;
+            var item = {id: "i" + (++ids), label: key + counts[key], shape: shape, geometry: geometry, circle: circle};
+            items().push(item);
+            shownItem = item.id;
+            message = "";
+            measureItem(item);
+            drawShapes();
+            showMeasure();
+        }
+
+        // A tool on (the same again: off); a pin is a click, the others regions.js's drawing on the first pane
+        function setTool(name) {
+            if (drawTool) drawTool.cancel();
+            drawTool = null;
+            tool = name === tool ? null : name;
+            message = "";
+            if (tool && tool !== "pin" && maps[0]) {
+                var drawing = tool;
+                drawTool = new Regions.DrawTool(L, maps[0], {shape: tool, doc: doc,
+                    onFinish: function (r) {
+                        maps[0].removeLayer(r.layer);
+                        drawTool = null;
+                        tool = null;
+                        var circle = r.circle ? {lat: r.circle.lat, lng: r.circle.lng, radius: r.circle.radius} : null;
+                        add(drawing, circle ? circlePixels(circle) : toPixels(r.geometry), circle);
+                    },
+                    onCancel: function () { drawTool = null; tool = null; showMeasure(); },
+                    onInvalid: function (reason) { message = REASONS[reason] || reason; showMeasure(); }});
+                drawTool.start();
+            }
+            if (maps[0] && !drawTool) maps[0].getContainer().style.cursor = tool === "pin" ? "crosshair" : "";
+            showMeasure();
+        }
+
+        // The measurements saved on the frame
+        function loadSaved() {
+            var mine = ++savedAsked, rel = frame;
+            return fetchFn(base + "/frame/measurements?frame=" + encodeURIComponent(rel), {credentials: "same-origin"}).then(core.readJson).then(function (r) {
+                if (mine !== savedAsked || !r.ok) return;
+                saved = r.data.measurements || [];
+                if (!saved.some(function (m) { return m.id === savedShown; })) savedShown = null;
+                showSaved();
+                drawShapes();
+            });
+        }
+
+        function send(url, method, body) {
+            return fetchFn(url, {method: method, credentials: "same-origin", headers: {"Content-Type": "application/json", "X-CSRFToken": csrf},
+                                 body: body === undefined ? undefined : JSON.stringify(body)}).then(function (r) {
+                return r.status === 204 ? {ok: true, data: {}} : core.readJson(r);
+            });
+        }
+
+        // The form's Save: a drawn shape saved (then out of the drawn ones), or a saved one renamed
+        function submitForm() {
+            var name = (doc.querySelector("[data-form=name]") || {}).value || "", comment = (doc.querySelector("[data-form=comment]") || {}).value || "";
+            form.name = name;
+            form.comment = comment;
+            form.busy = true;
+            form.error = "";
+            var request;
+            if (form.kind === "saved") {
+                request = send(base + "/frame/measurements/" + form.id, "PATCH", {name: name, comment: comment});
+            } else {
+                var item = items().filter(function (i) { return i.id === form.id; })[0];
+                request = send(base + "/frame/measurements", "POST", {name: name, comment: comment, shape: item.shape, frame: frame, changes: changes,
+                                                                     geometry: item.geometry, circle: item.circle, isotherm: limits()});
+            }
+            showMeasure();
+            showSaved();
+            return request.then(function (r) {
+                if (!r.ok) {
+                    form.busy = false;
+                    form.error = core.errorText(r.data, "Could not save it.");
+                } else {
+                    if (form.kind !== "saved") {
+                        drawn[frame] = items().filter(function (i) { return i.id !== form.id; });
+                        savedShown = r.data.id;
+                        shownItem = null;
+                    }
+                    form = null;
+                    loadSaved();
+                }
+                showMeasure();
+                showSaved();
+                drawShapes();
+            });
+        }
+
+        // A line's profile hovered: its point marked on the frame
+        function markProfile(e) {
+            var svg = e.target.closest ? e.target.closest("svg[data-act=profile]") : null;
+            var res = svg && (svg.closest("#ta-frame-saved") ? (saved.filter(function (m) { return m.id === savedShown; })[0] || {}).values :
+                (items().filter(function (i) { return i.id === shownItem; })[0] || {}).res);
+            if (marker) maps[0].removeLayer(marker);
+            marker = null;
+            if (!res || !res.profile || !maps[0]) return;
+            var box = svg.getBoundingClientRect(), share = Math.max(0, Math.min(1, (e.clientX - box.left) / (box.width || 1)));
+            var at = res.profile.points[Inspector.profileIndex(res.profile, share)];
+            marker = L.circleMarker(latLng(at), {radius: 5, color: "#000", weight: 1, fillColor: "#fff", fillOpacity: 1, interactive: false}).addTo(maps[0]);
+        }
 
         function showParams() {
             $("ta-frame-params").innerHTML = paramsHtml(infos[0], typed, changes, changeError,
@@ -407,17 +692,25 @@
             $("ta-frame-download").innerHTML = downloadHtml(!!tiles[1], withChanges && !!tiles[1]);
             showParams();
             showReadout();
+            showMeasure();
             return ctx.loadLeaflet().then(function (leaflet) {
                 L = leaflet;
                 showPane(0);
                 if (tiles[1] || maps[1]) showPane(1);
                 if (maps[1]) maps[1].invalidateSize();
                 recolour();
+                drawShapes();
+                remeasure();
             });
         }
 
         function choose(rel) {
+            if (drawTool) drawTool.cancel();
+            drawTool = null;
+            tool = null;
+            shownItem = savedShown = form = null;
             frame = rel;
+            loadSaved();
             typed = changesTyped(changes, unit());
             changeError = null;
             keepUrl();
@@ -454,7 +747,8 @@
         }
 
         Viewer.bindControls({doc: doc, el: $("ta-viewer-controls"), current: current, style: function () { return style; }, unit: unit,
-                             palettes: function () { return meta.palettes || []; }, recolour: recolour, restyle: recolour,
+                             palettes: function () { return meta.palettes || []; }, recolour: recolour,
+                             restyle: function () { recolour(); remeasure(); },
                              // A palette is the user's, everywhere (DJI's keys carry the viewer's prefix)
                              onPalette: function (key) {
                                  core.savePalette(fetchFn, page.getAttribute("data-api"), csrf, key.replace(/^dji_/, "")).catch(function () {});
@@ -496,6 +790,52 @@
             }
         });
 
+        $("ta-frame-measure").addEventListener("click", function (e) {
+            var b = e.target.closest ? e.target.closest("[data-tool], [data-act]") : null;
+            if (!b) return;
+            if (b.hasAttribute("data-tool")) return setTool(b.getAttribute("data-tool"));
+            var act = b.getAttribute("data-act"), row = b.closest("[data-item]");
+            if (act === "form-save") return submitForm();
+            if (act === "form-cancel") { form = null; return showMeasure(); }
+            var item = row && items().filter(function (i) { return i.id === row.getAttribute("data-item"); })[0];
+            if (!item) return;
+            if (act === "show") shownItem = shownItem === item.id ? null : item.id;
+            if (act === "remove") {
+                drawn[frame] = items().filter(function (i) { return i !== item; });
+                if (shownItem === item.id) shownItem = null;
+            }
+            if (act === "save") form = {kind: "region", id: item.id, label: item.label, name: item.label, comment: "", busy: false, error: ""};
+            showMeasure();
+            showSaved();
+            drawShapes();
+        });
+
+        $("ta-frame-saved").addEventListener("click", function (e) {
+            var b = e.target.closest ? e.target.closest("[data-act]") : null;
+            if (!b) return;
+            var act = b.getAttribute("data-act"), row = b.closest("[data-saved]");
+            if (act === "form-save") return submitForm();
+            if (act === "form-cancel") { form = null; return showSaved(); }
+            var m = row && saved.filter(function (x) { return x.id === row.getAttribute("data-saved"); })[0];
+            if (!m) return;
+            if (act === "show") savedShown = savedShown === m.id ? null : m.id;
+            if (act === "edit") form = {kind: "saved", id: m.id, name: m.name, comment: m.comment || "", busy: false, error: ""};
+            if (act === "delete") {
+                return core.ask(doc, "Delete “" + m.name + "”?", "It is deleted for everyone who can view the project.", "Delete", "danger").then(function (yes) {
+                    if (!yes) return;
+                    return send(base + "/frame/measurements/" + m.id, "DELETE").then(function () { return loadSaved(); });
+                });
+            }
+            showSaved();
+            showMeasure();
+            drawShapes();
+        });
+
+        [$("ta-frame-measure"), $("ta-frame-saved")].forEach(function (el) {
+            el.addEventListener("mousemove", markProfile);
+            el.addEventListener("mouseleave", function () { if (marker) maps[0].removeLayer(marker); marker = null; });
+        });
+
         $("ta-frame-download").addEventListener("change", function (e) {
             if (e.target.name === "ta-frame-measured") withChanges = e.target.value === "1";
         });
@@ -522,7 +862,7 @@
 
         // ← and → step through the list, but not while typing in a field
         doc.addEventListener("keydown", function (e) {
-            if ((e.key !== "ArrowLeft" && e.key !== "ArrowRight") || !frame || e.altKey || e.ctrlKey || e.metaKey ||
+            if ((e.key !== "ArrowLeft" && e.key !== "ArrowRight") || !frame || drawTool || e.altKey || e.ctrlKey || e.metaKey ||
                 /^(INPUT|SELECT|TEXTAREA)$/.test((e.target || {}).tagName || "")) return;
             e.preventDefault();
             step(e.key === "ArrowLeft" ? -1 : 1);
@@ -534,7 +874,8 @@
     var api = {CHANGES: CHANGES, listFrames: listFrames, frameTag: frameTag, changesQuery: changesQuery, frameApiUrl: frameApiUrl,
                listHtml: listHtml, changeStarts: changeStarts, readChanges: readChanges, changesTyped: changesTyped,
                newWorksetUrl: newWorksetUrl, paramsHtml: paramsHtml, infoHtml: infoHtml, valueAt: valueAt, readoutHtml: readoutHtml,
-               downloadHtml: downloadHtml, canvasOverlay: canvasOverlay, timeText: timeText, init: init};
+               downloadHtml: downloadHtml, canvasOverlay: canvasOverlay, timeText: timeText, toPixels: toPixels, circlePixels: circlePixels,
+               isothermLimits: isothermLimits, changesText: changesText, measureHtml: measureHtml, savedHtml: savedHtml, init: init};
     root.ThermalAnalyzerFrame = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

@@ -616,8 +616,9 @@
     }
 
     // The statistics of a region: a table and its histogram (a line's profile); iso, the isotherm shown: a share in it
-    // measured with other limits isn't shown (true: shown whatever it was measured with, as a saved one's)
-    function statisticsHtml(r, unit, iso) {
+    // measured with other limits isn't shown (true: shown whatever it was measured with, as a saved one's); pixels: a
+    // frame's region (the frame page), its sizes in pixels
+    function statisticsHtml(r, unit, iso, pixels) {
         if (r.loading) return '<div class="text-muted"><i class="fa fa-spinner fa-spin"></i> Reading the region…</div>';
         if (r.error) return '<div class="text-danger">' + escapeHtml(r.error) + "</div>";
         var s = r.statistics;
@@ -629,11 +630,11 @@
                     ["Surroundings", formatTemp(s.surroundings, unit)], ["ΔT", formatSigned(s.delta_t, unit)],
                     ["In the isotherm", typeof s.isotherm_share === "number" && (iso === true || r.isotherm === limitsKey(iso)) ? (s.isotherm_share * 100).toFixed(1) + " %" : ""],
                     ["Pixels", String(s.count)]];
-        if (regionArea(r) !== null) rows.push(["Area", formatArea(regionArea(r), unit)]);
-        if (typeof r.length === "number") rows.push(["Length", formatLength(r.length, unit)]);
+        if (regionArea(r) !== null && !pixels) rows.push(["Area", formatArea(regionArea(r), unit)]);
+        if (typeof r.length === "number") rows.push(["Length", pixels ? r.length.toFixed(1) + " px" : formatLength(r.length, unit)]);
         return '<table class="table table-condensed dt-inspector-stats"><tbody>' + rows.filter(function (row) { return row[1]; }).map(function (row) {
             return "<tr><td>" + escapeHtml(row[0]) + '</td><td class="text-right">' + escapeHtml(row[1]) + "</td></tr>";
-        }).join("") + "</tbody></table>" + (r.profile ? profileHtml(r.profile, unit, r.length) : histogramHtml(s.histogram, unit)) +
+        }).join("") + "</tbody></table>" + (r.profile ? profileHtml(r.profile, unit, r.length, pixels) : histogramHtml(s.histogram, unit)) +
             (r.resampled ? '<div class="text-muted dt-inspector-hint">A large region: read at a reduced resolution.</div>' : "");
     }
 
@@ -653,8 +654,10 @@
     var PROFILE_W = 240, PROFILE_H = 64;
     function profileX(d, length) { return length > 0 ? d / length * PROFILE_W : 0; }
 
-    // A line's temperatures along it, broken where there are none; hovering it finds the point on the map
-    function profileHtml(p, unit, length) {
+    // A line's temperatures along it, broken where there are none; hovering it finds the point on the map (pixels: on
+    // a frame, its distances in pixels)
+    function profileHtml(p, unit, length, pixels) {
+        var distance = function (d) { return pixels ? d.toFixed(d >= 100 ? 0 : 1) + " px" : formatLength(d, unit); };
         var found = p.values.filter(function (v) { return v !== null && v !== undefined; });
         if (!found.length) return "";
         length = length || p.distance[p.distance.length - 1];
@@ -672,8 +675,8 @@
                     '<polyline points="' + l.join(" ") + '" vector-effect="non-scaling-stroke"></polyline>';
             }).join("") + '<line class="dt-inspector-profile-at" x1="0" x2="0" y1="0" y2="' + PROFILE_H + '" vector-effect="non-scaling-stroke" visibility="hidden"></line></svg>' +
             '<div class="dt-inspector-range"><span>' + escapeHtml(formatTemp(lo, unit)) + "</span></div>" +
-            '<div class="dt-inspector-range"><span>' + escapeHtml(formatLength(0, unit)) + "</span><span>" + escapeHtml(formatLength(length, unit)) + "</span></div>" +
-            '<div class="text-muted dt-inspector-hint dt-inspector-profile-read">Hover the profile to find its point on the map.</div></div>';
+            '<div class="dt-inspector-range"><span>' + escapeHtml(distance(0)) + "</span><span>" + escapeHtml(distance(length)) + "</span></div>" +
+            '<div class="text-muted dt-inspector-hint dt-inspector-profile-read">Hover the profile to find its point on the ' + (pixels ? "frame" : "map") + ".</div></div>";
     }
 
     // The sample of a profile nearest a share (0..1) of its length

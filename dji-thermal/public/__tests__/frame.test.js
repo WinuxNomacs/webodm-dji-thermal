@@ -6,6 +6,8 @@ window.ThermalAnalyzerCore = core;
 window.ThermalScale = require('../scale');
 window.ThermalRecolour = require('../recolour');
 window.ThermalAnalyzerViewer = require('../viewer');
+window.ThermalRegions = require('../regions');
+window.ThermalInspector = require('../inspector');
 const frame = require('../frame');
 
 function page() {
@@ -94,9 +96,16 @@ describe("the frame page", () => {
     // A Leaflet stand-in: the panes' maps and the canvas each shows
     function fakeLeaflet() {
         const L = {maps: [], CRS: {Simple: {}}, DomUtil: {addClass() {}}, Util: {falseFn() {}}, latLngBounds: b => b};
+        const layer = extra => Object.assign({addTo(m) { (m.layers = m.layers || []).push(this); return this; }}, extra);
+        L.layerGroup = () => layer({layers: [], clearLayers() { this.layers = []; }});
+        L.circleMarker = (at, opts) => layer({marker: at, opts});
+        L.circle = (at, opts) => layer({circle: at, opts});
+        L.polyline = (points, opts) => layer({line: points, opts});
+        L.polygon = (points, opts) => layer({polygon: points, opts});
         L.map = (el, opts) => {
             const handlers = {};
             const m = {el, opts, layers: [], center: [0, 0], zoom: 0, on(ev, f) { (handlers[ev] = handlers[ev] || []).push(f); return m; },
+                       off() { return m; }, getContainer: () => el,
                        fire(ev, e) { (handlers[ev] || []).forEach(f => f(e)); }, fitBounds(b) { m.fitted = b; },
                        invalidateSize() {}, removeLayer(l) { m.layers = m.layers.filter(x => x !== l); },
                        setView(c, z) { m.center = c; m.zoom = z; m.fire("move"); }, getCenter: () => m.center, getZoom: () => m.zoom};
@@ -116,10 +125,35 @@ describe("the frame page", () => {
 
     // The server: the frames, a frame's figures and its values (a 2 × 1 frame: 15 and no data; 16.5 with the changes)
     function fakeServer() {
-        const calls = [];
+        const calls = [], saved = [];
+        const json = (data, code) => Promise.resolve({ok: !code || code < 400, status: code || 200, json: () => Promise.resolve(data)});
         const fetchFn = jest.fn((url, opts) => {
             calls.push([url, opts]);
-            if (url === BASE + "/frames") return Promise.resolve({ok: true, status: 200, json: () => Promise.resolve(FRAMES)});
+            const body = opts && opts.body ? JSON.parse(opts.body) : null;
+            if (url === BASE + "/frames") return json(FRAMES);
+            if (url === BASE + "/frame/region") {
+                const point = body.geometry.type === "Point";
+                return json({valid: true, reason: null, pixel_size: 1, statistics: {count: point ? 1 : 4, min: 15, max: 15, mean: point ? 15 : 16, std: 0,
+                             median: 15, percentiles: {2: 15, 98: 15}, histogram: {counts: [1], edges: [15, 16]}, surroundings: null, delta_t: null}});
+            }
+            if (url.startsWith(BASE + "/frame/measurements")) {
+                if (opts && opts.method === "POST") {
+                    const m = Object.assign({id: "aaaaaaaaaaa" + (saved.length + 1), created_by: "admin", created_at: "2026-11-01T10:00:00Z",
+                                             values: {valid: true, statistics: {count: 1, mean: 15}}}, body);
+                    saved.push(m);
+                    return json(m, 201);
+                }
+                if (opts && opts.method === "PATCH") {
+                    const m = saved.filter(x => url.endsWith(x.id))[0];
+                    Object.assign(m, body);
+                    return json(m);
+                }
+                if (opts && opts.method === "DELETE") {
+                    saved.splice(saved.findIndex(x => url.endsWith(x.id)), 1);
+                    return Promise.resolve({ok: true, status: 204});
+                }
+                return json({measurements: saved.slice(), can_change: true});
+            }
             const u = new URL(url, "http://x"), changed = u.searchParams.has("emissivity");
             if (u.pathname.endsWith("/frame")) {
                 return Promise.resolve({ok: true, status: 200, json: () => Promise.resolve(Object.assign({}, INFO, {
@@ -257,5 +291,94 @@ describe("the frame page", () => {
         await settle();
         expect(server.calls.length).toBe(before);
         expect(puts.length).toBeGreaterThan(drawn);
+    });
+
+    it("pins a pixel, measured on the server in the frame's pixels, and saves it for everyone with a name", async () => {
+        const {server, L} = await start();
+        document.querySelector("[data-tool=pin]").click();
+        L.maps[0].fire("click", {latlng: {lat: -0.5, lng: 0.25}});
+        await settle();
+        const region = server.calls.filter(c => c[0] === BASE + "/frame/region").pop();
+        expect(JSON.parse(region[1].body)).toEqual({frame: "a_T.JPG", changes: {}, geometry: {type: "Point", coordinates: [0.25, 0.5]}, isotherm: null});
+        expect($("ta-frame-measure").textContent).toContain("P1");
+        expect($("ta-frame-measure").textContent).toContain("15.00 °C");
+        document.querySelector("[data-item] [data-act=save]").click();
+        document.querySelector("[data-form=name]").value = "Hot spot";
+        document.querySelector("[data-act=form-save]").click();
+        await settle();
+        const post = server.calls.filter(c => c[0] === BASE + "/frame/measurements" && c[1] && c[1].method === "POST").pop();
+        expect(JSON.parse(post[1].body)).toEqual(expect.objectContaining({name: "Hot spot", shape: "pin", frame: "a_T.JPG", changes: {}}));
+        // Saved: out of the drawn ones, listed (and shown) under Saved on this frame
+        expect(document.querySelector("#ta-frame-measure [data-item]")).toBeNull();
+        expect($("ta-frame-saved").textContent).toContain("Hot spot");
+        expect($("ta-frame-saved").textContent).toContain("As converted. Saved by admin");
+    });
+
+    it("measures the shapes again when the isotherm or the parameters change, the isotherm's limits in °C", async () => {
+        const {server, L} = await start();
+        document.querySelector("[data-tool=pin]").click();
+        L.maps[0].fire("click", {latlng: {lat: -0.5, lng: 0.5}});
+        await settle();
+        const regions = () => server.calls.filter(c => c[0] === BASE + "/frame/region").map(c => JSON.parse(c[1].body));
+        $("ta-viewer-iso-mode").value = "above";
+        $("ta-viewer-iso-a").value = "20";
+        $("ta-viewer-iso-a").dispatchEvent(new Event("change", {bubbles: true}));
+        await settle();
+        expect(regions().pop().isotherm).toEqual({low: 20, high: null});
+        const field = document.querySelector("#ta-frame-params input[name=emissivity]");
+        field.value = "0.8";
+        field.dispatchEvent(new Event("input", {bubbles: true}));
+        $("ta-frame-apply").click();
+        await settle();
+        expect(regions().pop().changes).toEqual({emissivity: 0.8});
+        expect($("ta-frame-measure").textContent).toContain("Measured with the parameters changed.");
+    });
+
+    it("renames and deletes a saved measurement, and only who can change the project sees how", async () => {
+        const {server, L} = await start();
+        document.querySelector("[data-tool=pin]").click();
+        L.maps[0].fire("click", {latlng: {lat: -0.5, lng: 0.5}});
+        await settle();
+        document.querySelector("[data-item] [data-act=save]").click();
+        document.querySelector("[data-act=form-save]").click();
+        await settle();
+        document.querySelector("[data-saved] [data-act=edit]").click();
+        document.querySelector("[data-form=name]").value = "Renamed";
+        document.querySelector("[data-act=form-save]").click();
+        await settle();
+        expect(server.calls.some(c => c[1] && c[1].method === "PATCH")).toBe(true);
+        expect($("ta-frame-saved").textContent).toContain("Renamed");
+        document.querySelector("[data-saved] [data-act=delete]").click();
+        document.querySelector(".ta-dialog .btn-danger").click();
+        await settle();
+        expect($("ta-frame-saved").textContent).toContain("None yet");
+        const html = frame.savedHtml({saved: [{id: "x", name: "A", shape: "pin", values: {statistics: {count: 1, mean: 15}}}], canChange: false},
+                                     window.ThermalInspector);
+        expect(html).not.toContain("data-act=\"edit\"");
+        expect(html).not.toContain("data-act=\"delete\"");
+    });
+
+    it("turns shapes drawn on a pane into the frame's pixels, a circle a polygon around its centre", () => {
+        expect(frame.toPixels({type: "LineString", coordinates: [[1, -2], [3, -4]]})).toEqual({type: "LineString", coordinates: [[1, 2], [3, 4]]});
+        expect(frame.toPixels({type: "Polygon", coordinates: [[[0, 0], [2, 0], [2, -2], [0, 0]]]}).coordinates[0][2]).toEqual([2, 2]);
+        const ring = frame.circlePixels({lat: -10, lng: 20, radius: 5}).coordinates[0];
+        expect(ring.length).toBe(65);
+        expect(ring[0]).toEqual([25, 10]);
+        expect(ring[16][0]).toBeCloseTo(20, 9);
+        expect(ring[16][1]).toBeCloseTo(15, 9);
+        expect(frame.isothermLimits("between,50,68", "F")).toEqual({low: 10, high: 20});
+        expect(frame.isothermLimits("", "C")).toBeNull();
+        expect(frame.changesText({emissivity: 0.8, reflected_temp: 30}, "C")).toBe("emissivity 0.80, reflected temperature 30.0 °C");
+        // A line's statistics name its length and profile in pixels, not metres
+        const line = {id: "i1", label: "L1", shape: "line", geometry: {type: "LineString", coordinates: [[0, 0], [10, 0]]},
+                      res: {valid: true, pixel_size: 1, length: 10, statistics: {count: 30, min: 1, max: 2, mean: 1.5, std: 0.1, median: 1.5,
+                            percentiles: {2: 1, 98: 2}, histogram: {counts: [1], edges: [1, 2]}},
+                            profile: {distance: [0, 10], values: [1, 2], points: [[0, 0], [10, 0]]}}};
+        const el = document.createElement("div");
+        el.innerHTML = frame.measureHtml({tool: null, items: [line], shown: "i1", canChange: true}, window.ThermalInspector);
+        expect(el.textContent).toContain("Length10.0 px");
+        expect(el.textContent).toContain("0.0 px10.0 px");
+        expect(el.textContent).not.toMatch(/\d m\b/);
+        expect(el.textContent).not.toContain("Area");
     });
 });

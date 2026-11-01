@@ -49,6 +49,7 @@
 .dt-inspector-profile-at { stroke: #333; stroke-width: 1px; }
 .dt-inspector-profile-read { min-height: 2.6em; }
 .dt-inspector-pins td.text-right { white-space: nowrap; }
+.dt-inspector-pins td.text-right a + a { margin-left: 6px; }
 .dt-inspector-check input { margin: 0 4px 0 0; vertical-align: middle; }
 .dt-inspector-heading { display: block; margin: 0; }
 .dt-inspector-heading input { vertical-align: baseline; }
