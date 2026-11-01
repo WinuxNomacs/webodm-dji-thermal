@@ -1,6 +1,6 @@
 {% extends "app/plugins/templates/base.html" %}
 {% block content %}
-<link rel="stylesheet" href="{{ public }}analyzer.css">
+<link rel="stylesheet" href="{{ public }}analyzer.css?v={{ v }}">
 
 <div id="ta-dataset" class="ta-page" data-api="{{ api }}" data-public="{{ public }}" data-id="{{ dataset.id }}">
     {% csrf_token %}
@@ -66,8 +66,8 @@
 </div>
 
 {{ display|json_script:"ta-display" }}
-<script src="{{ public }}analyzer_core.js"></script>
-<script src="{{ public }}conversions.js"></script>
-<script src="{{ public }}picture_viewer.js"></script>
-<script src="{{ public }}dataset.js"></script>
+<script src="{{ public }}analyzer_core.js?v={{ v }}"></script>
+<script src="{{ public }}conversions.js?v={{ v }}"></script>
+<script src="{{ public }}picture_viewer.js?v={{ v }}"></script>
+<script src="{{ public }}dataset.js?v={{ v }}"></script>
 {% endblock %}

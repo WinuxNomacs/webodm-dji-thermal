@@ -4,6 +4,9 @@ view, a dataset's page, and a conversion's mosaics on a map (with WebODM's base 
 public/.
 """
 
+import hashlib
+import os
+
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import render
@@ -14,9 +17,25 @@ from app.models import Basemap, Task
 from . import conversions, datasets
 
 
+def version(folder):
+    """A short hash of the scripts and stylesheets in public/ (their names, sizes and times): added to their URLs,
+    so a browser fetches them again after any change instead of mixing cached files with new ones"""
+    h = hashlib.sha1()
+    for base in (folder, os.path.join(folder, "build")):
+        try:
+            names = sorted(os.listdir(base))
+        except OSError:
+            continue
+        for name in names:
+            if name.endswith((".js", ".css")):
+                st = os.stat(os.path.join(base, name))
+                h.update("{} {} {}\n".format(name, st.st_size, st.st_mtime_ns).encode())
+    return h.hexdigest()[:10]
+
+
 def common(plugin, request):
     # display: the user's preferences (conversions.display), read by analyzer_core.js
-    return {'title': _("Thermal Analyzer"), 'public': plugin.public_url(""),
+    return {'title': _("Thermal Analyzer"), 'public': plugin.public_url(""), 'v': version(plugin.get_path("public")),
             'api': "/api/plugins/{}/".format(plugin.get_name()), 'display': conversions.display(request.user)}
 
 
