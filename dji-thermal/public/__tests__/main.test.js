@@ -65,15 +65,13 @@ test("other tasks, and a tag naming no dataset, get no button", () => {
     expect(taskButton({id: DATASET, tags: [".dji-thermal-from-../../admin"]})).toBeNull();
 });
 
-test("the Thermal Inspector is added to maps that show a thermal orthophoto, with WebODM's Leaflet", () => {
+test("the Thermal Inspector is added to every map, with WebODM's Leaflet (its button shows when it has something to inspect)", () => {
     sideMenu(false);
     loadMain();
     const [deps, add] = global.PluginsAPI.Map.willAddControls.mock.calls[0];
     expect(deps).toEqual(["leaflet", "dji-thermal/inspector.css"]);
-    window.ThermalInspector = {hasThermal: jest.fn(tiles => tiles.length > 0), create: jest.fn()};
+    window.ThermalInspector = {create: jest.fn()};
     add({tiles: []}, "L");
-    expect(window.ThermalInspector.create).not.toHaveBeenCalled();
-    add({tiles: [{}]}, "L");
-    expect(window.ThermalInspector.create).toHaveBeenCalledWith({tiles: [{}]}, "L");
+    expect(window.ThermalInspector.create).toHaveBeenCalledWith({tiles: []}, "L");
     delete window.ThermalInspector;
 });

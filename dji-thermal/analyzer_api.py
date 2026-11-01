@@ -16,6 +16,7 @@ import io
 import os
 
 from django.core.exceptions import SuspiciousFileOperation
+from django.db.models import Q
 from django.http import HttpResponse
 from rest_framework import permissions, status
 from rest_framework.exceptions import NotFound, ValidationError
@@ -27,8 +28,9 @@ from zipstream.ng import ZipStream
 from app.api.tasks import download_file_response, download_file_stream
 from app.models import Project, Task
 from app.security import path_traversal_check
+from nodeodm import status_codes
 
-from . import conversion_tasks, conversions, converter, datasets, mosaics, portable
+from . import conversion_tasks, conversions, converter, datasets, inspector, inspector_api, mosaics, portable
 
 THUMBNAIL_SIZE = (96, 96)
 LARGE_SIZE = (1280, 1280)      # the Files tab's detail pane (?size=large): a frame at its own size, up to this
@@ -102,6 +104,13 @@ def detail(task, user):
     return out
 
 
+def has_map(project):
+    """Whether WebODM shows a map of the project: one of its tasks has finished with an orthophoto or an elevation model
+    (as Project.get_map_items; without one its map page says none is available, and no plugin runs there)"""
+    return project.task_set.filter(status=status_codes.COMPLETED).filter(
+        Q(orthophoto_extent__isnull=False) | Q(dsm_extent__isnull=False) | Q(dtm_extent__isnull=False)).exists()
+
+
 def conversion_summary(task, cid):
     """A conversion as the dataset's Convert tab lists it"""
     record, job, r = conversions.record(task, cid), conversions.job(task, cid), conversions.results(task, cid)
@@ -111,6 +120,8 @@ def conversion_summary(task, cid):
     return {
         'id': cid,
         'dataset': str(task.id),
+        'project': task.project_id,
+        'project_map': has_map(task.project),     # its mosaics can be laid on WebODM's map of the project
         'name': record.get('name') or cid,
         'settings': settings,
         'description': conversions.summary_text(settings),
@@ -731,6 +742,39 @@ class MosaicPoint(DatasetView):
         task = get_conversion(request, pk, cid)
         tab_raster(task, cid, tab)
         return Response(mosaics.point(task, cid, tab, *point_query(request)))
+
+
+def temperature_raster(task, cid, tab):
+    """The path of a temperature tab's mosaic (the Thermal Inspector's regions and isotherms read them)"""
+    if not mosaics.is_temperature(tab):
+        raise ValidationError({'error': "Not a tab of temperatures"})
+    return tab_raster(task, cid, tab)[0]
+
+
+class MosaicRegion(DatasetView):
+    def post(self, request, pk, cid, tab):
+        """The statistics of a temperature tab's values (°C) inside a polygon, as the Thermal Inspector's regions of an
+        orthophoto (inspector_api.region_request)"""
+        task = get_conversion(request, pk, cid)
+        raster = temperature_raster(task, cid, tab)
+        geometry, percentiles, bins = inspector_api.region_request(request)
+        unit = mosaics.result(task, cid).get('unit') or 'C'
+        return inspector_api.region_response(
+            lambda: inspector.raster_region(raster, geometry, unit=unit, percentiles=percentiles, bins=bins))
+
+
+class MosaicIsotherm(DatasetView):
+    def get(self, request, pk, cid, tab, z, x, y):
+        """A tile of a temperature tab painting its temperatures at or above ?low= and at or below ?high= (°C) in
+        ?color=, transparent elsewhere, as the Thermal Inspector's isotherms of an orthophoto"""
+        task = get_conversion(request, pk, cid)
+        raster = temperature_raster(task, cid, tab)
+        low, high, rgb = inspector_api.isotherm_request(request)
+        unit = mosaics.result(task, cid).get('unit') or 'C'
+        content = inspector.raster_isotherm(raster, int(z), int(x), int(y), low, high, rgb, mosaics.TILE_SIZE, unit=unit)
+        if content is None:
+            raise NotFound()
+        return png_response(content)
 
 
 class MosaicFrames(DatasetView):

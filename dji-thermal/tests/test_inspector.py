@@ -158,6 +158,38 @@ class TestInspector(BootTestCase):
               int((bounds.top - my) / (bounds.top - bounds.bottom) * size))
         return self.client.get(url, params), at
 
+    def test_a_mosaics_regions_and_isotherms_are_in_celsius_without_its_no_data_marker(self):
+        # A workset mosaic as dji-thermal-cli writes it: one band in its unit (here °F), absolute zero where it has none
+        path = os.path.join(self.task.task_path(), "mosaic-f.tif")
+        values = temperatures() * 1.8 + 32
+        values[:, :TRANSPARENT_COLUMNS] = -459.67
+        with rasterio.open(path, 'w', driver='GTiff', width=WIDTH, height=HEIGHT, count=1, dtype='float32',
+                           crs='EPSG:32616', transform=from_origin(ORIGIN[0], ORIGIN[1], PIXEL, PIXEL)) as dst:
+            dst.write(values.astype(np.float32), 1)
+        st = inspector.raster_region(path, square(0, 0, 19, 9), unit='F')['statistics']
+        expected = temperatures()[0:10, TRANSPARENT_COLUMNS:20]
+        self.assertEqual(st['count'], expected.size)
+        self.assertAlmostEqual(st['min'], float(expected.min()), places=3)
+        self.assertAlmostEqual(st['max'], float(expected.max()), places=3)
+        self.assertEqual(inspector.raster_region(path, square(0, 0, 5, 5), unit='F')['reason'], 'nodata')
+
+        def painted(col, row, low=None, high=None):
+            lon, lat = lonlat(col, row)
+            tms = morecantile.tms.get('WebMercatorQuad')
+            t = tms.tile(lon, lat, 18)
+            bounds, (mx, my) = tms.xy_bounds(t), tms.xy(lon, lat)
+            png = inspector.raster_isotherm(path, t.z, t.x, t.y, low, high, (255, 0, 0), unit='F')
+            x = int((mx - bounds.left) / (bounds.right - bounds.left) * 256)
+            y = int((bounds.top - my) / (bounds.top - bounds.bottom) * 256)
+            return np.array(Image.open(io.BytesIO(png)).convert('RGBA'))[y, x, 3] == 255
+
+        # (50, 40) is at 60 °C (140 °F): its limits are °C
+        self.assertTrue(painted(50, 40, low=55))
+        self.assertFalse(painted(50, 40, low=65))
+        self.assertTrue(painted(50, 40, low=58, high=62))
+        # Where it has no data, not painted even below any limit
+        self.assertFalse(painted(3, 40, high=1000))
+
     def test_djis_palettes_are_the_librarys_colour_tables(self):
         luts = converter.palette_luts()
         self.assertEqual(list(luts), conversions.palettes())

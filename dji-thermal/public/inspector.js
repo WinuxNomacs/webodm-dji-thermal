@@ -3,8 +3,11 @@
 // the same tasks; regions drawn by regions.js), isotherms (the temperatures above, below or between limits painted
 // over the thermal layers, also kept in the browser), the thermal layer's palette, which is the user's everywhere (the
 // Analyzer's preference), and a legend of its palette and range (scale.js). Temperatures come from the plugin's API
-// (inspector_api.py) in °C and are shown in WebODM's units (°F when imperial). main.js adds it through
-// PluginsAPI.Map.willAddControls, with WebODM's own Leaflet.
+// (inspector_api.py) in °C and are shown in WebODM's units (°F when imperial). The project's workset mosaics can be
+// laid on the map too (the Analyzer's tiles, above WebODM's layers, swiped against them with WebODM's own split
+// control): a thermal layer like the orthophotos, read through the Analyzer's API. main.js adds it through
+// PluginsAPI.Map.willAddControls, with WebODM's own Leaflet, to every map; its button shows when the map has a thermal
+// orthophoto or the project has mosaics.
 (function (root) {
     var API = "/api/plugins/dji-thermal/";
     var HOVER_MS = 80;              // the readout asks for the point the cursor rests on, not every point it crosses
@@ -25,6 +28,10 @@
     var TILE_URL = /\/api\/(?:plugins\/dji-thermal\/)?projects\/(\d+)\/tasks\/([^/]+)\/(?:orthophoto|inspector)\/tiles\//;
     var WEBODM_TILES = /\/api\/projects\/(\d+\/tasks\/[^/]+)\/orthophoto\/tiles\//;
     var PLUGIN_TILES = /\/api\/plugins\/dji-thermal\/projects\/(\d+\/tasks\/[^/]+)\/inspector\/tiles\//;
+    var MOSAIC_PARAM = "dt-mosaic";     // a link's ?dt-mosaic=<dataset>/<workset>[/<tab>]: laid on the map, the panel open
+    var MOSAIC_Z = 1000;                // above WebODM's layers (its z-indexes are below 100)
+    var MOSAIC_TABS = {as_converted: "Mosaic", harmonized: "Harmonized", source_frame: "Source frame"};
+    var DJI_PREFIX = "dji_";            // a DJI palette's key among a mosaic's palettes
     var REASONS = {excluded: "Outside the task's crop", outside_raster: "Outside the orthophoto", nodata: "No data here",
                    too_few_points: "A polygon needs three corners", self_intersecting: "The polygon's edges cross",
                    no_area: "The polygon has no area"};
@@ -69,8 +76,10 @@
         return (v >= 100 ? v.toFixed(0) : v.toFixed(2)) + (imperial ? " ft²" : " m²");
     }
 
-    // The task a layer of WebODM's map shows, when it is a thermal orthophoto: {project, task, layer}, else null
+    // The task a layer of WebODM's map shows, when it is a thermal orthophoto: {project, task, layer}; a workset mosaic
+    // laid on the map: {project, mosaic (laidMosaic's), layer}; else null
     function thermalLayer(layer) {
+        if (layer && layer.__dtMosaic) return {project: layer.__dtMosaic.project, mosaic: layer.__dtMosaic, layer: layer};
         var meta = layer && layer[META];
         var url = layer && layer._url;
         if (!meta || !meta.raster || typeof url !== "string") return null;
@@ -99,9 +108,114 @@
         return at.length ? at[at.length - 1] : null;
     }
 
-    function inspectorUrl(t, what) { return API + "projects/" + t.project + "/tasks/" + t.task + "/inspector/" + what; }
+    // A thermal layer's API: the Inspector's of its task, or the Analyzer's of its mosaic tab
+    function inspectorUrl(t, what) {
+        if (t.mosaic) return mosaicBase(t.mosaic) + "/mosaics/" + t.mosaic.tab + "/" + what;
+        return API + "projects/" + t.project + "/tasks/" + t.task + "/inspector/" + what;
+    }
     function pointUrl(t, latlng) {
         return inspectorUrl(t, "point") + "?lon=" + Number(latlng.lng).toFixed(8) + "&lat=" + Number(latlng.lat).toFixed(8);
+    }
+    // The colours of a palette for the legend: the task's, or for a mosaic the project's
+    function paletteUrl(t, name) {
+        return (t.mosaic ? API + "projects/" + t.project + "/inspector/palette" : inspectorUrl(t, "palette")) + "?name=" + encodeURIComponent(name);
+    }
+
+    // -- workset mosaics ---------------------------------------------------------------------------------------------
+
+    // A temperature in a mosaic's unit (C, F or K) in °C
+    function toCelsius(v, unit) { return unit === "F" ? (v - 32) / 1.8 : unit === "K" ? v - 273.15 : v; }
+
+    // The project a map shows: its tasks' (args.tiles), else its URL's (/map/project/<id>/, a project without tasks);
+    // none on WebODM's public maps, which have no workset mosaics
+    function projectOf(tiles, path) {
+        if (/^\/public\//.test(path || "")) return null;
+        var found = (tiles || []).map(function (t) { return t.meta && t.meta.task && t.meta.task.project; }).filter(Boolean)[0];
+        if (found) return String(found);
+        var m = /^\/map\/project\/(\d+)\//.exec(path || "");
+        return m ? m[1] : null;
+    }
+
+    // The mosaic a link asks for: {dataset, workset, tab} or null
+    function linkedMosaic(search) {
+        var m = new RegExp("[?&]" + MOSAIC_PARAM + "=([^&]*)").exec(search || "");
+        var parts = m ? decodeURIComponent(m[1]).split("/") : [];
+        if (parts.length < 2 || !parts[0] || !parts[1]) return null;
+        return {dataset: parts[0], workset: parts[1], tab: MOSAIC_TABS[parts[2]] ? parts[2] : null};
+    }
+
+    function mosaicId(m) { return m.dataset.id + "/" + m.workset.id; }
+    function mosaicBase(m) { return API + "datasets/" + m.dataset + "/conversions/" + m.workset; }
+
+    // A mosaic's palette key for the Inspector's palette (DJI's by name, or one of WebODM's colour maps), when the
+    // workset has it, else its own default; and the palette's name back, for the legend
+    function paletteKey(m, palette, display) {
+        var keys = m.palettes || [];
+        var dji = ((display && display.palettes) || []).indexOf(palette) !== -1;
+        if (dji && keys.indexOf(DJI_PREFIX + palette) !== -1) return DJI_PREFIX + palette;
+        if (!dji && palette && keys.indexOf(palette) !== -1) return palette;
+        return m.default_palette;
+    }
+    function keyPalette(key) { return String(key || "").indexOf(DJI_PREFIX) === 0 ? key.slice(DJI_PREFIX.length) : key; }
+
+    // A tab's range in the mosaic's unit: its 2nd to 98th percentile rounded outwards to a tenth (as the Analyzer's
+    // viewer starts), [0, 1] without them
+    function mosaicRange(tab) {
+        var p = tab && tab.stats && tab.stats.percentiles;
+        if (!p || p.length < 2) return [0, 1];
+        var lo = Math.floor(p[0] * 10) / 10, hi = Math.ceil(p[1] * 10) / 10;
+        return hi > lo ? [lo, hi] : [lo, lo + 1];
+    }
+
+    // What a mosaic laid on the map draws: {project, dataset, workset, tab, unit, built_at, key, range (its unit), name}
+    function laidMosaic(project, m, tab, palette, display) {
+        var t = (m.tabs || []).filter(function (x) { return x.tab === tab; })[0] || m.tabs[0];
+        return {project: String(project), dataset: m.dataset.id, workset: m.workset.id, tab: t.tab, unit: m.unit || "C",
+                built_at: m.built_at || "", key: paletteKey(m, palette, display), range: mosaicRange(t),
+                name: m.dataset.name + " › " + m.workset.name, bounds: t.bounds, maxzoom: t.maxzoom};
+    }
+
+    function mosaicTileUrl(info) {
+        return mosaicBase(info) + "/mosaics/" + info.tab + "/tiles/{z}/{x}/{y}.png?v=" + encodeURIComponent(info.built_at) +
+            "&color_map=" + encodeURIComponent(info.key) + "&rescale=" + info.range[0] + "," + info.range[1];
+    }
+    function mosaicIsothermUrl(info, iso) {
+        if (!validIsotherm(iso)) return "";
+        var params = [];
+        if (iso.mode !== "below") params.push("low=" + iso.low);
+        if (iso.mode !== "above") params.push("high=" + iso.high);
+        params.push("color=" + ISOTHERM_COLORS[iso.color]);
+        return mosaicBase(info) + "/mosaics/" + info.tab + "/isotherm/{z}/{x}/{y}.png?" + params.join("&");
+    }
+
+    // A thermal layer's range (°C) and palette, for the legend and the isotherm's starting limits
+    function layerRange(t) {
+        if (!t) return null;
+        if (t.mosaic) return t.mosaic.range.map(function (v) { return toCelsius(v, t.mosaic.unit); });
+        return rangeOf(t.layer._url);
+    }
+    function layerPalette(t) { return !t ? "" : t.mosaic ? keyPalette(t.mosaic.key) : paletteOf(t.layer._url); }
+
+    // The panel's Workset mosaics: each workset of the project's datasets, with a tickbox laying it on the map; once
+    // laid, its tab, opacity, Swipe (WebODM's split control) and Zoom to
+    function mosaicsHtml(state) {
+        if (!state.mosaics || !state.mosaics.length) return "";
+        return '<div class="dt-inspector-section"><strong>Workset mosaics</strong>' + state.mosaics.map(function (m) {
+            var id = mosaicId(m), laid = state.laid[id];
+            var head = '<label class="dt-inspector-check dt-inspector-mosaic-name"><input type="checkbox" data-act="mosaic-on"' + (laid ? " checked" : "") +
+                "> " + escapeHtml(m.dataset.name) + ' <span class="text-muted">›</span> ' + escapeHtml(m.workset.name) + "</label>";
+            if (!laid) return '<div class="dt-inspector-mosaic" data-mosaic="' + escapeHtml(id) + '">' + head + "</div>";
+            var info = laid.layer.__dtMosaic;
+            return '<div class="dt-inspector-mosaic" data-mosaic="' + escapeHtml(id) + '">' + head +
+                '<div class="dt-inspector-mosaic-controls"><select class="form-control input-sm" data-act="mosaic-tab" title="Which mosaic">' +
+                m.tabs.map(function (t) {
+                    return '<option value="' + t.tab + '"' + (t.tab === info.tab ? " selected" : "") + ">" + escapeHtml(MOSAIC_TABS[t.tab] || t.tab) + "</option>";
+                }).join("") + "</select>" +
+                '<input type="range" min="0" max="100" step="5" value="' + laid.opacity + '" data-act="mosaic-opacity" title="Opacity: ' + laid.opacity + '%">' +
+                '<button type="button" class="btn btn-' + (laid.swipe ? "primary" : "default") + ' btn-xs" data-act="mosaic-swipe" title="' +
+                (laid.swipe ? "Stop swiping" : "Show it on the right of a divider, WebODM's layers on the left") + '"><i class="fa fa-columns"></i> Swipe</button>' +
+                '<a href="javascript:void(0)" data-act="mosaic-zoom" title="Zoom to it"><i class="fa fa-search-plus"></i></a></div></div>';
+        }).join("") + "</div>";
     }
 
     // A tile URL with one parameter set (or removed, with no value), its others kept
@@ -317,7 +431,7 @@
     }
 
     function readoutHtml(r, unit) {
-        if (!r) return '<span class="text-muted">Move the cursor over the thermal orthophoto.</span>';
+        if (!r) return '<span class="text-muted">Move the cursor over a thermal layer.</span>';
         if (r.error) return '<span class="text-danger">' + escapeHtml(r.error) + "</span>";
         if (!r.valid) return '<span class="text-muted">' + escapeHtml(REASONS[r.reason] || "No temperature here") + "</span>";
         return '<span class="dt-inspector-temp">' + escapeHtml(formatTemp(r.temperature, unit)) + "</span>";
@@ -387,6 +501,7 @@
                 }).join("") + "</select></label>" : "") +
             '<label class="dt-inspector-label dt-inspector-check"><input type="checkbox" data-act="legend"' + (state.legendVisible ? " checked" : "") +
             "> Legend on the map</label>" +
+            mosaicsHtml(state) +
             '<div class="dt-inspector-section"><strong>Isotherm</strong>' + isothermHtml(state.isotherm, unit) +
             (state.isothermNotice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.isothermNotice) + "</div>" : "") + "</div>" +
             '<div class="dt-inspector-section"><strong>Pinned points</strong>' + pinsHtml(state.pins, unit, state.pinsVisible) + "</div>" +
@@ -418,7 +533,9 @@
         var state = {open: false, mode: "hover", readout: null, pins: loadPins(storage, key), pinsVisible: true,
                      regions: regions, regionsVisible: true, shown: regions.length ? regions[regions.length - 1].id : null,
                      notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
-                     legendVisible: legendShown()};
+                     legendVisible: legendShown(), mosaics: null, laid: {}};
+        var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
+        var search = deps.search !== undefined ? deps.search : root.location && root.location.search;
         var container, panel, cursor, pinLayer, regionLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
         var overlays = [], colors = {};     // the isotherm's layer over each thermal layer; each palette's colours
 
@@ -446,7 +563,7 @@
                 return kept;
             });
             wanted.forEach(function (t) {
-                var url = isothermUrl(t.layer._url, state.isotherm);
+                var url = t.mosaic ? mosaicIsothermUrl(t.mosaic, state.isotherm) : isothermUrl(t.layer._url, state.isotherm);
                 var o = overlays.filter(function (x) { return x.layer === t.layer; })[0];
                 if (!o) {
                     // The thermal layer's tiling as Leaflet set it up (detectRetina already applied)
@@ -464,11 +581,11 @@
         function renderLegend() {
             if (!legend) return;
             var layers = thermalLayers(map), t = layers[layers.length - 1];
-            var range = t && rangeOf(t.layer._url), name = t && paletteOf(t.layer._url);
+            var range = layerRange(t), name = layerPalette(t);
             if (!state.legendVisible || !range || !name) { legend.hidden = true; return; }
             if (colors[name] === undefined) {
                 colors[name] = null;
-                fetchFn(inspectorUrl(t, "palette") + "?name=" + encodeURIComponent(name), {credentials: "same-origin"}).then(readJson).then(function (r) {
+                fetchFn(paletteUrl(t, name), {credentials: "same-origin"}).then(readJson).then(function (r) {
                     colors[name] = r.ok && r.data.color_map ? r.data.color_map : false;
                     renderLegend();
                 }, function () { colors[name] = false; });
@@ -495,7 +612,7 @@
             if (what === "color") iso.color = value;
             else if (what === "mode") {
                 if (value === "off") return isothermChanged({mode: "off", color: iso.color});
-                var range = t && rangeOf(t.layer._url);
+                var range = layerRange(t);
                 var start = defaultIsotherm(value, range, iso.color, unit);
                 iso = assign(start, {low: typeof iso.low === "number" && value !== "below" ? iso.low : start.low,
                                      high: typeof iso.high === "number" && value !== "above" ? iso.high : start.high});
@@ -625,9 +742,14 @@
             render();
         }
 
+        // The temperature at a point of a thermal layer, in °C (a mosaic's in its unit; a frame's alone isn't one)
         function query(t, latlng) {
             return fetchFn(pointUrl(t, latlng), {credentials: "same-origin"}).then(readJson).then(function (r) {
                 if (!r.ok) return {error: (r.data && (r.data.error || r.data.detail)) || "Could not read the temperature"};
+                if (t.mosaic) {
+                    var c = typeof r.data.temperature === "number" ? toCelsius(r.data.temperature, t.mosaic.unit) : null;
+                    return assign({}, r.data, {temperature: c, valid: c !== null, reason: c !== null ? null : r.data.reason || "nodata"});
+                }
                 return r.data;
             }, function () { return {error: "Could not read the temperature"}; });
         }
@@ -686,6 +808,7 @@
         // The thermal layers' palette: the user's preference, applied as each layer comes
         function applyPalette(t) {
             if (!state.palette) return;
+            if (t.mosaic) return restyleMosaic(t.layer, {key: paletteKey(mosaicOf(t.mosaic), state.palette, state.display)});
             var url = withPalette(t.layer._url, state.palette, state.display);
             if (url === t.layer._url) return;
             applying = true;
@@ -699,7 +822,7 @@
         // colour map chosen there is the user's (saved when it is one of the palettes offered, else drawn on this page
         // only); a range alone keeps the user's palette, DJI's too
         function watch(t) {
-            if (t.layer.__dtWatched) return;
+            if (t.mosaic || t.layer.__dtWatched) return;
             t.layer.__dtWatched = true;
             t.layer.__dtPanelMap = colorMapOf(t.layer._url);
             var setUrl = t.layer.setUrl;
@@ -746,6 +869,76 @@
             renderLegend();
         }
 
+        // -- workset mosaics on the map -----------------------------------------------------------------------------
+
+        function mosaicOf(info) {
+            return (state.mosaics || []).filter(function (m) { return m.dataset.id === info.dataset && m.workset.id === info.workset; })[0] || {};
+        }
+
+        // A mosaic laid on the map drawn with changes ({tab, key}): its tile URL, and a tab's own range
+        function restyleMosaic(layer, change) {
+            var info = layer.__dtMosaic, m = mosaicOf(info);
+            var next = change.tab && change.tab !== info.tab ? laidMosaic(project, m, change.tab, state.palette, state.display) : assign({}, info, change);
+            layer.__dtMosaic = next;
+            var url = mosaicTileUrl(next);
+            if (url !== layer._url) layer.setUrl(url);
+            drawIsotherms();
+            renderLegend();
+        }
+
+        function layMosaic(m, tab) {
+            var id = mosaicId(m);
+            if (state.laid[id]) return state.laid[id];
+            var info = laidMosaic(project, m, tab, state.palette, state.display);
+            var b = info.bounds;
+            var layer = L.tileLayer(mosaicTileUrl(info), {maxZoom: 26, maxNativeZoom: (info.maxzoom || 20) + 1, minZoom: 0, tileSize: 256,
+                zIndex: MOSAIC_Z + Object.keys(state.laid).length, bounds: b ? L.latLngBounds([[b[1], b[0]], [b[3], b[2]]]) : undefined});
+            layer.__dtMosaic = info;
+            state.laid[id] = {layer: layer, opacity: 100, swipe: false};
+            layer.addTo(map);
+            return state.laid[id];
+        }
+
+        function liftMosaic(id) {
+            var laid = state.laid[id];
+            if (!laid) return;
+            if (laid.swipe) swipe(laid, false);
+            delete state.laid[id];
+            map.removeLayer(laid.layer);
+        }
+
+        // On the right of WebODM's split control (PluginsAPI.Map.sideBySideChanged, as its own layer panel does)
+        function swipe(laid, on) {
+            if (!plugins || !plugins.Map || !plugins.Map.sideBySideChanged) return;
+            laid.swipe = on;
+            plugins.Map.sideBySideChanged(laid.layer, on);
+        }
+
+        function zoomTo(laid) {
+            var b = laid.layer.options.bounds;
+            if (b) map.fitBounds(b);
+        }
+
+        function onMosaicInput(row, what, value) {
+            var m = (state.mosaics || []).filter(function (x) { return mosaicId(x) === row.getAttribute("data-mosaic"); })[0];
+            if (!m) return;
+            var id = mosaicId(m), laid = state.laid[id];
+            if (what === "on") {
+                if (value) zoomTo(layMosaic(m));
+                else liftMosaic(id);
+            } else if (!laid) return;
+            else if (what === "tab") restyleMosaic(laid.layer, {tab: value});
+            else if (what === "opacity") { laid.opacity = Number(value); laid.layer.setOpacity(laid.opacity / 100); }
+            else if (what === "swipe") swipe(laid, !laid.swipe);
+            else if (what === "zoom") return zoomTo(laid);
+            render();
+        }
+
+        // The button shows when the map has a thermal orthophoto or the project has mosaics
+        function showButton() {
+            container.style.display = hasThermal(args.tiles) || (state.mosaics && state.mosaics.length) ? "" : "none";
+        }
+
         function showPalette(name, except) {
             state.palette = name;
             thermalLayers(map).forEach(function (t) { if (t.layer !== except) applyPalette(t); });
@@ -766,6 +959,8 @@
             if (mode) return setMode(mode.getAttribute("data-mode"));
             var act = e.target.closest("[data-act]");
             var what = act && act.getAttribute("data-act");
+            var mrow = e.target.closest("[data-mosaic]");
+            if (mrow && (what === "mosaic-swipe" || what === "mosaic-zoom")) return onMosaicInput(mrow, what.slice("mosaic-".length));
             // A click anywhere on a region's row shows its statistics (measured again if they never came)
             var rrow = e.target.closest("[data-region]");
             var region = rrow && state.regions.filter(function (r) { return r.id === rrow.getAttribute("data-region"); })[0];
@@ -811,6 +1006,9 @@
                 try { storage.setItem(LEGEND_KEY, state.legendVisible ? "1" : "0"); } catch (err) { /* this page only */ }
                 renderLegend();
             } else if (what.indexOf("isotherm-") === 0) isothermInput(what.slice("isotherm-".length), e.target.value);
+            else if (what.indexOf("mosaic-") === 0) {
+                onMosaicInput(e.target.closest("[data-mosaic]"), what.slice("mosaic-".length), what === "mosaic-on" ? e.target.checked : e.target.value);
+            }
         }
 
         function open() {
@@ -849,6 +1047,7 @@
         });
         var control = new Control();
         map.addControl(control);
+        showButton();
         // Top left: WebODM's own buttons sit over the bottom corners
         var LegendControl = L.Control.extend({
             options: {position: "topleft"},
@@ -892,14 +1091,28 @@
             render();
         }, function () {});
 
+        // The project's workset mosaics, then the one a link asks for laid on the map, the panel open
+        var mosaicsReady = !project ? Promise.resolve() : ready.then(function () {
+            return fetchFn(API + "projects/" + project + "/inspector/mosaics", {credentials: "same-origin"}).then(readJson);
+        }).then(function (r) {
+            state.mosaics = r.ok && Array.isArray(r.data.mosaics) ? r.data.mosaics : [];
+            showButton();
+            var linked = linkedMosaic(search);
+            var m = linked && state.mosaics.filter(function (x) { return x.dataset.id === linked.dataset && x.workset.id === linked.workset; })[0];
+            if (m) {
+                zoomTo(layMosaic(m, linked.tab));
+                open();
+            } else render();
+        }, function () { state.mosaics = []; });
+
         // A region drawn before its statistics came (the page left) is read again
         state.regions.forEach(function (r) { if (!r.statistics && !r.reason) measure(r); });
 
-        return {control: control, state: state, open: open, close: close, ready: ready, click: onClick, setMode: setMode,
+        return {control: control, state: state, open: open, close: close, ready: ready, mosaicsReady: mosaicsReady, click: onClick, setMode: setMode,
                 legend: function () { return legend; }, overlays: function () { return overlays; }};
     }
 
-    // Added to a map only when it shows a thermal orthophoto
+    // Whether a map shows a thermal orthophoto
     function hasThermal(tiles) {
         return (tiles || []).some(function (t) {
             var bands = (t.meta && t.meta.task && t.meta.task.orthophoto_bands) || [];
@@ -914,7 +1127,9 @@
                isothermUrl: isothermUrl, describeIsotherm: describeIsotherm, legendHtml: legendHtml,
                pinsKey: pinsKey, regionsKey: regionsKey, loadPins: loadPins, savePins: savePins, pinsCsv: pinsCsv,
                regionsCsv: regionsCsv, statisticsHtml: statisticsHtml, readoutHtml: readoutHtml,
-               panelHtml: panelHtml, hasThermal: hasThermal, create: create};
+               panelHtml: panelHtml, hasThermal: hasThermal, projectOf: projectOf, linkedMosaic: linkedMosaic, paletteKey: paletteKey,
+               mosaicRange: mosaicRange, laidMosaic: laidMosaic, mosaicTileUrl: mosaicTileUrl, mosaicIsothermUrl: mosaicIsothermUrl,
+               mosaicsHtml: mosaicsHtml, toCelsius: toCelsius, create: create};
     root.ThermalInspector = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

@@ -1,5 +1,6 @@
 """The Thermal Inspector's API: a task's thermal orthophoto read at a point and over a region, drawn in DJI's palettes
-and as isotherms (see inspector.py), and a palette's colours for its legend"""
+and as isotherms (see inspector.py), a palette's colours for its legend, and the workset mosaics of a project it can
+lay on the map (their regions and isotherms: analyzer_api, with region_request and isotherm_request)"""
 import math
 import re
 
@@ -8,8 +9,12 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 
 from app.api.tasks import TaskNestedView
+from app.models import Project
 
-from . import converter, inspector, mosaics
+from . import conversions, converter, datasets, inspector, mosaics
+
+# The mosaics' tabs laid on the map: those of temperatures (View angle stays in the Analyzer's viewer)
+MAP_TABS = ('as_converted', 'harmonized', 'source_frame')
 
 
 class InspectorView(TaskNestedView):
@@ -69,70 +74,151 @@ class InspectorTiles(InspectorView):
         return png(inspector.tile(task, int(z), int(x), int(y), lut, low, high, size, crop))
 
 
+def isotherm_request(request):
+    """An isotherm tile's ?low=, ?high= (°C, one or both) and ?color= (RRGGBB): (low, high, rgb)"""
+    limits = []
+    for key in ('low', 'high'):
+        raw = request.query_params.get(key)
+        try:
+            value = None if raw in (None, '') else float(raw)
+        except ValueError:
+            value = math.nan
+        if value is not None and not math.isfinite(value):
+            raise ValidationError({'error': "Invalid limits"})
+        limits.append(value)
+    low, high = limits
+    if (low is None and high is None) or (low is not None and high is not None and low > high):
+        raise ValidationError({'error': "Invalid limits"})
+    color = request.query_params.get('color') or ''
+    if not re.fullmatch(r'[0-9a-fA-F]{6}', color):
+        raise ValidationError({'error': "Invalid color"})
+    return low, high, tuple(int(color[i:i + 2], 16) for i in (0, 2, 4))
+
+
 class InspectorIsotherm(InspectorView):
     def get(self, request, pk=None, project_pk=None, z="", x="", y=""):
         """A tile painting the temperatures at or above ?low= and at or below ?high= (°C, one or both) in ?color=
         (RRGGBB), transparent elsewhere; size and crop as the thermal layer's"""
         task = self.thermal_task(request, pk)
-        limits = []
-        for key in ('low', 'high'):
-            raw = request.query_params.get(key)
-            try:
-                value = None if raw in (None, '') else float(raw)
-            except ValueError:
-                value = math.nan
-            if value is not None and not math.isfinite(value):
-                raise ValidationError({'error': "Invalid limits"})
-            limits.append(value)
-        low, high = limits
-        if (low is None and high is None) or (low is not None and high is not None and low > high):
-            raise ValidationError({'error': "Invalid limits"})
-        color = request.query_params.get('color') or ''
-        if not re.fullmatch(r'[0-9a-fA-F]{6}', color):
-            raise ValidationError({'error': "Invalid color"})
+        low, high, rgb = isotherm_request(request)
         size, crop = tile_params(request)
-        rgb = tuple(int(color[i:i + 2], 16) for i in (0, 2, 4))
         return png(inspector.isotherm(task, int(z), int(x), int(y), low, high, rgb, size, crop))
+
+
+def palette_response(name):
+    """The colours of name (one of DJI's palettes or of WebODM's colour maps) for the legend: {name, color_map},
+    encoded as WebODM's tiler gives colour maps (0xRRGGBBAA)"""
+    lut = converter.palette_luts().get(name)
+    if lut is not None:
+        return Response({'name': name, 'color_map': mosaics.encoded(lut)})
+    from app.api.tiler import get_colormap_encoded_values
+    try:
+        if not re.fullmatch(r'[a-z0-9_]+', name):
+            raise ValueError(name)
+        return Response({'name': name, 'color_map': get_colormap_encoded_values(name)})
+    except Exception:  # noqa: BLE001 - rio-tiler refuses a name it doesn't have
+        raise NotFound({'error': "Not a palette"}) from None
 
 
 class InspectorPalette(InspectorView):
     def get(self, request, pk=None, project_pk=None):
-        """The colours of ?name= (one of DJI's palettes or of WebODM's colour maps) for the legend: {name, color_map},
-        encoded as WebODM's tiler gives colour maps (0xRRGGBBAA)"""
+        """The colours of ?name= for the legend (palette_response)"""
         self.thermal_task(request, pk)
-        name = request.query_params.get('name') or ''
-        lut = converter.palette_luts().get(name)
-        if lut is not None:
-            return Response({'name': name, 'color_map': mosaics.encoded(lut)})
-        from app.api.tiler import get_colormap_encoded_values
-        try:
-            if not re.fullmatch(r'[a-z0-9_]+', name):
-                raise ValueError(name)
-            return Response({'name': name, 'color_map': get_colormap_encoded_values(name)})
-        except Exception:  # noqa: BLE001 - rio-tiler refuses a name it doesn't have
-            raise NotFound({'error': "Not a palette"}) from None
+        return palette_response(request.query_params.get('name') or '')
+
+
+def region_request(request):
+    """What a region's statistics are asked with: {"geometry": a GeoJSON polygon (or a Feature of one), "bins",
+    "percentiles"}, as (geometry, percentiles, bins)"""
+    data = request.data if isinstance(request.data, dict) else {}
+    geometry = data.get('geometry')
+    if isinstance(geometry, dict) and geometry.get('type') == 'Feature':
+        geometry = geometry.get('geometry')
+    if not isinstance(geometry, dict):
+        raise ValidationError({'error': "A geometry is required"})
+    try:
+        bins = int(data.get('bins', inspector.HISTOGRAM_BINS))
+        percentiles = [float(p) for p in data.get('percentiles', inspector.PERCENTILES)]
+    except (TypeError, ValueError):
+        raise ValidationError({'error': "Invalid bins or percentiles"}) from None
+    if not (1 <= bins <= inspector.MAX_HISTOGRAM_BINS) or not all(0 <= p <= 100 for p in percentiles):
+        raise ValidationError({'error': "Invalid bins or percentiles"})
+    return geometry, percentiles, bins
+
+
+def region_response(read):
+    """read() (a region's statistics) as the response, its refusals as errors"""
+    try:
+        return Response(read())
+    except ValueError as e:
+        raise ValidationError({'error': str(e)}) from None
+    except Exception:  # noqa: BLE001 - GEOS refuses what isn't a geometry
+        raise ValidationError({'error': "Invalid geometry"}) from None
 
 
 class InspectorRegion(InspectorView):
     def post(self, request, pk=None, project_pk=None):
         """The statistics of the temperatures (°C) inside {"geometry": a GeoJSON polygon, "bins", "percentiles"}"""
         task = self.thermal_task(request, pk)
-        data = request.data if isinstance(request.data, dict) else {}
-        geometry = data.get('geometry')
-        if isinstance(geometry, dict) and geometry.get('type') == 'Feature':
-            geometry = geometry.get('geometry')
-        if not isinstance(geometry, dict):
-            raise ValidationError({'error': "A geometry is required"})
+        geometry, percentiles, bins = region_request(request)
+        return region_response(lambda: inspector.region(task, geometry, percentiles, bins))
+
+
+def map_mosaics(task, user):
+    """The worksets of a dataset whose mosaics can be laid on the map: [{dataset, workset, unit, built_at, palettes
+    (the viewer's palette keys), default_palette, tabs: [{tab, bounds, minzoom, maxzoom, stats}]}]"""
+    found = []
+    preferred = conversions.display(user)['palette']
+    for cid in conversions.ids(task):
+        built = mosaics.result(task, cid)
+        kinds = built.get('kinds') or {}
+        tabs = []
+        for tab, kind, _band in mosaics.TABS:
+            k = kinds.get(kind)
+            if tab in MAP_TABS and k and k.get('raster'):
+                tabs.append({'tab': tab, 'bounds': k.get('bounds'), 'minzoom': k.get('minzoom'),
+                             'maxzoom': k.get('maxzoom'), 'stats': k.get('temperature')})
+        if not tabs:
+            continue
+        settings = conversions.record(task, cid).get('settings') or {}
+        found.append({
+            'dataset': {'id': str(task.id), 'name': datasets.name_of(task)},
+            'workset': {'id': cid, 'name': conversions.record(task, cid).get('name') or cid},
+            'unit': built.get('unit') or settings.get('unit') or 'C', 'built_at': built.get('built_at'),
+            'palettes': [mosaics.DJI_PREFIX + name for name in mosaics.palettes_of(task, cid)] +
+                        list(mosaics.VIEWER_COLORMAPS),
+            'default_palette': mosaics.default_palette(task, cid, settings, preferred),
+            'tabs': tabs,
+        })
+    return found
+
+
+class InspectorProjectView(TaskNestedView):
+    def project(self, request, project_pk):
+        """The project, when the user may view it (WebODM's public maps have no workset mosaics)"""
         try:
-            bins = int(data.get('bins', inspector.HISTOGRAM_BINS))
-            percentiles = [float(p) for p in data.get('percentiles', inspector.PERCENTILES)]
-        except (TypeError, ValueError):
-            raise ValidationError({'error': "Invalid bins or percentiles"}) from None
-        if not (1 <= bins <= inspector.MAX_HISTOGRAM_BINS) or not all(0 <= p <= 100 for p in percentiles):
-            raise ValidationError({'error': "Invalid bins or percentiles"})
-        try:
-            return Response(inspector.region(task, geometry, percentiles, bins))
-        except ValueError as e:
-            raise ValidationError({'error': str(e)}) from None
-        except Exception:  # noqa: BLE001 - GEOS refuses what isn't a geometry
-            raise ValidationError({'error': "Invalid geometry"}) from None
+            project = Project.objects.get(pk=project_pk, deleting=False)
+        except (Project.DoesNotExist, ValueError):
+            raise NotFound() from None
+        if not request.user.is_authenticated or not request.user.has_perm('app.view_project', project):
+            raise NotFound()
+        return project
+
+
+class InspectorMosaics(InspectorProjectView):
+    def get(self, request, project_pk=None):
+        """The workset mosaics of the project's datasets the Inspector can lay on the map (map_mosaics), by dataset
+        name, then as each dataset lists its worksets"""
+        project = self.project(request, project_pk)
+        found = []
+        for task in sorted((t for t in datasets.visible(request.user) if t.project_id == project.id),
+                           key=lambda t: datasets.name_of(t).lower()):
+            found.extend(map_mosaics(task, request.user))
+        return Response({'mosaics': found})
+
+
+class InspectorProjectPalette(InspectorProjectView):
+    def get(self, request, project_pk=None):
+        """The colours of ?name= for the legend of a workset mosaic (palette_response)"""
+        self.project(request, project_pk)
+        return palette_response(request.query_params.get('name') or '')

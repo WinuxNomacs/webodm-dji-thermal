@@ -421,3 +421,139 @@ describe("the Thermal Inspector's isotherms and legend", () => {
         expect(again.ins.legend().hidden).toBe(true);
     });
 });
+
+describe("the Thermal Inspector's workset mosaics", () => {
+    const L = require("leaflet");
+    const BASE = "/api/plugins/dji-thermal/datasets/d-1/conversions/abc123def456/mosaics/";
+    const LIST = "GET /api/plugins/dji-thermal/projects/2/inspector/mosaics";
+    const BOUNDS = [-88.071, 41.999, -88.069, 42.001];
+    const MOSAICS = [{dataset: {id: "d-1", name: "Roof"}, workset: {id: "abc123def456", name: "Normalized"}, unit: "F",
+                      built_at: "2026-11-01T10:00:00+00:00", palettes: ["dji_ironred", "inferno"], default_palette: "inferno",
+                      tabs: [{tab: "as_converted", bounds: BOUNDS, minzoom: 15, maxzoom: 21, stats: {percentiles: [50.04, 120.96]}},
+                             {tab: "harmonized", bounds: BOUNDS, minzoom: 15, maxzoom: 21, stats: {percentiles: [60.01, 110]}}]}];
+    const change = (el, value) => {
+        if (el.type === "checkbox") el.checked = value; else el.value = value;
+        el.dispatchEvent(new Event("change", {bubbles: true}));
+    };
+
+    function leafletMap(task) {
+        const div = document.createElement("div");
+        document.body.appendChild(div);
+        const map = L.map(div, {zoomControl: false, renderer: new L.SVG()}).setView([42, -88.07], 18);
+        if (task) {
+            const layer = L.tileLayer(TILES);
+            layer[META] = {raster: true, task};
+            layer.addTo(map);
+        }
+        map.el = div;
+        return map;
+    }
+
+    // The Inspector on WebODM's map of project 2 (tiles: the tasks it shows), the project's mosaics as routes give them
+    function begin(map, tiles, routes, extra) {
+        const plugins = {Map: {onHandleClick: jest.fn(), sideBySideChanged: jest.fn()}};
+        const fetchFn = server(Object.assign({"GET /api/plugins/dji-thermal/display": Object.assign({}, DISPLAY, {palette: "ironred"}),
+                                              [LIST]: {mosaics: MOSAICS}}, routes));
+        const ins = inspector.create({map, tiles}, L, Object.assign({fetch: fetchFn, storage: window.localStorage, doc: document,
+                                     pluginsApi: plugins, save() {}, path: "/map/project/2/", search: ""}, extra));
+        return {ins, fetchFn, plugins, panel: () => map.el.querySelector(".dt-inspector-panel"),
+                button: () => map.el.querySelector(".dt-inspector"), laid: () => Object.values(map._layers).filter(l => l.__dtMosaic)};
+    }
+
+    it("shows its button when the map has a thermal orthophoto or the project has workset mosaics, and not on public maps", async () => {
+        const rgb = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, RGB_TASK)}}];
+        let s = begin(leafletMap(), rgb, {[LIST]: {mosaics: []}});
+        await s.ins.mosaicsReady;
+        expect(s.button().style.display).toBe("none");
+        s = begin(leafletMap(), rgb);
+        await s.ins.mosaicsReady;
+        expect(s.button().style.display).toBe("");
+        expect(s.panel().hidden).toBe(true);      // laid only when asked
+        // A project without tasks on its map: the project from the URL
+        s = begin(leafletMap(), [], {}, {path: "/map/project/2/"});
+        await s.ins.mosaicsReady;
+        expect(s.button().style.display).toBe("");
+        // WebODM's public maps have no workset mosaics: not asked for
+        s = begin(leafletMap(), rgb, {}, {path: "/public/task/1f0a/map/"});
+        await s.ins.mosaicsReady;
+        expect(s.fetchFn.mock.calls.some(c => c[0].includes("/inspector/mosaics"))).toBe(false);
+        expect(s.button().style.display).toBe("none");
+    });
+
+    it("lays a workset's mosaic on the map in the user's palette, reads it in °C and swipes it with WebODM's split control", async () => {
+        const map = leafletMap(THERMAL_TASK);
+        const point = jest.fn(() => jsonResponse({valid: true, temperature: 104, unit: "F", frame: "DJI_0001_T.JPG"}));
+        const region = jest.fn(() => jsonResponse({valid: true, reason: null, pixel_size: 0.1, resampled: false, statistics: {
+            count: 4, min: 20, max: 40, mean: 30, std: 2, median: 30, percentiles: {"2": 21, "98": 39},
+            histogram: {counts: [2, 2], edges: [20, 30, 40]}, min_location: [-88.07, 42], max_location: [-88.07, 42]}}));
+        const {ins, plugins, panel, laid} = begin(map, [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}],
+                                                  {["GET " + BASE + "as_converted/point"]: point, ["POST " + BASE + "as_converted/region"]: region});
+        await ins.mosaicsReady;
+        ins.open();
+        expect(panel().querySelector(".dt-inspector-mosaic").textContent).toContain("Roof › Normalized");
+        change(panel().querySelector('[data-act="mosaic-on"]'), true);
+        const layer = laid()[0];
+        // The Analyzer's tiles, in DJI's ironred (the user's) over the tab's 2nd to 98th percentile (°F, the mosaic's unit)
+        expect(layer._url).toBe(BASE + "as_converted/tiles/{z}/{x}/{y}.png?v=2026-11-01T10%3A00%3A00%2B00%3A00&color_map=dji_ironred&rescale=50,121");
+        expect(layer.options.zIndex).toBeGreaterThan(100);
+
+        map.setView([42, -88.07], 18);
+        map.fire("mousemove", {latlng: L.latLng(42, -88.07)});
+        await new Promise(r => setTimeout(r, 120));
+        await flush();
+        expect(point.mock.calls[0][0]).toContain(BASE + "as_converted/point?lon=-88.07000000&lat=42.00000000");
+        expect(panel().querySelector(".dt-inspector-readout").textContent).toBe("40.00 °C");
+
+        // A region over it reads the mosaic's
+        panel().querySelector('[data-mode="rectangle"]').click();
+        map.fire("mousedown", {latlng: map.containerPointToLatLng(L.point(10, 10)), originalEvent: {button: 0}});
+        document.dispatchEvent(new MouseEvent("mouseup", {clientX: 60, clientY: 50}));
+        await flush(); await flush();
+        expect(region).toHaveBeenCalledTimes(1);
+
+        change(panel().querySelector('[data-act="mosaic-tab"]'), "harmonized");
+        expect(layer._url).toContain(BASE + "harmonized/tiles/");
+        expect(layer._url).toContain("rescale=60,110");
+        change(panel().querySelector('[data-act="mosaic-opacity"]'), "40");
+        expect(layer.options.opacity).toBe(0.4);
+        panel().querySelector('[data-act="mosaic-swipe"]').click();
+        expect(plugins.Map.sideBySideChanged).toHaveBeenLastCalledWith(layer, true);
+        // Lifted while swiped: off WebODM's split control first
+        change(panel().querySelector('[data-act="mosaic-on"]'), false);
+        expect(plugins.Map.sideBySideChanged).toHaveBeenLastCalledWith(layer, false);
+        expect(map.hasLayer(layer)).toBe(false);
+        expect(laid().length).toBe(0);
+        map.remove();
+    });
+
+    it("opens with the mosaic a link asks for laid on the map", async () => {
+        const map = leafletMap();
+        const {ins, panel, laid} = begin(map, [], {}, {search: "?dt-mosaic=d-1%2Fabc123def456/harmonized"});
+        await ins.mosaicsReady;
+        expect(ins.state.open).toBe(true);
+        expect(laid()[0].__dtMosaic.tab).toBe("harmonized");
+        expect(panel().querySelector('[data-act="mosaic-on"]').checked).toBe(true);
+        map.remove();
+    });
+
+    it("reads the project, the linked mosaic and the palette a mosaic is drawn in", () => {
+        expect(inspector.projectOf([{meta: {task: {project: 7}}}], "/map/project/2/")).toBe("7");
+        expect(inspector.projectOf([], "/map/project/2/task/abc/")).toBe("2");
+        expect(inspector.projectOf([{meta: {task: {project: 7}}}], "/public/project/xyz/map/")).toBe(null);
+        expect(inspector.linkedMosaic("?a=1&dt-mosaic=d-1%2Fabc/source_frame")).toEqual({dataset: "d-1", workset: "abc", tab: "source_frame"});
+        expect(inspector.linkedMosaic("?dt-mosaic=d-1/abc/view_angle")).toEqual({dataset: "d-1", workset: "abc", tab: null});
+        expect(inspector.linkedMosaic("?dt-mosaic=d-1")).toBe(null);
+        const m = MOSAICS[0];
+        expect(inspector.paletteKey(m, "ironred", DISPLAY)).toBe("dji_ironred");
+        expect(inspector.paletteKey(m, "inferno", DISPLAY)).toBe("inferno");
+        // One the workset doesn't have: its own
+        expect(inspector.paletteKey(m, "magma", DISPLAY)).toBe("inferno");
+        expect(inspector.mosaicRange({stats: {percentiles: [20.04, 20.06]}})).toEqual([20, 20.1]);
+        expect(inspector.mosaicRange({stats: {percentiles: [20, 20]}})).toEqual([20, 21]);
+        const info = inspector.laidMosaic(2, m, "harmonized", "ironred", DISPLAY);
+        expect(inspector.mosaicIsothermUrl(info, {mode: "between", low: 20, high: 30, color: "blue"})).toBe(
+            BASE + "harmonized/isotherm/{z}/{x}/{y}.png?low=20&high=30&color=1e88e5");
+        expect(inspector.toCelsius(212, "F")).toBe(100);
+        expect(inspector.toCelsius(300, "K")).toBeCloseTo(26.85);
+    });
+});
