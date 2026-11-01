@@ -18,7 +18,21 @@ out the visible (RGB) photos taken with them. You can add a GCP file too.
 
 ## 2. Check the measurement values
 
-The panel shows how many thermal photos it found, then the values the temperatures are computed with.
+The panel shows how many thermal photos it found, then two settings, off by default:
+
+- **Normalize** measures every frame with one ambient and reflected temperature, the flight's medians of the values
+  the camera recorded, so there are no jumps between frames where those values change.
+- **Harmonize** also removes each frame's drift against the frames overlapping it, so the map has no seams. It takes
+  longer, and ticks Normalize. [Measurement settings](measurement.md#normalize-and-harmonize-worksets-only) explains
+  both.
+
+Both need every photo before any is converted. With either ticked, the photos are uploaded to the task's
+[DJI Thermal Analyzer](quickstart-analyzer.md) dataset first (**Also keep the photos**, below, is ticked for you),
+WebODM's worker converts them in a workset of that dataset, and the task starts processing once they're converted.
+You can close the page once the upload is done; the message under the project links to the dataset, where the
+workset shows its progress.
+
+Then come the values the temperatures are computed with.
 
 ![The DJI Thermal Task panel, with the measurement values and WebODM's task options](images/thermal-task-panel.png)
 

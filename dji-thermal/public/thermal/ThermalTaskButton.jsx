@@ -61,8 +61,15 @@ export default class ThermalTaskButton extends React.Component {
         return (
             <div className={"alert alert-dismissible " + (r.failed.length ? "alert-warning" : "alert-info")}>
                 <button type="button" className="close" title={_("Close")} onClick={() => this.setState({result: null})}><span aria-hidden="true">&times;</span></button>
-                {interpolate(_("Thermal task created with %(count)s images."), {count: r.converted.length})}
-                {r.dataset ? <React.Fragment>{" "}{_("Its photos are in a")}{" "}
+                {r.workset ?
+                    <React.Fragment>
+                        {interpolate(r.frames.harmonize ? _("Thermal task created: its %(count)s photos are being harmonized in a workset of its") :
+                                     _("Thermal task created: its %(count)s photos are being normalized in a workset of its"), {count: r.total})}
+                        {" "}<a href={"/plugins/dji-thermal/dataset/" + r.dataset}>{_("DJI Thermal Analyzer dataset")}</a>
+                        {". " + _("It starts processing once they are converted.")}
+                    </React.Fragment>
+                : interpolate(_("Thermal task created with %(count)s images."), {count: r.converted.length})}
+                {r.dataset && !r.workset ? <React.Fragment>{" "}{_("Its photos are in a")}{" "}
                     <a href={"/plugins/dji-thermal/dataset/" + r.dataset}>{_("DJI Thermal Analyzer dataset")}</a>
                     {r.analysisError ? ", " + interpolate(_("not analyzed yet: %(error)s"), {error: r.analysisError}) : ""}.</React.Fragment> : ""}
                 {r.failed.length ? " " + interpolate(_("%(count)s photos could not be converted:"), {count: r.failed.length}) : ""}

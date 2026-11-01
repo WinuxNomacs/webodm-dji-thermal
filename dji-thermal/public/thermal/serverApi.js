@@ -57,5 +57,10 @@ export default {
 
     analyzeDataset: datasetId => request({url: `${PLUGIN_API}/datasets/${datasetId}/analyze`, type: "POST", dataType: "json"}),
 
+    startWorkset: (projectId, taskId, settings) => request({
+        url: `${PLUGIN_API}/projects/${projectId}/tasks/${taskId}/workset`, type: "POST", contentType: "application/json",
+        data: JSON.stringify({settings}), dataType: "json"
+    }),
+
     removeDataset: datasetId => request({url: `${PLUGIN_API}/datasets/${datasetId}`, type: "DELETE"})
 };

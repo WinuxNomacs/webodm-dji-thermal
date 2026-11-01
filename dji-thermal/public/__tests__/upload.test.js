@@ -32,7 +32,8 @@ function fakeApi(answers = {}){
         taskDataset: jest.fn(() => Promise.resolve({id: "d1"})),
         uploadToDataset: jest.fn(() => Promise.resolve({})),
         analyzeDataset: jest.fn(() => Promise.resolve({})),
-        removeDataset: jest.fn(() => Promise.resolve())
+        removeDataset: jest.fn(() => Promise.resolve()),
+        startWorkset: jest.fn(() => Promise.resolve({id: "w1"}))
     };
     return api;
 }
@@ -157,5 +158,32 @@ describe("a thermal task's upload", () => {
         expect(api.removeDataset).toHaveBeenCalledWith("d1");
         expect(api.removeTask).toHaveBeenCalledWith(7, "t1");
         expect(api.commit).not.toHaveBeenCalled();
+    });
+
+    test("normalized, every photo goes to the task's dataset and the server converts them in a workset, without converting or committing here", async () => {
+        const api = fakeApi();
+        const progress = [];
+        const gcp = new File(["EPSG:4326\n0.50 0.60 223.8 320 256 DJI_0001_T.JPG gcp1\n"], "gcp_list.txt");
+        const thermal = Array.from({length: 11}, (_, i) => photo("DJI_00" + String(i + 1).padStart(2, "0") + "_T.JPG"));
+        const result = await upload(api, thermal, {frames: {normalize: true}, textFiles: [gcp], otherPhotos: [photo("DJI_0001_V.JPG")],
+                                                   onProgress: p => progress.push(p.done)}).start();
+
+        expect(api.taskDataset).toHaveBeenCalledWith(7, "t1");
+        expect(api.uploadToDataset.mock.calls.map(c => c[1].length)).toEqual([10, 2]);
+        expect(progress).toEqual([10, 12]);
+        expect(await readText(api.uploadFiles.mock.calls[0][2][0])).toContain("DJI_0001_T_temp_c.tiff gcp1");
+        expect(api.startWorkset).toHaveBeenCalledWith(7, "t1", {unit: "C", distance: "lrf", normalize: true, harmonize: false});
+        expect(api.convert).not.toHaveBeenCalled();
+        expect(api.commit).not.toHaveBeenCalled();
+        expect(result).toMatchObject({dataset: "d1", workset: "w1", frames: {normalize: true, harmonize: false}, total: 12});
+    });
+
+    test("harmonize normalizes too, and a workset that cannot start removes the task and its dataset", async () => {
+        const api = fakeApi();
+        api.startWorkset = jest.fn(() => Promise.reject(new Error("Over quota")));
+        await expect(upload(api, [photo("DJI_0001_T.JPG")], {frames: {harmonize: true}}).start()).rejects.toThrow("Over quota");
+        expect(api.startWorkset.mock.calls[0][2]).toMatchObject({normalize: true, harmonize: true});
+        expect(api.removeDataset).toHaveBeenCalledWith("d1");
+        expect(api.removeTask).toHaveBeenCalledWith(7, "t1");
     });
 });

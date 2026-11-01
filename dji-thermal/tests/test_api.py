@@ -4,6 +4,7 @@ task's DJI Thermal Analyzer dataset.
 
 As in test_converter, the tests with real R-JPEGs read them from DJI_THERMAL_SAMPLES_DIR and are skipped without it.
 """
+import contextlib
 import importlib
 import io
 import os
@@ -23,6 +24,8 @@ from .test_converter import ConverterTestCase, jpegs_in, read_tags, skip_without
 converter = importlib.import_module("coreplugins.dji-thermal.converter")
 api = importlib.import_module("coreplugins.dji-thermal.api")
 datasets = importlib.import_module("coreplugins.dji-thermal.datasets")
+conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
+conversion_tasks = importlib.import_module("coreplugins.dji-thermal.conversion_tasks")
 
 DESCRIBE_URL = "/api/plugins/dji-thermal/describe"
 
@@ -248,3 +251,79 @@ class TestTaskDataset(ApiTestCase):
         self.assertIn("quota", str(res.data))
         self.task.refresh_from_db()
         self.assertFalse(datasets.is_dataset(self.task))
+
+
+class TestTaskWorkset(ApiTestCase):
+    """DJI Thermal Task normalized or harmonized: the photos in the task's dataset, converted in a workset of it"""
+    def setUp(self):
+        super().setUp()
+        self.task.tags = ".dji-thermal-task"
+        self.task.auto_processing_node = True
+        self.task.save()
+        self.url = "/api/plugins/dji-thermal/projects/{}/tasks/{}/workset".format(self.project.id, self.task.id)
+
+    def made_dataset(self, *photos):
+        self.client.post(dataset_url(self.task))
+        self.task.refresh_from_db()
+        res = self.client.post("/api/plugins/dji-thermal/datasets/{}/upload".format(self.task.id),
+                               {"images": list(photos) or [jpeg_upload()]}, format="multipart")
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+
+    def test_a_workset_needs_a_partial_task_that_is_a_dataset_with_photos_and_normalizing(self):
+        self.assertIn("not a dataset", str(self.client.post(self.url, {"settings": {"normalize": True}}, format="json").data))
+        self.client.post(dataset_url(self.task))
+        self.assertIn("photos", str(self.client.post(self.url, {"settings": {"normalize": True}}, format="json").data))
+        self.made_dataset()
+        self.assertIn("Normalize or harmonize", str(self.client.post(self.url, {"settings": {}}, format="json").data))
+        Task.objects.filter(pk=self.task.pk).update(partial=False)
+        self.assertIn("already been committed", str(self.client.post(self.url, {"settings": {"normalize": True}}, format="json").data))
+        self.assertEqual(conversions.ids(self.task), [])
+
+    def test_the_workset_has_the_panel_s_values_and_commits_the_task_to_its_node_once_converted(self):
+        self.made_dataset()
+        with mock.patch.object(datasets, "start_job"):
+            res = self.client.post(self.url, {"settings": {"harmonize": True, "emissivity": "0.9", "unit": "F",
+                                                           "reflected_temp": "70", "distance": "embedded"}}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        record = conversions.record(self.task, res.data["id"])
+        self.assertEqual(record["name"], "DJI Thermal Task")
+        self.assertEqual({k: record["settings"][k] for k in ("normalize", "harmonize", "emissivity", "unit", "reflected_temp",
+                                                             "distance", "outputs", "mosaics")},
+                         {"normalize": True, "harmonize": True, "emissivity": 0.9, "unit": "F", "reflected_temp": 70.0,
+                          "distance": "embedded", "outputs": ["temp_c:tiff"], "mosaics": True})
+        self.assertEqual(record["then"], {"processing_node": None, "auto_processing_node": True})
+
+    def test_once_converted_the_task_gets_the_tiffs_keeps_its_text_files_and_is_committed(self):
+        self.made_dataset()
+        with mock.patch.object(datasets, "start_job"):
+            cid = conversions.create(self.task, "DJI Thermal Task", dict(conversions.DEFAULTS, normalize=True),
+                                     User.objects.get(username="testuser"))
+        out = conversions.output_path(self.task, cid)
+        for name in ("DJI_0001_T_temp_c.tiff", "DJI_0002_T_temp_c.tiff"):
+            with open(os.path.join(out, name), "wb") as f:
+                f.write(b"II*\0")
+        datasets.write_json(conversions.path(self.task, cid, conversions.RESULTS_FILE), {"files": [
+            {"path": n.replace("_temp_c.tiff", ".JPG"), "ok": True, "outputs": [n]} for n in os.listdir(out) if n.endswith(".tiff")]})
+        with open(self.task.get_image_path("gcp_list.txt"), "w") as f:
+            f.write("EPSG:4326\n")
+        with mock.patch("worker.tasks.process_task") as process:
+            conversion_tasks.commit_parent(self.task, cid, {"processing_node": None, "auto_processing_node": True})
+        self.task.refresh_from_db()
+        self.assertEqual((self.task.partial, self.task.auto_processing_node, self.task.images_count), (False, True, 3))
+        self.assertEqual(sorted(self.task.scan_images()), ["DJI_0001_T_temp_c.tiff", "DJI_0002_T_temp_c.tiff", "gcp_list.txt"])
+        process.delay.assert_called_once_with(self.task.id)
+
+    @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def test_a_flight_normalized_through_a_workset_is_committed_with_its_tiffs(self):
+        frames = [f for f in jpegs_in("DJI_THERMAL_FLIGHT_DIR") if f.upper().endswith("_T.JPG")][:3]
+        with contextlib.ExitStack() as stack:
+            self.made_dataset(*[stack.enter_context(open(f, "rb")) for f in frames])
+        with mock.patch("worker.tasks.process_task") as process:
+            res = self.client.post(self.url, {"settings": {"normalize": True}}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        self.assertEqual(conversions.job(self.task, res.data["id"])["status"], "ready")
+        self.task.refresh_from_db()
+        self.assertFalse(self.task.partial)
+        self.assertEqual(sorted(self.task.scan_images()),
+                         sorted(os.path.splitext(os.path.basename(f))[0] + "_temp_c.tiff" for f in frames))
+        process.delay.assert_called_once_with(self.task.id)

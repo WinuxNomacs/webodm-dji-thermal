@@ -319,6 +319,39 @@ def use_for_parent(task, cid, user=None):
     return t
 
 
+def commit_parent(task, cid, then):
+    """
+    A DJI Thermal Task's task (the dataset's own, still partial) normalized or harmonized through a workset (api.py
+    TaskWorkset), once the workset is converted: its TIFFs put in the task, which is committed to the processing node
+    chosen when it was made (then: {processing_node, auto_processing_node}), as WebODM's own commit does. What goes
+    wrong is the task's error, as WebODM shows one.
+    """
+    from worker import tasks as worker_tasks
+    # The GCP file and WebODM's text files sent with the photos, kept through use_for_parent's clearing of the folder
+    texts = {}
+    for name in task.scan_images():
+        if name.lower().endswith('.txt'):
+            with open(task.get_image_path(name), 'rb') as f:
+                texts[name] = f.read()
+    try:
+        t = use_for_parent(task, cid)
+    except ValueError as e:
+        Task.objects.filter(pk=task.pk).update(last_error=str(e))
+        return None
+    finally:
+        for name, content in texts.items():
+            with open(task.get_image_path(name), 'wb') as f:
+                f.write(content)
+    t.processing_node_id = then.get('processing_node')
+    t.auto_processing_node = bool(then.get('auto_processing_node'))
+    t.partial = False
+    t.images_count = len(t.scan_images())
+    t.update_size()
+    t.save()
+    worker_tasks.process_task.delay(t.id)
+    return t
+
+
 def release(task):
     """The dataset deleted, its task kept as an ordinary WebODM task with the images sent to it and what it processed:
     the dataset's jobs canceled, its folder removed, its tag and name prefix dropped"""
