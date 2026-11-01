@@ -31,6 +31,7 @@ from .test_converter import jpegs_in, skip_without
 datasets = importlib.import_module("coreplugins.dji-thermal.datasets")
 analysis = importlib.import_module("coreplugins.dji-thermal.analysis")
 conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
+converter = importlib.import_module("coreplugins.dji-thermal.converter")
 mosaics = importlib.import_module("coreplugins.dji-thermal.mosaics")
 colouring = importlib.import_module("coreplugins.dji-thermal.colouring")
 conversion_tasks = importlib.import_module("coreplugins.dji-thermal.conversion_tasks")
@@ -333,6 +334,37 @@ class TestConversionSettings(AnalyzerTestCase):
         self.assertEqual(errors, {})
         self.assertEqual((settings["distance"], settings["normalize"]), (12.5, True))
 
+    def test_harmonize_normalizes_too_and_settings_saved_before_it_harmonize_when_they_normalize(self):
+        settings, _ = conversions.parse_settings({"normalize": False, "harmonize": True})
+        self.assertEqual((settings["normalize"], settings["harmonize"]), (True, True))
+        settings, _ = conversions.parse_settings({"normalize": True, "harmonize": False})
+        self.assertEqual((settings["normalize"], settings["harmonize"]), (True, False))
+        self.assertTrue(conversions.harmonized({"normalize": True}))
+        self.assertEqual(conversions.summary_text(dict(conversions.DEFAULTS, normalize=True)).split(" · ")[1], "normalized")
+        self.assertIn("harmonized", conversions.summary_text({"normalize": True, "outputs": []}))
+
+    def test_normalizing_alone_measures_every_frame_with_the_flight_s_medians_unless_given(self):
+        s = dict(conversions.DEFAULTS, normalize=True, unit="F", reflected_temp=70.0)
+        args = conversions.api_arguments(s, (20.0, 25.0))
+        self.assertFalse(args["normalize"])
+        self.assertEqual((args["settings"].ambient_temp, args["settings"].reflected_temp), (68.0, 70.0))
+        args = conversions.api_arguments(dict(s, harmonize=True), (20.0, 25.0))
+        self.assertTrue(args["normalize"])
+        self.assertIsNone(args["settings"].ambient_temp)
+        self.assertIsNone(conversions.api_arguments(dict(conversions.DEFAULTS), (20.0, 25.0))["settings"].ambient_temp)
+
+    def test_the_flight_s_medians_are_those_the_frames_recorded(self):
+        recorded = {"a": {"ambient_temp": 20.0, "reflected_temp": 22.0}, "b": {"ambient_temp": 24.0},
+                    "c": {"ambient_temp": 30.0, "reflected_temp": 26.0}}
+
+        def describe(path):
+            if path not in recorded:
+                raise ValueError("not thermal")
+            return {"recorded": recorded[path]}
+        with mock.patch.object(converter, "describe", side_effect=describe):
+            self.assertEqual(conversions.flight_medians("/", ["a", "b", "c", "rgb"]), (24.0, 24.0))
+            self.assertEqual(conversions.flight_medians("/", ["rgb"]), (None, None))
+
     def test_a_user_saves_and_forgets_their_defaults(self):
         url = "/api/plugins/dji-thermal/preferences"
         res = self.client.get(url)
@@ -510,6 +542,20 @@ class TestConversions(AnalyzerTestCase):
         with zipfile.ZipFile(io.BytesIO(b"".join(everything.streaming_content))) as z:
             self.assertEqual(sorted(z.namelist()), sorted(conversions.output_files(task, res.data["id"])))
             self.assertEqual(len(z.namelist()), 6)
+
+    @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def test_a_flights_frames_normalized_alone_are_measured_with_its_medians_and_keep_their_drift(self):
+        frames = flight_frames(3)
+        task = self.create()
+        with contextlib.ExitStack() as stack:
+            self.upload(task, [stack.enter_context(open(f, "rb")) for f in frames])
+        medians = conversions.flight_medians(datasets.images_path(task), frames)
+        res = self.convert(task, {"outputs": ["temp_c:tiff"], "normalize": True, "harmonize": False, "mosaics": False})
+        self.assertEqual((res.data["status"], res.data["converted"]), ("ready", 3), res.data["error"])
+        self.assertEqual(res.data["results"]["normalization"],
+                         {"ambient_c": medians[0], "reflected_c": medians[1], "offsets": False})
+        self.assertEqual(conversions.normalized_medians(task, res.data["id"]), medians)
+        self.assertTrue(all(f["offset_c"] is None for f in res.data["results"]["files"]))
 
 
 def web_mercator_tile(lon, lat, z):
@@ -939,7 +985,7 @@ class TestConversionTasks(AnalyzerTestCase):
         info = self.client.get(self.url(task, cid)).data
         self.assertEqual(info["problems"], [])
         self.assertEqual(info["warnings"], [
-            "Not normalized: the frames' offsets show as seams where ODM blends them",
+            "Not harmonized: the frames' offsets show as seams where ODM blends them",
             "Oblique frames kept: the plan leaves out frames above -80° pitch",
             "Emissivity as recorded, the plan's is 0.95"])
 

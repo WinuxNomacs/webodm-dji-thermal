@@ -101,8 +101,8 @@ def checks(task, cid):
         problems.append("A task needs at least {} frames".format(MIN_FRAMES))
 
     plan = plan_settings(plan_of(task).get('process_args'))
-    if plan['normalize'] and not settings.get('normalize'):
-        warnings.append("Not normalized: the frames' offsets show as seams where ODM blends them")
+    if plan['normalize'] and not conversions.harmonized(settings):
+        warnings.append("Not harmonized: the frames' offsets show as seams where ODM blends them")
     if plan['max_pitch'] is not None and settings.get('max_pitch') != plan['max_pitch']:
         if settings.get('max_pitch') is None:
             warnings.append("Oblique frames kept: the plan leaves out frames above {:g}° pitch".format(plan['max_pitch']))

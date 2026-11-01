@@ -21,8 +21,9 @@ The settings are in sections:
   others), their compression, and whether to build mosaics.
 - **Measurement**: the values the temperatures are computed with. Left empty, each photo keeps its recorded value;
   the recorded median shows under each field. See [Measurement settings](measurement.md).
-- **Frames**: **Normalize** (the frames made to agree on temperature) and a gimbal pitch limit that keeps only the
-  frames looking straight down.
+- **Frames**: **Normalize** (one ambient and reflected temperature for every frame), **Harmonize** (also each
+  frame's drift removed, so a map has no seams; see [Measurement settings](measurement.md)) and a gimbal pitch
+  limit that keeps only the frames looking straight down.
 - **Adjustments**: gimbal angle overrides, temperatures above or below a threshold replaced, and the location and
   identifiers stripped from the outputs.
 
