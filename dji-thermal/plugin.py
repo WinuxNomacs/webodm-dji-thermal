@@ -53,8 +53,8 @@ class Plugin(PluginBase):
         return [name + "?v=" + v for name in ['main.js', 'scale.js', 'recolour.js', 'regions.js', 'frames.js', 'inspector.js']]
 
     def build_jsx_components(self):
-        # Leaflet: WebODM's own, for the mosaic viewer (see thermal/Leaflet.js)
-        return ['thermal/ThermalTaskButton.jsx', 'thermal/Leaflet.js']
+        # WorksetProgress: in a task's panel (main.js); Leaflet: WebODM's own, for the mosaic viewer (see thermal/Leaflet.js)
+        return ['thermal/ThermalTaskButton.jsx', 'thermal/WorksetProgress.jsx', 'thermal/Leaflet.js']
 
     def api_mount_points(self):
         return [

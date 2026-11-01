@@ -3,6 +3,7 @@ import ReactDOM from 'ReactDOM';
 import PropTypes from 'prop-types';
 import { _, interpolate } from 'webodm/classes/gettext';
 import ThermalTaskPanel from './ThermalTaskPanel';
+import WorksetProgress from './WorksetProgress';
 import { sortFiles } from './rjpeg';
 import './ThermalTask.scss';
 
@@ -67,6 +68,7 @@ export default class ThermalTaskButton extends React.Component {
                                      _("Thermal task created: its %(count)s photos are being normalized in a workset of its"), {count: r.total})}
                         {" "}<a href={"/plugins/dji-thermal/dataset/" + r.dataset}>{_("DJI Thermal Analyzer dataset")}</a>
                         {". " + _("It starts processing once they are converted.")}
+                        <WorksetProgress projectId={this.props.projectId} taskId={r.task.id} onStarted={this.props.onNewTaskAdded} />
                     </React.Fragment>
                 : interpolate(_("Thermal task created with %(count)s images."), {count: r.converted.length})}
                 {r.dataset && !r.workset ? <React.Fragment>{" "}{_("Its photos are in a")}{" "}

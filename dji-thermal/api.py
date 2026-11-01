@@ -177,13 +177,32 @@ class TaskWorkset(APIView):
     permission_classes = (permissions.IsAuthenticated,)
     MEASUREMENT = ('distance', 'unit', 'emissivity', 'reflected_temp', 'ambient_temp', 'humidity')
 
-    def post(self, request, project_pk=None, pk=None):
-        from . import conversions
+    def get_task(self, request, project_pk, pk, perms):
         try:
             task = Task.objects.get(pk=pk, project=project_pk, project__deleting=False)
-            check_project_perms(request, task.project, ('change_project',))
+            check_project_perms(request, task.project, perms)
         except (ObjectDoesNotExist, ValidationError):
             raise exceptions.NotFound() from None
+        return task
+
+    def get(self, request, project_pk=None, pk=None):
+        """The task's workset converting its photos, as the project page shows its progress (WorksetProgress.jsx):
+        {id, status, progress, stage, error, photos, committed: the task has its images, task_error}"""
+        from . import conversions
+        task = self.get_task(request, project_pk, pk, ('view_project',))
+        cid = next((c for c in reversed(conversions.ids(task)) if conversions.record(task, c).get('then')), None)
+        if cid is None:
+            raise exceptions.NotFound(detail="The task has no workset converting its photos")
+        conversions.check_stale(task, cid)
+        job = conversions.job(task, cid)
+        return Response({'id': cid, 'status': job['status'], 'progress': job.get('progress') or 0,
+                         'stage': job.get('stage') or {}, 'error': job.get('error') or '',
+                         'photos': len(datasets.image_files(task)), 'committed': not task.partial,
+                         'task_error': task.last_error or ''})
+
+    def post(self, request, project_pk=None, pk=None):
+        from . import conversions
+        task = self.get_task(request, project_pk, pk, ('change_project',))
         if not task.partial:
             raise exceptions.ValidationError(detail="The task's images have already been committed")
         if not datasets.is_dataset(task):

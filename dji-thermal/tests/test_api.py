@@ -311,6 +311,26 @@ class TestTaskWorkset(ApiTestCase):
         self.assertEqual((record["settings"]["palette"], conversion_tasks.task_palette(self.task)), ("hotiron", "hotiron"))
         self.assertEqual(record["then"], {"processing_node": None, "auto_processing_node": True})
 
+    def test_the_workset_s_progress_says_how_far_it_is_and_whether_the_task_started(self):
+        self.assertEqual(self.client.get(self.url).status_code, status.HTTP_404_NOT_FOUND)
+        self.made_dataset()
+        with mock.patch.object(datasets, "start_job"):
+            cid = self.client.post(self.url, {"settings": {"normalize": True}}, format="json").data["id"]
+        datasets.update_job(self.task, rel=conversions.rel(cid, conversions.JOB_FILE), status="converting", progress=0.25,
+                            stage={"stage": "align", "step": 2, "steps": 5}, started_at=datasets.now())
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual(res.data, {"id": cid, "status": "converting", "progress": 0.25,
+                                    "stage": {"stage": "align", "step": 2, "steps": 5}, "error": "", "photos": 1,
+                                    "committed": False, "task_error": ""})
+        Task.objects.filter(pk=self.task.pk).update(partial=False, last_error="No node")
+        self.assertEqual({k: self.client.get(self.url).data[k] for k in ("committed", "task_error")},
+                         {"committed": True, "task_error": "No node"})
+        # Only those who can see the project
+        other = APIClient()
+        other.force_authenticate(User.objects.create_user("stranger", password="x"))
+        self.assertEqual(other.get(self.url).status_code, status.HTTP_404_NOT_FOUND)
+
     def test_once_converted_the_task_gets_the_tiffs_keeps_its_text_files_and_is_committed_to_the_node_chosen(self):
         self.made_dataset()
         # WebODM's upload gives the partial task the node chosen: it waits for its images, not processing

@@ -12,7 +12,7 @@ function sideMenu(staff){
 function loadMain(){
     global.PluginsAPI = {Dashboard: {addNewTaskButton: jest.fn(), addTaskActionButton: jest.fn()},
                          Map: {willAddControls: jest.fn()}};
-    global.React = {createElement: (type, props, ...children) => ({type, props, children})};
+    global.React = {createElement: (type, props, ...children) => ({type, props, children}), Component: function(props){ this.props = props; }};
     jest.isolateModules(() => require("../main.js"));
 }
 
@@ -53,6 +53,30 @@ test("a dataset's own task gets a Thermal dataset button to the dataset", () => 
     expect(button.props.href).toBe("/plugins/dji-thermal/dataset/" + DATASET);
     expect(button.props.className).toBe("btn btn-sm btn-primary");
     expect(button.children[1]).toBe(" Thermal dataset");
+});
+
+test("a DJI Thermal Task's partial task shows its workset's progress in its panel, until it is committed", () => {
+    sideMenu(false);
+    loadMain();
+    const add = global.PluginsAPI.Dashboard.addTaskActionButton.mock.calls[1][0];
+    const progress = add({task: {id: DATASET, project: 12, partial: true, tags: [".dji-thermal-task", ".dji-thermal-dataset"]}});
+    expect(progress.props).toEqual({projectId: 12, taskId: DATASET});
+    expect(add({task: {id: DATASET, project: 12, partial: false, tags: [".dji-thermal-task"]}})).toBe(null);
+    expect(add({task: {id: DATASET, project: 12, partial: true, tags: []}})).toBe(null);
+});
+
+test("a panel's component from a bundle is answered at once and shown once the bundle is loaded", async () => {
+    sideMenu(false);
+    loadMain();
+    function Loaded(){}
+    global.PluginsAPI.SystemJS = {import: jest.fn(() => Promise.resolve({default: Loaded}))};
+    const Lazy = window.DjiThermalLazy("dji-thermal/build/X.js");
+    const shown = new Lazy({taskId: "t"});
+    shown.setState = function(s){ Object.assign(this.state, s); };
+    expect(shown.render()).toBe(null);
+    await shown.componentDidMount();
+    expect(global.PluginsAPI.SystemJS.import).toHaveBeenCalledWith("dji-thermal/build/X.js");
+    expect(shown.render()).toEqual({type: Loaded, props: {taskId: "t"}, children: []});
 });
 
 test("a task made from a workset links back to its dataset", () => {
