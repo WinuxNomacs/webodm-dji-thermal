@@ -670,6 +670,18 @@
     by `tests/colouring_fixtures.py` and checked current by `test_analyzer`. `recolour.test.js` (15: all eight
     cases pixel for pixel), `test_inspector.py` (3), `test_analyzer.py` (2, and the flight's value tiles). Timed on
     the user's task in the container: a value tile 15 ms and 16 KB, a coloured tile 18 ms (34 sharpened) and 8 KB.
+  - Step 2 built (2026-11-01), on `recolour-core`: `recolour.drawFromValues` (a Leaflet layer's `createTile` drawing
+    canvases from value tiles, `recolour()` once a frame, an unloaded tile's request aborted) and `isothermRange`;
+    `viewer.js`: the mosaic an `L.gridLayer` drawn from `valuesUrl`, `drawStyle`, the equalization from the tab's
+    histogram (asked once), the sliders recolouring while they move (`recolour`), the frames window on release
+    (`restyle`); `viewer.html` loads `recolour.js`. Found live: a tile read with a margin lands on a slightly shifted
+    grid (rio-tiler aligns its grid to the read's corner), so `_tile_values` (both) now takes the tile's own pixels
+    from a read without one (the server's sharpened tiles no longer shift either), and the seams' flags give the
+    second side's colour where both are, as `tile` draws. README, `quickstart-worksets.md`; screenshot
+    `mosaic-viewer` retaken. `analyzer.test.js` (viewer tests on the drawn style), `recolour.test.js` (1). Live, read
+    only, on the user's workset: no requests while a slider moves, 5 brightness steps drawn in 160 ms, sharpening in
+    75 ms; against the server's tiles with the same style, 15 of 35,546 pixels differ by at most 3 levels (6
+    sharpened: the 16-bit codes), the source frames' 25 more on the tile's edge (seams found from a margin of 8, not 1).
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone

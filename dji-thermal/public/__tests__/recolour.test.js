@@ -82,3 +82,54 @@ describe("value tiles", () => {
         canvas.mockRestore();
     });
 });
+
+describe("a Leaflet layer drawn from value tiles", () => {
+    // A canvas stand-in: what was put on it
+    function fakeCanvas() {
+        const ctx = {puts: 0, createImageData: (w, h) => ({width: w, height: h, data: new Uint8ClampedArray(w * h * 4)}),
+                     putImageData(image) { this.puts++; this.last = image; }, clearRect: jest.fn(), drawImage: jest.fn()};
+        return {getContext: () => ctx, ctx};
+    }
+
+    test("draws each tile from its values, colours them all again once a frame, and stops asking for a tile let go of", async () => {
+        const headers = {"X-Values-Offset": "10", "X-Values-Step": "1", "X-Values-Margin": "0", "X-Sharpen-Sigma": "1"};
+        let release;
+        const fetchFn = jest.fn((url, opts) => (url.endsWith("/slow") ? new Promise((resolve) => { release = resolve; opts.signal.addEventListener("abort", () => resolve({status: 404})); }) :
+            Promise.resolve({status: 200, ok: true, headers: {get: (k) => headers[k]}, blob: () => Promise.resolve("blob")})));
+        window.createImageBitmap = jest.fn(() => Promise.resolve({width: 2, height: 1}));
+        const create = jest.spyOn(document, "createElement").mockImplementation(() => {
+            const c = fakeCanvas();
+            c.ctx.getImageData = () => ({data: new Uint8ClampedArray([0, 0, 0, 255, 0, 10, 0, 255])});
+            c.ctx.drawImage = jest.fn();
+            return c;
+        });
+        const handlers = {};
+        const layer = {getTileSize: () => ({x: 2, y: 1}), on(ev, f) { handlers[ev] = f; return this; }};
+        let style = {colors: [0x000000ff, 0xffffffff], range: [10, 20], shares: null, sharpen: 0, isotherm: null};
+        Recolour.drawFromValues(layer, {url: (c) => "/values/" + c.z + (c.slow ? "/slow" : ""), style: () => style, fetchFn});
+
+        const done = jest.fn();
+        const canvas = layer.createTile({z: 3}, done);
+        await new Promise((r) => setTimeout(r, 0));
+        expect(fetchFn.mock.calls[0][0]).toBe("/values/3");
+        expect(done).toHaveBeenCalledWith(null, canvas);
+        expect(canvas.complete).toBe(true);
+        expect(Array.from(canvas.ctx.last.data)).toEqual([0, 0, 0, 255, 255, 255, 255, 255]);
+
+        jest.useFakeTimers();
+        const frame = jest.spyOn(window, "requestAnimationFrame");
+        style = Object.assign({}, style, {range: [0, 40]});
+        layer.recolour();
+        layer.recolour();
+        expect(frame).toHaveBeenCalledTimes(1);
+        jest.runOnlyPendingTimers();
+        expect(canvas.ctx.puts).toBe(2);
+        jest.useRealTimers();
+
+        const slow = layer.createTile({z: 4, slow: true}, jest.fn());
+        handlers.tileunload({tile: slow});
+        expect(fetchFn.mock.calls[1][1].signal.aborted).toBe(true);
+        release();
+        create.mockRestore();
+    });
+});

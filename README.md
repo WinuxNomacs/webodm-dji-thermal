@@ -176,7 +176,9 @@ over WebODM's base layers:
 - how the image is drawn (**Image**): **Brightness** and **Contrast** (which move and narrow the range), **Gamma**,
   **Sharpening** (an unsharp mask), **Linear** or **Equalized** (the colours spread over the temperatures the whole
   mosaic has most of; temperatures only) and **Reset**, drawn into the tiles and the frames' pictures, with the colour
-  scale drawn to match; the temperatures stay as they are. The temperature tabs share them, and each visit starts
+  scale drawn to match; the temperatures stay as they are. The map follows the sliders, the range and the isotherm as
+  they change, with no waiting: the browser colours each tile from its temperatures, which the server sends once (the
+  frames' pictures are drawn again once a slider is let go of). The temperature tabs share them, and each visit starts
   without them;
 - an **Isotherm** on the temperature tabs (above, below or between temperatures): its pixels keep the palette and the
   rest turns grey, on the map and in the frames' pictures;

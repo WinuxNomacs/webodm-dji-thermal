@@ -209,8 +209,79 @@
         return out;
     }
 
+    // The values of an isotherm as the server takes it ("above,T", "below,T", "between,A,B") drawn in the palette, as
+    // colour takes them ([low, high]), or null for none
+    function isothermRange(value) {
+        var p = String(value || "").split(",").map(parseFloat);
+        if (/^above,/.test(value)) return [p[1], 3e38];
+        if (/^below,/.test(value)) return [-3e38, p[1]];
+        if (/^between,/.test(value)) return [p[1], p[2]];
+        return null;
+    }
+
+    // -- Leaflet: a layer's tiles drawn from value tiles ----------------------------------------------------------------
+
+    // Makes a Leaflet grid layer (an L.GridLayer, or one of WebODM's L.TileLayers) draw its tiles from value tiles:
+    // o.url(coords) gives a tile's values URL, o.style() how they are coloured now (colour's style, or null for none),
+    // o.fetchFn fetches. layer.recolour() colours every tile again from its values, once a frame however often it is
+    // called. Returns the layer.
+    function drawFromValues(layer, o) {
+        var doc = root.document, canvases = [], frame = null, fetchFn = o.fetchFn || root.fetch.bind(root);
+        layer.__dtValues = o;
+        var later = function (f) { return root.requestAnimationFrame ? root.requestAnimationFrame(f) : setTimeout(f, 16); };
+        function paint(canvas) {
+            var tile = canvas.__dtTile, style = o.style(), ctx = canvas.getContext("2d");
+            if (!tile || !style) return ctx.clearRect(0, 0, canvas.width, canvas.height);
+            var w = tile.width - 2 * tile.margin, h = tile.height - 2 * tile.margin;
+            if (!canvas.__dtImage) canvas.__dtImage = ctx.createImageData(w, h);
+            colour(tile, style, canvas.__dtImage.data);
+            if (w === canvas.width && h === canvas.height) return ctx.putImageData(canvas.__dtImage, 0, 0);
+            // Drawn at another size than the values (a retina screen's tiles): scaled
+            var shown = doc.createElement("canvas");
+            shown.width = w;
+            shown.height = h;
+            shown.getContext("2d").putImageData(canvas.__dtImage, 0, 0);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(shown, 0, 0, canvas.width, canvas.height);
+        }
+        layer.createTile = function (coords, done) {
+            var canvas = doc.createElement("canvas"), size = this.getTileSize();
+            canvas.width = size.x;
+            canvas.height = size.y;
+            var controller = root.AbortController ? new root.AbortController() : null;
+            canvas.__dtAbort = controller;
+            canvases.push(canvas);
+            fetchValues(o.url(coords), fetchFn, controller && controller.signal).then(function (tile) {
+                canvas.__dtTile = tile;
+                if (tile) paint(canvas);
+                // as Leaflet takes a loaded image (it removes those of another zoom still loading)
+                canvas.complete = true;
+                done(null, canvas);
+            }, function (err) {
+                canvas.complete = true;
+                done(err, canvas);
+            });
+            return canvas;
+        };
+        layer.on("tileunload", function (e) {
+            var at = canvases.indexOf(e.tile);
+            if (at === -1) return;
+            canvases.splice(at, 1);
+            if (!e.tile.complete && e.tile.__dtAbort) e.tile.__dtAbort.abort();
+        });
+        layer.recolour = function () {
+            if (frame !== null) return;
+            frame = later(function () {
+                frame = null;
+                canvases.forEach(function (c) { if (c.__dtTile) paint(c); });
+            });
+        };
+        return layer;
+    }
+
     var api = {decode: decode, fetchValues: fetchValues, interp: interp, equalization: equalization, curveShares: curveShares,
-               drawnShares: drawnShares, tonedPalette: tonedPalette, colour: colour, CURVE_SAMPLES: CURVE_SAMPLES};
+               drawnShares: drawnShares, tonedPalette: tonedPalette, colour: colour, isothermRange: isothermRange,
+               drawFromValues: drawFromValues, CURVE_SAMPLES: CURVE_SAMPLES};
     root.ThermalRecolour = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

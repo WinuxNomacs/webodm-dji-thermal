@@ -476,8 +476,9 @@ def values_tile(task, cid, tab, z, x, y):
     values, frames, sigma = found
     flags = None
     if frames is not None:
-        flags = np.where(frames[1], 2, 0).astype(np.uint8)
-        flags[frames[0]] = 1
+        # as tile draws them: the second's colour where both are
+        flags = np.where(frames[0], 1, 0).astype(np.uint8)
+        flags[frames[1]] = 2
     return colouring.value_png(values, flags) + (sigma,)
 
 
@@ -503,20 +504,27 @@ def _tile_values(task, cid, tab, z, x, y, buffer):
         minzoom, maxzoom = get_zoom_safe(src)
         if z < minzoom - ZOOM_EXTRA_LEVELS or z > maxzoom + ZOOM_EXTRA_LEVELS:
             return None
+        indexes = (1, band) if framed else (band,)
         try:
-            t = src.tile(x, y, z, indexes=(1, band) if framed else (band,), tilesize=TILE_SIZE,
-                         resampling_method='nearest', tile_buffer=buffer or None)
+            t = src.tile(x, y, z, indexes=indexes, tilesize=TILE_SIZE, resampling_method='nearest',
+                         tile_buffer=buffer or None)
+            # The tile itself as it is read without a margin: with one, its pixels land on a slightly shifted grid
+            inner = src.tile(x, y, z, indexes=indexes, tilesize=TILE_SIZE, resampling_method='nearest') if buffer else t
         except TileOutsideBounds:
             return None
-    data = np.asarray(t.data[0], dtype=np.float64)
-    valid = (t.mask > 0) & np.isfinite(data)
+    bands, mask = np.asarray(t.data, dtype=np.float64), t.mask.copy()
+    if buffer:
+        bands[:, buffer:-buffer, buffer:-buffer] = inner.data
+        mask[buffer:-buffer, buffer:-buffer] = inner.mask
+    data = bands[0]
+    valid = (mask > 0) & np.isfinite(data)
     built = result(task, cid)
     if framed or band == 1:
         valid &= data > low_value(built.get('unit') or 'C')
     gsd = ((built.get('kinds') or {}).get(tab_kind(tab)) or {}).get('gsd_m')
     found_seams = None
     if framed:
-        frames = np.asarray(t.data[1], dtype=np.float64)
+        frames = bands[1]
         found_seams = seams(np.rint(np.where(np.isfinite(frames), frames, -1)), valid & np.isfinite(frames))
     return (np.where(valid, data, np.nan), found_seams,
             colouring.sharpen_sigma(gsd, tile_pixel_m(z, y)))

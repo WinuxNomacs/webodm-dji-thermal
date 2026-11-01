@@ -306,13 +306,19 @@ def _tile_values(task, z, x, y, size, crop, margin):
     import numpy as np
 
     from . import colouring, mosaics
-    found = _raster_tile(thermal_orthophoto(task), z, x, y, size, _crop(task) if crop else None, buffer=margin,
-                         pixel=True)
+    raster, cut = thermal_orthophoto(task), _crop(task) if crop else None
+    found = _raster_tile(raster, z, x, y, size, cut, buffer=margin, pixel=True)
     if found is None:
         return None
     data, pixel = found
     values = np.asarray(data.data[0], dtype=np.float64)
     values[~(data.mask > 0)] = np.nan
+    if margin:
+        # The tile itself as WebODM's map reads it: read with a margin, its pixels land on a slightly shifted grid
+        inner = _raster_tile(raster, z, x, y, size, cut)
+        kept = np.asarray(inner.data[0], dtype=np.float64)
+        kept[~(inner.mask > 0)] = np.nan
+        values[margin:-margin, margin:-margin] = kept
     read_z = z - 1 if size == 512 else z
     drawn = mosaics.tile_pixel_m(read_z, y) * mosaics.TILE_SIZE / size
     return values, colouring.sharpen_sigma(pixel, drawn)
