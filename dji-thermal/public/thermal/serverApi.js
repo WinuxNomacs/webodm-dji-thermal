@@ -13,7 +13,9 @@ function errorOf(xhr){
         else if (Array.isArray(json)) message = json.join(" ");
         else message = JSON.stringify(json);
     }
-    return new Error(message || (xhr && xhr.status ? `${xhr.status} ${xhr.statusText}` : "Cannot reach the server"));
+    const error = new Error(message || (xhr && xhr.status ? `${xhr.status} ${xhr.statusText}` : "Cannot reach the server"));
+    error.status = xhr && xhr.status;
+    return error;
 }
 
 function request(options){
@@ -61,6 +63,9 @@ export default {
         url: `${PLUGIN_API}/projects/${projectId}/tasks/${taskId}/workset`, type: "POST", contentType: "application/json",
         data: JSON.stringify({settings}), dataType: "json"
     }),
+
+    worksetProgress: (projectId, taskId) =>
+        request({url: `${PLUGIN_API}/projects/${projectId}/tasks/${taskId}/workset`, type: "GET", dataType: "json"}),
 
     removeDataset: datasetId => request({url: `${PLUGIN_API}/datasets/${datasetId}`, type: "DELETE"})
 };

@@ -54,8 +54,10 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
 3. **Normalize** and **Harmonize**, under it, off by default: as the workset settings of the same names (see
    below), one ambient and reflected temperature for every frame, and also each frame's drift removed. Ticked, every
    photo is uploaded first to the task's DJI Thermal Analyzer dataset (**Also keep the photos** is then ticked), a
-   workset of it converts them in WebODM's worker, and its TIFFs go into the task, which then starts processing; the
-   page can be closed once the upload is done. The workset and its mosaics stay in the Analyzer.
+   workset of it converts them in WebODM's worker, and its TIFFs go into the task, which then starts processing. The
+   message under the project, and the task's panel after the page is refreshed, show how far the conversion is
+   until the task starts; the page can be closed or refreshed once the upload is done. The workset and its mosaics
+   stay in the Analyzer.
 4. **Measurement**: the values the temperatures are computed with. Each field shows the value the camera recorded
    and the range the camera accepts; left empty, every photo keeps its own recorded value.
    - **Temperature unit** of the values you enter: Celsius, Fahrenheit or Kelvin, by default WebODM's units (°F

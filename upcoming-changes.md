@@ -5,6 +5,19 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **polish, a DJI Thermal Task's conversion shows its progress** (the user, 2026-11-01, with a screenshot of
+    the "Thermal task created" message: "is there a way for this to show progress? Otherwise the page appears hung
+    and I'm afraid to refresh."), `workset-progress`. Decided (the user): **in the message and in the task's panel**
+    (WebODM lets a plugin add to a task's expanded panel only, not its row). `api.py` TaskWorkset GET (the task's
+    workset with `then`, its job, `committed`, `task_error`); `thermal/worksetProgress.js` (the state),
+    `thermal/WorksetProgress.jsx` (a bar, the normalizing's stage through `analyzer_core.stageText`, "you can refresh
+    or close this page", asked every 3 s; the task list refreshed once the task starts), in `ThermalTaskButton`'s
+    message and, built as its own bundle, in the panel (`main.js`). A panel button that loads a bundle first is
+    dropped by WebODM (its trigger stops listening after the first answer, ApiFactory.js), so `main.js` answers at
+    once with `DjiThermalLazy`, which loads it. README, `quickstart-thermal-task.md`, `api.md` (the workset row, which
+    was missing). `test_api.py` (1), `worksetProgress.test.js` (3), `main.test.js` (2). Live (read only): ThermalTest2's
+    panel showed its real state (converted, "putting the images in the task"), and a faked converting answer the
+    stage with a moving bar.
   - Done: **bug, a harmonized DJI Thermal Task waits forever** (the user, 2026-11-01: ThermalTest2, 220 photos, still
     "Waiting to start processing" after its workset converted), `fix-workset-commit-chosen-node`. Two causes:
     - WebODM's upload gives the partial task the node chosen (node 1 here; the tests only used Auto), and
