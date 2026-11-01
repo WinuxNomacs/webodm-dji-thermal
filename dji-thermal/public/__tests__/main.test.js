@@ -38,7 +38,7 @@ test("the Thermal Task button is added to the dashboard", () => {
     expect(global.PluginsAPI.Dashboard.addNewTaskButton).toHaveBeenCalledTimes(1);
 });
 
-const DATASET = "27fcf631-25ec-4742-b8fc-5a3367c9db77";
+const DATASET = "0f1e2d3c-4b5a-4697-8877-665544332211";
 
 function taskButton(task){
     sideMenu(false);

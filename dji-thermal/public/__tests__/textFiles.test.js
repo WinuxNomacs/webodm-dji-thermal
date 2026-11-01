@@ -16,14 +16,14 @@ describe("the photos' names in the GCP file and WebODM's text files", () => {
     });
 
     test("a GCP file names the converted images", () => {
-        const gcp = "EPSG:4326\n-88.07 42.10 223.8 320 256 DJI_0001_T.JPG gcp1\n-88.07 42.10 223.8 100 80 DJI_0002_T.JPG gcp2\n";
+        const gcp = "EPSG:4326\n0.50 0.60 223.8 320 256 DJI_0001_T.JPG gcp1\n0.50 0.60 223.8 100 80 DJI_0002_T.JPG gcp2\n";
         expect(renameImages(gcp, ["DJI_0001_T.JPG", "DJI_0002_T.JPG"])).toBe(
-            "EPSG:4326\n-88.07 42.10 223.8 320 256 DJI_0001_T.tif gcp1\n-88.07 42.10 223.8 100 80 DJI_0002_T.tif gcp2\n");
+            "EPSG:4326\n0.50 0.60 223.8 320 256 DJI_0001_T.tif gcp1\n0.50 0.60 223.8 100 80 DJI_0002_T.tif gcp2\n");
     });
 
     test("geo.txt and image_groups.txt, which start lines with the name, are renamed too", () => {
-        expect(renameImages("EPSG:4326\nDJI_0001_T.JPG -88.07 42.10 223.8\n", ["DJI_0001_T.JPG"]))
-            .toBe("EPSG:4326\nDJI_0001_T.tif -88.07 42.10 223.8\n");
+        expect(renameImages("EPSG:4326\nDJI_0001_T.JPG 0.50 0.60 223.8\n", ["DJI_0001_T.JPG"]))
+            .toBe("EPSG:4326\nDJI_0001_T.tif 0.50 0.60 223.8\n");
         expect(renameImages("DJI_0001_T.JPG\tA\r\nDJI_0002_T.JPG\tB\r\n", ["DJI_0001_T.JPG", "DJI_0002_T.JPG"]))
             .toBe("DJI_0001_T.tif\tA\r\nDJI_0002_T.tif\tB\r\n");
     });
