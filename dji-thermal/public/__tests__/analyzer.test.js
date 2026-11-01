@@ -86,7 +86,7 @@ const ANALYSIS = {
 const DEFAULTS = {
     distance: "lrf", humidity: null, emissivity: null, reflected_temp: null, ambient_temp: null, unit: "C", range_min: null,
     range_max: null, palette: null, gimbal_yaw: null, gimbal_pitch: null, gimbal_roll: null, replace_above: null,
-    replace_above_value: null, replace_below: null, replace_below_value: null, strip_location: false, normalize: false,
+    replace_above_value: null, replace_below: null, replace_below_value: null, strip_location: false, normalize: false, harmonize: false,
     max_pitch: null, outputs: ["temp_c:tiff", "pseudo:png"], compression: "deflate", mosaics: true
 };
 const PREFERENCES = {
@@ -1230,9 +1230,18 @@ describe("a dataset's conversions", () => {
         expect(conversions.formProblem(Object.assign({}, read, {range_max: null}))).toMatch(/colour range/);
     });
 
+    it("reads Harmonize as Normalize too, and a workset saved before Harmonize existed as harmonized when it normalized", () => {
+        document.body.innerHTML = '<div id="f">' + conversions.formHtml(Object.assign({}, DEFAULTS, {harmonize: true}), PREFERENCES, {}) + "</div>";
+        expect(conversions.readForm(document.getElementById("f"))).toMatchObject({normalize: true, harmonize: true});
+        const old = Object.assign({}, DEFAULTS, {normalize: true});
+        delete old.harmonize;
+        document.body.innerHTML = '<div id="f">' + conversions.formHtml(old, PREFERENCES, {}) + "</div>";
+        expect(document.querySelector('input[name="harmonize"]').checked).toBe(true);
+    });
+
     it("fills the settings from the WebODM plan's process command", () => {
         const s = conversions.planSettings(["-o", "temp_c:tif,pseudo", "--max-pitch", "-80", "--normalize", "--emissivity", "0.9"], DEFAULTS);
-        expect(s).toEqual(Object.assign({}, DEFAULTS, {outputs: ["temp_c:tiff", "pseudo"], max_pitch: -80, normalize: true, emissivity: 0.9}));
+        expect(s).toEqual(Object.assign({}, DEFAULTS, {outputs: ["temp_c:tiff", "pseudo"], max_pitch: -80, normalize: true, harmonize: true, emissivity: 0.9}));
         expect(DEFAULTS.normalize).toBe(false);
     });
 
@@ -1263,7 +1272,7 @@ describe("a dataset's conversions", () => {
         const chips = document.createElement("div");
         chips.innerHTML = conversions.chipsHtml(diffs, "the defaults");
         expect(chips.querySelectorAll(".ta-chip-changed").length).toBe(4);
-        expect(chips.querySelector(".ta-chip-off-plan").getAttribute("title")).toBe("The WebODM plan: normalized");
+        expect(chips.querySelector(".ta-chip-off-plan").getAttribute("title")).toBe("The WebODM plan: harmonized");
         expect(conversions.chipsHtml([], "the defaults")).toContain("the defaults");
     });
 
@@ -1308,8 +1317,9 @@ describe("a dataset's conversions", () => {
         expect(summary.querySelector('[data-key="reflected_temp"]').textContent).toBe("reflected 68 °F");
         const field = input("reflected_temp").closest(".ta-field");
         expect(field.classList.contains("ta-changed")).toBe(true);
-        // The plan normalizes, the form does not
-        expect(input("normalize").closest(".checkbox").classList.contains("ta-off-plan")).toBe(true);
+        // The plan harmonizes, the form does not: both its boxes are marked together
+        expect(input("normalize").closest(".ta-normalize").classList.contains("ta-off-plan")).toBe(true);
+        expect(input("harmonize").closest(".ta-normalize")).toBe(input("normalize").closest(".ta-normalize"));
 
         click(field.querySelector('[data-reset="reflected_temp"]'));
         expect(input("reflected_temp").value).toBe("");
@@ -1383,9 +1393,10 @@ describe("a dataset's conversions", () => {
         let html = conversions.listHtml([running, CONVERSION], true, base, null);
         expect(html).toContain("Converting 30%");
         const starting = Object.assign({}, running, {progress: 0, settings: Object.assign({}, DEFAULTS, {normalize: true})});
-        expect(conversions.listHtml([starting], true, base, null)).toContain("Normalizing: comparing the frames' overlaps");
-        const normalizing = Object.assign({}, starting, {stage: {stage: "frames", step: 2, steps: 5, done: 40, total: 217, unit: "files"}});
-        expect(conversions.listHtml([normalizing], true, base, null)).toContain("Normalizing: step 2 of 5, reading frames, 40/217 files…");
+        expect(conversions.listHtml([starting], true, base, null)).toContain("Normalizing: reading the frames' recorded temperatures");
+        const harmonizing = Object.assign({}, starting, {settings: Object.assign({}, DEFAULTS, {normalize: true, harmonize: true}),
+                                                          stage: {stage: "frames", step: 2, steps: 5, done: 40, total: 217, unit: "files"}});
+        expect(conversions.listHtml([harmonizing], true, base, null)).toContain("Harmonizing: step 2 of 5, reading frames, 40/217 files…");
         expect(html).toContain('href="' + base + '9/download"');
         expect(html).not.toContain(base + '10/download');
         expect(html).toContain("2 converted, 1 skipped");

@@ -113,10 +113,15 @@
                 numberInput("range_max", s.range_max, ' step="any" placeholder="to"') + "</div>",
                 "Both, or neither for each image's own range. Also the range of the 16-bit grey outputs.");
 
-        var frames = '<div class="checkbox"><label><input type="checkbox" name="normalize"' + (s.normalize ? " checked" : "") +
-                "> Normalize: make the frames' temperatures consistent with each other</label>" +
-                '<span class="help-block">One ambient and reflected temperature for every frame, and each frame\'s drift against its ' +
-                "overlapping neighbours removed. Recommended for processing into a map.</span></div>" +
+        var frames = '<div class="ta-normalize"><div class="checkbox"><label><input type="checkbox" name="normalize"' + (s.normalize ? " checked" : "") +
+                "> Normalize: one ambient and reflected temperature for every frame</label>" +
+                '<span class="help-block">The flight\'s medians of the values the camera recorded, unless given in Measurement: ' +
+                "no jumps between frames where the recorded values change.</span></div>" +
+            '<div class="checkbox"><label><input type="checkbox" name="harmonize"' + (harmonizes(s) ? " checked" : "") +
+                "> Harmonize: each frame's drift against its overlapping neighbours removed</label>" +
+                '<span class="help-block">The camera drifts between its recalibrations: removing it leaves no seams in a map. ' +
+                "Compares the frames' overlaps, which takes a while; frames that can't be placed keep theirs. Normalizes too. " +
+                "Recommended for processing into a map.</span></div></div>" +
             field("Only frames with a gimbal pitch at or below (°)", numberInput("max_pitch", s.max_pitch, ' step="1" min="-90" max="90" placeholder="all frames"'),
                 "-80 keeps the nadir frames only.");
 
@@ -169,7 +174,8 @@
             s["replace_" + side + "_value"] = get("replace_" + side + "_nodata").checked ? "nodata" : num("replace_" + side + "_value");
         });
         s.strip_location = get("strip_location").checked;
-        s.normalize = get("normalize").checked;
+        s.harmonize = get("harmonize").checked;
+        s.normalize = get("normalize").checked || s.harmonize;
         s.max_pitch = num("max_pitch");
         s.compression = get("compression").value;
         s.mosaics = get("mosaics").checked;
@@ -193,7 +199,7 @@
                 });
                 i++;
             } else if (a === "--normalize") {
-                s.normalize = true;
+                s.normalize = s.harmonize = true;
             } else if (a === "--distance") {
                 s.distance = isNaN(Number(next)) ? next : Number(next);
                 i++;
@@ -264,7 +270,9 @@
         }};
     })).concat([
         {key: "unit", fields: ["unit"], text: function (s) { return "files in " + UNIT_LABELS[core.unitOf(s.unit)]; }},
-        {key: "normalize", fields: ["normalize"], text: function (s) { return s.normalize ? "normalized" : "not normalized"; }},
+        {key: "normalize", fields: ["normalize", "harmonize"], text: function (s) {
+            return harmonizes(s) ? "harmonized" : s.normalize ? "normalized" : "not normalized";
+        }},
         {key: "max_pitch", fields: ["max_pitch"], text: function (s) { return blank(s.max_pitch) ? "all frames" : "pitch ≤ " + num(s.max_pitch) + "°"; }},
         {key: "palette", fields: ["palette"], text: function (s) {
             return colouredOutputs(s).map(outputText).join(", ") + " in " + (s.palette || "each image's palette");
@@ -295,6 +303,7 @@
         return fields.map(function (f) {
             var v = s[f];
             if (f === "unit") return core.unitOf(v);
+            if (f === "harmonize") return harmonizes(s);
             if (typeof v === "boolean" || f === "normalize" || f === "strip_location" || f === "mosaics") return !!v;
             return blank(v) ? null : round2(v);
         });
@@ -339,7 +348,8 @@
         diffs.forEach(function (diff) {
             var d = DIFFERENCES.filter(function (x) { return x.key === diff.key; })[0];
             var input = form.querySelector('[name="' + d.fields[0] + '"]');
-            var box = input && (d.key === "outputs" ? input.closest(".ta-section") : input.closest(".ta-field, .checkbox, .ta-output"));
+            var box = input && (d.key === "outputs" ? input.closest(".ta-section") : d.key === "normalize" ? input.closest(".ta-normalize") :
+                input.closest(".ta-field, .checkbox, .ta-output"));
             if (!box) return;
             if (diff.changed) box.classList.add("ta-changed");
             if (diff.offPlan) box.classList.add("ta-off-plan");
@@ -397,6 +407,9 @@
             return '<a href="' + esc(taskUrl(dashboard, t)) + '">' + esc(t.name) + "</a> (" + esc(taskStatusLabel(t)) + ")";
         }).join(", ") + "</div>";
     }
+
+    // Whether settings harmonize: those saved before harmonize existed did whenever they normalized
+    function harmonizes(s) { return !!(s.harmonize === undefined ? s.normalize : s.harmonize); }
 
     function taskUrl(dashboard, t) {
         return (dashboard || "/dashboard/") + "?project_task_open=" + t.project + "&project_task_expanded=" + t.id;
@@ -582,7 +595,8 @@
             figures.push(core.formatDate(c.created_at) + (c.created_by ? " by " + c.created_by : ""));
             var progress = c.status === "converting" ? '<div class="progress"><div class="progress-bar progress-bar-striped active" style="width: ' +
                 Math.round((c.progress || 0) * 100) + '%;"></div></div>' + (c.progress ? "" : '<div class="text-muted">' +
-                ((c.settings || {}).normalize ? "Normalizing: " + (esc(core.stageText(c.stage)) || "comparing the frames' overlaps") + "…" :
+                (harmonizes(c.settings || {}) ? "Harmonizing: " + (esc(core.stageText(c.stage)) || "comparing the frames' overlaps") + "…" :
+                    (c.settings || {}).normalize ? "Normalizing: reading the frames' recorded temperatures…" :
                     "Starting…") + "</div>") : "";
             // What the conversion changed from the defaults, in its files' unit
             var settings = defaults && c.settings ? '<div class="ta-conversion-chips" title="' + esc(c.description) + '">' +

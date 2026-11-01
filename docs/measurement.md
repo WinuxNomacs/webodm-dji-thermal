@@ -55,10 +55,18 @@ The unit of the values you type: Celsius, Fahrenheit or Kelvin. The DJI Thermal 
 Celsius. In the Workset Creation Settings, **Unit of the files** sets the unit of a workset's temperature TIFFs
 separately.
 
-## Normalize (worksets only)
+## Normalize and harmonize (worksets only)
 
 The camera recalibrates itself during a flight, and the recorded ambient and reflected temperatures can change from
 photo to photo. So overlapping frames of the same ground can read a degree or two apart, and a map made from them
-shows seams. **Normalize**, in the Workset Creation Settings' Frames section, uses one ambient and reflected
-temperature for every frame and removes each frame's drift against its overlapping neighbours. The WebODM plan
-recommends it for processing into a map.
+shows seams. The Workset Creation Settings' Frames section has two settings for it:
+
+- **Normalize** measures every frame with one ambient and reflected temperature: the flight's medians of the values
+  the frames recorded (a value typed in Measurement is used instead). It's quick, and removes the jumps where the
+  recorded values change.
+- **Harmonize** also removes each frame's drift against the frames overlapping it, found by comparing their
+  overlaps as a mosaic does. It takes longer, and frames that can't be placed (oblique, or without a position) keep
+  their drift. Ticking it ticks Normalize. The WebODM plan recommends it for processing into a map.
+
+A workset made before Harmonize existed with Normalize ticked did both, and shows both ticked. The mosaic viewer's
+**Harmonized** mosaic is always harmonized, whatever the workset's settings.

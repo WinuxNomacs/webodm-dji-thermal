@@ -533,6 +533,14 @@
        summary chip "normalized" or "harmonized"; the WebODM plan's `--normalize` sets both. The Frames section of
        the Workset Creation Settings: the two tick boxes with a line each. Tests: `test_analyzer.py`,
        `analyzer.test.js`. Docs: `measurement.md` ("Normalize and harmonize"), `quickstart-worksets.md`, README.
+       Done (2026-11-01): `conversions.py` (`harmonize` in `DEFAULTS` and `parse_settings`, `harmonized`,
+       `api_arguments(s, medians)`, `flight_medians` from each frame's `describe`, `normalized_medians`; the job
+       keeps the medians as the results' `normalization` with `offsets: False`), `mosaics.py` (the workset's medians),
+       `conversion_tasks.checks` ("Not harmonized"), `conversions.js` (the two boxes framed together when off the
+       plan, the chip, the plan's `--normalize`, "Normalizing…"/"Harmonizing…"), `dataset.js` (the finding's fix
+       text). README, `measurement.md`, `quickstart-worksets.md`; screenshot `workset-settings` retaken.
+       `test_analyzer.py` (4, one converting 3 frames of the M4T flight normalized alone), `analyzer.test.js` (1 new,
+       5 changed).
     2. `thermal-task-normalize`: at the top of DJI Thermal Task's panel, **Normalize** and **Harmonize**, off, a
        line each. On: the task is created and made its own dataset, every photo (and the RGB ones) uploaded to the
        dataset, the GCP file and the text files sent with the workset's TIFF names (`_temp_c.tiff`), then

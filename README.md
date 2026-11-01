@@ -142,8 +142,8 @@ closed. A chip marked **≠ plan** differs from the WebODM plan's settings (hove
   dji-thermal-cli writes, and their compression; the palette and colour range of the pictures.
 - **Measurement**: each parameter, with the flight's recorded median beside it (left empty, each image keeps its
   own), and the unit of the files.
-- **Corrections**: normalization (one ambient and reflected temperature for every frame, each frame's drift
-  removed), a gimbal pitch limit for nadir frames only, gimbal overrides, temperatures above or below a threshold
+- **Corrections**: **Normalize** (one ambient and reflected temperature for every frame, the flight's medians) and
+  **Harmonize** (also each frame's drift against its overlapping neighbours removed), a gimbal pitch limit for nadir frames only, gimbal overrides, temperatures above or below a threshold
   replaced, the location stripped.
 - **Use the WebODM plan's settings** fills in what the plan recommends; **Copy settings to form**, in a workset's
   menu, fills in that workset's; **Save as my defaults** keeps your settings for new worksets (**Reset to defaults**
@@ -194,7 +194,7 @@ makes a WebODM task in the dataset's project from the
 workset's temperature TIFFs in °C (the `temp_c` TIFF output), without uploading them again:
 
 - It says what stops a task: a workset not finished converting, its location stripped (ODM needs it to place the frames), or
-  fewer than 2 °C TIFFs. It also warns where the workset's settings are off the WebODM plan (not normalized,
+  fewer than 2 °C TIFFs. It also warns where the workset's settings are off the WebODM plan (not harmonized,
   oblique frames kept, emissivity or humidity), with **New workset with the plan's settings**.
 - The plan's ODM options, the recommended ones ticked and the others to consider, each with its value and why; and
   the task's name.

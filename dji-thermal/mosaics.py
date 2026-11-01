@@ -172,7 +172,7 @@ def build(task, cid, write_progress):
     os.makedirs(os.path.join(out_dir, VIEWER_DIR), exist_ok=True)
 
     options = conversions.record(task, cid).get('settings') or conversions.DEFAULTS
-    args = conversions.api_arguments(options)
+    args = conversions.api_arguments(options, conversions.normalized_medians(task, cid))
     settings, unit = args['settings'], options.get('unit') or 'C'
     stripped = bool(options.get('strip_location'))
     max_pitch = options.get('max_pitch')
@@ -624,7 +624,8 @@ def frame_values(task, cid, tab, index):
     if not os.path.isfile(path):
         raise LookupError("The frame is not on the server any more")
     unit = result(task, cid).get('unit') or 'C'
-    settings = conversions.api_arguments(conversions.record(task, cid).get('settings') or conversions.DEFAULTS)['settings']
+    settings = conversions.api_arguments(conversions.record(task, cid).get('settings') or conversions.DEFAULTS,
+                                         conversions.normalized_medians(task, cid))['settings']
     m, celsius = row.get('measurement') or {}, lambda v: None if v is None else dtc.units.from_celsius(v, settings.unit)
     # As the mosaic measured it: its own recorded parameters (the distance in metres), the workset's replacements
     recorded = dataclasses.replace(settings, distance=m.get('distance', settings.distance),

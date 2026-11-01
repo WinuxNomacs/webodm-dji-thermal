@@ -20,6 +20,7 @@ installed (sdk.current()).
 import math
 import os
 import shutil
+import statistics
 import time
 import uuid
 
@@ -56,7 +57,8 @@ DEFAULTS = {
     'replace_below': None,
     'replace_below_value': None,
     'strip_location': False,
-    'normalize': False,
+    'normalize': False,     # one ambient and reflected temperature for every frame: the flight's medians
+    'harmonize': False,     # and each frame's drift against its overlapping neighbours removed (needs normalize)
     'max_pitch': None,
     'outputs': ['temp_c:tiff', 'pseudo:png'],
     'compression': 'deflate',
@@ -185,7 +187,8 @@ def parse_settings(raw):
         errors['palette'] = "Not one of dji-thermal-cli's palettes"
 
     out['strip_location'] = bool(get('strip_location'))
-    out['normalize'] = bool(get('normalize'))
+    out['harmonize'] = harmonized(raw)
+    out['normalize'] = bool(get('normalize')) or out['harmonize']
     out['mosaics'] = bool(get('mosaics'))
 
     compression = get('compression')
@@ -222,10 +225,17 @@ def parse_settings(raw):
     return out, errors
 
 
+def harmonized(s):
+    """Whether the settings harmonize: those saved before harmonize existed did whenever they normalized"""
+    return bool(s.get('harmonize', s.get('normalize')))
+
+
 def summary_text(s):
     """A short description of a conversion's settings, for the list"""
     parts = [', '.join(output_text(o, s.get('palette')) for o in s.get('outputs') or [])]
-    if s.get('normalize'):
+    if harmonized(s):
+        parts.append('harmonized')
+    elif s.get('normalize'):
         parts.append('normalized')
     if s.get('max_pitch') is not None:
         parts.append('pitch ≤ {:g}°'.format(s['max_pitch']))
@@ -238,21 +248,50 @@ def summary_text(s):
     return ' · '.join(p for p in parts if p)
 
 
-def api_arguments(s):
+def api_arguments(s, medians=None):
     """
     The keyword arguments of dji-thermal-cli's process for these settings (checked by parse_settings), measured
-    with the SDK in use.
+    with the SDK in use. Harmonizing is dji-thermal-cli's own normalization (the flight's medians and each frame's
+    offset); normalizing alone measures every frame with medians, the flight's (ambient_c, reflected_c) (see
+    flight_medians), where the settings give no value.
     :raises sdk.SdkError: the SDK set at deployment is missing
     """
     from . import sdk
     dtc = converter.library()
+    fields = {f: s[f] for f in SETTINGS_FIELDS}
+    if s.get('normalize') and not harmonized(s) and medians:
+        unit = s.get('unit') or 'C'
+        for field, value in zip(('ambient_temp', 'reflected_temp'), medians):
+            if fields[field] is None and value is not None:
+                fields[field] = round(float(dtc.units.from_celsius(value, unit)), 4)
     return {
-        'settings': dtc.Settings(sdk=sdk.current(), **{f: s[f] for f in SETTINGS_FIELDS}),
+        'settings': dtc.Settings(sdk=sdk.current(), **fields),
         'outputs': tuple(s['outputs']),
         'compression': s['compression'],
-        'normalize': bool(s['normalize']),
+        'normalize': harmonized(s),
         'max_pitch': s['max_pitch'],
     }
+
+
+def normalized_medians(task, cid):
+    """The flight's medians a conversion normalized with alone (without harmonizing), as its results keep them"""
+    norm = results(task, cid).get('normalization') or {}
+    return None if norm.get('offsets', True) else (norm.get('ambient_c'), norm.get('reflected_c'))
+
+
+def flight_medians(root, jpegs):
+    """The medians of the ambient and reflected temperatures (°C) the thermal frames recorded: (ambient_c,
+    reflected_c), None for one no frame recorded"""
+    values = {'ambient_temp': [], 'reflected_temp': []}
+    for path in jpegs:
+        try:
+            recorded = converter.describe(str(path))['recorded']
+        except Exception:  # noqa: BLE001 - not a thermal frame it can read: left out, as dji-thermal-cli does
+            recorded = {}
+        for k, v in values.items():
+            if recorded.get(k) is not None:
+                v.append(float(recorded[k]))
+    return tuple(float(statistics.median(v)) if v else None for v in values.values())
 
 
 def compact(report, root, out_dir, version=""):
@@ -457,7 +496,11 @@ def convert(task_id, run_id, cid):
         dtc = converter.library()
         if not datasets.image_files(task):
             raise RuntimeError("The dataset has no images")
-        args = api_arguments(record(task, cid).get('settings') or DEFAULTS)
+        settings = record(task, cid).get('settings') or DEFAULTS
+        medians = None
+        if settings.get('normalize') and not harmonized(settings):
+            medians = flight_medians(root, dtc.scan(root).jpegs)
+        args = api_arguments(settings, medians)
         # Each image is reported once when it is written. Normalizing first compares the frames' overlaps, stage by
         # stage: the page shows the stage while the progress is 0
         total = max(1, len(dtc.scan(root).jpegs))
@@ -486,6 +529,8 @@ def convert(task_id, run_id, cid):
         # jobs=1: a Celery worker's processes cannot start processes of their own
         report = dtc.process(root, out_dir, jobs=1, progress=progress, **args)
         result = compact(report, root, out_dir, dtc.__version__)
+        if medians is not None:
+            result['normalization'] = {'ambient_c': medians[0], 'reflected_c': medians[1], 'offsets': False}
     except Canceled:
         left_behind(task, cid)
         return {'canceled': True}

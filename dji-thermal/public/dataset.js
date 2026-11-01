@@ -305,7 +305,7 @@
     // dji-thermal-cli's options, as the Workset Creation Settings name them, for its findings and notes (which are
     // written for its command line); then its "deg" as degrees
     var SETTING_NAMES = [
-        [/--(?:mosaic-)?normalize\b/g, "Normalize"],
+        [/--(?:mosaic-)?normalize\b/g, "Normalize and Harmonize"],
         [/--(?:mosaic-)?max-pitch(?: DEG)?/g, "\u201cOnly frames with a gimbal pitch at or below\u201d"],
         [/--ambient-temp and --reflected-temp/g, "an Ambient and a Reflected temperature"],
         [/--ambient-temp\b/g, "Ambient temperature"], [/--reflected-temp\b/g, "Reflected temperature"],
@@ -327,7 +327,7 @@
     // (dji-thermal-cli's own suggestion, in the settings' words, for the others)
     var FINDING_FIXES = [
         {code: /_varies$/, text: "Tick Normalize in the Workset Creation Settings: one ambient and reflected temperature for every " +
-            "frame, and each frame's drift against its neighbours removed.", set: {normalize: true}, label: "Normalize"},
+            "frame (Harmonize also removes each frame's drift against its neighbours).", set: {normalize: true}, label: "Normalize"},
         {code: /^oblique$/, text: "The mosaics leave them out. For an orthophoto, leave them out of the workset too, as the WebODM " +
             "plan does: \u201cOnly frames with a gimbal pitch at or below\u201d \u221280\u00b0. Keep them for a 3D model.",
             set: {max_pitch: -80}, label: "Only frames at or below \u221280\u00b0"},
