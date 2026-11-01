@@ -10,7 +10,8 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
   worksets side by side), places the frames into mosaics shown on a map, and makes a WebODM task from the
   workset you choose.
 - **Thermal Inspector**, on WebODM's 2D map of a task with a thermal orthophoto: the temperature under the cursor,
-  pinned points, the statistics of regions drawn on it, isotherms, the map's palette and its legend. It also lays the
+  pinned points, the statistics of regions and lines drawn on it (with their surroundings and ΔT, and a line's
+  profile), isotherms, the map's palette and its legend. It also lays the
   Analyzer's workset mosaics on the map, to compare them with the project's own layers, and shows the frames that saw
   a point clicked.
 
@@ -230,14 +231,21 @@ Inspector:
 - **Pin**: a click pins the point with its temperature, labelled P1, P2…, shown on the map instead of WebODM's
   popup. The pins are listed in the panel (click one to go to it), can be hidden and shown together, removed, and
   downloaded as CSV (latitude, longitude, temperature). They are kept in your browser for the same tasks.
-- **Regions**: draw a rectangle or a circle (press and drag) or a polygon (click its corners; double-click or Enter
-  finishes, Backspace removes the last corner, Esc cancels), labelled R1, R2…. The panel shows the statistics of
-  the temperatures inside it: minimum, maximum, mean, median, standard deviation, 2nd and 98th percentiles, the
-  number of pixels and the area, and a histogram; the hottest and coldest pixels are marked on the map. Pixels
-  outside the task's crop or without data are left out; a region more than 4,096 pixels across is read at a reduced
-  resolution, and the panel says so. Regions are listed (click one's row for its statistics, or its name to
-  go to it too), can be hidden, removed and downloaded as CSV (a row of statistics per region, with the hottest and
-  coldest pixels' positions), and are kept in your browser for the same tasks.
+- **Regions and lines**: draw a rectangle or a circle (press and drag) or a polygon (click its corners; double-click
+  or Enter finishes, Backspace removes the last corner, Esc cancels), labelled R1, R2…, or a line (click its points,
+  finished the same way), labelled L1, L2…. The panel shows the statistics of the temperatures inside a region, or
+  along a line (a strip 0.25 m either side of it): minimum, maximum, mean, median, standard deviation, 2nd and 98th
+  percentiles, the number of pixels, the area or length, and a histogram; the hottest and coldest pixels are marked
+  on the map. It also shows the **surroundings** (the mean of a ring around a region, from its outline out to its
+  size, 1 to 3 m; of a band 1 m wide beside a line) and **ΔT**, the mean's difference with them; with the isotherm
+  on, the share of the region's pixels in it. A line has its **profile** instead of the histogram: its temperatures
+  every pixel along it, broken where there are none. Hovering the profile marks its
+  point on the map (and on a workset mosaic names the frame it came from); a click there opens the frames that saw
+  it. Pixels outside the task's crop or without data are left out; a region more than 4,096 pixels across is read at
+  a reduced resolution, and the panel says so. Regions and lines are listed (click one's row for its statistics, or
+  its name to go to it too), can be hidden, removed and downloaded as CSV (a row of statistics per region or line,
+  with the hottest and coldest pixels' positions; a line's profile as its own CSV), and are kept in your browser for
+  the same tasks.
 - **Palette**: the thermal layer's palette, from the same list as the Analyzer's: DJI's palettes (drawn by the
   plugin, over the range set in WebODM's layer panel) and WebODM's colour maps. It is your palette everywhere: the
   Analyzer's preference, saved when you choose one here or in WebODM's own layer panel, and the one the map opens

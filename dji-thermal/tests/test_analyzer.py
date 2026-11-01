@@ -802,6 +802,12 @@ class TestMosaics(AnalyzerTestCase):
         self.assertTrue(tab["stats"]["min"] - 0.01 <= st["min"] <= p["temperature"] <= st["max"] <= tab["stats"]["max"] + 0.01)
         self.assertEqual(self.client.post(self.url(task, cid, "/view_angle/region"), {"geometry": square}, format="json").status_code,
                          status.HTTP_400_BAD_REQUEST)
+        # A line across the point: its profile names the frame each sample came from, the point's among them
+        line = {"type": "LineString", "coordinates": [[lon - d, lat], [lon + d, lat]]}
+        profile = self.client.post(self.url(task, cid, "/harmonized/region"), {"geometry": line}, format="json").data["profile"]
+        self.assertEqual(len(profile["frames"]), len(profile["values"]))
+        self.assertIn(p["frame"], profile["frames"])
+        self.assertTrue(set(profile["frames"]) - {None} <= set(v["frames"]), profile["frames"])
         isotherm_url = self.url(task, cid, "/harmonized/isotherm/{}/{}/{}.png".format(t.z, t.x, t.y))
         painted = drawn(self.client.get(isotherm_url, {"low": (lo + hi) / 2, "color": "e53935"}))[..., 3]
         self.assertTrue(0 < (painted == 255).sum() < (plain[..., 3] > 0).sum())

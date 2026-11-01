@@ -1,7 +1,8 @@
 // Drawing the Thermal Inspector's regions on WebODM's map (inspector.js): a rectangle or a circle (press, drag,
-// release: the circle grows from its centre) or a polygon (click the corners; double-click, Enter or a click on the
-// first corner finishes; Backspace removes the last corner; Esc cancels), as GeoJSON polygons in lon/lat. While it
-// draws, it takes over the map's panning and double-click zoom. WebODM's 2D map has no drawing tool a plugin can use.
+// release: the circle grows from its centre), a polygon (click the corners; double-click, Enter or a click on the
+// first corner finishes; Backspace removes the last corner; Esc cancels) or a line (as a polygon, without closing it),
+// as GeoJSON polygons or lines in lon/lat. While it draws, it takes over the map's panning and double-click zoom.
+// WebODM's 2D map has no drawing tool a plugin can use.
 (function (root) {
     var STYLE = {color: "#ff9800", weight: 2, opacity: 0.95, fillColor: "#ff9800", fillOpacity: 0.12};
     var GUIDE_STYLE = {color: "#ff9800", weight: 2, opacity: 0.9, dashArray: "4 4", interactive: false};
@@ -48,6 +49,12 @@
 
     function ringToGeometry(ring) { return {type: "Polygon", coordinates: [ring]}; }
 
+    // A drawn line is usable with two distinct points: its GeoJSON, or null
+    function lineGeometry(points) {
+        var line = points.filter(function (p, i) { return i === 0 || !sameLatLng(p, points[i - 1]); });
+        return line.length >= 2 ? {type: "LineString", coordinates: line.map(function (p) { return [p.lng, p.lat]; })} : null;
+    }
+
     function cross(o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); }
     function onSegment(p, q, r) {
         return Math.min(p[0], r[0]) <= q[0] && q[0] <= Math.max(p[0], r[0]) && Math.min(p[1], r[1]) <= q[1] && q[1] <= Math.max(p[1], r[1]);
@@ -91,12 +98,13 @@
 
     function sameLatLng(a, b) { return a.lat === b.lat && a.lng === b.lng; }
 
-    // A shape being drawn: opts {shape: "rectangle" | "circle" | "polygon", onFinish({geometry, layer, circle}),
+    // A shape being drawn: opts {shape: "rectangle" | "circle" | "polygon" | "line", onFinish({geometry, layer, circle}),
     // onCancel(), onInvalid(reason)}. The finished layer is the caller's; circle is {lat, lng, radius} for circles.
     function DrawTool(L, map, opts) {
         var self = this;
         var doc = opts.doc || root.document;
         var active = false, guides = [], vertices = [], polyGuides = [], origin = null, drawn = null, saved = {};
+        var clicked = opts.shape === "polygon" || opts.shape === "line";     // drawn a click per point
 
         function addGuide(layer) { layer.addTo(map); guides.push(layer); return layer; }
         function dropGuide(layer) {
@@ -107,16 +115,16 @@
         // The release may be outside the map: read it from the DOM event
         function releasedAt(e) { return e && e.clientX !== undefined ? map.mouseEventToLatLng(e) : origin; }
 
-        function finish(layer, ring, extra) {
+        function finish(layer, geometry, extra) {
             guides = guides.filter(function (g) { return g !== layer; });
             self.stop();
-            opts.onFinish(assign({geometry: ringToGeometry(ring), layer: layer}, extra));
+            opts.onFinish(assign({geometry: geometry, layer: layer}, extra));
         }
 
         function onKey(e) {
             if (e.key === "Escape") self.cancel();
-            else if (opts.shape === "polygon" && e.key === "Enter") onPolyFinish();
-            else if (opts.shape === "polygon" && e.key === "Backspace") {
+            else if (clicked && e.key === "Enter") onPolyFinish();
+            else if (clicked && e.key === "Backspace") {
                 e.preventDefault();
                 vertices.pop();
                 redrawPolygon();
@@ -150,18 +158,18 @@
                 var radius = map.distance(origin, end);
                 if (a.distanceTo(b) < MIN_DRAG_PX || !(radius > 0)) return dropGuide(layer);
                 layer.setRadius(radius);
-                return finish(layer, circleRing(origin, radius), {circle: {lat: origin.lat, lng: origin.lng, radius: radius}});
+                return finish(layer, ringToGeometry(circleRing(origin, radius)), {circle: {lat: origin.lat, lng: origin.lng, radius: radius}});
             }
             if (Math.abs(a.x - b.x) < MIN_DRAG_PX || Math.abs(a.y - b.y) < MIN_DRAG_PX) return dropGuide(layer);
             layer.setBounds(L.latLngBounds(origin, end));
-            finish(layer, rectangleRing(origin, end));
+            finish(layer, ringToGeometry(rectangleRing(origin, end)));
         }
 
-        // A polygon: a click per corner
+        // A polygon or a line: a click per point
         function onPolyClick(e) {
             var last = vertices[vertices.length - 1];
             if (last && sameLatLng(last, e.latlng)) return;     // a double-click's second click
-            if (vertices.length >= 3 && map.latLngToContainerPoint(vertices[0]).distanceTo(map.latLngToContainerPoint(e.latlng)) <= CLOSE_DISTANCE_PX) {
+            if (opts.shape === "polygon" && vertices.length >= 3 && map.latLngToContainerPoint(vertices[0]).distanceTo(map.latLngToContainerPoint(e.latlng)) <= CLOSE_DISTANCE_PX) {
                 return onPolyFinish();
             }
             vertices.push(e.latlng);
@@ -180,9 +188,14 @@
         function onPolyFinish() {
             // A double-click ends with the same point twice
             var points = vertices.filter(function (p, i) { return i === 0 || !sameLatLng(p, vertices[i - 1]); });
+            if (opts.shape === "line") {
+                var line = lineGeometry(points);
+                if (!line) return (opts.onInvalid || function () {})("line_too_short");
+                return finish(addGuide(L.polyline(points, assign({interactive: false}, STYLE))), line);
+            }
             var check = validatePolygon(points);
             if (!check.valid) return (opts.onInvalid || function () {})(check.reason);
-            finish(addGuide(L.polygon(points, assign({interactive: false}, STYLE))), polygonRing(points));
+            finish(addGuide(L.polygon(points, assign({interactive: false}, STYLE))), ringToGeometry(polygonRing(points)));
         }
 
         this.start = function () {
@@ -192,7 +205,7 @@
             map.dragging.disable();
             map.doubleClickZoom.disable();
             map.getContainer().style.cursor = "crosshair";
-            if (opts.shape === "polygon") {
+            if (clicked) {
                 map.on("click", onPolyClick);
                 map.on("dblclick", onPolyFinish);
                 map.on("mousemove", onPolyMove);
@@ -232,7 +245,7 @@
     }
 
     var api = {STYLE: STYLE, rectangleRing: rectangleRing, polygonRing: polygonRing, circleRing: circleRing,
-               ringToGeometry: ringToGeometry, validatePolygon: validatePolygon, DrawTool: DrawTool};
+               ringToGeometry: ringToGeometry, validatePolygon: validatePolygon, lineGeometry: lineGeometry, DrawTool: DrawTool};
     root.ThermalRegions = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

@@ -128,8 +128,9 @@ class InspectorPalette(InspectorView):
 
 
 def region_request(request):
-    """What a region's statistics are asked with: {"geometry": a GeoJSON polygon (or a Feature of one), "bins",
-    "percentiles"}, as (geometry, percentiles, bins)"""
+    """What a region's statistics are asked with: {"geometry": a GeoJSON polygon or line (or a Feature of one), "bins",
+    "percentiles", "isotherm": {"low", "high"} (°C, either null) or null}, as (geometry, percentiles, bins, isotherm:
+    (low, high) or None)"""
     data = request.data if isinstance(request.data, dict) else {}
     geometry = data.get('geometry')
     if isinstance(geometry, dict) and geometry.get('type') == 'Feature':
@@ -143,7 +144,26 @@ def region_request(request):
         raise ValidationError({'error': "Invalid bins or percentiles"}) from None
     if not (1 <= bins <= inspector.MAX_HISTOGRAM_BINS) or not all(0 <= p <= 100 for p in percentiles):
         raise ValidationError({'error': "Invalid bins or percentiles"})
-    return geometry, percentiles, bins
+    return geometry, percentiles, bins, region_isotherm(data.get('isotherm'))
+
+
+def region_isotherm(value):
+    """A region request's isotherm as (low, high), °C, either None; None for none"""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValidationError({'error': "Invalid isotherm"})
+    limits = []
+    for key in ('low', 'high'):
+        v = value.get(key)
+        if v is not None and (isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v)):
+            raise ValidationError({'error': "Invalid isotherm"})
+        limits.append(None if v is None else float(v))
+    if limits == [None, None]:
+        return None
+    if None not in limits and limits[0] > limits[1]:
+        raise ValidationError({'error': "The isotherm's lower limit is above its upper one"})
+    return tuple(limits)
 
 
 def region_response(read):
@@ -158,10 +178,10 @@ def region_response(read):
 
 class InspectorRegion(InspectorView):
     def post(self, request, pk=None, project_pk=None):
-        """The statistics of the temperatures (°C) inside {"geometry": a GeoJSON polygon, "bins", "percentiles"}"""
+        """The statistics of the temperatures (°C) inside a polygon or along a line (region_request)"""
         task = self.thermal_task(request, pk)
-        geometry, percentiles, bins = region_request(request)
-        return region_response(lambda: inspector.region(task, geometry, percentiles, bins))
+        geometry, percentiles, bins, isotherm = region_request(request)
+        return region_response(lambda: inspector.region(task, geometry, percentiles, bins, isotherm))
 
 
 def map_mosaics(task, user):

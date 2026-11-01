@@ -22,12 +22,26 @@ The panel's buttons choose what a click on the map does:
 - **Rectangle**, **circle** and **polygon**: draw a region (R1, R2…). For a rectangle or circle, press and drag. For
   a polygon, click its corners, then double-click or press Enter to finish (Backspace removes the last corner, Esc
   cancels).
+- **Line**: click the line's points, then double-click or press Enter to finish (L1, L2…).
 
 For each region, the panel shows the minimum, maximum, mean, median, standard deviation, 2nd and 98th percentiles,
-the number of pixels, the area and a histogram. The hottest and coldest pixels are marked on the map.
+the number of pixels, the area and a histogram. The hottest and coldest pixels are marked on the map. It also shows:
 
-Pins and regions can be hidden, removed, and downloaded as CSV. Your browser keeps them for the next time you open
-the same task.
+- **Surroundings**: the mean temperature of a ring around the region, from its outline out to its size (between 1
+  and 3 m).
+- **ΔT**: the region's mean minus its surroundings'. A hot spot on a roof has a ΔT well above zero.
+- **In the isotherm**: with an isotherm on (section 3), the share of the region's pixels within its limits. Change
+  the limits and the region shown is measured again.
+
+A line is measured along a strip 0.25 m either side of it, with its surroundings in a band 1 m wide beside it. In
+place of the histogram it has its **profile**: the temperatures every pixel along it. Hover the profile to see each
+point's distance and temperature, marked on the map; click it to open the frames that saw that point (section 5).
+
+![A line across a roof, its profile hovered: the point is marked on the map](images/inspector-line.png)
+
+Pins, regions and lines can be hidden, removed, and downloaded as CSV; a line's profile has its own **Profile CSV**
+(distance, position and temperature of each point, and on a workset mosaic its frame). Your browser keeps them for
+the next time you open the same task.
 
 ## 3. Colours, legend and isotherms
 

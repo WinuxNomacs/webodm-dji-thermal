@@ -753,14 +753,18 @@ def temperature_raster(task, cid, tab):
 
 class MosaicRegion(DatasetView):
     def post(self, request, pk, cid, tab):
-        """The statistics of a temperature tab's values (°C) inside a polygon, as the Thermal Inspector's regions of an
-        orthophoto (inspector_api.region_request)"""
+        """The statistics of a temperature tab's values (°C) inside a polygon or along a line, as the Thermal
+        Inspector's regions of an orthophoto (inspector_api.region_request); a line's profile names each sample's
+        source frame"""
         task = get_conversion(request, pk, cid)
         raster = temperature_raster(task, cid, tab)
-        geometry, percentiles, bins = inspector_api.region_request(request)
-        unit = mosaics.result(task, cid).get('unit') or 'C'
+        geometry, percentiles, bins, isotherm = inspector_api.region_request(request)
+        built = mosaics.result(task, cid)
+        source = mosaics.tab_raster(task, cid, 'source_frame')
+        frames = source + (built.get('frames') or [],) if source else None
         return inspector_api.region_response(
-            lambda: inspector.raster_region(raster, geometry, unit=unit, percentiles=percentiles, bins=bins))
+            lambda: inspector.raster_region(raster, geometry, unit=built.get('unit') or 'C', percentiles=percentiles,
+                                            bins=bins, isotherm=isotherm, frames=frames))
 
 
 class MosaicIsotherm(DatasetView):

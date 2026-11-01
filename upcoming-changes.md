@@ -267,7 +267,7 @@
 - **Thermal Analyzer, part 2** (the user, 2026-11-01; details under "Up next: Thermal Analyzer, part 2" below):
   the workset mosaics laid on WebODM's 2D map from the Thermal Inspector (for comparing with any task's layers), the
   source frames window, measuring tools and saved measurements there, and the frame page. In five steps; steps 1
-  (the mosaics on the map) and 2 (the source frames window) done 2026-11-01.
+  (the mosaics on the map), 2 (the source frames window) and 3 (measuring: lines, surroundings, ΔT) done 2026-11-01.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -411,6 +411,27 @@ last phase did with its colouring.
    `profile_points`, `mosaic_measure`): statistics and histogram, where the extremes are, the surroundings and ΔT,
    the isotherm's share, a line's profile (with each sample's frame on a mosaic); its result panel and charts
    (`result.tsx`, `charts.tsx`) in plain JavaScript. The Inspector's region endpoint and this share one module.
+   Decided (the user, 2026-11-01): the Inspector's own toolbar is extended rather than a second one added (it already
+   had Pin, Rectangle, Circle, Polygon, statistics, histogram and the extremes marked): a Line tool, and every
+   region's surroundings, ΔT and isotherm share; pins stay one pixel's temperature (no disc, surroundings or ΔT).
+   **Done** (2026-11-01, `inspector-measure`): `inspector.py` (`raster_region` takes a line: a strip
+   `LINE_HALF_WIDTH` 0.25 m either side, its `length` and `_profile` every pixel up to 1,000 samples, on a mosaic each
+   sample's source frame; every region's `surroundings` (a ring from its outline out to its size, 1 to 3 m; a band 1 m
+   beside a line) and `delta_t`, and `isotherm_share` when asked; GEOS, as WebODM has no shapely), `inspector_api.py`
+   (`region_request`'s `isotherm`, `region_isotherm`), `analyzer_api.py` (`MosaicRegion` passes the source frame
+   band), `regions.js` (a line: clicks, double-click or Enter, `lineGeometry`), `inspector.js` (Line mode, L1…
+   numbered apart from R1…, the rows, `profileHtml` with hover marking the point on the map and a click opening its
+   frames, the line labelled at its start, the isotherm's limits sent and the shown region measured again when they
+   change, `profileCsv`, the regions CSV's new columns), `inspector.css`. Tests: `test_inspector.py` (a line's
+   profile and length, a sample without data, a one-point line refused; surroundings and ΔT of a hot square and of a
+   line along a hot band; the isotherm share, refused limits), `test_analyzer.py` (a mosaic line's frames),
+   `inspector.test.js` (changed: the CSV's columns and the new rows; new: a line drawn, its profile hovered, its CSV,
+   L/R numbering; the isotherm share measured again). Jest 175, Django 140 (1 skipped), ESLint, Ruff; the isotherm
+   share's test seen failing with the upper limit ignored. Live on project 1 (read only): HomerunObliqueII's
+   orthophoto (a line: 13.1 m, surroundings and ΔT, the profile hovered and clicked to the frames window; a rectangle
+   with the isotherm Above: 19.3 %) and its workset's mosaic (a line, each sample's frame named); no console errors.
+   Docs: README, `index.md`, the Inspector quickstart's section 2, `api.md`; screenshots `inspector` retaken (the
+   shot now closes the frames window its pin opens), `inspector-line` new.
 4. **Saved measurements**: named, with a comment, kept with what they measure (a workset's
    `viewer/measurements.json`, a task's `thermal/measurements.json`, replaced atomically), listed in the panel,
    renamed and deleted, exported as CSV and GeoJSON; the approximate emissivity / reflected-temperature correction
