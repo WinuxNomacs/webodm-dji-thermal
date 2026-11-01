@@ -8,6 +8,7 @@ const conversions = require('../conversions');
 window.ThermalAnalyzerConversions = conversions;
 const dataset = require('../dataset');
 const viewer = require('../viewer');
+const Recolour = require('../recolour');
 
 // A page's markup from its Django template, with the template tags filled in as the plugin does
 function page(name) {
@@ -1896,6 +1897,8 @@ describe("the mosaic viewer", () => {
     const BOUNDS = [10.0, 45.0, 10.001, 45.001];
     const tab = (name, kind, stats) => ({tab: name, kind, bounds: BOUNDS, minzoom: 15, maxzoom: 21, stats});
     const TEMPS = {min: 10.2, max: 48.9, percentiles: [12.34, 40.06]};
+    // A mosaic's histogram, for the equalization
+    const HISTOGRAM = {counts: [1, 0, 3, 2], edges: [0, 10, 20, 30, 40]};
     const INFERNO = Array.from({length: 256}, (_, i) => ((i << 24) | (0 << 16) | ((255 - i) << 8) | 255) >>> 0);
     const VIEWER = Object.assign({}, CONVERSION, {
         dataset_name: "Roof", unit: "C", flown: ["2026:10:12 18:29:50", "2026:10:12 18:30:10"], built_at: "2026-10-18T11:05:00Z",
@@ -1930,6 +1933,12 @@ describe("the mosaic viewer", () => {
             return t;
         };
         L.tileLayer.wms = (url, opts) => layer({url, opts, wms: true});
+        // The mosaic's tiles, coloured from their values (recolour.js)
+        L.gridLayer = opts => {
+            const t = layer({opts, on() { return t; }, getTileSize: () => ({x: 256, y: 256})});
+            L.tiles.push(t);
+            return t;
+        };
         L.layerGroup = () => layer({group: true, clearLayers() { this.layers = []; }});
         L.circleMarker = (latlng, opts) => layer({marker: latlng, opts});
         L.polygon = (points, opts) => layer({polygon: points, opts});
@@ -1940,6 +1949,9 @@ describe("the mosaic viewer", () => {
     beforeEach(() => { document.body.innerHTML = page('viewer.html'); });
     afterEach(() => { window.localStorage.clear(); });
     const $ = id => document.getElementById(id);
+    // How a mosaic layer's tiles are coloured now, and a value tile's URL
+    const drawn = t => t.__dtValues.style();
+    const valuesOf = t => t.__dtValues.url({z: 18, x: 1, y: 2});
     const start = (fetchFn, L, basemaps) => viewer.init({doc: document, fetchFn, loadLeaflet: () => Promise.resolve(L), basemaps: basemaps || []});
 
     it("works out a tab's starting range, in the user's unit, and reads a typed one back", () => {
@@ -1983,10 +1995,10 @@ describe("the mosaic viewer", () => {
         expect(viewer.takenText([])).toBe("");
     });
 
-    it("asks for the tiles with the palette and range, and a new URL when the mosaic is built again", () => {
-        const url = viewer.tileUrl(C9, "harmonized", {palette: "dji_ironred", range: [12.3, 40.1]}, "2026-10-18T11:05:00Z");
-        expect(url).toBe(C9 + "/mosaics/harmonized/tiles/{z}/{x}/{y}.png?v=2026-10-18T11%3A05%3A00Z&color_map=dji_ironred&rescale=12.3,40.1");
-        expect(viewer.tileUrl(C9, "source_frame", {palette: "inferno", range: [0, 1]}, "x")).toBe(C9 + "/mosaics/source_frame/tiles/{z}/{x}/{y}.png?v=x&color_map=inferno&rescale=0,1");
+    it("asks for a tile's values once, and again when the mosaic is built again", () => {
+        expect(viewer.valuesUrl(C9, "harmonized", {z: 18, x: 1, y: 2}, "2026-10-18T11:05:00Z"))
+            .toBe(C9 + "/mosaics/harmonized/values/18/1/2.png?v=2026-10-18T11%3A05%3A00Z");
+        expect(viewer.valuesUrl(C9, "source_frame", {z: 3, x: 4, y: 5}, "x")).toBe(C9 + "/mosaics/source_frame/values/3/4/5.png?v=x");
     });
 
     it("describes the values under the cursor and the mosaic's report", () => {
@@ -2048,8 +2060,11 @@ describe("the mosaic viewer", () => {
         expect([...$("ta-viewer-tabs").querySelectorAll("a")].map(a => a.textContent)).toEqual(["Mosaic", "Harmonized", "Source frame", "View angle"]);
         const map = L.maps[0];
         expect(map.fitted).toEqual([[45.0, 10.0], [45.001, 10.001]]);
-        expect(L.tiles[0].url).toContain("/mosaics/as_converted/tiles/");
-        expect(L.tiles[0].url).toContain("color_map=dji_ironred");
+        expect(valuesOf(L.tiles[0])).toBe(C9 + "/mosaics/as_converted/values/18/1/2.png?v=2026-10-18T11%3A05%3A00Z");
+        expect(drawn(L.tiles[0])).toMatchObject({palette: "dji_ironred", colors: INFERNO, shares: null, sharpen: 0, isotherm: null,
+                                                 seams: false});
+        // rounded outwards in °F, kept in °C
+        expect(drawn(L.tiles[0]).range.map(x => x.toFixed(1))).toEqual(["12.3", "40.1"]);
         expect($("ta-viewer-palette").value).toBe("dji_ironred");
         // 12.3 to 40.1 °C is 54.2 to 104.2 °F
         expect([...$("ta-viewer-scale").querySelectorAll(".ta-tick")].map(t => t.textContent)).toEqual(["54.2", "70", "80", "90", "104.2"]);
@@ -2058,33 +2073,36 @@ describe("the mosaic viewer", () => {
         click($("ta-viewer-tabs").querySelector('[data-tab="harmonized"]'));
         await ticks();
         const t = L.tiles[L.tiles.length - 1];
-        expect(t.url).toContain("/mosaics/harmonized/tiles/");
+        expect(valuesOf(t)).toContain("/mosaics/harmonized/values/");
         expect(map.layers.filter(l => L.tiles.indexOf(l) >= 0)).toEqual([t]);
         $("ta-viewer-palette").value = "inferno";
         change($("ta-viewer-palette"));
-        expect(t.url).toContain("color_map=inferno");
+        expect(drawn(t).palette).toBe("inferno");
         // A temperature palette chosen is the user's, everywhere
         const put = fetchFn.mock.calls.filter(c => c[1] && c[1].method === "PUT");
         expect(put.map(c => JSON.parse(c[1].body))).toEqual([{palette: "inferno"}]);
         $("ta-viewer-min").value = "32";
         $("ta-viewer-max").value = "212";
         change($("ta-viewer-max"));
-        expect(t.url).toContain("rescale=0,100");
+        expect(drawn(t).range).toEqual([0, 100]);
         $("ta-viewer-max").value = "20";
         change($("ta-viewer-max"));
         expect($("ta-viewer-range-error").textContent).toMatch(/above the minimum/);
-        expect(t.url).toContain("rescale=0,100");
+        expect(drawn(t).range).toEqual([0, 100]);
         click($("ta-viewer-auto"));
-        expect(t.url).toMatch(/rescale=12\.3\d*,40\.1\d*/);
+        expect(drawn(t).range.map(x => x.toFixed(1))).toEqual(["12.3", "40.1"]);
 
         // The view angles keep their own; the source frames are drawn over the temperatures, in their palette and range
         click($("ta-viewer-tabs").querySelector('[data-tab="view_angle"]'));
         await ticks();
-        expect(L.tiles[L.tiles.length - 1].url).toContain("color_map=inferno&rescale=1,12");
+        expect(drawn(L.tiles[L.tiles.length - 1])).toMatchObject({palette: "inferno", range: [1, 12], seams: false});
         click($("ta-viewer-tabs").querySelector('[data-tab="source_frame"]'));
         await ticks();
         expect($("ta-viewer-palette").value).toBe("inferno");
-        expect(L.tiles[L.tiles.length - 1].url).toMatch(/source_frame\/tiles\/.*color_map=inferno&rescale=12\.3\d*,40\.1\d*/);
+        const frames = L.tiles[L.tiles.length - 1];
+        expect(valuesOf(frames)).toContain("/mosaics/source_frame/values/");
+        expect(drawn(frames)).toMatchObject({palette: "inferno", seams: true});
+        expect(drawn(frames).range.map(x => x.toFixed(1))).toEqual(["12.3", "40.1"]);
         click($("ta-viewer-tabs").querySelector('[data-tab="harmonized"]'));
         await ticks();
         expect($("ta-viewer-palette").value).toBe("inferno");
@@ -2286,7 +2304,7 @@ describe("the mosaic viewer", () => {
         const L = fakeLeaflet();
         const at = "?lon=10.0005&lat=45.0005";
         const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
-                                [C9 + "/mosaics/as_converted/curve?rescale=-1.6,26.2&gamma=2&equalize=1"]: {shares: [0, 0.9, 1]},
+                                [C9 + "/mosaics/as_converted/histogram"]: HISTOGRAM,
                                 [C9 + "/mosaics/as_converted/point" + at]: {valid: true, temperature: 30, frame: "b_T.JPG"},
                                 [C9 + "/mosaics/as_converted/frames" + at]: {frames: [{index: 1, file: "b_T.JPG", x: 3.5, y: 2.5,
                                     width: 8, height: 6, view_angle: 2, source: true}], models: true},
@@ -2294,44 +2312,53 @@ describe("the mosaic viewer", () => {
                                 [C9 + "/mosaics/view_angle/frames" + at]: {frames: [], models: true}});
         await start(fetchFn, L);
         await ticks();
-        const tile = () => L.tiles[L.tiles.length - 1].url;
+        const tile = () => drawn(L.tiles[L.tiles.length - 1]);
+        const recoloured = jest.spyOn(L.tiles[0], "recolour");
         const slide = (id, value, done) => {
             $(id).value = value;
             $(id).dispatchEvent(new Event("input", {bubbles: true}));
             if (done) $(id).dispatchEvent(new Event("change", {bubbles: true}));
         };
-        expect(tile()).toContain("rescale=12.3,40.1");
-        expect(tile()).not.toContain("gamma");
+        expect([tile().range, tile().shares]).toEqual([[12.3, 40.1], null]);
 
-        // Brightness moves the range: the boxes follow while it moves, the tiles once it is let go of
+        // Brightness moves the range: the boxes and the tiles follow while it moves, with no requests
+        const asked = fetchFn.mock.calls.length;
         slide("ta-viewer-brightness", "0.5", false);
         expect([$("ta-viewer-min").value, $("ta-viewer-max").value]).toEqual(["-1.6", "26.2"]);
-        expect(tile()).toContain("rescale=12.3,40.1");
+        expect(tile().range).toEqual([-1.6, 26.2]);
+        expect(recoloured).toHaveBeenCalled();
+        expect(fetchFn.mock.calls.length).toBe(asked);
         slide("ta-viewer-brightness", "0.5", true);
-        expect(tile()).toContain("rescale=-1.6,26.2");
+        expect(tile().range).toEqual([-1.6, 26.2]);
 
-        // Gamma: its value and the colour bar while it moves, the tiles once let go of
+        // Gamma: its value, the colour bar and the tiles while it moves
         const legend = () => document.querySelector(".ta-viewer-legend").style.background;
         const linear = legend();
         slide("ta-viewer-gamma", "1", false);
         expect($("ta-viewer-gamma-value").textContent).toBe("2.00");
         expect(legend()).not.toBe(linear);
-        expect(tile()).not.toContain("gamma");
+        expect(tile().shares[16]).toBeCloseTo(0.5, 12);
         slide("ta-viewer-gamma", "1", true);
-        expect(tile()).toContain("&gamma=2");
+        // Sharpening too
+        slide("ta-viewer-sharpen", "2", false);
+        expect(tile().sharpen).toBe(2);
 
-        // Equalized: the tiles, and the colour bar along the server's curve
+        // Equalized: the tiles and the colour bar along the curve of the mosaic's histogram, asked for once
         $("ta-viewer-tone").value = "equalize";
         change($("ta-viewer-tone"));
         await ticks();
-        expect(tile()).toContain("&gamma=2&equalize=1");
-        expect(calls(fetchFn)).toContain("GET " + C9 + "/mosaics/as_converted/curve?rescale=-1.6,26.2&gamma=2&equalize=1");
-        expect(legend().match(/rgb\(/g).length).toBe(3);
+        const curve = Recolour.curveShares(-1.6, 26.2, {gamma: 2}, Recolour.equalization(HISTOGRAM, -1.6, 26.2));
+        expect(tile().shares).toEqual(curve);
+        expect(legend().match(/rgb\(/g).length).toBe(Recolour.CURVE_SAMPLES);
+        slide("ta-viewer-brightness", "0", true);
+        expect(tile().shares).toEqual(Recolour.curveShares(12.3, 40.1, {gamma: 2}, Recolour.equalization(HISTOGRAM, 12.3, 40.1)));
+        expect(calls(fetchFn).filter(c => c.endsWith("/histogram"))).toHaveLength(1);
+        slide("ta-viewer-brightness", "0.5", true);
 
         // The frames window's picture is drawn the same way
         L.maps[0].fire("click", {latlng: {lng: 10.0005, lat: 45.0005}});
         await ticks();
-        expect($("ta-viewer-pip").querySelector("img").getAttribute("src")).toContain("rescale=-1.6,26.2&gamma=2&equalize=1");
+        expect($("ta-viewer-pip").querySelector("img").getAttribute("src")).toContain("rescale=-1.6,26.2&gamma=2&equalize=1&sharpen=2");
 
         // The isotherm: its fields shown for its mode, no error before a temperature is typed, then drawn in the tiles
         // and the frames window's picture
@@ -2339,11 +2366,11 @@ describe("the mosaic viewer", () => {
         change($("ta-viewer-iso-mode"));
         expect([$("ta-viewer-iso-a").hidden, $("ta-viewer-iso-b").hidden, $("ta-viewer-iso-hint").hidden]).toEqual([false, true, false]);
         expect($("ta-viewer-iso-error").textContent).toBe("");
-        expect(tile()).not.toContain("isotherm");
+        expect(tile().isotherm).toBeNull();
         $("ta-viewer-iso-a").value = "30";
         change($("ta-viewer-iso-a"));
         await ticks();
-        expect(tile()).toContain("&isotherm=above%2C30");
+        expect(tile().isotherm).toEqual([30, 3e38]);
         expect($("ta-viewer-pip").querySelector("img").getAttribute("src")).toContain("&isotherm=above%2C30");
 
         // View angle: no Equalized, no isotherm
@@ -2351,7 +2378,7 @@ describe("the mosaic viewer", () => {
         await ticks();
         expect([...$("ta-viewer-tone").options].map(o => o.value)).toEqual(["linear"]);
         expect($("ta-viewer-iso-mode")).toBeNull();
-        expect(tile()).not.toContain("isotherm");
+        expect(tile().isotherm).toBeNull();
 
         // Back on the temperatures the isotherm is still there; None removes it
         click($("ta-viewer-tabs").querySelector('[data-tab="as_converted"]'));
@@ -2360,11 +2387,11 @@ describe("the mosaic viewer", () => {
         $("ta-viewer-iso-mode").value = "";
         change($("ta-viewer-iso-mode"));
         expect($("ta-viewer-iso-a").hidden).toBe(true);
-        expect(tile()).not.toContain("isotherm");
+        expect(tile().isotherm).toBeNull();
 
         // Reset: the Auto range, no adjustments
         click($("ta-viewer-reset"));
-        expect(tile()).toMatch(/rescale=12\.3,40\.1$/);
+        expect(tile()).toMatchObject({range: [12.3, 40.1], shares: null, sharpen: 0, isotherm: null});
         expect([$("ta-viewer-gamma-value").textContent, $("ta-viewer-tone").value, $("ta-viewer-brightness").value]).toEqual(["1.00", "linear", "0"]);
     });
 

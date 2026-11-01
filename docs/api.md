@@ -37,6 +37,8 @@ workset's id (12 hexadecimal characters).
 | GET | `.../mosaics/<tab>/tiles/<z>/<x>/<y>.png` | A map tile of a mosaic tab, over `rescale=min,max` in `color_map`, drawn with `gamma` (0.2 to 5), `sharpen` (0 to 5), and on temperatures `equalize=1` and `isotherm` (`above,T`, `below,T` or `between,A,B`, in the mosaic's unit: those pixels in the palette, the rest grey); the same for a frame's picture. |
 | POST | `.../mosaics/<tab>/region` | A temperature tab's statistics inside a GeoJSON polygon or along a line, in °C, as the Thermal Inspector's `region`; a line's profile also names each sample's source frame. |
 | GET | `.../mosaics/<tab>/isotherm/<z>/<x>/<y>.png?low=&high=&color=` | A temperature tab's isotherm tile, as the Thermal Inspector's `isotherm` (limits in °C). |
+| GET | `.../mosaics/<tab>/values/<z>/<x>/<y>.png` | The values (in the tab's unit) a tile is drawn from, for the browser to colour: a PNG whose red and green hold a 16-bit code (the value is `X-Values-Offset` + code × `X-Values-Step`), blue the source frames' seams (1 and 2), alpha where there are values, with `X-Values-Margin` more pixels on each side and the sharpening's sigma in `X-Sharpen-Sigma`. |
+| GET | `.../mosaics/<tab>/histogram` | A temperature tab's histogram (`counts`, `edges`), for the browser's equalization. |
 | GET | `.../mosaics/<tab>/curve?rescale=&gamma=&equalize=` | How the tab's images are drawn, for the colour scale: the palette's share at 65 values evenly across the range. |
 | GET | `.../mosaics/<tab>/point?lon=&lat=` | The temperature, frame, frame pixel (the frame's column and row) and view angle at a point. |
 | GET | `.../mosaics/<tab>/frames?lon=&lat=`, `.../frames/<index>.png` | The frames that saw a point; one frame's picture. |
@@ -56,6 +58,8 @@ On a task with a thermal orthophoto, under `projects/<project>/tasks/<task>/insp
 | GET, POST | `measurements` | The measurements saved on the task's orthophoto, with what it was measured with (`baseline`: `{emissivity, reflected}` or null) and whether you can change them (`can_change`); saves one (`{name, comment, shape, geometry, circle, isotherm, correction}`: a pin's `geometry` a point), measured on the server. |
 | PATCH, DELETE | `measurements/<id>` | Renames a saved measurement or changes its comment (`{name, comment}`); deletes it. |
 | GET | `tiles/<z>/<x>/<y>` | The orthophoto drawn in a palette (`palette=`: one of DJI's or WebODM's colour maps) over `rescale=` (°C), with WebODM's `size` and `crop` and the mosaics' adjustments (`gamma`, `equalize=1`, from the orthophoto's histogram, kept in the task's `thermal/` folder, and `sharpen`). |
+| GET | `values/<z>/<x>/<y>` | The values (°C) a tile is drawn from, with WebODM's `size` and `crop`, as the mosaics' `values` (its ETag is the orthophoto's version). |
+| GET | `histogram` | The orthophoto's histogram (`counts`, `edges`), for the browser's equalization. |
 | GET | `curve?rescale=` | How the tiles share the palette out over the range with `gamma` and `equalize=1`, for the legend. |
 | GET | `isotherm/<z>/<x>/<y>` | An isotherm's tiles. |
 | GET | `palette?name=` | A palette's colours, for the legend. |

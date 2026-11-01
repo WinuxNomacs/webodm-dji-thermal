@@ -1,10 +1,12 @@
 """The Thermal Inspector's API: a task's thermal orthophoto read at a point and over a region, drawn in a palette with
 the mosaics' adjustments and as isotherms (see inspector.py), a palette's colours for its legend, and the workset mosaics of a project it can
 lay on the map (their regions and isotherms: analyzer_api, with region_request and isotherm_request)"""
+import hashlib
 import math
+import os
 import re
 
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseNotModified
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
 
@@ -15,6 +17,8 @@ from . import colouring, conversion_tasks, conversions, converter, correction, d
 
 # The mosaics' tabs laid on the map: those of temperatures (View angle stays in the Analyzer's viewer)
 MAP_TABS = ('as_converted', 'harmonized', 'source_frame')
+# The value tiles' encoding (colouring.value_png), in their ETag: a change to it is a new version of every tile
+VALUES_VERSION = 1
 
 
 class InspectorView(TaskNestedView):
@@ -87,6 +91,57 @@ class InspectorTiles(InspectorView):
         low, high = tile_range(request)
         size, crop = tile_params(request)
         return png(inspector.tile(task, int(z), int(x), int(y), colors, low, high, size, crop, tile_adjust(request)))
+
+
+def values_response(found, cache_control):
+    """A value tile (inspector's or mosaics' values_tile: PNG bytes, offset, step, sigma) as the browser decodes it
+    (recolour.js): the PNG, with the values' offset and step, its margin and the unsharp mask's sigma in headers"""
+    if found is None:
+        raise NotFound({'error': "Outside of bounds"})
+    data, offset, step, sigma = found
+    response = HttpResponse(data, content_type='image/png')
+    response['X-Values-Offset'] = repr(offset)
+    response['X-Values-Step'] = repr(step)
+    response['X-Values-Margin'] = str(colouring.MARGIN)
+    response['X-Sharpen-Sigma'] = repr(sigma)
+    response['Cache-Control'] = cache_control
+    return response
+
+
+def histogram_response(histogram):
+    """A raster's histogram for the browser's equalization (colouring.equalization): {counts, edges}, both null when it
+    has no values"""
+    counts, edges = histogram if histogram is not None else (None, None)
+    return Response({'counts': None if counts is None else [int(c) for c in counts],
+                     'edges': None if edges is None else [float(e) for e in edges]})
+
+
+class InspectorValues(InspectorView):
+    def get(self, request, pk=None, project_pk=None, z="", x="", y=""):
+        """
+        The thermal orthophoto's values (°C) a tile is drawn from, as a value tile for the browser to colour
+        (values_response), with the parameters of WebODM's tiles the map keeps (size and crop). Its ETag is the
+        orthophoto's version (and the crop's), so a browser asks again only to check it.
+        """
+        task = self.thermal_task(request, pk)
+        size, crop = tile_params(request)
+        st = os.stat(inspector.thermal_orthophoto(task))
+        version = [VALUES_VERSION, st.st_ino, st.st_size, st.st_mtime_ns, crop and task.crop and task.crop.wkt]
+        etag = '"{}"'.format(hashlib.sha1(repr(version).encode()).hexdigest()[:20])
+        if etag in [t.strip() for t in request.META.get('HTTP_IF_NONE_MATCH', '').split(',')]:
+            response = HttpResponseNotModified()
+        else:
+            response = values_response(inspector.values_tile(task, int(z), int(x), int(y), size, crop),
+                                       'private, no-cache')
+        response['ETag'] = etag
+        response['Cache-Control'] = 'private, no-cache'
+        return response
+
+
+class InspectorHistogram(InspectorView):
+    def get(self, request, pk=None, project_pk=None):
+        """The thermal orthophoto's histogram (°C), for the browser's equalization (histogram_response)"""
+        return histogram_response(inspector.histogram(self.thermal_task(request, pk)))
 
 
 class InspectorCurve(InspectorView):

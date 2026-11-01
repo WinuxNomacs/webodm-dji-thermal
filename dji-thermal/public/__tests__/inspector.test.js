@@ -1,5 +1,6 @@
 // The Thermal Inspector on WebODM's 2D map (inspector.js), on a fake Leaflet map with WebODM's layer metadata
 const inspector = require("../inspector.js");
+const Recolour = require("../recolour.js");
 
 const META = Symbol.for("meta");
 const TILES = "/api/projects/2/tasks/abc-1/orthophoto/tiles/{z}/{x}/{y}.png?formula=Celsius&bands=L&color_map=magma&rescale=10,40";
@@ -9,12 +10,20 @@ const RGB_TASK = {id: "rgb-2", orthophoto_bands: [{name: "red"}, {name: "green"}
 const flush = () => new Promise(r => setTimeout(r, 0));
 const jsonResponse = (data, ok = true) => Promise.resolve({ok, json: () => Promise.resolve(data)});
 
+// Leaflet's tile layers as the Inspector uses them: their tiles' URLs, and the events drawing from values listens to
+const tiling = {on() { return this; }, getTileSize: () => ({x: 256, y: 256})};
+
 function tileLayer(url, task, opts) {
-    const layer = {_url: url, options: Object.assign({zIndex: 1}, opts), redraws: 0,
-                   setUrl(u) { this._url = u; }, redraw() { this.redraws++; }, _removeAllTiles() {}};
+    const layer = Object.assign({_url: url, options: Object.assign({zIndex: 1}, opts), redraws: 0,
+                                 setUrl(u) { this._url = u; }, redraw() { this.redraws++; },
+                                 getTileUrl(c) { return this._url.replace("{z}", c.z).replace("{x}", c.x).replace("{y}", c.y); }}, tiling);
     layer[META] = {raster: true, task};
     return layer;
 }
+
+// How a layer drawn from values is coloured now (recolour.js's style), and its value tile at 18/1/2
+const drawn = layer => layer.__dtValues.style();
+const valuesOf = layer => layer.__dtValues.url({z: 18, x: 1, y: 2});
 
 function fakeLeaflet() {
     const L = {};
@@ -27,6 +36,11 @@ function fakeLeaflet() {
     L.tileLayer = (url, options) => {
         const container = document.createElement("div");
         return layer({_url: url, options, setUrl(u) { this._url = u; }, getContainer() { return container; }});
+    };
+    // The mosaics and isotherms, drawn from values
+    L.gridLayer = (options) => {
+        const container = document.createElement("div");
+        return layer(Object.assign({options, redraws: 0, redraw() { this.redraws++; }, getContainer() { return container; }}, tiling));
     };
     return L;
 }
@@ -542,11 +556,11 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         expect(panel().textContent).toContain("The emissivity is between 0.1 and 1");
         expect(ins.state.correction.emissivity).toBe(0.8);
 
-        // The isotherm's limits are corrected temperatures: its tiles get the layer's own
+        // The isotherm's limits are corrected temperatures: it paints the layer's own
         change(panel().querySelector('[data-act="isotherm-mode"]'), "above");
-        const iso = ins.state.isotherm, tile = ins.overlays()[0].overlay._url;
+        const iso = ins.state.isotherm;
         const raw = inspector.uncorrected(iso.low, {wanted: {emissivity: 0.8, reflected: 21}, baseline: BASELINE});
-        expect(Number(/low=([\d.-]+)/.exec(tile)[1])).toBeCloseTo(raw, 4);
+        expect(drawn(ins.overlays()[0].overlay).isotherm[0]).toBeCloseTo(raw, 4);
         map.remove();
     });
 
@@ -618,6 +632,13 @@ describe("the Thermal Inspector's isotherms and legend", () => {
         expect(inspector.validIsotherm({mode: "above", low: 1, color: "pink"})).toBe(false);
     });
 
+    it("asks for a tile's values where the layer's tile is, with its size and crop", () => {
+        const url = "/api/projects/2/tasks/abc-1/orthophoto/tiles/18/1/2?formula=Celsius&bands=L&rescale=10,40&size=512&crop=1&color_map=magma";
+        expect(inspector.valuesUrl(url)).toBe("/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/values/18/1/2?size=512&crop=1");
+        expect(inspector.valuesUrl(inspector.withPalette(url, "ironred", DISPLAY))).toBe(inspector.valuesUrl(url));
+        expect(inspector.valuesUrl("/elsewhere/18/1/2.png")).toBe("");
+    });
+
     it("starts limits within the layer's range, rounded in the user's unit", () => {
         expect(inspector.defaultIsotherm("above", [10, 40], "red", "C")).toEqual({mode: "above", color: "red", low: 31});
         expect(inspector.defaultIsotherm("between", [10, 40], "red", "C")).toEqual({mode: "between", color: "red", low: 19, high: 31});
@@ -657,10 +678,12 @@ describe("the Thermal Inspector's isotherms and legend", () => {
         expect(ins.state.isotherm.low).toBe(35);
         const overlay = ins.overlays()[0].overlay;
         expect(map.added).toContain(overlay);
-        expect(overlay._url).toBe("/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/isotherm/{z}/{x}/{y}?low=35&color=e53935");
+        // Painted in the browser from the layer's values
+        expect(valuesOf(overlay)).toBe("/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/values/18/1/2");
+        expect(drawn(overlay)).toEqual({paint: [229, 57, 53], isotherm: [35, 3e38]});
         expect(overlay.options).toMatchObject({tileSize: 512, bounds: "b", zIndex: 2, opacity: 1});
         change(panel().querySelector('[data-act="isotherm-color"]'), "blue");
-        expect(overlay._url).toMatch(/color=1e88e5$/);
+        expect(drawn(overlay).paint).toEqual([30, 136, 229]);
         layer.hide();
         expect(overlay.getContainer().style.display).toBe("none");
         layer.show();
@@ -677,11 +700,12 @@ describe("the Thermal Inspector's isotherms and legend", () => {
         const map2 = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
         const again = start(map2, {[PALETTE]: {name: "magma", color_map: INFERNO}});
         expect(again.ins.state.isotherm).toEqual(saved);
-        expect(map2.added).toContain(again.ins.overlays()[0].overlay);
+        const first = again.ins.overlays()[0].overlay;
+        expect(map2.added).toContain(first);
         again.ins.open();
         change(again.panel().querySelector('[data-act="isotherm-mode"]'), "off");
         expect(again.ins.overlays()).toEqual([]);
-        expect(map2.added.some(l => /isotherm/.test(l._url || ""))).toBe(false);
+        expect(map2.added).not.toContain(first);
         expect(window.localStorage.getItem(inspector.isothermKey(["abc-1"]))).toBeNull();
     });
 
@@ -919,8 +943,10 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(panel().querySelector(".dt-inspector-mosaic").textContent).toContain("Roof › Normalized");
         change(panel().querySelector('[data-act="mosaic-on"]'), true);
         const layer = laid()[0];
-        // The Analyzer's tiles, in DJI's ironred (the user's) over the tab's 2nd to 98th percentile (°F, the mosaic's unit)
-        expect(layer._url).toBe(BASE + "as_converted/tiles/{z}/{x}/{y}.png?v=2026-11-01T10%3A00%3A00%2B00%3A00&color_map=dji_ironred&rescale=50,121");
+        // Drawn from the Analyzer's values (kept until it is built again), in DJI's ironred (the user's) over the tab's
+        // 2nd to 98th percentile (°F, the mosaic's unit)
+        expect(valuesOf(layer)).toBe(BASE + "as_converted/values/18/1/2.png?v=2026-11-01T10%3A00%3A00%2B00%3A00");
+        expect([layer.__dtMosaic.key, layer.__dtMosaic.range]).toEqual(["dji_ironred", [50, 121]]);
         expect(layer.options.zIndex).toBeGreaterThan(100);
 
         map.setView([0.5, 0.5], 18);
@@ -938,8 +964,8 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(region).toHaveBeenCalledTimes(1);
 
         change(panel().querySelector('[data-act="mosaic-tab"]'), "harmonized");
-        expect(layer._url).toContain(BASE + "harmonized/tiles/");
-        expect(layer._url).toContain("rescale=60,110");
+        expect(valuesOf(layer)).toContain(BASE + "harmonized/values/");
+        expect(layer.__dtMosaic.range).toEqual([60, 110]);
         change(panel().querySelector('[data-act="mosaic-opacity"]'), "40");
         expect(layer.options.opacity).toBe(0.4);
         panel().querySelector('[data-act="mosaic-swipe"]').click();
@@ -947,7 +973,8 @@ describe("the Thermal Inspector's workset mosaics", () => {
         // Its isotherm is clipped as WebODM's divider clips it
         change(panel().querySelector('[data-act="isotherm-mode"]'), "above");
         const overlay = ins.overlays().find(o => o.layer === layer).overlay;
-        expect(overlay._url).toContain(BASE + "harmonized/isotherm/{z}/{x}/{y}.png?low=");
+        expect(valuesOf(overlay)).toContain(BASE + "harmonized/values/");
+        expect(drawn(overlay).isotherm[0]).toBeCloseTo(ins.state.isotherm.low * 1.8 + 32, 9);      // °F, the mosaic's unit
         layer.getContainer().style.clip = "rect(0px, 500px, 400px, 200px)";
         await flush();
         expect(overlay.getContainer().style.clip).toBe("rect(0px, 500px, 400px, 200px)");
@@ -1072,8 +1099,15 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(inspector.mosaicRange({stats: {percentiles: [20.04, 20.06]}})).toEqual([20, 20.1]);
         expect(inspector.mosaicRange({stats: {percentiles: [20, 20]}})).toEqual([20, 21]);
         const info = inspector.laidMosaic(2, m, "harmonized", "ironred", DISPLAY);
-        expect(inspector.mosaicIsothermUrl(info, {mode: "between", low: 20, high: 30, color: "blue"})).toBe(
-            BASE + "harmonized/isotherm/{z}/{x}/{y}.png?low=20&high=30&color=1e88e5");
+        expect(inspector.mosaicValuesUrl(info, {z: 18, x: 1, y: 2})).toBe(BASE + "harmonized/values/18/1/2.png?v=2026-11-01T10%3A00%3A00%2B00%3A00");
+        // An isotherm (°C) paints a mosaic's values in its unit, in its colour
+        const painted = inspector.isothermStyle({mode: "between", low: 20, high: 30, color: "blue"}, "F");
+        expect(painted.paint).toEqual([30, 136, 229]);
+        expect(painted.isotherm[0]).toBeCloseTo(68, 9);
+        expect(painted.isotherm[1]).toBeCloseTo(86, 9);
+        expect(inspector.isothermStyle({mode: "above", low: 20, color: "red"})).toEqual({paint: [229, 57, 53], isotherm: [20, 3e38]});
+        expect(inspector.isothermStyle({mode: "below", high: 5, color: "red"}).isotherm).toEqual([-3e38, 5]);
+        expect(inspector.isothermStyle({mode: "off", color: "red"})).toBeNull();
         expect(inspector.toCelsius(212, "F")).toBe(100);
         expect(inspector.toCelsius(300, "K")).toBeCloseTo(26.85);
     });
@@ -1081,7 +1115,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
 
 describe("the Thermal Inspector's colour scale and Image section", () => {
     const PALETTE = "GET /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/palette";
-    const CURVE = "GET /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/curve";
+    const HISTOGRAM = "GET /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/histogram";
     const PLUGIN = "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/tiles/";
     const INFERNO = Array.from({length: 256}, (_, i) => ((i << 24) | ((255 - i) << 8) | 255) >>> 0);
     const change = (el, value) => { el.value = value; el.dispatchEvent(new Event("change", {bubbles: true})); };
@@ -1158,47 +1192,59 @@ describe("the Thermal Inspector's colour scale and Image section", () => {
         expect([field(panel(), "range-min").value, field(panel(), "range-max").value]).toEqual(["12.3", "38.1"]);
     });
 
-    it("moves the range with brightness and contrast while a slider moves, and draws it when let go", async () => {
+    it("colours the tiles again from their values while a slider moves: brightness and contrast move the range, no requests", async () => {
         const layer = orthophoto();
         const map = fakeMap([layer]);
-        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}});
+        const {ins, panel, fetchFn} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}});
         await ins.ready;
         await flush();
         ins.open();
+        // WebODM's layer drawn from values (its tiles drawn again once), in the layer's palette
+        expect(valuesOf(layer)).toBe("/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/values/18/1/2");
+        expect(drawn(layer)).toMatchObject({colors: INFERNO, range: [10, 40], shares: null, sharpen: 0, seams: false});
+        const redraws = layer.redraws, asked = fetchFn.mock.calls.length, recoloured = jest.spyOn(layer, "recolour");
         field(panel(), "range-auto").click();
         const contrast = field(panel(), "image-contrast");
         slide(contrast, "1");       // half as wide around Auto's middle: 18.75 to 31.65 °C
         expect([field(panel(), "range-min").value, field(panel(), "range-max").value]).toEqual(["18.8", "31.7"]);
         expect(ticks(ins.legend())[0]).toBe("18.8");
-        expect(inspector.rangeOf(layer._url)).toEqual([12.3, 38.1]);       // not drawn yet
+        expect(inspector.rangeOf(layer._url)).toEqual([18.75, 31.65]);
+        expect(drawn(layer).range).toEqual([18.75, 31.65]);
+        expect(recoloured).toHaveBeenCalled();
         expect(field(panel(), "image-contrast")).toBe(contrast);          // the panel isn't drawn again under the cursor
         change(contrast, "1");
         expect(inspector.rangeOf(layer._url)).toEqual([18.75, 31.65]);
         const gamma = field(panel(), "image-gamma");
         slide(gamma, "1");
         expect(field(panel(), "image-gamma-value").textContent).toBe("2.00");
-        expect(layer._url).not.toContain("gamma=");
+        expect(drawn(layer).shares[16]).toBeCloseTo(0.5, 12);
         change(gamma, "1");
+        expect([layer.redraws, fetchFn.mock.calls.length]).toEqual([redraws, asked]);
         expect(layer._url).toContain(PLUGIN);
         expect(inspector.adjustOf(layer._url)).toEqual({gamma: 2, equalize: false, sharpen: 0});
         expect(inspector.paletteOf(layer._url)).toBe("magma");
         expect(ins.legend().querySelector(".dt-legend-bar").style.background).toMatch(/linear-gradient/);
     });
 
-    it("equalizes with the server's curve on the scale, and Reset draws Auto's range without adjustments on WebODM's tiles again", async () => {
+    it("equalizes along the orthophoto's histogram, asked for once, and Reset draws Auto's range without adjustments", async () => {
         const layer = orthophoto();
         const map = fakeMap([layer]);
-        const curve = jest.fn(() => jsonResponse({shares: Array.from({length: 65}, (_, i) => Math.sqrt(i / 64))}));
-        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}, [CURVE]: curve});
+        const H = {counts: [1, 2, 3, 0], edges: [0, 10, 20, 30, 40]};
+        const histogram = jest.fn(() => jsonResponse(H));
+        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}, [HISTOGRAM]: histogram});
         await ins.ready;
         await flush();
         ins.open();
         change(field(panel(), "image-tone"), "equalize");
         expect(inspector.adjustOf(layer._url).equalize).toBe(true);
-        expect(curve.mock.calls[0][0]).toBe("/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/curve?rescale=10,40&equalize=1");
         await flush();
+        const curve = Recolour.curveShares(10, 40, {gamma: 1}, Recolour.equalization(H, 10, 40));
+        expect(drawn(layer).shares).toEqual(curve);
         const stops = ins.legend().querySelector(".dt-legend-bar").style.background.match(/rgb\(/g) || [];
         expect(stops.length).toBe(65);      // one stop per share of the curve
+        change(field(panel(), "range-max"), "30");
+        expect(drawn(layer).shares).toEqual(Recolour.curveShares(10, 30, {gamma: 1}, Recolour.equalization(H, 10, 30)));
+        expect(histogram).toHaveBeenCalledTimes(1);
         expect(field(panel(), "image-tone").value).toBe("equalize");
         field(panel(), "image-reset").click();
         expect(layer._url).toBe(TILES.replace("color_map=magma&rescale=10,40", "rescale=12.3,38.1&color_map=magma"));
@@ -1243,7 +1289,7 @@ describe("the Thermal Inspector's colour scale and Image section", () => {
         // A mosaic laid above it: its own range (°F) and no adjustments
         const info = {project: "2", dataset: "d-1", workset: "w-1", tab: "as_converted", unit: "F", built_at: "b", key: "magma",
                       range: [50, 104], auto: [50, 104], adjust: {gamma: 1, equalize: false, sharpen: 0}, extent: null, name: "Roof › W"};
-        const mosaic = fakeLeaflet().tileLayer(inspector.mosaicTileUrl(info), {zIndex: 1000});
+        const mosaic = fakeLeaflet().gridLayer({zIndex: 1000});
         mosaic.__dtMosaic = info;
         ins.state.mosaics = [{dataset: {id: "d-1", name: "Roof"}, workset: {id: "w-1", name: "W"}, palettes: ["magma"], default_palette: "magma", tabs: []}];
         map.add(mosaic);
@@ -1251,7 +1297,7 @@ describe("the Thermal Inspector's colour scale and Image section", () => {
         expect([field(panel(), "range-min").value, field(panel(), "range-max").value]).toEqual(["10", "40"]);
         expect(field(panel(), "image-sharpen").value).toBe("0");
         change(field(panel(), "image-gamma"), "-1");
-        expect(mosaic._url).toBe("/api/plugins/dji-thermal/datasets/d-1/conversions/w-1/mosaics/as_converted/tiles/{z}/{x}/{y}.png?v=b&color_map=magma&rescale=50,104&gamma=0.5");
+        expect(mosaic.__dtMosaic).toMatchObject({range: [50, 104], adjust: {gamma: 0.5, equalize: false, sharpen: 0}});
         expect(inspector.framesSource(inspector.thermalLayer(mosaic)).query).toContain("&gamma=0.5");
         expect(inspector.adjustOf(below._url)).toEqual({gamma: 1, equalize: false, sharpen: 2});
         // The orthophoto's frames are drawn with its adjustments too

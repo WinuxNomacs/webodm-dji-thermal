@@ -23,6 +23,7 @@ from app.models import Project, Task
 from app.tests.classes import BootTestCase
 
 inspector = importlib.import_module("coreplugins.dji-thermal.inspector")
+colouring = importlib.import_module("coreplugins.dji-thermal.colouring")
 converter = importlib.import_module("coreplugins.dji-thermal.converter")
 conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
 correction = importlib.import_module("coreplugins.dji-thermal.correction")
@@ -306,7 +307,7 @@ class TestInspector(BootTestCase):
                          status.HTTP_403_FORBIDDEN)
         self.assertEqual(other.delete("{}/{}".format(url, mid)).status_code, status.HTTP_403_FORBIDDEN)
 
-    def tile(self, col, row, zoom=18, task=None, what="tiles", **params):
+    def tile(self, col, row, zoom=18, task=None, what="tiles", headers=None, **params):
         """The map tile holding a pixel's centre (of the thermal layer, or what), and where that centre is in it (x, y)"""
         lon, lat = lonlat(col, row)
         tms = morecantile.tms.get('WebMercatorQuad')
@@ -316,7 +317,7 @@ class TestInspector(BootTestCase):
         url = self.url(task or self.task, "{}/{}/{}/{}".format(what, t.z + (size == 512), t.x, t.y))
         at = (int((mx - bounds.left) / (bounds.right - bounds.left) * size),
               int((bounds.top - my) / (bounds.top - bounds.bottom) * size))
-        return self.client.get(url, params), at
+        return self.client.get(url, params, **(headers or {})), at
 
     def test_a_mosaics_regions_and_isotherms_are_in_celsius_without_its_no_data_marker(self):
         # A workset mosaic as dji-thermal-cli writes it: one band in its unit (here °F), absolute zero where it has none
@@ -422,6 +423,45 @@ class TestInspector(BootTestCase):
         self.assertLess(abs(self.pixel(50, 40, palette='whitehot', rescale='0,200', sharpen=5, size=512)[0] - 0.3 * 255), 4)
         for params in ({'gamma': 9}, {'gamma': 'x'}, {'equalize': 2}, {'sharpen': -1}):
             self.assertEqual(self.tile(50, 40, palette='whitehot', **params)[0].status_code, status.HTTP_400_BAD_REQUEST, params)
+
+    def test_a_value_tile_holds_the_temperatures_a_tile_is_drawn_from_with_a_margin(self):
+        margin = colouring.MARGIN
+        res, (x, y) = self.tile(50, 40, what="values")
+        self.assertEqual((res.status_code, res['Content-Type']), (status.HTTP_200_OK, 'image/png'))
+        self.assertEqual((res['X-Values-Margin'], res['Cache-Control']), (str(margin), 'private, no-cache'))
+        rgba = np.asarray(Image.open(io.BytesIO(res.content)))
+        self.assertEqual(rgba.shape, (256 + 2 * margin, 256 + 2 * margin, 4))
+        offset, step = float(res['X-Values-Offset']), float(res['X-Values-Step'])
+        value = lambda px: offset + (int(px[0]) * 256 + int(px[1])) * step
+        # (50, 40) is at 60 °C, read as the drawn tile reads it (bilinear)
+        self.assertLess(abs(value(rgba[y + margin, x + margin]) - 60), 0.5)
+        self.assertEqual(rgba[y + margin, x + margin, 3], 255)
+        res, (x, y) = self.tile(3, 40, what="values")
+        self.assertEqual(np.asarray(Image.open(io.BytesIO(res.content)))[y + margin, x + margin, 3], 0)
+        # 512 pixels, and the task's crop, as the drawn tiles have them
+        res, _at = self.tile(50, 40, what="values", size=512)
+        self.assertEqual(Image.open(io.BytesIO(res.content)).size, (512 + 2 * margin,) * 2)
+        self.crop(40, 30, 60, 50)
+        res, (x, y) = self.tile(70, 40, what="values", crop='1')
+        self.assertEqual(np.asarray(Image.open(io.BytesIO(res.content)))[y + margin, x + margin, 3], 0)
+
+    def test_a_value_tile_is_asked_again_only_to_check_it_is_the_orthophotos_version(self):
+        res, _at = self.tile(50, 40, what="values")
+        etag = res['ETag']
+        again, _at = self.tile(50, 40, what="values", headers={'HTTP_IF_NONE_MATCH': etag})
+        self.assertEqual((again.status_code, again['ETag']), (status.HTTP_304_NOT_MODIFIED, etag))
+        cropped, _at = self.tile(50, 40, what="values", crop='1')
+        self.assertNotEqual(cropped['ETag'], etag)
+        os.utime(inspector.thermal_orthophoto(self.task), ns=(1, 1))
+        self.assertEqual(self.tile(50, 40, what="values", headers={'HTTP_IF_NONE_MATCH': etag})[0].status_code, status.HTTP_200_OK)
+        far = self.client.get(self.url(self.task, "values/18/0/0"))
+        self.assertEqual(far.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_the_orthophotos_histogram_is_given_for_the_browsers_equalization(self):
+        res = self.client.get(self.url(self.task, "histogram"))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        counts, edges = inspector.histogram(self.task)
+        self.assertEqual((res.data['counts'], res.data['edges']), (counts.tolist(), edges.tolist()))
 
     def test_the_legends_curve_is_the_tiles(self):
         res = self.client.get(self.url(self.task, "curve"), {'rescale': '0,200', 'gamma': 2})

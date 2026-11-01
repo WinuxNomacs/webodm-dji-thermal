@@ -49,7 +49,7 @@ class Plugin(PluginBase):
     def include_js_files(self):
         # WebODM only turns these into URLs: versioned like the Analyzer's pages' (analyzer_pages.version)
         v = version(self.get_path("public"))
-        return [name + "?v=" + v for name in ['main.js', 'scale.js', 'regions.js', 'frames.js', 'inspector.js']]
+        return [name + "?v=" + v for name in ['main.js', 'scale.js', 'recolour.js', 'regions.js', 'frames.js', 'inspector.js']]
 
     def build_jsx_components(self):
         # Leaflet: WebODM's own, for the mosaic viewer (see thermal/Leaflet.js)
@@ -62,6 +62,8 @@ class Plugin(PluginBase):
             MountPoint(TASK + '/inspector/region$', inspector_api.InspectorRegion.as_view()),
             MountPoint(TASK + r'/inspector/tiles/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)$', inspector_api.InspectorTiles.as_view()),
             MountPoint(TASK + r'/inspector/isotherm/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)$', inspector_api.InspectorIsotherm.as_view()),
+            MountPoint(TASK + r'/inspector/values/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)$', inspector_api.InspectorValues.as_view()),
+            MountPoint(TASK + '/inspector/histogram$', inspector_api.InspectorHistogram.as_view()),
             MountPoint(TASK + '/inspector/curve$', inspector_api.InspectorCurve.as_view()),
             MountPoint(TASK + '/inspector/palette$', inspector_api.InspectorPalette.as_view()),
             MountPoint(TASK + '/inspector/measurements$', inspector_api.InspectorMeasurements.as_view()),
@@ -88,6 +90,9 @@ class Plugin(PluginBase):
             MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/tiles/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)\.png$',
                        analyzer_api.MosaicTile.as_view()),
             MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/point$', analyzer_api.MosaicPoint.as_view()),
+            MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/values/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)\.png$',
+                       analyzer_api.MosaicValues.as_view()),
+            MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/histogram$', analyzer_api.MosaicHistogram.as_view()),
             MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/curve$', analyzer_api.MosaicCurve.as_view()),
             MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/region$', analyzer_api.MosaicRegion.as_view()),
             MountPoint(CONVERSION + r'/mosaics/(?P<tab>[a-z_]+)/isotherm/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)\.png$',

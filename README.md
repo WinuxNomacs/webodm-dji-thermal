@@ -176,7 +176,9 @@ over WebODM's base layers:
 - how the image is drawn (**Image**): **Brightness** and **Contrast** (which move and narrow the range), **Gamma**,
   **Sharpening** (an unsharp mask), **Linear** or **Equalized** (the colours spread over the temperatures the whole
   mosaic has most of; temperatures only) and **Reset**, drawn into the tiles and the frames' pictures, with the colour
-  scale drawn to match; the temperatures stay as they are. The temperature tabs share them, and each visit starts
+  scale drawn to match; the temperatures stay as they are. The map follows the sliders, the range and the isotherm as
+  they change, with no waiting: the browser colours each tile from its temperatures, which the server sends once (the
+  frames' pictures are drawn again once a slider is let go of). The temperature tabs share them, and each visit starts
   without them;
 - an **Isotherm** on the temperature tabs (above, below or between temperatures): its pixels keep the palette and the
   rest turns grey, on the map and in the frames' pictures;
@@ -290,9 +292,12 @@ Inspector:
   is loaded again).
 - **Image**: the mosaic viewer's controls for how the topmost thermal layer is drawn: Brightness and Contrast (moving
   and narrowing the range from Auto's), Gamma, Linear or Equalized (from the whole layer's histogram) and Sharpening,
-  and Reset. An adjusted orthophoto is drawn by the plugin (its histogram, for Equalized, kept in the task's folder);
-  the frames window draws its pictures alike. Each thermal layer keeps its own range and adjustments, for this visit
-  only.
+  and Reset. The map follows them as they move, with the colour scale, the range and the isotherm: the thermal layers
+  (the task's orthophoto, in any palette, and the mosaics laid on the map) are coloured in your browser from their
+  temperatures, which the plugin sends once per tile, so nothing waits on the server (the orthophoto's histogram, for
+  Equalized, is kept in the task's folder). WebODM's layer keeps its opacity, swipe and layer panel. The frames window
+  draws its pictures alike, once a slider is let go of. Each thermal layer keeps its own range and adjustments, for
+  this visit only.
 - **Legend**: a colour bar of the thermal layer's palette over its range (shared out as the Image section draws it),
   in your unit, at the map's top left: its ends say the range's lowest and highest temperatures, with round values
   between. When the image's own coldest or hottest temperature lies outside that range (narrowed in the colour scale

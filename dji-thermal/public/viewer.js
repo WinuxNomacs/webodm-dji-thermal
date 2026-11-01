@@ -7,6 +7,7 @@
     var core = root.ThermalAnalyzerCore || (typeof require !== "undefined" ? require("./analyzer_core") : null);
     var scale = root.ThermalScale || (typeof require !== "undefined" ? require("./scale") : null);
     var Frames = root.ThermalFrames || (typeof require !== "undefined" ? require("./frames") : null);
+    var Recolour = root.ThermalRecolour || (typeof require !== "undefined" ? require("./recolour") : null);
     var pipHtml = Frames.pipHtml;
     var gradientCss = scale.gradientCss, scaleTicks = scale.scaleTicks, rangeTicks = scale.rangeTicks;
     var esc = function (t) { return core.escapeHtml(t); };
@@ -115,12 +116,10 @@
         return first.slice(0, 10) === last.slice(0, 10) ? first + "–" + last.slice(11) : first + " – " + last;
     }
 
-    // A tab's tile URL template (base: the conversion's API URL) with its palette and range; the build time makes a
-    // mosaic built again a new URL, so the browser keeps tiles no longer than the mosaic they show
-    function tileUrl(base, tab, style, builtAt) {
-        var query = ["v=" + encodeURIComponent(builtAt || ""), "color_map=" + encodeURIComponent(style.palette),
-                     "rescale=" + style.range[0] + "," + style.range[1]];
-        return base + "/mosaics/" + tab + "/tiles/{z}/{x}/{y}.png?" + query.join("&") + adjustQuery(style.adjust) + isothermQuery(tab, style);
+    // The URL of a tab's value tile (base: the conversion's API URL), which the browser colours (recolour.js); the
+    // build time makes a mosaic built again a new URL, so the browser keeps tiles no longer than the mosaic they show
+    function valuesUrl(base, tab, coords, builtAt) {
+        return base + "/mosaics/" + tab + "/values/" + coords.z + "/" + coords.x + "/" + coords.y + ".png?v=" + encodeURIComponent(builtAt || "");
     }
 
     // One of the mosaic's frames as the tab draws it (its temperatures, or on View angle its pixels' angles), with the
@@ -309,17 +308,29 @@
             return styles[g];
         }
 
-        // The legend's curve with equalization: the server's (from the whole mosaic's histogram), for the range shown
-        var askedCurve = 0;
+        // The curve with equalization, for the range shown: from the tab's histogram (the whole mosaic's), asked for
+        // once, as the server draws it
+        var histograms = {};
         function loadCurve() {
-            var s = style(), n = ++askedCurve, askedTab = tab;
-            if (!s.adjust.equalize) return Promise.resolve();
-            return fetchFn(base + "/mosaics/" + tab + "/curve?rescale=" + s.range[0] + "," + s.range[1] + adjustQuery(s.adjust),
-                           {credentials: "same-origin"}).then(core.readJson).then(function (r) {
-                if (n !== askedCurve || askedTab !== tab) return;
-                s.curve = r.ok ? r.data.shares : null;
-                showScale();
+            var s = style(), askedTab = tab, h = histograms[tab];
+            if (!s.adjust.equalize || !isTemperature(tab)) return;
+            if (h && !h.then) {
+                s.curve = Recolour.curveShares(s.range[0], s.range[1], s.adjust, Recolour.equalization(h, s.range[0], s.range[1]));
+                return;
+            }
+            if (h) return;
+            histograms[tab] = fetchFn(base + "/mosaics/" + tab + "/histogram", {credentials: "same-origin"}).then(core.readJson).then(function (r) {
+                histograms[askedTab] = r.ok ? r.data : {counts: null, edges: null};
+                if (askedTab === tab) recolour();
             });
+        }
+
+        // How the tab's tiles are coloured now (recolour.js's style)
+        function drawStyle() {
+            var s = style(), p = (v.palettes || []).filter(function (x) { return x.key === s.palette; })[0];
+            if (!p) return null;
+            return {palette: s.palette, colors: p.color_map, range: s.range, shares: styleShares(s), sharpen: s.adjust.sharpen,
+                    isotherm: isTemperature(tab) ? Recolour.isothermRange(s.isotherm && s.isotherm.value) : null, seams: tab === "source_frame"};
         }
 
         function showScale() {
@@ -426,12 +437,13 @@
             if (pickLayer) pickLayer.clearLayers();
         }
 
+        // The tab's tiles, coloured in the browser from their values
         function showLayer() {
-            var t = current();
-            var url = tileUrl(base, tab, style(), v.built_at);
+            var t = current(), shownTab = tab, builtAt = v.built_at;
             if (layer) map.removeLayer(layer);
-            layer = L.tileLayer(url, {maxZoom: 26, maxNativeZoom: (t.maxzoom || 20) + 1, minZoom: 0,
-                                      bounds: t.bounds ? [[t.bounds[1], t.bounds[0]], [t.bounds[3], t.bounds[2]]] : undefined});
+            layer = Recolour.drawFromValues(L.gridLayer({maxZoom: 26, maxNativeZoom: (t.maxzoom || 20) + 1, minZoom: 0,
+                bounds: t.bounds ? [[t.bounds[1], t.bounds[0]], [t.bounds[3], t.bounds[2]]] : undefined}),
+                {url: function (coords) { return valuesUrl(base, shownTab, coords, builtAt); }, style: drawStyle, fetchFn: fetchFn});
             layer.addTo(map);
             if (!fitted && t.bounds) {
                 map.fitBounds([[t.bounds[1], t.bounds[0]], [t.bounds[3], t.bounds[2]]]);
@@ -445,8 +457,8 @@
             if (v.project) $("ta-viewer-webodm-map").href = "/map/project/" + encodeURIComponent(v.project) + "/?dt-mosaic=" +
                 encodeURIComponent(v.dataset + "/" + v.id) + (isTemperature(tab) ? "/" + tab : "");
             $("ta-viewer-tabs").innerHTML = tabsHtml(v.tabs, tab);
-            $("ta-viewer-controls").innerHTML = controlsHtml(t, style(), v.palettes || [], v.unit);
             loadCurve();
+            $("ta-viewer-controls").innerHTML = controlsHtml(t, style(), v.palettes || [], v.unit);
             $("ta-viewer-report").innerHTML = reportHtml(v.kinds[t.kind], t.kind, base);
             $("ta-viewer-readout").innerHTML = '<span class="ta-message">' + esc(READOUT_HINT) + "</span>";
             return ensureMap().then(function () {
@@ -455,12 +467,16 @@
             });
         }
 
-        // Only the scale and the tiles, as the palette, range or adjustments change
-        function restyle() {
-            showScale();
-            if (layer) layer.setUrl(tileUrl(base, tab, style(), v.built_at));
-            if (pick) showPick();
+        // The scale and the tiles coloured again, as the palette, range or adjustments change (no requests)
+        function recolour() {
             loadCurve();
+            showScale();
+            if (layer) layer.recolour();
+        }
+        // And the frames window's picture, which the server draws
+        function restyle() {
+            recolour();
+            if (pick) showPick();
         }
 
         function render(data) {
@@ -549,7 +565,7 @@
                 style().adjust.equalize = e.target.value === "equalize";
                 return restyle();
             }
-            // A slider let go of draws the image again (while it moves, only the legend and the boxes follow)
+            // A slider let go of draws the frames window's picture again too (while it moves, the tiles follow)
             if (/^ta-viewer-(brightness|contrast|gamma|sharpen)$/.test(e.target.id)) {
                 slide(e.target);
                 restyle();
@@ -589,11 +605,12 @@
                 s.adjust.sharpen = Math.round((parseFloat(input.value) || 0) * 100) / 100;
                 $("ta-viewer-sharpen-value").textContent = core.formatNumber(s.adjust.sharpen, 1);
             }
-            showScale();
         }
 
         $("ta-viewer-controls").addEventListener("input", function (e) {
-            if (/^ta-viewer-(brightness|contrast|gamma|sharpen)$/.test(e.target.id)) slide(e.target);
+            if (!/^ta-viewer-(brightness|contrast|gamma|sharpen)$/.test(e.target.id)) return;
+            slide(e.target);
+            recolour();
         });
 
         // Auto: the range from the mosaic's percentiles; Reset: that range, and no adjustments
@@ -634,7 +651,7 @@
     }
 
     var api = {tabLabel: tabLabel, styleGroup: styleGroup, defaultRange: defaultRange, parseRange: parseRange, shownRange: shownRange,
-               gradientCss: gradientCss, scaleTicks: scaleTicks, legendHtml: legendHtml, takenText: takenText, tileUrl: tileUrl,
+               gradientCss: gradientCss, scaleTicks: scaleTicks, legendHtml: legendHtml, takenText: takenText, valuesUrl: valuesUrl,
                frameUrl: frameUrl, pipHtml: pipHtml, READOUT_HINT: READOUT_HINT, tabsHtml: tabsHtml, controlsHtml: controlsHtml, readoutHtml: readoutHtml, reportHtml: reportHtml, statusHtml: statusHtml,
                baseLayers: baseLayers, loadLeaflet: loadLeaflet, init: init, adjustQuery: adjustQuery, toneShares: toneShares,
                slidRange: slidRange, sliderPositions: sliderPositions, sliderGamma: sliderGamma, gammaSlider: gammaSlider,
