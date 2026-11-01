@@ -506,6 +506,42 @@
        M4T flight, WebODM's commit intercepted so nothing processed): the task tagged and linked, the result's link,
        the dataset with the photos (10 MB) and analyzing; the dataset and the task removed after.
 
+- **Normalize and harmonize in DJI Thermal Task** (the user, 2026-11-01, with a screenshot of DJI Thermal Task's
+  panel): "When creating a thermal task we should settings at the top that are disabled by default for normalizing
+  and harmonizing, accompanied by a brief description of what they do."
+  - What it builds on: dji-thermal-cli's normalization (`api.normalization`, a `Normalization` given to `process`)
+    has two parts: one ambient and reflected temperature for every frame (the flight's medians of the recorded
+    values, unless given), and each frame's offset against its overlapping neighbours removed (camera drift; frames
+    the mosaic can't place get none). The Analyzer's workset setting **Normalize** applies both; its **Harmonized**
+    mosaic is the one built with them. Both need every photo on the server before any is converted, while DJI
+    Thermal Task converts each photo as it uploads (`api.py` `TaskConvert`). A workset's conversion runs in WebODM's
+    worker with its progress, and **Use for parent task** puts a workset's TIFFs in the dataset's own task, which a
+    DJI Thermal Task's task now is (`dataset-in-task`).
+  - Proposed: at the top of the panel, **Normalize** and **Harmonize** (it needs Normalize), off. Off: as now. On:
+    the photos go to the task's dataset first, a workset with these settings and the panel's measurement values is
+    converted in the worker, and its TIFFs go into the task, which then starts processing, with the browser closed
+    or not.
+  - Decided (the user, 2026-11-01): **through a workset** (the photos in the task's dataset, "Also keep the photos"
+    ticked and locked; the workset and its mosaics stay in the Analyzer); **the same two settings in the Workset
+    Creation Settings**; **next, before the speed-up**.
+  - Steps:
+    1. `harmonize-setting`: worksets get `harmonize` beside `normalize` (`conversions.DEFAULTS`, `parse_settings`:
+       Harmonize ticks Normalize; a record or saved defaults without `harmonize` read it as `normalize`, so the
+       existing normalized worksets show both). Normalize alone: every frame measured with the flight's medians of
+       the recorded ambient and reflected temperatures (read from the frames in the conversion job; a value typed
+       in Measurement wins), `process(normalize=False)`; with Harmonize, `process(normalize=True)` as now. The
+       summary chip "normalized" or "harmonized"; the WebODM plan's `--normalize` sets both. The Frames section of
+       the Workset Creation Settings: the two tick boxes with a line each. Tests: `test_analyzer.py`,
+       `analyzer.test.js`. Docs: `measurement.md` ("Normalize and harmonize"), `quickstart-worksets.md`, README.
+    2. `thermal-task-normalize`: at the top of DJI Thermal Task's panel, **Normalize** and **Harmonize**, off, a
+       line each. On: the task is created and made its own dataset, every photo (and the RGB ones) uploaded to the
+       dataset, the GCP file and the text files sent with the workset's TIFF names (`_temp_c.tiff`), then
+       `POST .../tasks/<t>/workset` makes a workset (°C TIFFs, the panel's measurement values, the two settings,
+       mosaics) that, once converted, is sent to the task (`use_for_parent`) and the task committed with the panel's
+       processing node; the mosaics are built after. The panel's message says the task processes once the workset
+       is converted, with a link to the dataset. Tests: `upload.test.js`, `test_api.py`. Docs: the Thermal Task
+       quickstart, README.
+
 - **Faster image adjustments** (the user, 2026-11-01, from `new.md`): "can anything be done to improve the
   rendering response time of changes to the images sliders? How fast the tiles are rendered? etc.... Looking for it
   to be as seamless and realtime as possible without needing a webodm pr".
