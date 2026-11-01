@@ -15,7 +15,7 @@ workset's id (12 hexadecimal characters).
 | --- | --- | --- |
 | POST | `describe` | One thermal photo's camera, recorded measurement values and their ranges. Nothing is kept. |
 | POST | `projects/<project>/tasks/<task>/convert` | Converts one photo into a partial task's images, with the measurement values sent with it. Answers `converted`, `ignored` (not a DJI thermal photo) or `failed` with the reason. |
-| POST | `projects/<project>/tasks/<task>/dataset` | The task's DJI Thermal Analyzer dataset, `{id}`: the one it's linked to, or a new one in its project named after it (201), which the task is then linked to. Needs the right to change the project; not on a dataset's own task. |
+| POST | `projects/<project>/tasks/<task>/dataset` | The task's DJI Thermal Analyzer dataset, `{id}`: the task itself if it's one, the one it's linked to, or else the task made a dataset, kept in it (201). Needs the right to change the project. |
 
 ## DJI Thermal Analyzer
 

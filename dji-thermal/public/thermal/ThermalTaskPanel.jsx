@@ -233,7 +233,7 @@ export default class ThermalTaskPanel extends React.Component {
                                            onChange={e => this.setState({keepPhotos: e.target.checked})} />
                                     {" "}{_("Also keep the photos in a DJI Thermal Analyzer dataset")}
                                 </label>
-                                <span className="help-block">{_("A dataset named after the task, in this project, with every photo picked (the RGB ones too): to check the flight or try other conversion settings. The photos are sent once.")}</span>
+                                <span className="help-block">{_("The task is also a dataset, with every photo picked (the RGB ones too): to check the flight or try other conversion settings. The photos are sent once.")}</span>
                             </div>
                         </div>
                         <NewTaskPanel

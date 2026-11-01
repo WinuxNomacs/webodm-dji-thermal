@@ -222,8 +222,9 @@ class DatasetDetail(DatasetView):
 
     def delete(self, request, pk):
         task = get_dataset(request, pk, 'delete_project')
-        if task.scan_images():
-            # A conversion was sent to it: kept as an ordinary task, with those images and what it processed
+        if task.scan_images() or datasets.in_task(task):
+            # A conversion was sent to it, or it was a task before: kept as an ordinary task, with its images and
+            # what it processed
             conversion_tasks.release(task)
         else:
             task.delete()       # its folder with it; a running analysis is canceled (see task_removing)

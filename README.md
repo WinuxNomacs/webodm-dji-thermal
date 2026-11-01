@@ -58,9 +58,9 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
      recorded (usually 5 m, whatever the flight height). Or the recorded distance, or one distance for all photos.
      With the rangefinder's distance, the temperatures differ slightly from DJI's own apps, which use the recorded
      one.
-   - **Also keep the photos in a DJI Thermal Analyzer dataset**: the task is linked to a new dataset, named after it
-     in the same project, that gets every photo picked (the RGB ones too) as they are uploaded, so they are sent
-     once, and is analyzed once the task is made. The message under the project then links to it.
+   - **Also keep the photos in a DJI Thermal Analyzer dataset**: the task is also a dataset, under its own name,
+     that gets every photo picked (the RGB ones too) as they are uploaded, so they are sent once, and is analyzed
+     once the task is made. The message under the project then links to it.
 3. Below it, WebODM's own task panel: name, processing node, options and the photos on the map. Images are not
    resized: the thermal frames keep their size. **Review**, then **Start Processing**.
 4. Each photo is converted as it is uploaded, a few at a time. A photo that fails is left out with its reason;
@@ -72,9 +72,9 @@ OpenStreetMap's Nominatim; the DJI Thermal Task does not, as the plugin calls no
 
 The DJI Thermal Task keeps only the converted images, not the photos, unless you ticked **Also keep the photos in a
 DJI Thermal Analyzer dataset**. To look at a task's photos in the Analyzer afterwards, press **Create thermal
-dataset** in the task's expanded panel on the dashboard: it makes a dataset for the
-task, in its project and named after it, and opens it, to add the flight's photos (**Add images**). The panel then has
-a **Thermal dataset** button, back to it. Deleting the dataset leaves the task as it was.
+dataset** in the task's expanded panel on the dashboard: the task becomes a dataset too, under its own name (no
+other task is added), and the dataset opens, to add the flight's photos (**Add images**). The panel then has a
+**Thermal dataset** button, back to it. Deleting the dataset leaves the task as it was, with its images and results.
 
 ## The DJI Thermal Analyzer
 
@@ -219,8 +219,9 @@ instead of a new one, so one task is processed again and again as you try workse
 A dataset is kept in a task of its project, named "Thermal dataset: *name*": its photos and worksets are in that
 task's folder, apart from the images WebODM processes, so the task holds no image until a workset is sent to it
 (**Use for parent task**). It shows in the project's task list with "Set a processing node"; leave it unset until it
-holds a workset's TIFFs. Its expanded panel on the dashboard has a **Thermal dataset** button that opens the
-dataset in the DJI Thermal Analyzer. It is shared as the project is:
+holds a workset's TIFFs. A dataset made for a DJI Thermal Task's task (**Create thermal dataset**, or **Also keep the
+photos**) is kept in that task instead, under its name, with no other task. Its expanded panel on the dashboard has a
+**Thermal dataset** button that opens the dataset in the DJI Thermal Analyzer. It is shared as the project is:
 
 - viewing the project shows the dataset, its worksets and mosaics, and downloads them;
 - changing the project allows adding images, analyzing, converting and making tasks;
@@ -228,8 +229,9 @@ dataset in the DJI Thermal Analyzer. It is shared as the project is:
 
 Its photos and worksets count toward the project owner's storage quota (no upload, conversion, mosaic or task once
 the owner is over it); a task made from a workset counts its own images too. The dataset goes when its task or the
-project is deleted. Deleting the dataset deletes its task too, unless a workset was sent to it: the task is then
-kept as an ordinary WebODM task (named without "Thermal dataset:") with those images and what it processed.
+project is deleted. Deleting the dataset deletes its task too, unless a workset was sent to it or it is kept in a
+DJI Thermal Task's task: the task is then kept as an ordinary WebODM task (named without "Thermal dataset:") with its
+images and what it processed.
 Temperatures are shown in the unit of your preferences (see above).
 
 ## The Thermal Inspector

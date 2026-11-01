@@ -3,9 +3,9 @@
 // and WebODM's API commits the task, which starts processing. A photo that is not a thermal image is ignored, one
 // that fails stays out with its reason; a task left with no image is removed.
 //
-// With keepPhotos, the task is first linked to a new DJI Thermal Analyzer dataset, each photo's conversion also keeps
-// it there (no second upload), the other photos (otherPhotos: the RGB ones, another camera's) are uploaded to it, and
-// its analysis starts once the task is committed. The dataset is removed with the task if the upload fails.
+// With keepPhotos, the task is first made a DJI Thermal Analyzer dataset too, each photo's conversion also keeps it
+// there (no second upload), the other photos (otherPhotos: the RGB ones, another camera's) are uploaded to it, and
+// its analysis starts once the task is committed. The dataset goes with the task if the upload fails.
 import { tiffName, withImagesRenamed } from './textFiles';
 
 export const CONCURRENCY = 3;

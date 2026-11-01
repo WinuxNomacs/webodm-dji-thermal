@@ -13,7 +13,7 @@ from a conversion are kept as a list of ids in its folder:
 Such a task also has a hidden tag naming its dataset, `.dji-thermal-from-<dataset id>`, so the dashboard's Thermal
 dataset button (main.js) links back to it without asking the server; listing the tasks puts it back on one without it
 (made, e.g. a task made before the tag existed), and it goes when the dataset does (unlink_made). A task made by the
-Thermal Task button (tagged THERMAL_TASK_TAG) gets the same tag when a dataset is made for it (link_dataset), to hold
+Thermal Task button (tagged THERMAL_TASK_TAG) becomes a dataset itself when one is made for it (link_dataset), to hold
 the flight's photos.
 
 A conversion can also be sent to the dataset's own task, its "parent task" (use_for_parent): its TIFFs replace the
@@ -187,7 +187,9 @@ def unlink_made(task):
 
 
 def linked_dataset(task):
-    """The dataset task is linked to by its tag, if it is still there"""
+    """The dataset task is: itself, or the one its tag links it to, if it is still there"""
+    if datasets.is_dataset(task):
+        return task
     for t in (task.tags or "").split():
         pk = t[len(FROM_TAG):] if t.startswith(FROM_TAG) else ""
         if re.fullmatch(r'[0-9a-f-]{36}', pk):
@@ -198,16 +200,13 @@ def linked_dataset(task):
 
 
 def link_dataset(task, user):
-    """(dataset, made): the dataset task is linked to, or a new one in its project named after it, which task is then
-    linked to (its tag, any stale one replaced)"""
+    """(dataset, made): the dataset task is or is linked to, or task itself made one (datasets.adopt; a stale link's
+    tag dropped)"""
     found = linked_dataset(task)
     if found is not None:
         return found, False
-    dataset = datasets.create(task.project, task.name or "Task #{}".format(task.id), user)
-    tags = [t for t in (task.tags or "").split() if not t.startswith(FROM_TAG)] + [FROM_TAG + str(dataset.id)]
-    task.tags = " ".join(tags)
-    Task.objects.filter(pk=task.pk).update(tags=task.tags)
-    return dataset, True
+    task.tags = " ".join(t for t in (task.tags or "").split() if not t.startswith(FROM_TAG))
+    return datasets.adopt(task, user), True
 
 
 def made(task, cid):

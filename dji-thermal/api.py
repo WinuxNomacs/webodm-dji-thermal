@@ -93,8 +93,8 @@ class TaskConvert(APIView):
     Converts one photo into a partial task's images, with the measurement values sent with it (see
     converter.settings). The answer's status is 'converted' (with the task's image name), 'ignored' (not a DJI
     thermal image: the RGB photos taken with them, another camera's) or 'failed', with the reason. With 'dataset',
-    the id of the dataset the task is linked to (TaskDataset), the photo is also kept in that dataset, whatever its
-    status.
+    the id of the task's dataset (TaskDataset: the task itself), the photo is also kept in that dataset, whatever
+    its status.
     """
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -143,8 +143,8 @@ class TaskConvert(APIView):
 
 class TaskDataset(APIView):
     """
-    The DJI Thermal Analyzer dataset linked to a task (see conversion_tasks.link_dataset): the one it has, or a new
-    one in its project, named after it. The answer is {id}, with status 201 when it was made.
+    The DJI Thermal Analyzer dataset of a task (see conversion_tasks.link_dataset): the task itself if it is one, the
+    one it is linked to, or the task made one, kept in it. The answer is {id}, with status 201 when it was made.
     """
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -154,8 +154,6 @@ class TaskDataset(APIView):
             check_project_perms(request, task.project, ('change_project',))
         except (ObjectDoesNotExist, ValidationError):
             raise exceptions.NotFound() from None
-        if datasets.is_dataset(task):
-            raise exceptions.ValidationError(detail="This task is a dataset's own")
         found = conversion_tasks.linked_dataset(task)
         if found is None and datasets.over_quota(task):
             raise exceptions.ValidationError(detail=OVER_QUOTA)

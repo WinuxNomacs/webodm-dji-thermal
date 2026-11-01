@@ -3,6 +3,30 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **Bug: a task's dataset shows as a second task** (the user, 2026-11-01, with a screenshot of Test project on the
+  Dashboard): "I clicked "Thermal dataset" on the ThermalTest task here. I then and added images, converted mosaics
+  etc... however it seems to have created a new task in my Test Project instead of linking to the existing
+  ThermalTest task."
+  - What it builds on: a dataset is kept in a holder task of its project (`datasets.py`), which the Dashboard lists
+    ("Thermal dataset: ThermalTest", 0 images, "Set a processing node"). `task-dataset` made such a holder and
+    linked ThermalTest to it by the `.dji-thermal-from-` tag. A holder can already become a processed task (a
+    workset sent to it, `use_for_parent`), and deleting a dataset whose task has images keeps the task
+    (`conversion_tasks.release`). WebODM removes a task's whole folder only on delete or a backup restore; a
+    restart removes its assets, not `thermal/`.
+  - Proposed: the DJI Thermal Task's task becomes the dataset's own task (its tag, its `thermal/` folder, its name
+    kept), so no second task; deleting the dataset keeps the task (`release`).
+  - Decided (the user, 2026-11-01): **the dataset inside the task**, also for the tick box; **the user's existing
+    dataset moved into ThermalTest**.
+  - Done (2026-11-01), `dataset-in-task`: `datasets.adopt` (the tag, `thermal/` records with `in_task`, the name
+    kept) and `in_task`; `rename` without the holder's prefix for such a dataset; `conversion_tasks.linked_dataset`
+    gives a dataset's own task itself, `link_dataset` adopts the task (a stale link's tag dropped); deleting such a
+    dataset releases its task (`analyzer_api` `DatasetDetail.delete`). README ("Where a dataset is kept"),
+    `quickstart-thermal-task.md`, `quickstart-analyzer.md`, `api.md`. `test_api.py` `TestTaskDataset` (8). Live:
+    the tick box's upload (commit intercepted) made the new task the dataset (3 tasks with ThermalTest and the
+    holder, none added), removed after. The user's dataset moved: its `thermal/` hard-linked into ThermalTest's
+    folder (`in_task` added), ThermalTest tagged as the dataset (its link tag dropped), checked read only (the
+    dataset page, the workset's mosaic viewer drawing tiles, the panel's Thermal dataset link), then the holder task
+    deleted with its folder; checked again after.
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
   - Done: **polish, the Thermal Inspector's Regions list: no "Show its statistics" button** (the user, 2026-10-31:

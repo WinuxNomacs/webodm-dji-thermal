@@ -18,8 +18,8 @@ PluginsAPI.Map.willAddControls(["leaflet", "dji-thermal/inspector.css", "dji-the
 
 // A Thermal dataset button on a task's expanded panel: on the dataset's own task (its hidden tag) and on a task linked
 // to one (the tag naming the dataset, see conversion_tasks.py). A task made by the Thermal Task button (its tag), or
-// one with a thermal orthophoto, that has none gets Create thermal dataset instead: the server makes the dataset and
-// links the task (api.py TaskDataset), then the dataset's page opens, to add the flight's photos.
+// one with a thermal orthophoto, that has none gets Create thermal dataset instead: the task becomes a dataset itself
+// (api.py TaskDataset), then the dataset's page opens, to add the flight's photos.
 PluginsAPI.Dashboard.addTaskActionButton(function(args){
     var task = args.task || {};
     var tags = task.tags || [];

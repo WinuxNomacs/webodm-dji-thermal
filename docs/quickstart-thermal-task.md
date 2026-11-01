@@ -29,8 +29,8 @@ material you're measuring. [Measurement settings](measurement.md) explains each 
 **Temperature unit** is the unit of the values you type. The task's images are always in degrees Celsius.
 
 **Also keep the photos in a DJI Thermal Analyzer dataset**, under the values: tick it to look at the photos in the
-[DJI Thermal Analyzer](quickstart-analyzer.md) too. The task gets a dataset of its own, named after it in the same
-project, with every photo you picked (the RGB ones too). The photos are sent once, for both, and the dataset is
+[DJI Thermal Analyzer](quickstart-analyzer.md) too. The task is also a dataset, under its own name, with every
+photo you picked (the RGB ones too). The photos are sent once, for both, and the dataset is
 analyzed once the task is made; the message under the project links to it. Without it, the task keeps only the
 converted images (see section 5).
 
@@ -51,10 +51,10 @@ When WebODM has finished, open the task's map. Its orthophoto holds temperatures
 
 Unless you kept the photos in a dataset (section 2), the task keeps only the converted images. To check the photos (each frame's temperatures, camera
 and position, and the problems found), or to try other conversion settings, give the task a dataset: in its
-expanded panel on the dashboard, press **Create thermal dataset**. The dataset is made in the task's project, named
-after it, and opens, empty: add the flight's photos with **Add images** (see
+expanded panel on the dashboard, press **Create thermal dataset**. The task becomes a dataset too, under its own
+name (no other task is added), and the dataset opens, empty: add the flight's photos with **Add images** (see
 [Checking a flight in the DJI Thermal Analyzer](quickstart-analyzer.md)). From then on the task's panel has a **Thermal
-dataset** button, back to it. Deleting the dataset leaves the task as it was.
+dataset** button, back to it. Deleting the dataset leaves the task as it was, with its images and results.
 
 ## Good to know
 
