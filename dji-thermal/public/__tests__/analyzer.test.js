@@ -1946,6 +1946,10 @@ describe("the mosaic viewer", () => {
         expect(el.textContent).toContain("68.00 °F");
         expect(el.textContent).toContain("a_T.JPG");
         expect(el.textContent).toContain("3.2°");
+        expect(el.textContent).not.toContain("Frame pixel");
+        el.innerHTML = viewer.readoutHtml({valid: true, temperature: 20, frame: "a_T.JPG", view_angle: 3.21, frame_pixel: [353, 256]}, "C");
+        expect(el.textContent).toContain("Frame pixel");
+        expect(el.textContent).toContain("x 353, y 256");
         expect(viewer.readoutHtml({valid: false, reason: "outside_raster"}, "C")).toContain("Outside the mosaic");
         expect(viewer.readoutHtml({valid: false, reason: "nodata"}, "C")).toContain("No data here");
 
