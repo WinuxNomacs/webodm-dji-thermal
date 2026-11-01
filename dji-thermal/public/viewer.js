@@ -167,6 +167,7 @@
             "Outside the mosaic." : "No data here.") + "</span>";
         var rows = [["Temperature", res.temperature === null || res.temperature === undefined ? "no data" : core.formatTemp(res.temperature, unit)]];
         if (res.frame !== null && res.frame !== undefined) rows.push(["Frame", res.frame]);
+        if (res.frame_pixel) rows.push(["Frame pixel", "x " + res.frame_pixel[0] + ", y " + res.frame_pixel[1]]);
         if (res.view_angle !== null && res.view_angle !== undefined) rows.push(["View angle", core.formatNumber(res.view_angle, 1, "°")]);
         // A file name may break after its underscores
         return '<table class="table table-condensed ta-viewer-values"><tbody>' + rows.map(function (r) {
