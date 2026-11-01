@@ -62,3 +62,10 @@
 .dt-tick { position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .dt-tick-start { transform: none; }
 .dt-tick-end { transform: translateX(-100%); }
+/* The source frames window (frames.js), beside the panel */
+.dt-inspector-frames {
+    position: absolute; right: 324px; top: 0; width: 300px; max-width: calc(100vw - 380px); padding: 6px;
+    background: #fff; color: #333; border-radius: 4px; box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4); font-size: 12px; cursor: default;
+}
+.dt-inspector-frames[hidden] { display: none; }
+.dt-inspector-frames .ta-message { color: #777; }

@@ -180,6 +180,19 @@ const SHOTS = {
         await p.waitForTimeout(1500);
         return p;
     },
+    "inspector-frames": async (p, env) => {
+        // The frames that saw a point clicked on the map's thermal orthophoto (its task processed from a workset)
+        await p.goto(env.url + need(env, "DT_DOCS_MAP"));
+        await p.waitForSelector(".dt-inspector-button", {timeout: 30000});
+        await p.waitForTimeout(3000);
+        await p.click(".dt-inspector-button");
+        const map = await p.locator(".leaflet-container").first().boundingBox();
+        await p.mouse.click(map.x + map.width * 0.4, map.y + map.height * 0.55);
+        await p.waitForSelector(".dt-inspector-frames:not([hidden]) img", {timeout: 30000})
+            .catch(() => { throw new Error("no source frames: is DT_DOCS_MAP's task processed from a workset with mosaics?"); });
+        await p.waitForTimeout(2000);
+        return p;
+    },
     "inspector-mosaics": async (p, env) => {
         // WebODM's map of the dataset's project, its first workset's mosaic laid by the link, swiped against the
         // project's own layers

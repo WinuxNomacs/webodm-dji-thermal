@@ -3,7 +3,7 @@
 The Thermal Inspector reads temperatures from a processed thermal task, on WebODM's 2D map. It works on any task
 whose orthophoto holds temperatures: one made with [Thermal Task](quickstart-thermal-task.md), or from a
 [workset](quickstart-worksets.md). It can also lay the mosaics of the Thermal Analyzer's worksets on the map, to
-compare them with the project's own layers.
+compare them with the project's own layers, and show the frames that saw a point.
 
 ## 1. Open it
 
@@ -63,3 +63,20 @@ orthophoto.
 The mosaics are the plugin's layers, not entries of WebODM's layer panel, and you lay them again each time you open
 the map. WebODM shows a project's map only once one of its tasks has finished with an orthophoto or an elevation
 model; until then, look at the mosaics in the Analyzer's [mosaic viewer](quickstart-worksets.md#3-the-mosaics).
+
+## 5. The frames that saw a point
+
+On a workset mosaic, or on the orthophoto of a task processed from a workset whose mosaics are built, a click in
+**Hover** opens the frames that saw that point, beside the panel. Dropping a pin, or clicking a pin's name in the
+panel, opens them too.
+
+![The frames that saw a point clicked on a thermal orthophoto processed from a workset](images/inspector-frames.png)
+
+- The frame is drawn in the layer's palette and range, with a circle on the point; its outline is dashed on the map.
+- The arrows step through every frame that saw the point. On a mosaic, the frame its pixel came from is first. On an
+  orthophoto, ODM blended the frames, so they start with the one that saw the point closest to straight down.
+- On an orthophoto the frames are placed with the workset's camera models, from their GPS and gimbal, not the cameras
+  ODM refined: the point can be a little off.
+- The cross closes the window; closing the Inspector closes it too.
+
+On other layers a click in Hover is WebODM's own: its popup with the task's downloads.

@@ -58,5 +58,5 @@ On a project, under `projects/<project>/inspector/`, for those who can view it:
 
 | Method | Path | What it does |
 | --- | --- | --- |
-| GET | `mosaics` | The workset mosaics of the project's datasets the Inspector can lay on the map: their temperature tabs, bounds, statistics and palettes. |
+| GET | `mosaics` | The workset mosaics of the project's datasets the Inspector can lay on the map: their temperature tabs, bounds, statistics and palettes, and the WebODM tasks processed from each workset's TIFFs (whose orthophotos show its source frames). |
 | GET | `palette?name=` | A palette's colours, for a mosaic's legend. |

@@ -7,7 +7,8 @@
 // laid on the map too (the Analyzer's tiles, above WebODM's layers, swiped against them with WebODM's own split
 // control): a thermal layer like the orthophotos, read through the Analyzer's API. main.js adds it through
 // PluginsAPI.Map.willAddControls, with WebODM's own Leaflet, to every map; its button shows when the map has a thermal
-// orthophoto or the project has mosaics.
+// orthophoto or the project has mosaics. A click shows the frames that saw a point (frames.js, the Analyzer's source
+// frames window) beside the panel, on a mosaic and on an orthophoto processed from a workset's TIFFs.
 (function (root) {
     var API = "/api/plugins/dji-thermal/";
     var HOVER_MS = 80;              // the readout asks for the point the cursor rests on, not every point it crosses
@@ -23,6 +24,7 @@
     var SQ_FT_PER_SQ_M = 10.7639104;
     var Regions = root.ThermalRegions || (typeof require !== "undefined" ? require("./regions.js") : null);
     var Scale = root.ThermalScale || (typeof require !== "undefined" ? require("./scale.js") : null);
+    var Frames = root.ThermalFrames || (typeof require !== "undefined" ? require("./frames.js") : null);
     var META = root.Symbol ? root.Symbol["for"]("meta") : "meta";      // where WebODM's map keeps a layer's metadata
     // A thermal layer's tiles: WebODM's, or the plugin's in one of DJI's palettes
     var TILE_URL = /\/api\/(?:plugins\/dji-thermal\/)?projects\/(\d+)\/tasks\/([^/]+)\/(?:orthophoto|inspector)\/tiles\//;
@@ -123,8 +125,9 @@
 
     // -- workset mosaics ---------------------------------------------------------------------------------------------
 
-    // A temperature in a mosaic's unit (C, F or K) in °C
+    // A temperature in a mosaic's unit (C, F or K) in °C, and back
     function toCelsius(v, unit) { return unit === "F" ? (v - 32) / 1.8 : unit === "K" ? v - 273.15 : v; }
+    function fromCelsius(c, unit) { return Math.round((unit === "F" ? c * 1.8 + 32 : unit === "K" ? c + 273.15 : c) * 1e4) / 1e4; }
 
     // The project a map shows: its tasks' (args.tiles), else its URL's (/map/project/<id>/, a project without tasks);
     // none on WebODM's public maps, which have no workset mosaics
@@ -175,9 +178,24 @@
                 name: m.dataset.name + " › " + m.workset.name, bounds: t.bounds, maxzoom: t.maxzoom};
     }
 
-    function mosaicTileUrl(info) {
-        return mosaicBase(info) + "/mosaics/" + info.tab + "/tiles/{z}/{x}/{y}.png?v=" + encodeURIComponent(info.built_at) +
-            "&color_map=" + encodeURIComponent(info.key) + "&rescale=" + info.range[0] + "," + info.range[1];
+    // A mosaic's tiles and its frames are drawn alike: build time, palette and range (its unit)
+    function mosaicQuery(info) {
+        return "v=" + encodeURIComponent(info.built_at) + "&color_map=" + encodeURIComponent(info.key) + "&rescale=" + info.range[0] + "," + info.range[1];
+    }
+    function mosaicTileUrl(info) { return mosaicBase(info) + "/mosaics/" + info.tab + "/tiles/{z}/{x}/{y}.png?" + mosaicQuery(info); }
+
+    // Where a thermal layer's source frames come from: a mosaic's own; for a WebODM orthophoto, the workset (of
+    // mosaics, the Inspector's list) whose TIFFs its task processed, drawn as its as-converted mosaic in the layer's
+    // palette and range ({base, tab, query, orthophoto}); null for an orthophoto from elsewhere
+    function framesSource(t, mosaics, palette, display) {
+        if (!t) return null;
+        if (t.mosaic) return {base: mosaicBase(t.mosaic), tab: t.mosaic.tab, query: mosaicQuery(t.mosaic), orthophoto: false};
+        var m = (mosaics || []).filter(function (x) { return (x.tasks || []).indexOf(t.task) !== -1; })[0];
+        if (!m) return null;
+        var info = laidMosaic(t.project, m, "as_converted", palette || paletteOf(t.layer._url), display);
+        var range = rangeOf(t.layer._url);
+        if (range) info.range = range.map(function (c) { return fromCelsius(c, info.unit); });
+        return {base: mosaicBase(info), tab: info.tab, query: mosaicQuery(info), orthophoto: true};
     }
     function mosaicIsothermUrl(info, iso) {
         if (!validIsotherm(iso)) return "";
@@ -430,8 +448,9 @@
             '<button type="button" class="btn btn-default btn-xs" data-act="clear-regions"><i class="fa fa-trash"></i> Remove all</button></div>';
     }
 
-    function readoutHtml(r, unit) {
-        if (!r) return '<span class="text-muted">Move the cursor over a thermal layer.</span>';
+    // frames: a click shows the frames that saw a point of a layer shown
+    function readoutHtml(r, unit, frames) {
+        if (!r) return '<span class="text-muted">Move the cursor over a thermal layer.' + (frames ? " Click it to see the frames that saw the point." : "") + "</span>";
         if (r.error) return '<span class="text-danger">' + escapeHtml(r.error) + "</span>";
         if (!r.valid) return '<span class="text-muted">' + escapeHtml(REASONS[r.reason] || "No temperature here") + "</span>";
         return '<span class="dt-inspector-temp">' + escapeHtml(formatTemp(r.temperature, unit)) + "</span>";
@@ -494,7 +513,7 @@
             }).join("") + "</div>" +
             (state.mode === "polygon" ? '<div class="text-muted dt-inspector-hint">Click the corners; double-click or Enter finishes, Esc cancels.</div>' : "") +
             (state.notice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.notice) + "</div>" : "") +
-            '<div class="dt-inspector-readout">' + readoutHtml(state.readout, unit) + "</div>" +
+            '<div class="dt-inspector-readout">' + readoutHtml(state.readout, unit, state.frames) + "</div>" +
             (options.length ? '<label class="dt-inspector-label">Palette <select class="form-control input-sm" data-act="palette">' +
                 options.map(function (o) {
                     return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === current ? " selected" : "") + ">" + escapeHtml(o[1]) + "</option>";
@@ -533,15 +552,17 @@
         var state = {open: false, mode: "hover", readout: null, pins: loadPins(storage, key), pinsVisible: true,
                      regions: regions, regionsVisible: true, shown: regions.length ? regions[regions.length - 1].id : null,
                      notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
-                     legendVisible: legendShown(), mosaics: null, laid: {}};
+                     legendVisible: legendShown(), mosaics: null, laid: {}, frames: false, pick: null};
         var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
         var search = deps.search !== undefined ? deps.search : root.location && root.location.search;
-        var container, panel, cursor, pinLayer, regionLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
+        var container, panel, frameBox, cursor, pinLayer, regionLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
+        var pickSeq = 0;                    // the frames asked for last
         var overlays = [], colors = {};     // the isotherm's layer over each thermal layer; each palette's colours
 
         function render() {
             if (!state.open) { panel.hidden = true; return; }
             panel.hidden = false;
+            state.frames = thermalLayers(map).some(function (t) { return !!framesSource(t, state.mosaics); });
             panel.innerHTML = panelHtml(state);
             // Within the map, above its bottom controls
             var room = map.getContainer().clientHeight - container.offsetTop - 60;
@@ -594,6 +615,7 @@
 
         // The legend of the topmost thermal layer shown: its palette (its colours asked for once) and range
         function renderLegend() {
+            restylePick();
             if (!legend) return;
             var layers = thermalLayers(map), t = layers[layers.length - 1];
             var range = layerRange(t), name = layerPalette(t);
@@ -648,7 +670,7 @@
         // A reading changes only the readout, so the panel's buttons stay as they are while used
         function renderReadout() {
             var el = state.open && panel.querySelector(".dt-inspector-readout");
-            if (el) el.innerHTML = readoutHtml(state.readout, userUnit());
+            if (el) el.innerHTML = readoutHtml(state.readout, userUnit(), state.frames);
         }
 
         function drawPins() {
@@ -803,12 +825,15 @@
         }
 
         // A click while pinning pins the point and is not WebODM's (no popup), nor is one while drawing
+        // In Hover, one on a layer with source frames shows them (else it is WebODM's); a pin shows them too
         function onClick(e) {
             if (Date.now() - drawnAt < DRAWN_CLICK_MS) return true;
-            if (!state.open || state.mode === "hover") return false;
+            if (!state.open) return false;
+            var t = state.mode === "hover" || state.mode === "pin" ? thermalLayerAt(map, e.latlng) : null;
+            if (state.mode === "hover") return showFrames(t, e.latlng);
             if (state.mode !== "pin") return true;
-            var t = thermalLayerAt(map, e.latlng);
             if (!t) return true;
+            showFrames(t, e.latlng);
             var n = state.pins.reduce(function (m, p) { return Math.max(m, Number(String(p.label).replace(/\D/g, "")) || 0); }, 0) + 1;
             var pin = {id: String(Date.now()) + n, label: "P" + n, lat: e.latlng.lat, lng: e.latlng.lng, temperature: null, reason: null};
             query(t, e.latlng).then(function (r) {
@@ -818,6 +843,69 @@
                 pinsChanged();
             });
             return true;
+        }
+
+        // -- the source frames window ------------------------------------------------------------------------------
+
+        // The frames that saw a point of a thermal layer, beside the panel; keep: the frame to show again if it saw the
+        // point too. False (nothing shown) for a layer without source frames.
+        function showFrames(t, latlng, keep) {
+            var src = framesSource(t, state.mosaics, state.palette, state.display);
+            if (!src) return false;
+            var n = ++pickSeq;
+            fetchFn(Frames.framesUrl(src.base, src.tab, latlng), {credentials: "same-origin"}).then(readJson).then(function (r) {
+                if (n !== pickSeq || !state.open) return;
+                var frames = r.ok ? r.data.frames || [] : [];
+                if (src.orthophoto) frames = Frames.orthophotoFrames(frames);
+                var at = frames.map(function (f) { return f.index; }).indexOf(keep);
+                state.pick = {t: t, latlng: latlng, frames: frames, models: !r.ok || r.data.models, at: at < 0 ? 0 : at,
+                              orthophoto: src.orthophoto, error: r.ok ? "" : (r.data && (r.data.error || r.data.detail)) || "Could not find the frames here."};
+                drawPick();
+            }, function () {});
+            return true;
+        }
+
+        function frameImageUrl(pick) {
+            var src = framesSource(thermalLayer(pick.t.layer), state.mosaics, state.palette, state.display), f = pick.frames[pick.at];
+            return src && f ? Frames.frameUrl(src.base, src.tab, f.index, src.query) : "";
+        }
+
+        function drawPick() {
+            var pick = state.pick, f = pick.frames[pick.at];
+            frameBox.hidden = false;
+            frameBox.innerHTML = Frames.pipHtml(pick, frameImageUrl(pick));
+            if (pick.error) frameBox.querySelector(".ta-message").textContent = pick.error;
+            pickLayer.clearLayers();
+            L.circleMarker(pick.latlng, {radius: 6, color: "#000", weight: 1, fillColor: "#fff", fillOpacity: 1, interactive: false}).addTo(pickLayer);
+            if (f && f.footprint) {
+                L.polygon(f.footprint.map(function (c) { return [c[1], c[0]]; }),
+                          {color: "#fff", weight: 2, dashArray: "6 4", fill: false, interactive: false}).addTo(pickLayer);
+            }
+        }
+
+        // The frame shown drawn again as its layer is (palette, range)
+        function restylePick() {
+            var img = state.pick && frameBox.querySelector("img");
+            var url = img && frameImageUrl(state.pick);
+            if (url && img.getAttribute("src") !== url) img.setAttribute("src", url);
+        }
+
+        function closeFrames() {
+            pickSeq++;
+            state.pick = null;
+            if (!frameBox) return;
+            frameBox.hidden = true;
+            frameBox.innerHTML = "";
+            pickLayer.clearLayers();
+        }
+
+        function onFramesClick(e) {
+            var b = e.target.closest("button[data-pip]");
+            if (!b || b.disabled || !state.pick) return;
+            var action = b.getAttribute("data-pip");
+            if (action === "close") return closeFrames();
+            state.pick.at = Math.max(0, Math.min(state.pick.frames.length - 1, state.pick.at + (action === "next" ? 1 : -1)));
+            drawPick();
         }
 
         // The thermal layers' palette: the user's preference, applied as each layer comes
@@ -880,6 +968,7 @@
 
         function onLayerRemove(e) {
             if (!thermalLayer(e.layer)) return;
+            if (state.pick && state.pick.t.layer === e.layer) closeFrames();
             drawIsotherms();
             renderLegend();
         }
@@ -899,6 +988,9 @@
             if (url !== layer._url) layer.setUrl(url);
             drawIsotherms();
             renderLegend();
+            // The frames of the tab now shown, the same one shown if it saw the point too
+            var pick = state.pick, f = pick && pick.frames[pick.at];
+            if (pick && pick.t.layer === layer && next.tab !== info.tab) showFrames(thermalLayer(layer), pick.latlng, f && f.index);
         }
 
         function layMosaic(m, tab) {
@@ -994,7 +1086,10 @@
             var row = act.closest("[data-pin]");
             var pin = row && state.pins.filter(function (p) { return p.id === row.getAttribute("data-pin"); })[0];
             if (what === "close") close();
-            else if (what === "goto" && pin) map.panTo([pin.lat, pin.lng]);
+            else if (what === "goto" && pin) {
+                map.panTo([pin.lat, pin.lng]);
+                showFrames(thermalLayerAt(map, L.latLng(pin.lat, pin.lng)), L.latLng(pin.lat, pin.lng));
+            }
             else if (what === "remove" && pin) { state.pins = state.pins.filter(function (p) { return p !== pin; }); pinsChanged(); }
             else if (what === "toggle") { state.pinsVisible = !state.pinsVisible; drawPins(); render(); }
             else if (what === "clear") { state.pins = []; pinsChanged(); }
@@ -1033,6 +1128,7 @@
         }
 
         function close() {
+            closeFrames();
             setMode("hover");
             state.open = false;
             state.readout = null;
@@ -1050,6 +1146,13 @@
                 container.innerHTML = '<a href="javascript:void(0)" class="dt-inspector-button" title="Thermal Inspector"><i class="fa fa-thermometer-half"></i></a>';
                 panel = L.DomUtil.create("div", "dt-inspector-panel", container);
                 panel.hidden = true;
+                frameBox = L.DomUtil.create("div", "dt-inspector-frames", container);
+                frameBox.hidden = true;
+                frameBox.addEventListener("click", onFramesClick);
+                // A frame that cannot be drawn says so in its place
+                frameBox.addEventListener("error", function (e) {
+                    if (e.target.tagName === "IMG") e.target.parentNode.outerHTML = '<div class="text-danger">Could not draw this frame.</div>';
+                }, true);
                 L.DomEvent.disableClickPropagation(container);
                 L.DomEvent.disableScrollPropagation(container);
                 // Over the panel the cursor is not over the map
@@ -1079,6 +1182,7 @@
         cursor.style.display = "none";
         regionLayer = L.layerGroup().addTo(map);
         pinLayer = L.layerGroup().addTo(map);
+        pickLayer = L.layerGroup().addTo(map);
         drawPins();
         drawRegions();
         map.on("mousemove", onMove);
@@ -1144,6 +1248,7 @@
                regionsCsv: regionsCsv, statisticsHtml: statisticsHtml, readoutHtml: readoutHtml,
                panelHtml: panelHtml, hasThermal: hasThermal, projectOf: projectOf, linkedMosaic: linkedMosaic, paletteKey: paletteKey,
                mosaicRange: mosaicRange, laidMosaic: laidMosaic, mosaicTileUrl: mosaicTileUrl, mosaicIsothermUrl: mosaicIsothermUrl,
+               framesSource: framesSource, fromCelsius: fromCelsius,
                mosaicsHtml: mosaicsHtml, toCelsius: toCelsius, create: create};
     root.ThermalInspector = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

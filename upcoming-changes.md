@@ -266,8 +266,8 @@
 
 - **Thermal Analyzer, part 2** (the user, 2026-11-01; details under "Up next: Thermal Analyzer, part 2" below):
   the workset mosaics laid on WebODM's 2D map from the Thermal Inspector (for comparing with any task's layers), the
-  source frames window, measuring tools and saved measurements there, and the frame page. In five steps; step 1
-  (the mosaics on the map) done 2026-11-01.
+  source frames window, measuring tools and saved measurements there, and the frame page. In five steps; steps 1
+  (the mosaics on the map) and 2 (the source frames window) done 2026-11-01.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
@@ -389,6 +389,23 @@ last phase did with its colouring.
    worksets quickstart, `api.md`, README; screenshots `inspector` retaken, `inspector-mosaics` new.
 2. **The source frames window in the Inspector**: `viewer.js`'s frames window shared (moved to a script both
    load), on a click or a pin; on an ODM orthophoto from the workset its task records (`conversions/<id>/tasks.json`).
+   **Done** (2026-11-01, `inspector-frames`): `frames.js` / `frames.css` (the window, `framesUrl`, `frameUrl`,
+   `orthophotoFrames`), loaded by the mosaic viewer and the map (`plugin.py`, `main.js`, `viewer.html`); `inspector.js`
+   (`framesSource`: a mosaic's own frames, or for an orthophoto the workset whose TIFFs its task processed, drawn in
+   the layer's palette and range converted to the mosaic's unit; the window beside the panel, the point and the
+   frame's outline on the map, redrawn with the palette, asked again on a mosaic's other tab, closed with its layer or
+   the Inspector); `conversion_tasks.holding` (the tasks made from a workset, and the dataset's own while the workset
+   was the last sent there) listed as each mosaic's `tasks` by `map_mosaics`. A click in Hover on a layer with frames
+   is the Inspector's (else WebODM's popup, as before); a pin, and a pin's name in the panel, open them too. On an
+   orthophoto none is the pixel's own (ODM blends), so they are by view angle, and the window says the point is placed
+   from GPS and gimbal. Tests: `inspector.test.js` (a mosaic's frames: the click, the URL, next, the palette, another
+   tab keeping the frame, closed, lifted; an orthophoto's: by view angle, its palette and range in °F, a pin; an
+   orthophoto from elsewhere left to WebODM), `main.test.js` (changed: frames.css), `test_analyzer.py` (`holding`;
+   the list's `tasks`). Jest 173, Django 137 (1 skipped), ESLint, Ruff; live on project 1: HomerunObliqueII's task
+   (from workset `324fe5774f35`, 49 frames at the point, by view angle, next, inferno), its mosaic laid by the link (61
+   frames, the mosaic's own first, Harmonized), the mosaic viewer's window unchanged; no console errors (the palette
+   put back to ironred after). Docs: the Inspector quickstart's section 5, README, `index.md`, `api.md`; screenshot
+   `inspector-frames` new.
 3. **Measuring tools**: dji-thermal-ui's tools (Spot, Line, Area, Box, Circle: `measure.ts`, `drawing.ts`) beside
    the Inspector's pins and regions, from its `thermal_measure.py` (`check_geometry`, `region_stats`,
    `profile_points`, `mosaic_measure`): statistics and histogram, where the extremes are, the surroundings and ΔT,

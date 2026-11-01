@@ -198,6 +198,15 @@ def made(task, cid):
     return [found[i] for i in ids if i in found]
 
 
+def holding(task, cid):
+    """The ids of the tasks whose images are the conversion's TIFFs: those made from it, and the dataset's own when
+    the conversion was the last sent to it (read only: some may since have been deleted)"""
+    ids = [str(i) for i in datasets.read_json(conversions.path(task, cid, TASKS_FILE), [])]
+    if datasets.read_json(datasets.data_path(task, PARENT_FILE)).get('conversion') == cid:
+        ids.append(str(task.id))
+    return ids
+
+
 def parent_busy(task):
     """The dataset's task is queued, processing or has an action pending in WebODM: its images are in use"""
     return task.status in (status_codes.QUEUED, status_codes.RUNNING) or task.pending_action is not None or \

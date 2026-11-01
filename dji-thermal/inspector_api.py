@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from app.api.tasks import TaskNestedView
 from app.models import Project
 
-from . import conversions, converter, datasets, inspector, mosaics
+from . import conversion_tasks, conversions, converter, datasets, inspector, mosaics
 
 # The mosaics' tabs laid on the map: those of temperatures (View angle stays in the Analyzer's viewer)
 MAP_TABS = ('as_converted', 'harmonized', 'source_frame')
@@ -166,7 +166,8 @@ class InspectorRegion(InspectorView):
 
 def map_mosaics(task, user):
     """The worksets of a dataset whose mosaics can be laid on the map: [{dataset, workset, unit, built_at, palettes
-    (the viewer's palette keys), default_palette, tabs: [{tab, bounds, minzoom, maxzoom, stats}]}]"""
+    (the viewer's palette keys), default_palette, tabs: [{tab, bounds, minzoom, maxzoom, stats}], tasks (the ids of
+    the WebODM tasks processed from the workset's TIFFs, whose orthophotos show its source frames)}]"""
     found = []
     preferred = conversions.display(user)['palette']
     for cid in conversions.ids(task):
@@ -189,6 +190,7 @@ def map_mosaics(task, user):
                         list(mosaics.VIEWER_COLORMAPS),
             'default_palette': mosaics.default_palette(task, cid, settings, preferred),
             'tabs': tabs,
+            'tasks': conversion_tasks.holding(task, cid),
         })
     return found
 
