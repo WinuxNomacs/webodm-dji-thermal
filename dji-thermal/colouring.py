@@ -30,6 +30,7 @@ EQUALIZE_SPAN = (0.1, 99.9)     # the percentiles a mosaic's histogram spans: it
 CURVE_SAMPLES = 65
 ISOTHERM_MODES = ('above', 'below', 'between')
 HISTOGRAMS_KEPT = 16      # the mosaics' histograms kept in memory
+VALUE_CODES = 65535       # a value tile's codes run from 0 to this, a tile's lowest value to its highest
 
 _histograms = {}
 
@@ -125,6 +126,30 @@ def colour(values, colors, value_range=None, shares=None, sharpen=0.0, isotherm=
     out[..., 3] = 255
     out[~here] = 0
     return out
+
+
+def value_png(values, flags=None):
+    """
+    Values (a 2-D array, NaN where there are none) as a value tile, which the browser colours (recolour.js): an RGBA PNG
+    whose red and green hold a 16-bit code (the value is offset + code * step), blue a flag per pixel (flags, 0 to 255:
+    the source frames' seams) and alpha 255 where there is a value, 0 elsewhere. Returns (PNG bytes, offset, step).
+    """
+    import io
+
+    from PIL import Image
+    v = np.asarray(values, dtype=np.float64)
+    has = np.isfinite(v)
+    offset, top = (float(v[has].min()), float(v[has].max())) if has.any() else (0.0, 0.0)
+    step = (top - offset) / VALUE_CODES if top > offset else 1.0
+    code = js_round((np.where(has, v, offset) - offset) / step).astype(np.uint16)
+    out = np.zeros(v.shape + (4,), np.uint8)
+    out[..., 0], out[..., 1] = code >> 8, code & 255
+    if flags is not None:
+        out[..., 2] = flags
+    out[..., 3] = np.where(has, 255, 0)
+    buf = io.BytesIO()
+    Image.fromarray(out, 'RGBA').save(buf, 'PNG')
+    return buf.getvalue(), offset, step
 
 
 def sharpen_sigma(raster_pixel, drawn_pixel):

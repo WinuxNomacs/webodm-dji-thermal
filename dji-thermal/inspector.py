@@ -272,8 +272,6 @@ def tile(task, z, x, y, colors, low, high, size=256, crop=False, adjust=None):
     mosaics are (colouring.parse_adjust's; equalized from the whole orthophoto's histogram), as PNG bytes; None outside
     the orthophoto. Where it has no data comes from its alpha band.
     """
-    import numpy as np
-
     from . import colouring, mosaics
     adjust = adjust or mosaics.NO_ADJUST
     curve = None
@@ -281,6 +279,33 @@ def tile(task, z, x, y, colors, low, high, size=256, crop=False, adjust=None):
         curve = colouring.equalization(histogram(task), low, high)
     shares = colouring.curve_shares(low, high, adjust, curve) if adjust['equalize'] or adjust['gamma'] != 1.0 else None
     margin = colouring.MARGIN if adjust['sharpen'] > 0 else 0
+    found = _tile_values(task, z, x, y, size, crop, margin)
+    if found is None:
+        return None
+    values, sigma = found
+    rgba = colouring.colour(values, colors, (low, high), shares, adjust['sharpen'], sigma=sigma, margin=margin)
+    return mosaics.png(rgba)
+
+
+def values_tile(task, z, x, y, size=256, crop=False):
+    """
+    The values tile draws (°C), with colouring.MARGIN more pixels on each side, as a value tile for the browser to colour
+    (colouring.value_png), and the unsharp mask's sigma: (PNG bytes, offset, step, sigma); None outside the orthophoto
+    """
+    from . import colouring
+    found = _tile_values(task, z, x, y, size, crop, colouring.MARGIN)
+    if found is None:
+        return None
+    values, sigma = found
+    return colouring.value_png(values) + (sigma,)
+
+
+def _tile_values(task, z, x, y, size, crop, margin):
+    """The values of a tile as tile reads them, NaN where there are none, with margin more pixels on each side, and the
+    unsharp mask's sigma for them: (values, sigma); None outside the orthophoto"""
+    import numpy as np
+
+    from . import colouring, mosaics
     found = _raster_tile(thermal_orthophoto(task), z, x, y, size, _crop(task) if crop else None, buffer=margin,
                          pixel=True)
     if found is None:
@@ -290,9 +315,7 @@ def tile(task, z, x, y, colors, low, high, size=256, crop=False, adjust=None):
     values[~(data.mask > 0)] = np.nan
     read_z = z - 1 if size == 512 else z
     drawn = mosaics.tile_pixel_m(read_z, y) * mosaics.TILE_SIZE / size
-    rgba = colouring.colour(values, colors, (low, high), shares, adjust['sharpen'],
-                            sigma=colouring.sharpen_sigma(pixel, drawn), margin=margin)
-    return mosaics.png(rgba)
+    return values, colouring.sharpen_sigma(pixel, drawn)
 
 
 def histogram(task):

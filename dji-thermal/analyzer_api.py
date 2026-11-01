@@ -710,6 +710,29 @@ def mosaic_adjust(request, tab):
     return adjust
 
 
+class MosaicValues(DatasetView):
+    def get(self, request, pk, cid, tab, z, x, y):
+        """
+        The values (in the tab's unit) a viewer tab's tile is drawn from, as a value tile for the browser to colour
+        (inspector_api.values_response; the source frames' seams flagged). The viewer's URL carries the mosaics' build
+        time, so a tile is cached until they are built again.
+        """
+        task = get_conversion(request, pk, cid)
+        tab_raster(task, cid, tab)
+        return inspector_api.values_response(mosaics.values_tile(task, cid, tab, int(z), int(x), int(y)),
+                                             'private, max-age=86400')
+
+
+class MosaicHistogram(DatasetView):
+    def get(self, request, pk, cid, tab):
+        """A temperature tab's histogram (in its unit), for the browser's equalization (inspector_api.histogram_response)"""
+        task = get_conversion(request, pk, cid)
+        tab_raster(task, cid, tab)
+        if not mosaics.is_temperature(tab):
+            raise ValidationError({'equalize': "Only temperatures can be equalized"})
+        return inspector_api.histogram_response(mosaics.histogram(task, cid, tab))
+
+
 class MosaicCurve(DatasetView):
     def get(self, request, pk, cid, tab):
         """How a viewer tab's images are drawn over rescale=min,max with gamma and equalize=1, for the legend: the

@@ -661,6 +661,15 @@
   - Steps: (1) `recolour-core`: value tile and histogram endpoints, `recolour.js` with its fixtures and tests;
     (2) `recolour-viewer`: the mosaic viewer; (3) `recolour-inspector`: the Thermal Inspector, README, docs and
     screenshots.
+  - Step 1 built (2026-11-01), on `recolour-core`: `colouring.value_png`; `inspector.values_tile` and
+    `mosaics.values_tile` (reading shared with `tile` by `_tile_values`); `inspector_api` `InspectorValues` (ETag
+    from the orthophoto's version and the crop, `private, no-cache`), `InspectorHistogram`, `values_response`,
+    `histogram_response`; `analyzer_api` `MosaicValues` (`max-age=86400`, the URL carrying the build time),
+    `MosaicHistogram`; `api.md`. `public/recolour.js` (`decode`, `fetchValues`, `equalization`, `curveShares`,
+    `drawnShares`, `colour` with the blur kept per range). Fixtures `public/__tests__/fixtures/colouring.json`, written
+    by `tests/colouring_fixtures.py` and checked current by `test_analyzer`. `recolour.test.js` (15: all eight
+    cases pixel for pixel), `test_inspector.py` (3), `test_analyzer.py` (2, and the flight's value tiles). Timed on
+    the user's task in the container: a value tile 15 ms and 16 KB, a coloured tile 18 ms (34 sharpened) and 8 KB.
 
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone

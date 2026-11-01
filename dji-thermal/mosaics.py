@@ -442,6 +442,51 @@ def tile(task, cid, tab, z, x, y, cmap, low, high, adjust=None, isotherm=None):
     :return: None when the tile is outside the mosaic
     :raises ValueError: equalize asked on a tab of no temperatures
     """
+    from . import colouring
+    adjust = adjust or NO_ADJUST
+    framed = tab == 'source_frame'
+    tone = shares(task, cid, tab, low, high, adjust)
+    # The source frames read a pixel around the tile to find the seams on its edges; the unsharp mask reads its margin
+    buffer = max(1 if framed else 0, colouring.MARGIN if adjust['sharpen'] > 0 else 0)
+    found = _tile_values(task, cid, tab, z, x, y, buffer)
+    if found is None:
+        return None
+    values, frames, sigma = found
+    rgba = colouring.colour(values, palette_colors(cmap), (low, high), tone, adjust['sharpen'],
+                            colouring.isotherm_range(isotherm), sigma=sigma, margin=buffer)
+    if framed:
+        first, second = frames
+        inner = (slice(buffer, -buffer), slice(buffer, -buffer))
+        rgba[first[inner], :3], rgba[second[inner], :3] = SEAM_COLORS
+    return png(rgba)
+
+
+def values_tile(task, cid, tab, z, x, y):
+    """
+    The values a viewer tab's tile is drawn from (in its unit), with colouring.MARGIN more pixels on each side, as a
+    value tile for the browser to colour (colouring.value_png; the source frames' seams flagged 1 and 2, for
+    SEAM_COLORS), and the unsharp mask's sigma: (PNG bytes, offset, step, sigma); None outside the mosaic
+    """
+    import numpy as np
+
+    from . import colouring
+    found = _tile_values(task, cid, tab, z, x, y, colouring.MARGIN)
+    if found is None:
+        return None
+    values, frames, sigma = found
+    flags = None
+    if frames is not None:
+        flags = np.where(frames[1], 2, 0).astype(np.uint8)
+        flags[frames[0]] = 1
+    return colouring.value_png(values, flags) + (sigma,)
+
+
+def _tile_values(task, cid, tab, z, x, y, buffer):
+    """
+    A viewer tab's tile read with buffer more pixels on each side (never interpolated: the nearest pixel): its values,
+    NaN where there are none, the source frames' seams (first, second; see seams) or None on another tab, and the unsharp
+    mask's sigma: (values, seams, sigma); None when the tile is outside the mosaic
+    """
     import numpy as np
     from rio_tiler.errors import TileOutsideBounds
     from rio_tiler.io import COGReader
@@ -450,13 +495,8 @@ def tile(task, cid, tab, z, x, y, cmap, low, high, adjust=None, isotherm=None):
     from app.raster_utils import ZOOM_EXTRA_LEVELS
 
     from . import colouring
-    adjust = adjust or NO_ADJUST
     raster, band = tab_raster(task, cid, tab)
     framed = tab == 'source_frame'
-    tone = shares(task, cid, tab, low, high, adjust)
-    # The source frames read the temperatures too, and a pixel around the tile to find the seams on its edges; the
-    # unsharp mask reads its margin
-    buffer = max(1 if framed else 0, colouring.MARGIN if adjust['sharpen'] > 0 else 0)
     with COGReader(raster) as src:
         if not src.tile_exists(z, x, y):
             return None
@@ -474,15 +514,12 @@ def tile(task, cid, tab, z, x, y, cmap, low, high, adjust=None, isotherm=None):
     if framed or band == 1:
         valid &= data > low_value(built.get('unit') or 'C')
     gsd = ((built.get('kinds') or {}).get(tab_kind(tab)) or {}).get('gsd_m')
-    rgba = colouring.colour(np.where(valid, data, np.nan), palette_colors(cmap), (low, high), tone, adjust['sharpen'],
-                            colouring.isotherm_range(isotherm), sigma=colouring.sharpen_sigma(gsd, tile_pixel_m(z, y)),
-                            margin=buffer)
+    found_seams = None
     if framed:
         frames = np.asarray(t.data[1], dtype=np.float64)
-        first, second = seams(np.rint(np.where(np.isfinite(frames), frames, -1)), valid & np.isfinite(frames))
-        inner = (slice(buffer, -buffer), slice(buffer, -buffer))
-        rgba[first[inner], :3], rgba[second[inner], :3] = SEAM_COLORS
-    return png(rgba)
+        found_seams = seams(np.rint(np.where(np.isfinite(frames), frames, -1)), valid & np.isfinite(frames))
+    return (np.where(valid, data, np.nan), found_seams,
+            colouring.sharpen_sigma(gsd, tile_pixel_m(z, y)))
 
 
 def palette_colors(cmap):

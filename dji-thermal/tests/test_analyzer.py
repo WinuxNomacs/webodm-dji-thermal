@@ -589,6 +589,31 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual(first.astype(int).tolist(), [[0, 1, 0], [1, 1, 0], [0, 0, 0]])
         self.assertEqual(second.astype(int).tolist(), [[0, 0, 1], [0, 0, 1], [1, 1, 0]])
 
+    def test_the_browsers_colouring_fixtures_are_what_colouring_draws(self):
+        from . import colouring_fixtures
+        with open(colouring_fixtures.PATH) as f:
+            kept = f.read()
+        self.assertEqual(kept, colouring_fixtures.text(colouring_fixtures.build(colouring)),
+                         "Write them again: .venv/bin/python dji-thermal/tests/colouring_fixtures.py")
+
+    def test_a_value_tile_holds_its_values_in_16_bits_with_flags_and_clear_where_there_are_none(self):
+        import numpy as np
+        values = np.array([[-12.5, 0.0, np.nan], [480.25, 21.3, 21.31]])
+        flags = np.array([[0, 1, 0], [2, 0, 0]], np.uint8)
+        data, offset, step = colouring.value_png(values, flags)
+        rgba = np.asarray(Image.open(io.BytesIO(data)))
+        self.assertEqual(rgba.shape, (2, 3, 4))
+        code = rgba[..., 0].astype(int) * 256 + rgba[..., 1]
+        self.assertEqual((offset, code.max()), (-12.5, colouring.VALUE_CODES))
+        has = ~np.isnan(values)
+        np.testing.assert_allclose((offset + code * step)[has], values[has], atol=step / 2)
+        self.assertEqual(rgba[..., 3].tolist(), [[255, 255, 0], [255, 255, 255]])
+        self.assertEqual(rgba[..., 2].tolist(), flags.tolist())
+        # One value, or none: decoded as they are
+        data, offset, step = colouring.value_png(np.array([[7.5, np.nan]]))
+        self.assertEqual((offset, step), (7.5, 1.0))
+        self.assertEqual(colouring.value_png(np.full((1, 2), np.nan))[1:], (0.0, 1.0))
+
     def test_the_viewer_draws_values_as_dji_thermal_ui_does(self):
         import numpy as np
         grey = [(i << 24) | (i << 16) | (i << 8) | 255 for i in range(256)]
@@ -779,6 +804,25 @@ class TestMosaics(AnalyzerTestCase):
         # The source frames: the temperatures in the palette, with black and white lines where frames meet (white is
         # not in inferno), the whole mosaic in one tile
         whole = web_mercator_tile(lon, lat, tab["minzoom"])
+        # The values the browser colours: the tile's, with a margin, cached until the mosaics are built again; the
+        # source frames' seams flagged, both sides; the equalization's histogram of temperatures only
+        values = self.client.get(self.url(task, cid, "/harmonized/values/{}/{}/{}.png".format(t.z, t.x, t.y)))
+        self.assertEqual((values.status_code, values["Content-Type"]), (status.HTTP_200_OK, "image/png"))
+        self.assertEqual((values["X-Values-Margin"], values["Cache-Control"]), (str(colouring.MARGIN), "private, max-age=86400"))
+        coded = np.asarray(Image.open(io.BytesIO(values.content)))
+        self.assertEqual(coded.shape, (256 + 2 * colouring.MARGIN,) * 2 + (4,))
+        inner = coded[colouring.MARGIN:-colouring.MARGIN, colouring.MARGIN:-colouring.MARGIN]
+        self.assertEqual((inner[..., 3] > 0).tolist(), (plain[..., 3] > 0).tolist())
+        decoded = float(values["X-Values-Offset"]) + (inner[..., 0].astype(int) * 256 + inner[..., 1]) * float(values["X-Values-Step"])
+        self.assertTrue(lo - 5 < np.median(decoded[inner[..., 3] > 0]) < hi + 5)
+        self.assertGreater(float(values["X-Sharpen-Sigma"]), 0)
+        framed = self.client.get(self.url(task, cid, "/source_frame/values/{}/{}/{}.png".format(whole.z, whole.x, whole.y)))
+        self.assertEqual(set(np.unique(np.asarray(Image.open(io.BytesIO(framed.content)))[..., 2]).tolist()), {0, 1, 2})
+        self.assertEqual(self.client.get(self.url(task, cid, "/harmonized/values/{}/0/0.png".format(t.z))).status_code,
+                         status.HTTP_404_NOT_FOUND)
+        h = self.client.get(self.url(task, cid, "/harmonized/histogram")).data
+        self.assertEqual((h["counts"], h["edges"]), (kept[0].tolist(), kept[1].tolist()))
+        self.assertEqual(self.client.get(self.url(task, cid, "/view_angle/histogram")).status_code, status.HTTP_400_BAD_REQUEST)
         frames_tile = self.client.get(self.url(task, cid, "/source_frame/tiles/{}/{}/{}.png".format(whole.z, whole.x, whole.y)),
                                       {"color_map": "inferno", "rescale": "{},{}".format(lo, hi)})
         self.assertEqual(frames_tile.status_code, status.HTTP_200_OK)
