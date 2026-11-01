@@ -5,6 +5,16 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **bug, a harmonized DJI Thermal Task waits forever** (the user, 2026-11-01: ThermalTest2, 220 photos, still
+    "Waiting to start processing" after its workset converted), `fix-workset-commit-chosen-node`. Two causes:
+    - WebODM's upload gives the partial task the node chosen (node 1 here; the tests only used Auto), and
+      `commit_parent` → `use_for_parent` took "a node and no status" for processing in WebODM (`parent_busy`) and
+      refused. A partial task is no longer busy (WebODM processes no partial task). `test_api.py`: the commit test
+      uses a chosen node. Django 180 OK, Ruff.
+    - The dev server's worker had run since before the day's changes, so it ran the old `conversions.py` (no commit
+      at all), and `run_function_async` sent the wrong lines of the changed `datasets.py` (the mosaics'
+      `KeyError('run_job')`). Not a plugin bug: CLAUDE.md now says to restart the worker after changing Python.
+    WebODM deletes a partial task after 72 hours (`CLEANUP_PARTIAL_TASKS`).
   - Done: **bug, deleting a dataset kept in a task removes the task's saved measurements and palette** (found
     building `task-palette`, the user agreed, 2026-11-01), `fix-release-keeps-measurements`. `conversion_tasks.release`
     removed the whole `thermal/` folder, though the task, its orthophoto and the Thermal Inspector on it stay; a

@@ -17,6 +17,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from app.models import Project, Task
+from nodeodm.models import ProcessingNode
 from webodm import settings as django_settings
 
 from .test_converter import ConverterTestCase, jpegs_in, read_tags, skip_without
@@ -310,8 +311,12 @@ class TestTaskWorkset(ApiTestCase):
         self.assertEqual((record["settings"]["palette"], conversion_tasks.task_palette(self.task)), ("hotiron", "hotiron"))
         self.assertEqual(record["then"], {"processing_node": None, "auto_processing_node": True})
 
-    def test_once_converted_the_task_gets_the_tiffs_keeps_its_text_files_and_is_committed(self):
+    def test_once_converted_the_task_gets_the_tiffs_keeps_its_text_files_and_is_committed_to_the_node_chosen(self):
         self.made_dataset()
+        # WebODM's upload gives the partial task the node chosen: it waits for its images, not processing
+        node = ProcessingNode.objects.create(hostname="localhost", port=11223)
+        Task.objects.filter(pk=self.task.pk).update(processing_node=node, auto_processing_node=False)
+        self.task.refresh_from_db()
         with mock.patch.object(datasets, "start_job"):
             cid = conversions.create(self.task, "DJI Thermal Task", dict(conversions.DEFAULTS, normalize=True),
                                      User.objects.get(username="testuser"))
@@ -324,9 +329,10 @@ class TestTaskWorkset(ApiTestCase):
         with open(self.task.get_image_path("gcp_list.txt"), "w") as f:
             f.write("EPSG:4326\n")
         with mock.patch("worker.tasks.process_task") as process:
-            conversion_tasks.commit_parent(self.task, cid, {"processing_node": None, "auto_processing_node": True})
+            conversion_tasks.commit_parent(self.task, cid, {"processing_node": node.id, "auto_processing_node": False})
         self.task.refresh_from_db()
-        self.assertEqual((self.task.partial, self.task.auto_processing_node, self.task.images_count), (False, True, 3))
+        self.assertEqual((self.task.partial, self.task.processing_node_id, self.task.images_count, self.task.last_error),
+                         (False, node.id, 3, None))
         self.assertEqual(sorted(self.task.scan_images()), ["DJI_0001_T_temp_c.tiff", "DJI_0002_T_temp_c.tiff", "gcp_list.txt"])
         process.delay.assert_called_once_with(self.task.id)
 

@@ -265,9 +265,10 @@ def holding(task, cid):
 
 
 def parent_busy(task):
-    """The dataset's task is queued, processing or has an action pending in WebODM: its images are in use"""
+    """The dataset's task is queued, processing or has an action pending in WebODM: its images are in use. A partial
+    task (DJI Thermal Task's, its images still to come) is not, though WebODM's upload gave it the node chosen"""
     return task.status in (status_codes.QUEUED, status_codes.RUNNING) or task.pending_action is not None or \
-        (task.processing_node_id is not None and task.status is None)
+        (task.processing_node_id is not None and task.status is None and not task.partial)
 
 
 def parent(task):
