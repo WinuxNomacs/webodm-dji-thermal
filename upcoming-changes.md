@@ -3,39 +3,39 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **Bug: a task's dataset shows as a second task** (the user, 2026-11-01, with a screenshot of Test project on the
-  Dashboard): "I clicked "Thermal dataset" on the ThermalTest task here. I then and added images, converted mosaics
-  etc... however it seems to have created a new task in my Test Project instead of linking to the existing
-  ThermalTest task."
-  - What it builds on: a dataset is kept in a holder task of its project (`datasets.py`), which the Dashboard lists
-    ("Thermal dataset: ThermalTest", 0 images, "Set a processing node"). `task-dataset` made such a holder and
-    linked ThermalTest to it by the `.dji-thermal-from-` tag. A holder can already become a processed task (a
-    workset sent to it, `use_for_parent`), and deleting a dataset whose task has images keeps the task
-    (`conversion_tasks.release`). WebODM removes a task's whole folder only on delete or a backup restore; a
-    restart removes its assets, not `thermal/`.
-  - Proposed: the DJI Thermal Task's task becomes the dataset's own task (its tag, its `thermal/` folder, its name
-    kept), so no second task; deleting the dataset keeps the task (`release`).
-  - Decided (the user, 2026-11-01): **the dataset inside the task**, also for the tick box; **the user's existing
-    dataset moved into ThermalTest**.
-  - Done (2026-11-01), `dataset-in-task`: `datasets.adopt` (the tag, `thermal/` records with `in_task`, the name
-    kept) and `in_task`; `rename` without the holder's prefix for such a dataset; `conversion_tasks.linked_dataset`
-    gives a dataset's own task itself, `link_dataset` adopts the task (a stale link's tag dropped); deleting such a
-    dataset releases its task (`analyzer_api` `DatasetDetail.delete`). README ("Where a dataset is kept"),
-    `quickstart-thermal-task.md`, `quickstart-analyzer.md`, `api.md`. `test_api.py` `TestTaskDataset` (8). Live:
-    the tick box's upload (commit intercepted) made the new task the dataset (3 tasks with ThermalTest and the
-    holder, none added), removed after. The user's dataset moved: its `thermal/` hard-linked into ThermalTest's
-    folder (`in_task` added), ThermalTest tagged as the dataset (its link tag dropped), checked read only (the
-    dataset page, the workset's mosaic viewer drawing tiles, the panel's Thermal dataset link), then the holder task
-    deleted with its folder; checked again after.
-- **Polish: the dataset page names its WebODM task** (the user, 2026-11-01, with a screenshot of ThermalTest's
-  dataset page): "We should add the name and a link to the parent webodm task, for both visibility in the ui but a
-  navigation path between the 2". Done (2026-11-01), `dataset-task-link`: under the dataset's name, "WebODM task
-  <name>" linking to the task's expanded panel on the Dashboard (whose Thermal dataset button links back), for a
-  dataset kept in a task (`in_task`, now in the dataset's details) or whose own task holds images (`dataset.js`
-  `taskLink`). README, `quickstart-analyzer.md` section 2; screenshot `dataset` retaken. `analyzer.test.js` (1),
-  `test_api.py`. Live on ThermalTest (read only): the link shown, followed to its panel.
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **bug, a task's dataset shows as a second task** (the user, 2026-11-01, with a screenshot of Test project on the
+    Dashboard): "I clicked "Thermal dataset" on the ThermalTest task here. I then and added images, converted mosaics
+    etc... however it seems to have created a new task in my Test Project instead of linking to the existing
+    ThermalTest task."
+    - What it builds on: a dataset is kept in a holder task of its project (`datasets.py`), which the Dashboard lists
+      ("Thermal dataset: ThermalTest", 0 images, "Set a processing node"). `task-dataset` made such a holder and
+      linked ThermalTest to it by the `.dji-thermal-from-` tag. A holder can already become a processed task (a
+      workset sent to it, `use_for_parent`), and deleting a dataset whose task has images keeps the task
+      (`conversion_tasks.release`). WebODM removes a task's whole folder only on delete or a backup restore; a
+      restart removes its assets, not `thermal/`.
+    - Proposed: the DJI Thermal Task's task becomes the dataset's own task (its tag, its `thermal/` folder, its name
+      kept), so no second task; deleting the dataset keeps the task (`release`).
+    - Decided (the user, 2026-11-01): **the dataset inside the task**, also for the tick box; **the user's existing
+      dataset moved into ThermalTest**.
+    - Done (2026-11-01), `dataset-in-task`: `datasets.adopt` (the tag, `thermal/` records with `in_task`, the name
+      kept) and `in_task`; `rename` without the holder's prefix for such a dataset; `conversion_tasks.linked_dataset`
+      gives a dataset's own task itself, `link_dataset` adopts the task (a stale link's tag dropped); deleting such a
+      dataset releases its task (`analyzer_api` `DatasetDetail.delete`). README ("Where a dataset is kept"),
+      `quickstart-thermal-task.md`, `quickstart-analyzer.md`, `api.md`. `test_api.py` `TestTaskDataset` (8). Live:
+      the tick box's upload (commit intercepted) made the new task the dataset (3 tasks with ThermalTest and the
+      holder, none added), removed after. The user's dataset moved: its `thermal/` hard-linked into ThermalTest's
+      folder (`in_task` added), ThermalTest tagged as the dataset (its link tag dropped), checked read only (the
+      dataset page, the workset's mosaic viewer drawing tiles, the panel's Thermal dataset link), then the holder task
+      deleted with its folder; checked again after.
+  - Done: **polish, the dataset page names its WebODM task** (the user, 2026-11-01, with a screenshot of ThermalTest's
+    dataset page): "We should add the name and a link to the parent webodm task, for both visibility in the ui but a
+    navigation path between the 2". Done (2026-11-01), `dataset-task-link`: under the dataset's name, "WebODM task
+    <name>" linking to the task's expanded panel on the Dashboard (whose Thermal dataset button links back), for a
+    dataset kept in a task (`in_task`, now in the dataset's details) or whose own task holds images (`dataset.js`
+    `taskLink`). README, `quickstart-analyzer.md` section 2; screenshot `dataset` retaken. `analyzer.test.js` (1),
+    `test_api.py`. Live on ThermalTest (read only): the link shown, followed to its panel.
   - Done: **polish, the Thermal Inspector's Regions list: no "Show its statistics" button** (the user, 2026-10-31:
     it "doesn't appear to do anything"; it only chose whose statistics are shown, which the name did too),
     `remove-region-chart`. Decided (the user): removed; a click anywhere on a region's row shows its statistics
@@ -271,348 +271,17 @@
     section's caret drawn by the plugin (WebODM hid the browser's). Jest 122; live check on the test flight (read
     only): the tabs Worksets, Files, Problems, WebODM plan, opened on Worksets; no console error.
 
-- **Thermal Inspector** (the user, 2026-10-30): the earlier Pixel Inspector ported as a control on WebODM's 2D map,
-  for thermal orthophotos, with the palette and unit shared with the Analyzer; in five steps (details under
-  "Up next: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0. Steps 2–5
-  and 3b done (the last, isotherms and the legend, 2026-10-31), and dji-thermal-cli 1.10.0 pinned with the fallback
-  to its internal tables dropped (2026-10-31, `pin-cli-1.10.0`). Done.
-- **Linux, Windows and macOS** (the user, 2026-10-31, from `new.md`; details under "Done: Linux, Windows and
-  macOS" below): the plugin works on every way WebODM is installed: Docker on all three systems (the macOS
-  installer runs Docker), and the native Windows installer, checked end to end there. Done.
-- **Picture viewer in the Files view** (the user, 2026-10-31, from `new.md`; details under "Done: Picture
-  viewer" below): clicking the picture in the Files view's detail pane opens it in a window on the page, with a
-  close button and basic controls, instead of a new tab. Done.
-- **UX review** (the user, 2026-10-31, from `new.md`: "how would you make this ui more intuitive?"; details under
-  "Done: UX review" below): a review of every page and control the plugin adds, proposals for the user to choose
-  from, then the chosen ones built. Done: the review, all 13 proposals in six steps, and a bug it found.
-- **Documentation** (the user, 2026-10-31, from `new.md`; details under "Done: Documentation" below): the docs
-  hosted from this GitHub repo, with quickstart tutorials and screenshots, kept current with every feature change.
-  Done; GitHub Pages is turned on by the user once the repo is public.
+**Last**
+- **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
+  (CHANGELOG, README, the zip rebuilt by `dev/package.sh` on the merge, its new sha256, the `release-check` skill);
+  then the user tags `v1.0.0`, attaches the zip to the GitHub release and adds `{url, sha256}` to WebODM-Plugins'
+  `directory.json` (details under "Done: Release 1.0.0" below).
 
-- **The mosaic viewer's image controls** (the user, 2026-10-31, from a screenshot of dji-thermal-ui's viewer panel:
-  "How much of this can be built into the mosaic/harmonized/source frame viewers?"; details under "Done: The
-  mosaic viewer's image controls" below): the frame pixel under the cursor, brightness, contrast, gamma,
-  sharpening, Linear/Equalized, an isotherm, and a click keeping the readout with "Follow the cursor". Done
-  (2026-11-01), in four steps.
+**Later**
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
 
-- **Thermal Analyzer, part 2** (the user, 2026-11-01; details under "Done: Thermal Analyzer, part 2" below):
-  the workset mosaics laid on WebODM's 2D map from the Thermal Inspector (for comparing with any task's layers), the
-  source frames window, measuring tools and saved measurements there, and the frame page. In five steps; steps 1
-  (the mosaics on the map), 2 (the source frames window), 3 (measuring: lines, surroundings, ΔT), 4 (saved
-  measurements, the emissivity correction) and 5 (the frame page) done 2026-11-01. Done.
-
-- **The Thermal Inspector's panel and legend: movable, the legend's ends labelled** (the user, 2026-11-01, from
-  `new.md`):
-  - The request: "Thermal Inspector should always open in the same location but the form should be draggable to
-    move around within the webodm viewer allowing for it to be moved out of the way. Same for the thermal
-    palette/scale control." And: "The temperature palette/scale ui control needs to show the minimum/maximum
-    temperatures at their respective ranges of the scale. Example: an image has a temperature range of 55F-105F,
-    I expect the beginning of the scale to say 55 and the end of the scale to say 105, with in between values along
-    the gradient."
-  - What it builds on: on WebODM's map, the Inspector's panel (`.dt-inspector-panel`) opens left of its toolbar
-    button, top right, in the same Leaflet control as the source frames window (`.dt-inspector-frames`, left of the
-    panel). The legend (`.dt-legend`) is its own control, top left, shown by the panel's "Legend" tickbox. Nothing
-    in the plugin is dragged today.
-  - The legend today (`inspector.js` `legendHtml`; the mosaic viewer's own, `viewer.js` `legendHtml`) marks only
-    round values inside the range (`scale.js` `scaleTicks`), so its ends are unlabelled unless the range starts or
-    ends on a round value. Its range is the layer's colour range: a WebODM orthophoto's `rescale` (what WebODM's
-    layer settings chose, by default from the orthophoto's statistics, not always its own lowest and highest
-    temperatures); a mosaic's, the range of its palette.
-  - Proposed: one step, `inspector-move`. The panel dragged by its heading, the legend by any part of it, both
-    kept inside the map. The ends of both legends labelled with the range's own values, with round values between
-    them (one that would crowd an end left out).
-  - Decided (the user, 2026-11-01):
-    - It comes **before Part 2's step 5**.
-    - **The legend's ends show the colour range's own values**, with round values between them. When the image's
-      own lowest or highest temperature lies outside that range, a line under the bar gives them ("Image: 41–118
-      °F").
-    - **A moved panel or legend goes back to its place** when the panel is closed and opened again, the legend
-      hidden and shown again, or the page reloaded; nothing is remembered.
-    - **The source frames window moves with the panel**, beside it, on the other side when there is no room.
-  - Done (2026-11-01), `inspector-move`:
-    - `scale.js` `rangeTicks`: the ends with the range's own values (to the round values' decimals, a tenth when
-      that would round them), round values between that are more than 18% of the bar from an end; used by both
-      legends (`inspector.js` `legendHtml`, `viewer.js` `legendHtml`).
-    - `inspector.js`: `layerExtent` (WebODM's tile metadata's statistics for an orthophoto, the tab's stats for a
-      mosaic: `laidMosaic`'s `extent`) and `extentHtml` ("Image: low–high", corrected with the correction).
-      `movable` (pointer events, a CSS translate kept inside the map, re-fitted after a redraw or the map's
-      resize; the box grabbed last raises its Leaflet corner over WebODM's other controls); the panel by its
-      heading (not its links), the legend anywhere; `placeFrames` moves the frames window with the panel and puts
-      it on the panel's right when only that side has room. Reset on close, on the legend's tickbox, on reload.
-    - Tests: Jest 185 (`rangeTicks`, the image line, `movable`, the panel with the frames window, the legend; four
-      tests' expected ticks updated). Mutation checks (no reset on close, the frames not following, no end
-      labels) fail them. Live (read only, no writes, no console errors): both dragged inside the map without
-      panning it, the frames window flipped right at the map's left edge, both back after close/hide; legends
-      "9.9 20 30 40 51.5 / Image: -42.5–56.6 °C", the mosaic viewer "9.5 20 30 40 51.9". README, quickstart
-      section 3; screenshots retaken: `inspector`, `inspector-line`, `inspector-saved`, `inspector-frames`,
-      `inspector-mosaics`, `mosaic-viewer`, `mosaic-frames`.
-
-- **The colour scale and the Image section in the Thermal Inspector** (the user, 2026-11-01, with a screenshot of
-  the mosaic viewer's panel):
-  - The request: "Let's move the color palette into the Thermal Inspector control along with copying the Image
-    section and functionality we use in the mosaics viewer." The screenshot shows the Analyzer's mosaic viewer
-    panel: Palette, the colour scale, the range boxes ("49.2 to 125.4 °F", Auto), "This mosaic: -49.2 to 133.6 °F",
-    and the Image section (Brightness, Contrast, Gamma, Sharpening, Linear/Equalized, Reset).
-  - What it builds on:
-    - The Inspector panel has Palette (applied to every thermal layer) and the "Legend on the map" tickbox. The
-      range is read from the layer: an orthophoto's `rescale`, set in WebODM's own layer panel; a mosaic's,
-      `mosaicRange` (its 2nd to 98th percentile).
-    - The mosaic viewer (`viewer.js`): `controlsHtml`/`imageHtml`, `slidRange` and `sliderPositions` (brightness
-      and contrast move and narrow the range around Auto), `SLIDERS`, `adjustQuery`. Its tiles and frame pictures
-      are drawn by the server with `gamma`, `equalize=1` and `sharpen` (`colouring.parse_adjust`, `colour`,
-      `mosaics` equalization from the mosaic's histogram, `tile_buffer` margins for sharpening).
-    - The orthophoto: drawn by WebODM's tiler (a colour map and `rescale` only), or by the plugin's
-      `inspector/tiles` for DJI's palettes (`inspector.tile`: a colour table over low..high, no adjustments).
-  - Decided (the user, 2026-11-01):
-    - **The panel gets the scale and range**, under Palette: the colour scale (as the legend's), the range boxes in
-      the user's unit, Auto, and the layer's own lowest and highest temperatures. **The map's legend stays**, with
-      its tickbox.
-    - **They act on the topmost thermal layer shown** (the one the legend reads); **each layer keeps its own** range
-      and adjustments.
-    - **Nothing is remembered**, as the mosaic viewer: each visit starts from the layer's own range and no
-      adjustments.
-    - **The range stays in step with WebODM's layer panel** both ways, as the palette does.
-  - Proposed build, one step (`inspector-image`):
-    - Server: `inspector/tiles` draws the orthophoto in any palette (DJI's, or WebODM's colour maps by their
-      encoded colours) with `gamma`, `equalize=1` and `sharpen` through `colouring.colour`, sharpening with a
-      margin; the equalization from the orthophoto's histogram, worked out once and kept in the task's `thermal/`
-      folder (by the orthophoto's time). An unadjusted orthophoto in one of WebODM's colour maps stays on WebODM's
-      tiles, so WebODM's layer panel keeps working as now.
-    - Browser: the panel's scale, range boxes and Auto (an orthophoto's Auto from the 2nd and 98th percentiles in
-      WebODM's tile metadata), and the Image section from `viewer.js`, shared rather than copied. A mosaic's
-      adjustments go in its tile and frame URLs; an orthophoto's, in the plugin's tile URL. The frames window's
-      pictures are drawn with the layer's adjustments.
-    - Tests (Django: the tile with each adjustment, the histogram kept; Jest: the panel, ranges in step with
-      WebODM's URL, per-layer state), live check, README, quickstart section 3, screenshots.
-  - Done (2026-11-01), `inspector-image`:
-    - Server: `inspector.tile` draws through `colouring.colour` in any palette's encoded colours
-      (`inspector_api.palette_colors`: DJI's or WebODM's colour maps), with gamma, equalize (the orthophoto's
-      histogram, `inspector.histogram`: read at most 4,096 pixels a side, kept as `thermal/histogram.json` by
-      `colouring.kept_histogram`) and sharpen (`_raster_tile`'s `buffer`, sigma from the orthophoto's pixel and the
-      tile's); `inspector/curve` gives the legend's shares.
-    - `scale.js`: the Image section's maths and controls moved from `viewer.js` (`SLIDERS`, `slidRange`,
-      `sliderPositions`, `sliderGamma`, `adjustQuery`, `toneShares`, `adjustShares`, `imageControlsHtml`), used
-      by both. `inspector.js`: `scaleHtml` and `imageHtml` under Palette (the scale, range boxes in the user's
-      unit, corrected with the correction, Auto, "This layer", then the Legend tickbox and Image); the topmost
-      layer's look (`lookOf`, a preview while a slider moves, drawn on release: `setLook`); an orthophoto's range
-      and adjustments live in its tile URL (`withPalette(url, name, display, adjust)`: the plugin's tiles in DJI's
-      palettes or adjusted, WebODM's otherwise; `adjustOf`, `withRange`), a mosaic's in `laidMosaic`'s `adjust`
-      and `auto` (`mosaicQuery`, so its frames too); an orthophoto's Auto from WebODM's tile metadata's
-      percentiles (`autoRange`); the legends follow the tone curve (`barHtml`, the server's curve when
-      equalized). WebODM's layer panel: a range set there is the layer's; its own range sent again with a colour
-      map doesn't undo the Inspector's (`__dtPanelRange`); the panel's histogram fields only show a range set in
-      the Inspector after a reload (a plugin can't reach them).
-    - Tests: Django 148 (1 skipped; the tile in WebODM's colour maps, with gamma, equalized with its histogram
-      kept, sharpened; the curve); Jest 192 (URLs, Auto, the panel's range typed and Auto, sliders previewed then
-      drawn, equalized with the curve and Reset, in step with WebODM's panel, per-layer state with a mosaic and
-      its frames). Mutation checks (WebODM's panel's resent range undoing the Inspector's, a mosaic's adjustments
-      left out of its query) fail them. Live on the test flight (no writes, no console errors): Auto, contrast,
-      Equalized (the curve asked), gamma and sharpening reach the tiles; the frame picture drawn with the
-      orthophoto's gamma; the laid mosaic with its own range and gamma; the mosaic viewer's gamma unchanged. The
-      histogram the check made in the task's folder removed. README, quickstart section 3, `palettes.md`,
-      `api.md`; screenshots: `inspector-image` (new), `inspector`, `inspector-line`, `inspector-frames`,
-      `inspector-mosaics` retaken (`inspector-saved` retaken, unchanged).
-
-- **Names and the splash image** (the user, 2026-11-01, from `new.md`):
-  - The requests: "make webodm-thermal-analyzer-ui.png the splash image for the readme and docs. Resize a copy if
-    needed and check in the source image and any copies to an appropriate location." "Rename the Thermal Analyzer
-    tab to be the Dji Thermal Analyzer. Same for the title on the main ui page." "Rename "Thermal Task" button to
-    "Dji Thermal Task"."
-  - What it builds on: the image (untracked, at the repo root) is 2185×1930, 2.8 MB: a task's map with the
-    Thermal Inspector open, from before the colour scale and Image section; its sidebar says "Thermal Analyzer";
-    its corner credits "Map data: © Google Maps" (a basemap was loaded under the orthophoto, which the
-    screenshots' rule leaves out). The names: WebODM's sidebar entry (`plugin.py` `main_menu`), the landing page's
-    heading and the dataset page's breadcrumb (`templates/`), the pages' titles (`dataset.js`), the Dashboard's
-    button (`ThermalTaskButton.jsx`, built), links and hints that name them (`ThermalTaskPanel.jsx`,
-    `datasets.js`, `main.js`), and README and docs (about 25 and 25 mentions); screenshots showing the sidebar or
-    the button are retaken.
-  - Proposed: one step, `names-splash`. The image in `docs/images/` (the source, and a copy about 1200 px wide
-    shown at the top of README and `docs/index.md`, linking to the source).
-  - Decided (the user, 2026-11-01): **"DJI Thermal Analyzer" and "DJI Thermal Task"**; **the user's image, the
-    map credit cropped off** (it keeps the earlier panel and name). First of the new phases, before the speed-up
-    and Part 2's step 5.
-  - Done (2026-11-01), `names-splash`: "DJI Thermal Analyzer" in WebODM's sidebar (`plugin.py`), the landing
-    page's heading and title (`analyzer_pages.py`, `datasets.html`), the dataset page's breadcrumb and title
-    (`dataset.html`, `dataset.js`), and "DJI Thermal Task" on the Dashboard's button (`ThermalTaskButton.jsx`,
-    rebuilt), in the links and hints naming them, the manifest's description, README and docs. The image cropped
-    of its bottom 28 px (the map credit): `docs/images/splash-source.png` (2185×1902) and `splash.png` (1200 px,
-    256 colours, 414 KB) at the top of README and `docs/index.md`, linking to the source; `CLAUDE.md` and the
-    `docs` skill say it isn't made by `dev/screenshots.js`. Jest 192, Django 148 (1 skipped), ESLint, Ruff;
-    screenshots showing the sidebar or the button retaken and looked at (`thermal-task-button`,
-    `thermal-task-panel`, `analyzer-list`, `dataset`, `dataset-files`, `picture-viewer`, `mosaic-viewer`,
-    `mosaic-frames`, `dji-sdk` and the six `inspector*`).
-
-- **Ready to be public** (the user, 2026-11-01, from `new.md`): "this repo will be made public soon, be sure to
-  scan anything checked in that might be considered personal or secret."
-  - The scan (2026-11-01), of the 121 tracked files and every commit on every branch (225; 222 pushed):
-    - No secret: no key, token, password (but the tests' own `test1234` users), `.env`, private path or address;
-      commits carry only GitHub's noreply address. No DJI file or flight image, now or ever (the only file ever
-      removed is `exiftool_camera.config`). No PNG holds text or EXIF chunks. No mention of the earlier port's
-      source.
-    - `webodm-thermal-analyzer-ui.png` at the repo root, committed by mistake with the Inspector image step
-      (98f4abc, pushed): the user's uncropped splash, with Google's map credit (no coordinates or place). A
-      duplicate of `docs/images/splash-source.png`.
-    - Test fixtures at real-looking places: `inspector.test.js`'s points, `textFiles.test.js`'s GCPs and `test_converter.py`'s GPS (history
-      only, removed 2026-10-31); `main.test.js` used the dev dataset's id.
-    - `upcoming-changes.md`: the user's dataset name (about 30 times), two paths in the user's home folder, the
-      native Windows install's checks, and the user's words quoted.
-  - Decided (the user, 2026-11-01): **`upcoming-changes.md` kept, the dataset's name and the home paths scrubbed**
-    ("the test flight", "its own repository"); **the history left as it is** (nothing in it is secret; no
-    force-push).
-  - Done (2026-11-01), `public-scan`: the root image removed; `inspector.test.js`'s points and `textFiles.test.js`'s GCPs moved to a made-up place
-    in the sea (0.5 N, 0.5 E, the same distances between them), `main.test.js` a made-up dataset id; the plan
-    scrubbed. Jest 192, ESLint.
-
-- **A dataset for a DJI Thermal Task's task** (the user, 2026-11-01, with a screenshot of a task's expanded panel
-  on the Dashboard): "I created this thermal task using the DJI Thermal Task button. There needs to be a way to
-  create and link a dataset in the thermal analyzer. I propose a button to create and link but navigates to the
-  dataset in the thermal analyzer once linked."
-  - What it builds on: DJI Thermal Task converts each photo on the server into the task's TIFF (`api.py`
-    `TaskConvert`) and keeps no original. A dataset holds the original R-JPEGs (`datasets.IMAGE_EXTENSIONS`: JPEG
-    only), so a dataset made for such a task starts empty. A task made from a workset already has the hidden tag
-    `.dji-thermal-from-<dataset id>` (`conversion_tasks.FROM_TAG`), which gives its expanded panel the **Thermal
-    dataset** button (`main.js`) and is removed when the dataset is deleted (`unlink_made`).
-  - Proposed: on the expanded panel of a task whose images are the plugin's TIFFs and that has no dataset, a
-    **Create thermal dataset** button: the server makes a dataset in the task's project, named after the task,
-    gives the task the `.dji-thermal-from-` tag, and the browser opens the new dataset (empty: its **Add images** uploads
-    the flight's photos). After that the panel shows **Thermal dataset**, as a workset's task does.
-  - Decided (the user, 2026-11-01): **the button, and a tick box in DJI Thermal Task's panel** ("Also keep the
-    photos in a DJI Thermal Analyzer dataset": the same upload fills a new linked dataset, no second upload);
-    **next, before the speed-up**.
-  - Steps:
-    1. `task-dataset`: `POST .../projects/<p>/tasks/<t>/dataset` (`api.py` `TaskDataset`; change permission; not
-       on a dataset's own task; over quota refused): the task's linked dataset if it has one, else a new one named
-       after the task, the task tagged `.dji-thermal-from-<id>` (`conversion_tasks.link_dataset`). DJI Thermal
-       Task's tasks get the hidden tag `.dji-thermal-task` when created. `main.js`: **Create thermal dataset** on
-       the expanded panel of a task with that tag or a thermal orthophoto (older tasks) and no dataset; a click
-       makes it and opens the dataset page. Tests: `test_api.py`, `main.test.js`.
-       Done (2026-11-01): as above (`conversion_tasks.linked_dataset`, `link_dataset`; `main.js`
-       `DjiThermalTaskDataset`; `upload.js` `THERMAL_TASK_TAG`); README, `quickstart-thermal-task.md` section 5,
-       `api.md`; no screenshot (a task's panel shows its CRS). `test_api.py` `TestTaskDataset` (5), `main.test.js`
-       (3), `upload.test.js`. Live on the user's ThermalTest (its thermal orthophoto, no tag): the button shown,
-       a click made the dataset and opened it, the panel then had Thermal dataset; the dataset deleted after, the
-       task's tags back to none.
-    2. `keep-photos`: the tick box in DJI Thermal Task's panel. With it, the upload links a dataset to the new
-       task first (step 1's call), each photo's conversion request also saves the photo (thermal or not, any JPEG)
-       in that dataset (`TaskConvert`, only into the task's own linked dataset), and the dataset's analysis starts
-       once the task is committed; a failed upload removes the dataset with the task. The result names the dataset
-       with a link. Tests: `upload.test.js`, `test_api.py`.
-       Done (2026-11-01): `ThermalTaskPanel.jsx` (the tick box, off by default; the photos not converted, RGB or
-       another camera's, as `otherPhotos`), `upload.js` (`taskDataset`, `dataset` sent with each conversion,
-       `uploadOtherPhotos` 10 per request, `analyzeDataset` after the commit, `removeDataset` with the task),
-       `serverApi.js`, `ThermalTaskButton.jsx` (the result's link), `api.py` `keep_in_dataset`, `DatasetAnalyze`
-       counts the dataset's size first. README, `quickstart-thermal-task.md` sections 2 and 5; screenshot
-       `thermal-task-panel` retaken. `upload.test.js` (4), `test_api.py` (2). Live (3 thermal and 2 RGB photos of the
-       M4T flight, WebODM's commit intercepted so nothing processed): the task tagged and linked, the result's link,
-       the dataset with the photos (10 MB) and analyzing; the dataset and the task removed after.
-
-- **Normalize and harmonize in DJI Thermal Task** (the user, 2026-11-01, with a screenshot of DJI Thermal Task's
-  panel): "When creating a thermal task we should settings at the top that are disabled by default for normalizing
-  and harmonizing, accompanied by a brief description of what they do."
-  - What it builds on: dji-thermal-cli's normalization (`api.normalization`, a `Normalization` given to `process`)
-    has two parts: one ambient and reflected temperature for every frame (the flight's medians of the recorded
-    values, unless given), and each frame's offset against its overlapping neighbours removed (camera drift; frames
-    the mosaic can't place get none). The Analyzer's workset setting **Normalize** applies both; its **Harmonized**
-    mosaic is the one built with them. Both need every photo on the server before any is converted, while DJI
-    Thermal Task converts each photo as it uploads (`api.py` `TaskConvert`). A workset's conversion runs in WebODM's
-    worker with its progress, and **Use for parent task** puts a workset's TIFFs in the dataset's own task, which a
-    DJI Thermal Task's task now is (`dataset-in-task`).
-  - Proposed: at the top of the panel, **Normalize** and **Harmonize** (it needs Normalize), off. Off: as now. On:
-    the photos go to the task's dataset first, a workset with these settings and the panel's measurement values is
-    converted in the worker, and its TIFFs go into the task, which then starts processing, with the browser closed
-    or not.
-  - Decided (the user, 2026-11-01): **through a workset** (the photos in the task's dataset, "Also keep the photos"
-    ticked and locked; the workset and its mosaics stay in the Analyzer); **the same two settings in the Workset
-    Creation Settings**; **next, before the speed-up**.
-  - Steps:
-    1. `harmonize-setting`: worksets get `harmonize` beside `normalize` (`conversions.DEFAULTS`, `parse_settings`:
-       Harmonize ticks Normalize; a record or saved defaults without `harmonize` read it as `normalize`, so the
-       existing normalized worksets show both). Normalize alone: every frame measured with the flight's medians of
-       the recorded ambient and reflected temperatures (read from the frames in the conversion job; a value typed
-       in Measurement wins), `process(normalize=False)`; with Harmonize, `process(normalize=True)` as now. The
-       summary chip "normalized" or "harmonized"; the WebODM plan's `--normalize` sets both. The Frames section of
-       the Workset Creation Settings: the two tick boxes with a line each. Tests: `test_analyzer.py`,
-       `analyzer.test.js`. Docs: `measurement.md` ("Normalize and harmonize"), `quickstart-worksets.md`, README.
-       Done (2026-11-01): `conversions.py` (`harmonize` in `DEFAULTS` and `parse_settings`, `harmonized`,
-       `api_arguments(s, medians)`, `flight_medians` from each frame's `describe`, `normalized_medians`; the job
-       keeps the medians as the results' `normalization` with `offsets: False`), `mosaics.py` (the workset's medians),
-       `conversion_tasks.checks` ("Not harmonized"), `conversions.js` (the two boxes framed together when off the
-       plan, the chip, the plan's `--normalize`, "Normalizing…"/"Harmonizing…"), `dataset.js` (the finding's fix
-       text). README, `measurement.md`, `quickstart-worksets.md`; screenshot `workset-settings` retaken.
-       `test_analyzer.py` (4, one converting 3 frames of the M4T flight normalized alone), `analyzer.test.js` (1 new,
-       5 changed).
-    2. `thermal-task-normalize`: at the top of DJI Thermal Task's panel, **Normalize** and **Harmonize**, off, a
-       line each. On: the task is created and made its own dataset, every photo (and the RGB ones) uploaded to the
-       dataset, the GCP file and the text files sent with the workset's TIFF names (`_temp_c.tiff`), then
-       `POST .../tasks/<t>/workset` makes a workset (°C TIFFs, the panel's measurement values, the two settings,
-       mosaics) that, once converted, is sent to the task (`use_for_parent`) and the task committed with the panel's
-       processing node; the mosaics are built after. The panel's message says the task processes once the workset
-       is converted, with a link to the dataset. Tests: `upload.test.js`, `test_api.py`. Docs: the Thermal Task
-       quickstart, README.
-       Done (2026-11-01): `ThermalTaskPanel.jsx` (`renderFrames` after the photo count, Harmonize ticks Normalize,
-       "Also keep the photos" ticked and locked), `upload.js` (`startWorkset`: the photos 10 per request to the
-       dataset with their progress, the text files with `worksetTiffName`), `textFiles.js`, `serverApi.js`
-       (`startWorkset`), `ThermalTaskButton.jsx` (the message); `api.py` `TaskWorkset` (a partial task that is a
-       dataset with photos; °C TIFFs and mosaics, the panel's values, `then` with the task's node),
-       `conversions.create(then=)` and `run` (`commit_parent` once converted, before the mosaics),
-       `conversion_tasks.commit_parent` (the text files kept through `use_for_parent`, committed as WebODM's
-       commit does; a failure is the task's error). README (step 2), `quickstart-thermal-task.md` section 2;
-       screenshot `thermal-task-panel` retaken. `test_api.py` `TestTaskWorkset` (4, one converting 3 frames of the
-       M4T flight end to end), `upload.test.js` (2), `textFiles.test.js` (1). Live (2 thermal and 1 RGB photo, a GCP
-       file; the workset request intercepted): Harmonize ticked Normalize and locked the photos kept, the photos
-       went to the dataset (no conversion requests), the request carried the settings, the message; the task and
-       dataset removed after.
-
-- **The Thermal Inspector's Mosaic Overlays and Manual Corrections** (the user, 2026-11-01, from `new.md`):
-  - The requests: "in the Thermal Inspector, change "Workset mosaics" to "Mosaic Overlays". Also make sure it's only
-    visible when any workset mosaics actually exist." "in the Thermal Inspector, change Correction to Manual
-    Corrections. Place the checkbox directly next to it and remove the "Corrector for another...." description
-    entirely. This way when someone wants to make manual corrections they can check the box which expands them.
-    Unchecking returns to defaults and collapses the options again."
-  - What it builds on (`inspector.js`): `mosaicsHtml` already returns nothing when the project has no mosaics, and
-    the server lists only worksets whose mosaics are built (`inspector_api.map_mosaics`, a workset without a built
-    Mosaic, Harmonized or Source frame raster is left out), so the section already shows only when one exists.
-    `correctionHtml`: the heading "Correction", under it a tick box labelled "Correct for another emissivity and
-    reflected temperature"; ticked, the emissivity and reflected fields, what each layer was measured with, and the
-    "Approximate (a broadband model)…" line. Unticking keeps the values typed (`correctionInput`), so ticking again
-    brings them back; the correction is kept in the browser per task (`saveCorrection`).
-  - Proposed: one step, `inspector-names`: "Mosaic Overlays" for the section (its visibility unchanged; a test that
-    it's absent without mosaics); "Manual Corrections" as the heading, with the tick box in it and no label;
-    unticking forgets the values typed, so the next tick starts again from the topmost layer's own; the
-    "Approximate…" line and the layers' measured-with lines kept. README, `quickstart-inspector.md` (sections 4 and
-    7), screenshots `inspector-saved`, `inspector-mosaics` and any showing the panel's sections retaken.
-  - Decided (the user, 2026-11-01): **before Faster image adjustments**.
-  - Done (2026-11-01), `inspector-names`: `inspector.js` `mosaicsHtml` ("Mosaic Overlays"), `correctionHtml` (the
-    tick box in the "Manual Corrections" heading, `.dt-inspector-heading` in `inspector.css`; its label gone),
-    `correctionInput` (unticked, the correction is just `{on: false}`, so the browser's copy is removed and the next
-    tick starts from the topmost layer's own values). README, `quickstart-inspector.md` sections 4 and 7 (its
-    section 4 anchor, linked from `quickstart-worksets.md`). Screenshots `inspector`, `inspector-image`,
-    `inspector-saved`, `inspector-mosaics` retaken (read only). `inspector.test.js` (2: Mosaic Overlays absent
-    without mosaics; the heading, and unticking forgetting the values). Jest 206, ESLint.
-
-- **The Thermal Inspector's top stays in view** (the user, 2026-11-01, from `new.md`): "in the Thermal Inspector,
-  make the top section a header area that remains visible when you scroll down. This way the controls and
-  temperature are always visible."
-  - What it builds on (`inspector.js` `panelHtml`, `inspector.css`): the panel (on WebODM's 2D map, the toolbar's
-    Inspector button) scrolls as a whole past 70% of the window's height (`max-height: 70vh; overflow-y: auto`).
-    From the top: the heading (Thermal Inspector, its ×, dragged to move the panel), the mode buttons (Hover, Pin,
-    the region shapes, Line) with the polygon/line hint and any notice, the readout (the temperature under the
-    cursor), then Palette, the colour scale (its bar and range fields), "Legend on the map", Image, Mosaic Overlays,
-    Isotherm, Manual Corrections, Pinned points, Regions and lines, Saved measurements. The whole panel is drawn
-    again on each change (`panel.innerHTML`).
-  - Proposed: one step, `inspector-header`: the heading, mode buttons, hints and readout in a header kept at the
-    top of the panel while the rest scrolls under it (CSS `position: sticky`, a white background and a line under
-    it); the panel's drag by its heading unchanged. README and `quickstart-inspector.md` if they describe it; a
-    screenshot of the panel scrolled down.
-  - Decided (the user, 2026-11-01): **also Palette and the colour scale** in the header; **before Faster image
-    adjustments**.
-  - Done (2026-11-01), `inspector-header`: `inspector.js` `panelHtml` (the heading, modes, hints, readout, Palette
-    and the scale in `.dt-inspector-top`), `inspector.css` (sticky over the panel's padding, above the sections'
-    buttons, a line under it); "Legend on the map", Image and the sections below scroll under it. README ("The
-    panel's top stays in view"), `quickstart-inspector.md` section 2. Screenshots `inspector`, `inspector-line`,
-    `inspector-image`, `inspector-saved`, `inspector-mosaics` retaken (read only; the first three and
-    `inspector-saved` show the panel scrolled under its top). `inspector.test.js` (1). Jest 207, ESLint.
-
+**Done**
 - **Faster image adjustments** (the user, 2026-11-01, from `new.md`): "can anything be done to improve the
   rendering response time of changes to the images sliders? How fast the tiles are rendered? etc.... Looking for it
   to be as seamless and realtime as possible without needing a webodm pr".
@@ -697,18 +366,337 @@
     sharpening 188 ms on 512-pixel tiles); the isotherm painted with no requests; against the plugin's tiles at most
     7 levels apart on 0.2% of pixels, against WebODM's own magma at most 3; a laid mosaic from values, its tab's
     values asked on a change, zooming in and out with no errors.
-
-**Last**
-- **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
-  (CHANGELOG, README, the zip rebuilt by `dev/package.sh` on the merge, its new sha256, the `release-check` skill);
-  then the user tags `v1.0.0`, attaches the zip to the GitHub release and adds `{url, sha256}` to WebODM-Plugins'
-  `directory.json` (details under "Done: Release 1.0.0" below).
-
-**Later**
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
-
-**Done**
+- **The Thermal Inspector's top stays in view** (the user, 2026-11-01, from `new.md`): "in the Thermal Inspector,
+  make the top section a header area that remains visible when you scroll down. This way the controls and
+  temperature are always visible."
+  - What it builds on (`inspector.js` `panelHtml`, `inspector.css`): the panel (on WebODM's 2D map, the toolbar's
+    Inspector button) scrolls as a whole past 70% of the window's height (`max-height: 70vh; overflow-y: auto`).
+    From the top: the heading (Thermal Inspector, its ×, dragged to move the panel), the mode buttons (Hover, Pin,
+    the region shapes, Line) with the polygon/line hint and any notice, the readout (the temperature under the
+    cursor), then Palette, the colour scale (its bar and range fields), "Legend on the map", Image, Mosaic Overlays,
+    Isotherm, Manual Corrections, Pinned points, Regions and lines, Saved measurements. The whole panel is drawn
+    again on each change (`panel.innerHTML`).
+  - Proposed: one step, `inspector-header`: the heading, mode buttons, hints and readout in a header kept at the
+    top of the panel while the rest scrolls under it (CSS `position: sticky`, a white background and a line under
+    it); the panel's drag by its heading unchanged. README and `quickstart-inspector.md` if they describe it; a
+    screenshot of the panel scrolled down.
+  - Decided (the user, 2026-11-01): **also Palette and the colour scale** in the header; **before Faster image
+    adjustments**.
+  - Done (2026-11-01), `inspector-header`: `inspector.js` `panelHtml` (the heading, modes, hints, readout, Palette
+    and the scale in `.dt-inspector-top`), `inspector.css` (sticky over the panel's padding, above the sections'
+    buttons, a line under it); "Legend on the map", Image and the sections below scroll under it. README ("The
+    panel's top stays in view"), `quickstart-inspector.md` section 2. Screenshots `inspector`, `inspector-line`,
+    `inspector-image`, `inspector-saved`, `inspector-mosaics` retaken (read only; the first three and
+    `inspector-saved` show the panel scrolled under its top). `inspector.test.js` (1). Jest 207, ESLint.
+- **The Thermal Inspector's Mosaic Overlays and Manual Corrections** (the user, 2026-11-01, from `new.md`):
+  - The requests: "in the Thermal Inspector, change "Workset mosaics" to "Mosaic Overlays". Also make sure it's only
+    visible when any workset mosaics actually exist." "in the Thermal Inspector, change Correction to Manual
+    Corrections. Place the checkbox directly next to it and remove the "Corrector for another...." description
+    entirely. This way when someone wants to make manual corrections they can check the box which expands them.
+    Unchecking returns to defaults and collapses the options again."
+  - What it builds on (`inspector.js`): `mosaicsHtml` already returns nothing when the project has no mosaics, and
+    the server lists only worksets whose mosaics are built (`inspector_api.map_mosaics`, a workset without a built
+    Mosaic, Harmonized or Source frame raster is left out), so the section already shows only when one exists.
+    `correctionHtml`: the heading "Correction", under it a tick box labelled "Correct for another emissivity and
+    reflected temperature"; ticked, the emissivity and reflected fields, what each layer was measured with, and the
+    "Approximate (a broadband model)…" line. Unticking keeps the values typed (`correctionInput`), so ticking again
+    brings them back; the correction is kept in the browser per task (`saveCorrection`).
+  - Proposed: one step, `inspector-names`: "Mosaic Overlays" for the section (its visibility unchanged; a test that
+    it's absent without mosaics); "Manual Corrections" as the heading, with the tick box in it and no label;
+    unticking forgets the values typed, so the next tick starts again from the topmost layer's own; the
+    "Approximate…" line and the layers' measured-with lines kept. README, `quickstart-inspector.md` (sections 4 and
+    7), screenshots `inspector-saved`, `inspector-mosaics` and any showing the panel's sections retaken.
+  - Decided (the user, 2026-11-01): **before Faster image adjustments**.
+  - Done (2026-11-01), `inspector-names`: `inspector.js` `mosaicsHtml` ("Mosaic Overlays"), `correctionHtml` (the
+    tick box in the "Manual Corrections" heading, `.dt-inspector-heading` in `inspector.css`; its label gone),
+    `correctionInput` (unticked, the correction is just `{on: false}`, so the browser's copy is removed and the next
+    tick starts from the topmost layer's own values). README, `quickstart-inspector.md` sections 4 and 7 (its
+    section 4 anchor, linked from `quickstart-worksets.md`). Screenshots `inspector`, `inspector-image`,
+    `inspector-saved`, `inspector-mosaics` retaken (read only). `inspector.test.js` (2: Mosaic Overlays absent
+    without mosaics; the heading, and unticking forgetting the values). Jest 206, ESLint.
+- **Normalize and harmonize in DJI Thermal Task** (the user, 2026-11-01, with a screenshot of DJI Thermal Task's
+  panel): "When creating a thermal task we should settings at the top that are disabled by default for normalizing
+  and harmonizing, accompanied by a brief description of what they do."
+  - What it builds on: dji-thermal-cli's normalization (`api.normalization`, a `Normalization` given to `process`)
+    has two parts: one ambient and reflected temperature for every frame (the flight's medians of the recorded
+    values, unless given), and each frame's offset against its overlapping neighbours removed (camera drift; frames
+    the mosaic can't place get none). The Analyzer's workset setting **Normalize** applies both; its **Harmonized**
+    mosaic is the one built with them. Both need every photo on the server before any is converted, while DJI
+    Thermal Task converts each photo as it uploads (`api.py` `TaskConvert`). A workset's conversion runs in WebODM's
+    worker with its progress, and **Use for parent task** puts a workset's TIFFs in the dataset's own task, which a
+    DJI Thermal Task's task now is (`dataset-in-task`).
+  - Proposed: at the top of the panel, **Normalize** and **Harmonize** (it needs Normalize), off. Off: as now. On:
+    the photos go to the task's dataset first, a workset with these settings and the panel's measurement values is
+    converted in the worker, and its TIFFs go into the task, which then starts processing, with the browser closed
+    or not.
+  - Decided (the user, 2026-11-01): **through a workset** (the photos in the task's dataset, "Also keep the photos"
+    ticked and locked; the workset and its mosaics stay in the Analyzer); **the same two settings in the Workset
+    Creation Settings**; **next, before the speed-up**.
+  - Steps:
+    1. `harmonize-setting`: worksets get `harmonize` beside `normalize` (`conversions.DEFAULTS`, `parse_settings`:
+       Harmonize ticks Normalize; a record or saved defaults without `harmonize` read it as `normalize`, so the
+       existing normalized worksets show both). Normalize alone: every frame measured with the flight's medians of
+       the recorded ambient and reflected temperatures (read from the frames in the conversion job; a value typed
+       in Measurement wins), `process(normalize=False)`; with Harmonize, `process(normalize=True)` as now. The
+       summary chip "normalized" or "harmonized"; the WebODM plan's `--normalize` sets both. The Frames section of
+       the Workset Creation Settings: the two tick boxes with a line each. Tests: `test_analyzer.py`,
+       `analyzer.test.js`. Docs: `measurement.md` ("Normalize and harmonize"), `quickstart-worksets.md`, README.
+       Done (2026-11-01): `conversions.py` (`harmonize` in `DEFAULTS` and `parse_settings`, `harmonized`,
+       `api_arguments(s, medians)`, `flight_medians` from each frame's `describe`, `normalized_medians`; the job
+       keeps the medians as the results' `normalization` with `offsets: False`), `mosaics.py` (the workset's medians),
+       `conversion_tasks.checks` ("Not harmonized"), `conversions.js` (the two boxes framed together when off the
+       plan, the chip, the plan's `--normalize`, "Normalizing…"/"Harmonizing…"), `dataset.js` (the finding's fix
+       text). README, `measurement.md`, `quickstart-worksets.md`; screenshot `workset-settings` retaken.
+       `test_analyzer.py` (4, one converting 3 frames of the M4T flight normalized alone), `analyzer.test.js` (1 new,
+       5 changed).
+    2. `thermal-task-normalize`: at the top of DJI Thermal Task's panel, **Normalize** and **Harmonize**, off, a
+       line each. On: the task is created and made its own dataset, every photo (and the RGB ones) uploaded to the
+       dataset, the GCP file and the text files sent with the workset's TIFF names (`_temp_c.tiff`), then
+       `POST .../tasks/<t>/workset` makes a workset (°C TIFFs, the panel's measurement values, the two settings,
+       mosaics) that, once converted, is sent to the task (`use_for_parent`) and the task committed with the panel's
+       processing node; the mosaics are built after. The panel's message says the task processes once the workset
+       is converted, with a link to the dataset. Tests: `upload.test.js`, `test_api.py`. Docs: the Thermal Task
+       quickstart, README.
+       Done (2026-11-01): `ThermalTaskPanel.jsx` (`renderFrames` after the photo count, Harmonize ticks Normalize,
+       "Also keep the photos" ticked and locked), `upload.js` (`startWorkset`: the photos 10 per request to the
+       dataset with their progress, the text files with `worksetTiffName`), `textFiles.js`, `serverApi.js`
+       (`startWorkset`), `ThermalTaskButton.jsx` (the message); `api.py` `TaskWorkset` (a partial task that is a
+       dataset with photos; °C TIFFs and mosaics, the panel's values, `then` with the task's node),
+       `conversions.create(then=)` and `run` (`commit_parent` once converted, before the mosaics),
+       `conversion_tasks.commit_parent` (the text files kept through `use_for_parent`, committed as WebODM's
+       commit does; a failure is the task's error). README (step 2), `quickstart-thermal-task.md` section 2;
+       screenshot `thermal-task-panel` retaken. `test_api.py` `TestTaskWorkset` (4, one converting 3 frames of the
+       M4T flight end to end), `upload.test.js` (2), `textFiles.test.js` (1). Live (2 thermal and 1 RGB photo, a GCP
+       file; the workset request intercepted): Harmonize ticked Normalize and locked the photos kept, the photos
+       went to the dataset (no conversion requests), the request carried the settings, the message; the task and
+       dataset removed after.
+- **A dataset for a DJI Thermal Task's task** (the user, 2026-11-01, with a screenshot of a task's expanded panel
+  on the Dashboard): "I created this thermal task using the DJI Thermal Task button. There needs to be a way to
+  create and link a dataset in the thermal analyzer. I propose a button to create and link but navigates to the
+  dataset in the thermal analyzer once linked."
+  - What it builds on: DJI Thermal Task converts each photo on the server into the task's TIFF (`api.py`
+    `TaskConvert`) and keeps no original. A dataset holds the original R-JPEGs (`datasets.IMAGE_EXTENSIONS`: JPEG
+    only), so a dataset made for such a task starts empty. A task made from a workset already has the hidden tag
+    `.dji-thermal-from-<dataset id>` (`conversion_tasks.FROM_TAG`), which gives its expanded panel the **Thermal
+    dataset** button (`main.js`) and is removed when the dataset is deleted (`unlink_made`).
+  - Proposed: on the expanded panel of a task whose images are the plugin's TIFFs and that has no dataset, a
+    **Create thermal dataset** button: the server makes a dataset in the task's project, named after the task,
+    gives the task the `.dji-thermal-from-` tag, and the browser opens the new dataset (empty: its **Add images** uploads
+    the flight's photos). After that the panel shows **Thermal dataset**, as a workset's task does.
+  - Decided (the user, 2026-11-01): **the button, and a tick box in DJI Thermal Task's panel** ("Also keep the
+    photos in a DJI Thermal Analyzer dataset": the same upload fills a new linked dataset, no second upload);
+    **next, before the speed-up**.
+  - Steps:
+    1. `task-dataset`: `POST .../projects/<p>/tasks/<t>/dataset` (`api.py` `TaskDataset`; change permission; not
+       on a dataset's own task; over quota refused): the task's linked dataset if it has one, else a new one named
+       after the task, the task tagged `.dji-thermal-from-<id>` (`conversion_tasks.link_dataset`). DJI Thermal
+       Task's tasks get the hidden tag `.dji-thermal-task` when created. `main.js`: **Create thermal dataset** on
+       the expanded panel of a task with that tag or a thermal orthophoto (older tasks) and no dataset; a click
+       makes it and opens the dataset page. Tests: `test_api.py`, `main.test.js`.
+       Done (2026-11-01): as above (`conversion_tasks.linked_dataset`, `link_dataset`; `main.js`
+       `DjiThermalTaskDataset`; `upload.js` `THERMAL_TASK_TAG`); README, `quickstart-thermal-task.md` section 5,
+       `api.md`; no screenshot (a task's panel shows its CRS). `test_api.py` `TestTaskDataset` (5), `main.test.js`
+       (3), `upload.test.js`. Live on the user's ThermalTest (its thermal orthophoto, no tag): the button shown,
+       a click made the dataset and opened it, the panel then had Thermal dataset; the dataset deleted after, the
+       task's tags back to none.
+    2. `keep-photos`: the tick box in DJI Thermal Task's panel. With it, the upload links a dataset to the new
+       task first (step 1's call), each photo's conversion request also saves the photo (thermal or not, any JPEG)
+       in that dataset (`TaskConvert`, only into the task's own linked dataset), and the dataset's analysis starts
+       once the task is committed; a failed upload removes the dataset with the task. The result names the dataset
+       with a link. Tests: `upload.test.js`, `test_api.py`.
+       Done (2026-11-01): `ThermalTaskPanel.jsx` (the tick box, off by default; the photos not converted, RGB or
+       another camera's, as `otherPhotos`), `upload.js` (`taskDataset`, `dataset` sent with each conversion,
+       `uploadOtherPhotos` 10 per request, `analyzeDataset` after the commit, `removeDataset` with the task),
+       `serverApi.js`, `ThermalTaskButton.jsx` (the result's link), `api.py` `keep_in_dataset`, `DatasetAnalyze`
+       counts the dataset's size first. README, `quickstart-thermal-task.md` sections 2 and 5; screenshot
+       `thermal-task-panel` retaken. `upload.test.js` (4), `test_api.py` (2). Live (3 thermal and 2 RGB photos of the
+       M4T flight, WebODM's commit intercepted so nothing processed): the task tagged and linked, the result's link,
+       the dataset with the photos (10 MB) and analyzing; the dataset and the task removed after.
+- **Ready to be public** (the user, 2026-11-01, from `new.md`): "this repo will be made public soon, be sure to
+  scan anything checked in that might be considered personal or secret."
+  - The scan (2026-11-01), of the 121 tracked files and every commit on every branch (225; 222 pushed):
+    - No secret: no key, token, password (but the tests' own `test1234` users), `.env`, private path or address;
+      commits carry only GitHub's noreply address. No DJI file or flight image, now or ever (the only file ever
+      removed is `exiftool_camera.config`). No PNG holds text or EXIF chunks. No mention of the earlier port's
+      source.
+    - `webodm-thermal-analyzer-ui.png` at the repo root, committed by mistake with the Inspector image step
+      (98f4abc, pushed): the user's uncropped splash, with Google's map credit (no coordinates or place). A
+      duplicate of `docs/images/splash-source.png`.
+    - Test fixtures at real-looking places: `inspector.test.js`'s points, `textFiles.test.js`'s GCPs and `test_converter.py`'s GPS (history
+      only, removed 2026-10-31); `main.test.js` used the dev dataset's id.
+    - `upcoming-changes.md`: the user's dataset name (about 30 times), two paths in the user's home folder, the
+      native Windows install's checks, and the user's words quoted.
+  - Decided (the user, 2026-11-01): **`upcoming-changes.md` kept, the dataset's name and the home paths scrubbed**
+    ("the test flight", "its own repository"); **the history left as it is** (nothing in it is secret; no
+    force-push).
+  - Done (2026-11-01), `public-scan`: the root image removed; `inspector.test.js`'s points and `textFiles.test.js`'s GCPs moved to a made-up place
+    in the sea (0.5 N, 0.5 E, the same distances between them), `main.test.js` a made-up dataset id; the plan
+    scrubbed. Jest 192, ESLint.
+- **Names and the splash image** (the user, 2026-11-01, from `new.md`):
+  - The requests: "make webodm-thermal-analyzer-ui.png the splash image for the readme and docs. Resize a copy if
+    needed and check in the source image and any copies to an appropriate location." "Rename the Thermal Analyzer
+    tab to be the Dji Thermal Analyzer. Same for the title on the main ui page." "Rename "Thermal Task" button to
+    "Dji Thermal Task"."
+  - What it builds on: the image (untracked, at the repo root) is 2185×1930, 2.8 MB: a task's map with the
+    Thermal Inspector open, from before the colour scale and Image section; its sidebar says "Thermal Analyzer";
+    its corner credits "Map data: © Google Maps" (a basemap was loaded under the orthophoto, which the
+    screenshots' rule leaves out). The names: WebODM's sidebar entry (`plugin.py` `main_menu`), the landing page's
+    heading and the dataset page's breadcrumb (`templates/`), the pages' titles (`dataset.js`), the Dashboard's
+    button (`ThermalTaskButton.jsx`, built), links and hints that name them (`ThermalTaskPanel.jsx`,
+    `datasets.js`, `main.js`), and README and docs (about 25 and 25 mentions); screenshots showing the sidebar or
+    the button are retaken.
+  - Proposed: one step, `names-splash`. The image in `docs/images/` (the source, and a copy about 1200 px wide
+    shown at the top of README and `docs/index.md`, linking to the source).
+  - Decided (the user, 2026-11-01): **"DJI Thermal Analyzer" and "DJI Thermal Task"**; **the user's image, the
+    map credit cropped off** (it keeps the earlier panel and name). First of the new phases, before the speed-up
+    and Part 2's step 5.
+  - Done (2026-11-01), `names-splash`: "DJI Thermal Analyzer" in WebODM's sidebar (`plugin.py`), the landing
+    page's heading and title (`analyzer_pages.py`, `datasets.html`), the dataset page's breadcrumb and title
+    (`dataset.html`, `dataset.js`), and "DJI Thermal Task" on the Dashboard's button (`ThermalTaskButton.jsx`,
+    rebuilt), in the links and hints naming them, the manifest's description, README and docs. The image cropped
+    of its bottom 28 px (the map credit): `docs/images/splash-source.png` (2185×1902) and `splash.png` (1200 px,
+    256 colours, 414 KB) at the top of README and `docs/index.md`, linking to the source; `CLAUDE.md` and the
+    `docs` skill say it isn't made by `dev/screenshots.js`. Jest 192, Django 148 (1 skipped), ESLint, Ruff;
+    screenshots showing the sidebar or the button retaken and looked at (`thermal-task-button`,
+    `thermal-task-panel`, `analyzer-list`, `dataset`, `dataset-files`, `picture-viewer`, `mosaic-viewer`,
+    `mosaic-frames`, `dji-sdk` and the six `inspector*`).
+- **The colour scale and the Image section in the Thermal Inspector** (the user, 2026-11-01, with a screenshot of
+  the mosaic viewer's panel):
+  - The request: "Let's move the color palette into the Thermal Inspector control along with copying the Image
+    section and functionality we use in the mosaics viewer." The screenshot shows the Analyzer's mosaic viewer
+    panel: Palette, the colour scale, the range boxes ("49.2 to 125.4 °F", Auto), "This mosaic: -49.2 to 133.6 °F",
+    and the Image section (Brightness, Contrast, Gamma, Sharpening, Linear/Equalized, Reset).
+  - What it builds on:
+    - The Inspector panel has Palette (applied to every thermal layer) and the "Legend on the map" tickbox. The
+      range is read from the layer: an orthophoto's `rescale`, set in WebODM's own layer panel; a mosaic's,
+      `mosaicRange` (its 2nd to 98th percentile).
+    - The mosaic viewer (`viewer.js`): `controlsHtml`/`imageHtml`, `slidRange` and `sliderPositions` (brightness
+      and contrast move and narrow the range around Auto), `SLIDERS`, `adjustQuery`. Its tiles and frame pictures
+      are drawn by the server with `gamma`, `equalize=1` and `sharpen` (`colouring.parse_adjust`, `colour`,
+      `mosaics` equalization from the mosaic's histogram, `tile_buffer` margins for sharpening).
+    - The orthophoto: drawn by WebODM's tiler (a colour map and `rescale` only), or by the plugin's
+      `inspector/tiles` for DJI's palettes (`inspector.tile`: a colour table over low..high, no adjustments).
+  - Decided (the user, 2026-11-01):
+    - **The panel gets the scale and range**, under Palette: the colour scale (as the legend's), the range boxes in
+      the user's unit, Auto, and the layer's own lowest and highest temperatures. **The map's legend stays**, with
+      its tickbox.
+    - **They act on the topmost thermal layer shown** (the one the legend reads); **each layer keeps its own** range
+      and adjustments.
+    - **Nothing is remembered**, as the mosaic viewer: each visit starts from the layer's own range and no
+      adjustments.
+    - **The range stays in step with WebODM's layer panel** both ways, as the palette does.
+  - Proposed build, one step (`inspector-image`):
+    - Server: `inspector/tiles` draws the orthophoto in any palette (DJI's, or WebODM's colour maps by their
+      encoded colours) with `gamma`, `equalize=1` and `sharpen` through `colouring.colour`, sharpening with a
+      margin; the equalization from the orthophoto's histogram, worked out once and kept in the task's `thermal/`
+      folder (by the orthophoto's time). An unadjusted orthophoto in one of WebODM's colour maps stays on WebODM's
+      tiles, so WebODM's layer panel keeps working as now.
+    - Browser: the panel's scale, range boxes and Auto (an orthophoto's Auto from the 2nd and 98th percentiles in
+      WebODM's tile metadata), and the Image section from `viewer.js`, shared rather than copied. A mosaic's
+      adjustments go in its tile and frame URLs; an orthophoto's, in the plugin's tile URL. The frames window's
+      pictures are drawn with the layer's adjustments.
+    - Tests (Django: the tile with each adjustment, the histogram kept; Jest: the panel, ranges in step with
+      WebODM's URL, per-layer state), live check, README, quickstart section 3, screenshots.
+  - Done (2026-11-01), `inspector-image`:
+    - Server: `inspector.tile` draws through `colouring.colour` in any palette's encoded colours
+      (`inspector_api.palette_colors`: DJI's or WebODM's colour maps), with gamma, equalize (the orthophoto's
+      histogram, `inspector.histogram`: read at most 4,096 pixels a side, kept as `thermal/histogram.json` by
+      `colouring.kept_histogram`) and sharpen (`_raster_tile`'s `buffer`, sigma from the orthophoto's pixel and the
+      tile's); `inspector/curve` gives the legend's shares.
+    - `scale.js`: the Image section's maths and controls moved from `viewer.js` (`SLIDERS`, `slidRange`,
+      `sliderPositions`, `sliderGamma`, `adjustQuery`, `toneShares`, `adjustShares`, `imageControlsHtml`), used
+      by both. `inspector.js`: `scaleHtml` and `imageHtml` under Palette (the scale, range boxes in the user's
+      unit, corrected with the correction, Auto, "This layer", then the Legend tickbox and Image); the topmost
+      layer's look (`lookOf`, a preview while a slider moves, drawn on release: `setLook`); an orthophoto's range
+      and adjustments live in its tile URL (`withPalette(url, name, display, adjust)`: the plugin's tiles in DJI's
+      palettes or adjusted, WebODM's otherwise; `adjustOf`, `withRange`), a mosaic's in `laidMosaic`'s `adjust`
+      and `auto` (`mosaicQuery`, so its frames too); an orthophoto's Auto from WebODM's tile metadata's
+      percentiles (`autoRange`); the legends follow the tone curve (`barHtml`, the server's curve when
+      equalized). WebODM's layer panel: a range set there is the layer's; its own range sent again with a colour
+      map doesn't undo the Inspector's (`__dtPanelRange`); the panel's histogram fields only show a range set in
+      the Inspector after a reload (a plugin can't reach them).
+    - Tests: Django 148 (1 skipped; the tile in WebODM's colour maps, with gamma, equalized with its histogram
+      kept, sharpened; the curve); Jest 192 (URLs, Auto, the panel's range typed and Auto, sliders previewed then
+      drawn, equalized with the curve and Reset, in step with WebODM's panel, per-layer state with a mosaic and
+      its frames). Mutation checks (WebODM's panel's resent range undoing the Inspector's, a mosaic's adjustments
+      left out of its query) fail them. Live on the test flight (no writes, no console errors): Auto, contrast,
+      Equalized (the curve asked), gamma and sharpening reach the tiles; the frame picture drawn with the
+      orthophoto's gamma; the laid mosaic with its own range and gamma; the mosaic viewer's gamma unchanged. The
+      histogram the check made in the task's folder removed. README, quickstart section 3, `palettes.md`,
+      `api.md`; screenshots: `inspector-image` (new), `inspector`, `inspector-line`, `inspector-frames`,
+      `inspector-mosaics` retaken (`inspector-saved` retaken, unchanged).
+- **The Thermal Inspector's panel and legend: movable, the legend's ends labelled** (the user, 2026-11-01, from
+  `new.md`):
+  - The request: "Thermal Inspector should always open in the same location but the form should be draggable to
+    move around within the webodm viewer allowing for it to be moved out of the way. Same for the thermal
+    palette/scale control." And: "The temperature palette/scale ui control needs to show the minimum/maximum
+    temperatures at their respective ranges of the scale. Example: an image has a temperature range of 55F-105F,
+    I expect the beginning of the scale to say 55 and the end of the scale to say 105, with in between values along
+    the gradient."
+  - What it builds on: on WebODM's map, the Inspector's panel (`.dt-inspector-panel`) opens left of its toolbar
+    button, top right, in the same Leaflet control as the source frames window (`.dt-inspector-frames`, left of the
+    panel). The legend (`.dt-legend`) is its own control, top left, shown by the panel's "Legend" tickbox. Nothing
+    in the plugin is dragged today.
+  - The legend today (`inspector.js` `legendHtml`; the mosaic viewer's own, `viewer.js` `legendHtml`) marks only
+    round values inside the range (`scale.js` `scaleTicks`), so its ends are unlabelled unless the range starts or
+    ends on a round value. Its range is the layer's colour range: a WebODM orthophoto's `rescale` (what WebODM's
+    layer settings chose, by default from the orthophoto's statistics, not always its own lowest and highest
+    temperatures); a mosaic's, the range of its palette.
+  - Proposed: one step, `inspector-move`. The panel dragged by its heading, the legend by any part of it, both
+    kept inside the map. The ends of both legends labelled with the range's own values, with round values between
+    them (one that would crowd an end left out).
+  - Decided (the user, 2026-11-01):
+    - It comes **before Part 2's step 5**.
+    - **The legend's ends show the colour range's own values**, with round values between them. When the image's
+      own lowest or highest temperature lies outside that range, a line under the bar gives them ("Image: 41–118
+      °F").
+    - **A moved panel or legend goes back to its place** when the panel is closed and opened again, the legend
+      hidden and shown again, or the page reloaded; nothing is remembered.
+    - **The source frames window moves with the panel**, beside it, on the other side when there is no room.
+  - Done (2026-11-01), `inspector-move`:
+    - `scale.js` `rangeTicks`: the ends with the range's own values (to the round values' decimals, a tenth when
+      that would round them), round values between that are more than 18% of the bar from an end; used by both
+      legends (`inspector.js` `legendHtml`, `viewer.js` `legendHtml`).
+    - `inspector.js`: `layerExtent` (WebODM's tile metadata's statistics for an orthophoto, the tab's stats for a
+      mosaic: `laidMosaic`'s `extent`) and `extentHtml` ("Image: low–high", corrected with the correction).
+      `movable` (pointer events, a CSS translate kept inside the map, re-fitted after a redraw or the map's
+      resize; the box grabbed last raises its Leaflet corner over WebODM's other controls); the panel by its
+      heading (not its links), the legend anywhere; `placeFrames` moves the frames window with the panel and puts
+      it on the panel's right when only that side has room. Reset on close, on the legend's tickbox, on reload.
+    - Tests: Jest 185 (`rangeTicks`, the image line, `movable`, the panel with the frames window, the legend; four
+      tests' expected ticks updated). Mutation checks (no reset on close, the frames not following, no end
+      labels) fail them. Live (read only, no writes, no console errors): both dragged inside the map without
+      panning it, the frames window flipped right at the map's left edge, both back after close/hide; legends
+      "9.9 20 30 40 51.5 / Image: -42.5–56.6 °C", the mosaic viewer "9.5 20 30 40 51.9". README, quickstart
+      section 3; screenshots retaken: `inspector`, `inspector-line`, `inspector-saved`, `inspector-frames`,
+      `inspector-mosaics`, `mosaic-viewer`, `mosaic-frames`.
+- **Thermal Analyzer, part 2** (the user, 2026-11-01; details under "Done: Thermal Analyzer, part 2" below):
+  the workset mosaics laid on WebODM's 2D map from the Thermal Inspector (for comparing with any task's layers), the
+  source frames window, measuring tools and saved measurements there, and the frame page. In five steps; steps 1
+  (the mosaics on the map), 2 (the source frames window), 3 (measuring: lines, surroundings, ΔT), 4 (saved
+  measurements, the emissivity correction) and 5 (the frame page) done 2026-11-01. Done.
+- **The mosaic viewer's image controls** (the user, 2026-10-31, from a screenshot of dji-thermal-ui's viewer panel:
+  "How much of this can be built into the mosaic/harmonized/source frame viewers?"; details under "Done: The
+  mosaic viewer's image controls" below): the frame pixel under the cursor, brightness, contrast, gamma,
+  sharpening, Linear/Equalized, an isotherm, and a click keeping the readout with "Follow the cursor". Done
+  (2026-11-01), in four steps.
+- **Documentation** (the user, 2026-10-31, from `new.md`; details under "Done: Documentation" below): the docs
+  hosted from this GitHub repo, with quickstart tutorials and screenshots, kept current with every feature change.
+  Done; GitHub Pages is turned on by the user once the repo is public.
+- **UX review** (the user, 2026-10-31, from `new.md`: "how would you make this ui more intuitive?"; details under
+  "Done: UX review" below): a review of every page and control the plugin adds, proposals for the user to choose
+  from, then the chosen ones built. Done: the review, all 13 proposals in six steps, and a bug it found.
+- **Picture viewer in the Files view** (the user, 2026-10-31, from `new.md`; details under "Done: Picture
+  viewer" below): clicking the picture in the Files view's detail pane opens it in a window on the page, with a
+  close button and basic controls, instead of a new tab. Done.
+- **Linux, Windows and macOS** (the user, 2026-10-31, from `new.md`; details under "Done: Linux, Windows and
+  macOS" below): the plugin works on every way WebODM is installed: Docker on all three systems (the macOS
+  installer runs Docker), and the native Windows installer, checked end to end there. Done.
+- **Thermal Inspector** (the user, 2026-10-30): the earlier Pixel Inspector ported as a control on WebODM's 2D map,
+  for thermal orthophotos, with the palette and unit shared with the Analyzer; in five steps (details under
+  "Up next: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0. Steps 2–5
+  and 3b done (the last, isotherms and the legend, 2026-10-31), and dji-thermal-cli 1.10.0 pinned with the fallback
+  to its internal tables dropped (2026-10-31, `pin-cli-1.10.0`). Done.
 - **Release 1.0.0** — 2026-10-30, `release/1.0.0` (details below).
 - **Thermal Analyzer, part 1** — 2026-10-29, in four steps (`analyzer-datasets`, `analyzer-conversions`,
   `analyzer-mosaics`, `analyzer-task`; details under "1. Thermal Analyzer, part 1" below).
