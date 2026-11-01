@@ -1939,6 +1939,16 @@ describe("the mosaic viewer", () => {
         expect(viewer.gradientCss(INFERNO)).toMatch(/^linear-gradient\(to right, rgb\(0,0,255\), /);
     });
 
+    it("says the colour scale's own lowest and highest values at its ends, and round values between that don't crowd them", () => {
+        const scale = require("../scale.js");
+        const marks = (lo, hi) => scale.rangeTicks(lo, hi, 5).map(t => [t.label, Math.round(t.at * 100)]);
+        // The request's example: 55 to 105 °F
+        expect(marks(55, 105)).toEqual([["55", 0], ["70", 30], ["80", 50], ["90", 70], ["105", 100]]);
+        expect(marks(12.34, 40.06)).toEqual([["12.3", 0], ["20", 28], ["25", 46], ["30", 64], ["35", 82], ["40.1", 100]]);
+        expect(marks(0, 1).map(m => m[0])).toEqual(["0.0", "0.2", "0.4", "0.6", "0.8", "1.0"]);
+        expect(scale.rangeTicks(3, 3, 5)).toEqual([]);
+    });
+
     it("says when the frames were flown", () => {
         expect(viewer.takenText(["2026:10:12 18:29:50", "2026:10:12 18:30:10"])).toBe("2026-10-12 18:29–18:30");
         expect(viewer.takenText(["2026:10:12 18:29:50", "2026:10:13 09:00:00"])).toBe("2026-10-12 18:29 – 2026-10-13 09:00");
@@ -2015,7 +2025,7 @@ describe("the mosaic viewer", () => {
         expect(L.tiles[0].url).toContain("color_map=dji_ironred");
         expect($("ta-viewer-palette").value).toBe("dji_ironred");
         // 12.3 to 40.1 °C is 54.2 to 104.2 °F
-        expect([...$("ta-viewer-scale").querySelectorAll(".ta-tick")].map(t => t.textContent)).toEqual(["60", "70", "80", "90", "100"]);
+        expect([...$("ta-viewer-scale").querySelectorAll(".ta-tick")].map(t => t.textContent)).toEqual(["54.2", "70", "80", "90", "104.2"]);
 
         // Harmonized shares the palette and range of the temperatures
         click($("ta-viewer-tabs").querySelector('[data-tab="harmonized"]'));

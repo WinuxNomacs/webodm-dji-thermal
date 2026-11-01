@@ -34,6 +34,7 @@
     var Scale = root.ThermalScale || (typeof require !== "undefined" ? require("./scale.js") : null);
     var Frames = root.ThermalFrames || (typeof require !== "undefined" ? require("./frames.js") : null);
     var META = root.Symbol ? root.Symbol["for"]("meta") : "meta";      // where WebODM's map keeps a layer's metadata
+    var TILE_META = root.Symbol ? root.Symbol["for"]("tile-meta") : "tile-meta";   // and its tiles' (their statistics)
     // A thermal layer's tiles: WebODM's, or the plugin's in one of DJI's palettes
     var TILE_URL = /\/api\/(?:plugins\/dji-thermal\/)?projects\/(\d+)\/tasks\/([^/]+)\/(?:orthophoto|inspector)\/tiles\//;
     var WEBODM_TILES = /\/api\/projects\/(\d+\/tasks\/[^/]+)\/orthophoto\/tiles\//;
@@ -187,11 +188,14 @@
         return hi > lo ? [lo, hi] : [lo, lo + 1];
     }
 
-    // What a mosaic laid on the map draws: {project, dataset, workset, tab, unit, built_at, key, range (its unit), name}
+    // What a mosaic laid on the map draws: {project, dataset, workset, tab, unit, built_at, key, range (its unit),
+    // extent (its lowest and highest temperatures, its unit; or null), name}
     function laidMosaic(project, m, tab, palette, display) {
         var t = (m.tabs || []).filter(function (x) { return x.tab === tab; })[0] || m.tabs[0];
+        var s = t.stats || {};
         return {project: String(project), dataset: m.dataset.id, workset: m.workset.id, tab: t.tab, unit: m.unit || "C",
                 built_at: m.built_at || "", key: paletteKey(m, palette, display), range: mosaicRange(t),
+                extent: typeof s.min === "number" && typeof s.max === "number" ? [s.min, s.max] : null,
                 name: m.dataset.name + " › " + m.workset.name, bounds: t.bounds, maxzoom: t.maxzoom};
     }
 
@@ -228,6 +232,14 @@
         if (!t) return null;
         if (t.mosaic) return t.mosaic.range.map(function (v) { return toCelsius(v, t.mosaic.unit); });
         return rangeOf(t.layer._url);
+    }
+    // A thermal layer's lowest and highest temperatures (°C): a mosaic's, or what WebODM's tiles say of the orthophoto;
+    // null when unknown
+    function layerExtent(t) {
+        if (!t) return null;
+        if (t.mosaic) return t.mosaic.extent ? t.mosaic.extent.map(function (v) { return toCelsius(v, t.mosaic.unit); }) : null;
+        var s = t.layer[TILE_META] && t.layer[TILE_META].statistics && t.layer[TILE_META].statistics["1"];
+        return s && typeof s.min === "number" && typeof s.max === "number" ? [s.min, s.max] : null;
     }
     function layerPalette(t) { return !t ? "" : t.mosaic ? keyPalette(t.mosaic.key) : paletteOf(t.layer._url); }
 
@@ -407,16 +419,18 @@
             "The temperatures shown change; the map's colours don't.</div>";
     }
 
-    // The legend: the palette's colours (encoded, as the palette API gives them) over the range (°C), marked in the
-    // user's unit, with the part an isotherm paints; with a correction (fix), the marks are of corrected temperatures
-    // where the layer's own values are drawn, and the isotherm's limits corrected ones too
-    function legendHtml(colors, range, label, unit, iso, fix) {
+    // The legend: the palette's colours (encoded, as the palette API gives them) over the range (°C), its ends marked
+    // with their values and round values between, in the user's unit, with the part an isotherm paints; with a
+    // correction (fix), the marks are of corrected temperatures where the layer's own values are drawn, and the
+    // isotherm's limits corrected ones too. extent, the image's lowest and highest temperatures (°C), is said under the
+    // bar when it reaches beyond the range
+    function legendHtml(colors, range, label, unit, iso, fix, extent) {
         if (!colors || !colors.length || !range) return "";
         unit = unit || userUnit();
         var lo = shownTemp(corrected(range[0], fix), unit), hi = shownTemp(corrected(range[1], fix), unit);
         var at = function (celsius) { return (uncorrected(celsius, fix) - range[0]) / (range[1] - range[0]); };
-        var ticks = Scale.scaleTicks(lo, hi, 4).map(function (t) {
-            var where = fix ? at(typedTemp(t.value, unit)) : t.at;
+        var ticks = Scale.rangeTicks(lo, hi, 4).map(function (t) {
+            var where = fix && !t.end ? at(typedTemp(t.value, unit)) : t.at;
             var end = where < 0.1 ? " dt-tick-start" : where > 0.9 ? " dt-tick-end" : "";
             return '<span class="dt-tick' + end + '" style="left: ' + (where * 100).toFixed(1) + '%;">' + escapeHtml(t.label) + "</span>";
         }).join("");
@@ -433,7 +447,17 @@
         }
         return '<div class="dt-legend-title">' + escapeHtml(label) + ' <span class="text-muted">°' + unit + "</span></div>" +
             '<div class="dt-legend-bar" style="background: ' + Scale.gradientCss(colors) + ';">' + mark + "</div>" +
-            '<div class="dt-legend-ticks">' + ticks + "</div>";
+            '<div class="dt-legend-ticks">' + ticks + "</div>" + extentHtml(range, unit, fix, extent);
+    }
+
+    // The image's lowest and highest temperatures, when either lies outside the legend's range (as shown, to a tenth)
+    function extentHtml(range, unit, fix, extent) {
+        if (!extent) return "";
+        var tenth = function (c) { return Math.round(shownTemp(corrected(c, fix), unit) * 10) / 10; };
+        var low = tenth(extent[0]), high = tenth(extent[1]);
+        if (low >= tenth(range[0]) && high <= tenth(range[1])) return "";
+        return '<div class="dt-legend-extent text-muted" title="The colours stop at the ends of the scale: colder and hotter parts take its end colours">Image: ' +
+            escapeHtml(String(low)) + "–" + escapeHtml(String(high)) + " °" + unit + "</div>";
     }
 
     // Pins: {id, label, lat, lng, temperature (°C) or null, reason}, remembered in the browser for the same tasks;
@@ -809,6 +833,61 @@
                                function () { return {ok: res.ok, data: {}}; });
     }
 
+    // A box (the panel, the legend) dragged over the map: moved by an offset (a CSS translate) that keeps it inside
+    // area (the map's element); grabs(target) says whether a press there starts a drag (not on a link or a field);
+    // moved(offset) follows each move. The box grabbed last is drawn over the map's other controls (its Leaflet corner
+    // raised) until it is back in its place. reset puts it back
+    function movable(box, area, grabs, moved, doc) {
+        var offset = {x: 0, y: 0}, drag = null;
+        doc = doc || box.ownerDocument;
+        function corner() { return box.closest(".leaflet-top, .leaflet-bottom") || box; }
+        function set(x, y) {
+            offset = {x: x, y: y};
+            box.style.transform = x || y ? "translate(" + x + "px, " + y + "px)" : "";
+            if (!x && !y) corner().style.zIndex = "";
+            if (moved) moved(offset);
+        }
+        function place(x, y) {
+            var r = box.getBoundingClientRect(), a = area.getBoundingClientRect();
+            var left = r.left - offset.x, top = r.top - offset.y;       // where it is unmoved
+            // Inside the area; a box wider or taller than the area keeps its left or top edge in it
+            x = Math.max(a.left - left, Math.min(x, a.right - (left + r.width)));
+            y = Math.max(a.top - top, Math.min(y, a.bottom - (top + r.height)));
+            set(Math.round(x) || 0, Math.round(y) || 0);
+        }
+        function onMove(e) {
+            if (!drag) return;
+            e.preventDefault();
+            place(drag.x + e.clientX - drag.startX, drag.y + e.clientY - drag.startY);
+        }
+        function onUp() {
+            drag = null;
+            box.classList.remove("dt-moving");
+            doc.removeEventListener("pointermove", onMove);
+            doc.removeEventListener("pointerup", onUp);
+            doc.removeEventListener("pointercancel", onUp);
+        }
+        box.addEventListener("pointerdown", function (e) {
+            if ((e.button && e.button !== 0) || !grabs(e.target)) return;
+            e.preventDefault();
+            e.stopPropagation();        // not the map's own dragging
+            drag = {x: offset.x, y: offset.y, startX: e.clientX, startY: e.clientY};
+            corner().style.zIndex = String(++movedOnTop);
+            box.classList.add("dt-moving");
+            doc.addEventListener("pointermove", onMove);
+            doc.addEventListener("pointerup", onUp);
+            doc.addEventListener("pointercancel", onUp);
+        });
+        return {
+            reset: function () { onUp(); set(0, 0); },
+            keep: function () { if (offset.x || offset.y) place(offset.x, offset.y); },     // after the area or the box changed size
+            offset: function () { return offset; }
+        };
+    }
+    var movedOnTop = 1000;      // Leaflet's corners are at 1000: the box grabbed last goes over them
+    var FIELDS = "a, button, input, select, textarea, label";      // a press on these is theirs, not a drag
+    var FRAMES_WIDTH = 300, FRAMES_GAP = 8;                         // the source frames window beside the panel (px)
+
     // The control on a map: args as WebODM's willAddControls gives them ({map, tiles}); deps for tests ({fetch,
     // storage, doc, pluginsApi, save})
     function create(args, L, deps) {
@@ -829,7 +908,7 @@
                      savedShown: null, form: null, savable: {}};
         var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
         var search = deps.search !== undefined ? deps.search : root.location && root.location.search;
-        var container, panel, frameBox, cursor, pinLayer, regionLayer, savedLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
+        var container, panel, frameBox, panelMove, legendMove, cursor, pinLayer, regionLayer, savedLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
         var profileMarker = null, profileAt = null;     // the point of the profile hovered, on the map
         var pickSeq = 0;                    // the frames asked for last
         var overlays = [], colors = {};     // the isotherm's layer over each thermal layer; each palette's colours
@@ -847,6 +926,7 @@
             // Within the map, above its bottom controls
             var room = map.getContainer().clientHeight - container.offsetTop - 60;
             if (room > 0) panel.style.maxHeight = Math.max(160, room) + "px";
+            panelMove.keep();       // moved, and now taller: still inside the map
         }
 
         function legendShown() {
@@ -997,8 +1077,9 @@
             }
             if (!colors[name]) { legend.hidden = true; return; }
             var label = ((state.display && state.display.palettes) || []).indexOf(name) !== -1 ? "DJI " + name : name;
-            legend.innerHTML = legendHtml(colors[name], range, label, userUnit(), state.isotherm, fixFor(t));
+            legend.innerHTML = legendHtml(colors[name], range, label, userUnit(), state.isotherm, fixFor(t), layerExtent(t));
             legend.hidden = false;
+            legendMove.keep();
         }
 
         function isothermChanged(iso) {
@@ -1373,6 +1454,7 @@
             var pick = state.pick, f = pick.frames[pick.at];
             frameBox.hidden = false;
             frameBox.innerHTML = Frames.pipHtml(pick, frameImageUrl(pick));
+            placeFrames(panelMove.offset());
             if (pick.error) frameBox.querySelector(".ta-message").textContent = pick.error;
             pickLayer.clearLayers();
             L.circleMarker(pick.latlng, {radius: 6, color: "#000", weight: 1, fillColor: "#fff", fillOpacity: 1, interactive: false}).addTo(pickLayer);
@@ -1387,6 +1469,14 @@
             var img = state.pick && frameBox.querySelector("img");
             var url = img && frameImageUrl(state.pick);
             if (url && img.getAttribute("src") !== url) img.setAttribute("src", url);
+        }
+
+        // The source frames window moves with the panel, beside it: on its left, or on its right when only that has room
+        function placeFrames(offset) {
+            frameBox.style.transform = panel.style.transform;
+            var a = map.getContainer().getBoundingClientRect(), p = panel.getBoundingClientRect();
+            var room = (frameBox.offsetWidth || FRAMES_WIDTH) + FRAMES_GAP;
+            frameBox.classList.toggle("dt-inspector-frames-right", !!(offset.x || offset.y) && p.left - a.left < room && a.right - p.right >= room);
         }
 
         function closeFrames() {
@@ -1673,6 +1763,7 @@
             if (what === "palette") choosePalette(e.target.value);
             else if (what === "legend") {
                 state.legendVisible = e.target.checked;
+                if (!state.legendVisible) legendMove.reset();
                 try { storage.setItem(LEGEND_KEY, state.legendVisible ? "1" : "0"); } catch (err) { /* this page only */ }
                 renderLegend();
             } else if (what.indexOf("isotherm-") === 0) isothermInput(what.slice("isotherm-".length), e.target.value);
@@ -1692,6 +1783,7 @@
 
         function close() {
             closeFrames();
+            panelMove.reset();
             onProfileOut();
             setMode("hover");
             state.open = false;
@@ -1719,6 +1811,10 @@
                 }, true);
                 L.DomEvent.disableClickPropagation(container);
                 L.DomEvent.disableScrollPropagation(container);
+                // The panel is dragged by its heading, the frames window with it
+                panelMove = movable(panel, map.getContainer(), function (t) {
+                    return !!t.closest(".dt-inspector-head") && !t.closest(FIELDS);
+                }, placeFrames, doc);
                 // Over the panel the cursor is not over the map
                 container.addEventListener("mousemove", function (e) { e.stopPropagation(); onOut(); });
                 container.querySelector(".dt-inspector-button").addEventListener("click", function () { if (state.open) close(); else open(); });
@@ -1748,6 +1844,7 @@
                 legend.hidden = true;
                 L.DomEvent.disableClickPropagation(legend);
                 L.DomEvent.disableScrollPropagation(legend);
+                legendMove = movable(legend, map.getContainer(), function (t) { return !t.closest(FIELDS); }, null, doc);
                 return legend;
             }
         });
@@ -1761,6 +1858,7 @@
         drawPins();
         drawRegions();
         loadSources();
+        map.on("resize", function () { panelMove.keep(); legendMove.keep(); });
         map.on("mousemove", onMove);
         map.on("mouseout", onOut);
         map.on("layeradd", onLayerAdd);
@@ -1828,7 +1926,7 @@
                framesSource: framesSource, fromCelsius: fromCelsius, corrected: corrected, uncorrected: uncorrected,
                rawIsotherm: rawIsotherm, correctionHtml: correctionHtml, loadCorrection: loadCorrection, correctionKey: correctionKey,
                savedHtml: savedHtml, savedCsv: savedCsv, savedGeoJson: savedGeoJson, formHtml: formHtml, pinsHtml: pinsHtml,
-               mosaicsHtml: mosaicsHtml, toCelsius: toCelsius, create: create};
+               mosaicsHtml: mosaicsHtml, toCelsius: toCelsius, movable: movable, create: create};
     root.ThermalInspector = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

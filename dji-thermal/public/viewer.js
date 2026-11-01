@@ -8,7 +8,7 @@
     var scale = root.ThermalScale || (typeof require !== "undefined" ? require("./scale") : null);
     var Frames = root.ThermalFrames || (typeof require !== "undefined" ? require("./frames") : null);
     var pipHtml = Frames.pipHtml;
-    var gradientCss = scale.gradientCss, scaleTicks = scale.scaleTicks;
+    var gradientCss = scale.gradientCss, scaleTicks = scale.scaleTicks, rangeTicks = scale.rangeTicks;
     var esc = function (t) { return core.escapeHtml(t); };
     var POLL_MS = 2000;
     var HOVER_MS = 120;         // the readout asks for the point the cursor rests on, not every point it crosses
@@ -141,10 +141,10 @@
     }
 
     // A colour scale: the palette's gradient (along shares: how the image is drawn) over the range shown ([lo, hi]),
-    // marked with round values
+    // marked with its ends' values and round values between them
     function legendHtml(encoded, shown, shares) {
         if (!encoded) return "";
-        var ticks = scaleTicks(shown[0], shown[1], 5).map(function (t) {
+        var ticks = rangeTicks(shown[0], shown[1], 5).map(function (t) {
             var end = t.at < 0.1 ? " ta-tick-start" : t.at > 0.9 ? " ta-tick-end" : "";
             return '<span class="ta-tick' + end + '" style="left: ' + (t.at * 100).toFixed(1) + '%;">' + esc(t.label) + "</span>";
         }).join("");

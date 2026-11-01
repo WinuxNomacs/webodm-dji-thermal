@@ -48,9 +48,16 @@ the next time you open the same task; to share one, save it (section 6).
 
 - **Palette**: the thermal layer's colours, from the same list as the Thermal Analyzer's. It's your palette
   everywhere: choosing one here also sets it in the Analyzer. The range is set in WebODM's own layer panel.
-- **Legend on the map**: a colour bar with the palette's range, at the map's top left.
+- **Legend on the map**: a colour bar with the palette's range, at the map's top left. Its two ends say the range's
+  lowest and highest temperatures, with round values between them. If the image itself goes colder or hotter than
+  that range (when it was narrowed in WebODM's layer panel), a line under the bar says how far: "Image: -42.5–56.6
+  °C". Those parts take the colours of the bar's ends.
 - **Isotherm**: paints the temperatures above, below or between limits you type, in a colour you choose. The
   legend marks the part painted. **Off** removes it.
+
+The panel and the legend can be moved out of the way: drag the panel by its heading (the frames window comes along,
+beside it), or the legend by any part. Both stay inside the map. Closing the panel, hiding the legend or reloading
+the page puts them back where they started.
 
 Temperatures are shown in WebODM's units: °F when its map is set to Imperial, °C otherwise. See
 [Palettes and units](palettes.md).

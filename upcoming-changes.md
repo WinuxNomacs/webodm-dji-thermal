@@ -270,6 +270,52 @@
   (the mosaics on the map), 2 (the source frames window), 3 (measuring: lines, surroundings, ΔT) and 4 (saved
   measurements, the emissivity correction) done 2026-11-01; step 5 (the frame page) is next.
 
+- **The Thermal Inspector's panel and legend: movable, the legend's ends labelled** (the user, 2026-11-01, from
+  `new.md`):
+  - The request: "Thermal Inspector should always open in the same location but the form should be draggable to
+    move around within the webodm viewer allowing for it to be moved out of the way. Same for the thermal
+    palette/scale control." And: "The temperature palette/scale ui control needs to show the minimum/maximum
+    temperatures at their respective ranges of the scale. Example: an image has a temperature range of 55F-105F,
+    I expect the beginning of the scale to say 55 and the end of the scale to say 105, with in between values along
+    the gradient."
+  - What it builds on: on WebODM's map, the Inspector's panel (`.dt-inspector-panel`) opens left of its toolbar
+    button, top right, in the same Leaflet control as the source frames window (`.dt-inspector-frames`, left of the
+    panel). The legend (`.dt-legend`) is its own control, top left, shown by the panel's "Legend" tickbox. Nothing
+    in the plugin is dragged today.
+  - The legend today (`inspector.js` `legendHtml`; the mosaic viewer's own, `viewer.js` `legendHtml`) marks only
+    round values inside the range (`scale.js` `scaleTicks`), so its ends are unlabelled unless the range starts or
+    ends on a round value. Its range is the layer's colour range: a WebODM orthophoto's `rescale` (what WebODM's
+    layer settings chose, by default from the orthophoto's statistics, not always its own lowest and highest
+    temperatures); a mosaic's, the range of its palette.
+  - Proposed: one step, `inspector-move`. The panel dragged by its heading, the legend by any part of it, both
+    kept inside the map. The ends of both legends labelled with the range's own values, with round values between
+    them (one that would crowd an end left out).
+  - Decided (the user, 2026-11-01):
+    - It comes **before Part 2's step 5**.
+    - **The legend's ends show the colour range's own values**, with round values between them. When the image's
+      own lowest or highest temperature lies outside that range, a line under the bar gives them ("Image: 41–118
+      °F").
+    - **A moved panel or legend goes back to its place** when the panel is closed and opened again, the legend
+      hidden and shown again, or the page reloaded; nothing is remembered.
+    - **The source frames window moves with the panel**, beside it, on the other side when there is no room.
+  - Done (2026-11-01), `inspector-move`:
+    - `scale.js` `rangeTicks`: the ends with the range's own values (to the round values' decimals, a tenth when
+      that would round them), round values between that are more than 18% of the bar from an end; used by both
+      legends (`inspector.js` `legendHtml`, `viewer.js` `legendHtml`).
+    - `inspector.js`: `layerExtent` (WebODM's tile metadata's statistics for an orthophoto, the tab's stats for a
+      mosaic: `laidMosaic`'s `extent`) and `extentHtml` ("Image: low–high", corrected with the correction).
+      `movable` (pointer events, a CSS translate kept inside the map, re-fitted after a redraw or the map's
+      resize; the box grabbed last raises its Leaflet corner over WebODM's other controls); the panel by its
+      heading (not its links), the legend anywhere; `placeFrames` moves the frames window with the panel and puts
+      it on the panel's right when only that side has room. Reset on close, on the legend's tickbox, on reload.
+    - Tests: Jest 185 (`rangeTicks`, the image line, `movable`, the panel with the frames window, the legend; four
+      tests' expected ticks updated). Mutation checks (no reset on close, the frames not following, no end
+      labels) fail them. Live (read only, no writes, no console errors): both dragged inside the map without
+      panning it, the frames window flipped right at the map's left edge, both back after close/hide; legends
+      "9.9 20 30 40 51.5 / Image: -42.5–56.6 °C", the mosaic viewer "9.5 20 30 40 51.9". README, quickstart
+      section 3; screenshots retaken: `inspector`, `inspector-line`, `inspector-saved`, `inspector-frames`,
+      `inspector-mosaics`, `mosaic-viewer`, `mosaic-frames`.
+
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
   (CHANGELOG, README, the zip rebuilt by `dev/package.sh` on the merge, its new sha256, the `release-check` skill);

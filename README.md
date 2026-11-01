@@ -154,7 +154,7 @@ over WebODM's base layers:
 - a tab for each mosaic (**Mosaic**, as converted, and **Harmonized**), **Source frame** (the mosaic with a black and
   white line where one frame meets the next) and **View angle** (the angle each pixel was seen at);
 - the palette (the usual ones and the DJI palettes of the images; opening in your preferred one, if they hold it) and the
-  range, changed live, with the colour scale
+  range, changed live, with the colour scale (its ends marked with the range's own values)
   and **Auto** (the 2nd to 98th percentile);
 - how the image is drawn (**Image**): **Brightness** and **Contrast** (which move and narrow the range), **Gamma**,
   **Sharpening** (an unsharp mask), **Linear** or **Equalized** (the colours spread over the temperatures the whole
@@ -264,9 +264,14 @@ Inspector:
   Analyzer's preference, saved when you choose one here or in WebODM's own layer panel, and the one the map opens
   in. WebODM's layer panel lists only its own colour maps; one it has that the Analyzer doesn't is drawn but not
   saved.
-- **Legend**: a colour bar of the thermal layer's palette over its range, marked in your unit, at the map's top
-  left; it follows the palette and range, and "Legend on the map" hides it. With several thermal tasks on the map,
-  it is the topmost one's.
+- **Legend**: a colour bar of the thermal layer's palette over its range, in your unit, at the map's top left: its
+  ends say the range's lowest and highest temperatures, with round values between. When the image's own coldest or
+  hottest temperature lies outside that range (WebODM's layer panel narrowed it), a line under the bar gives them.
+  It follows the palette and range, and "Legend on the map" hides it. With several thermal tasks on the map, it is
+  the topmost one's.
+- **Moving them**: drag the panel by its heading, or the legend by any part, to move it out of the way; both stay
+  inside the map, and the frames window moves with the panel. Closing the panel, hiding the legend or reloading the
+  page puts them back in their places.
 - **Isotherm**: paints the temperatures above, below or between limits (typed in your unit) in a colour of six,
   over each thermal layer, hidden with it, within the task's crop; the legend marks the part painted. Kept in your
   browser for the same tasks; Off removes it.
