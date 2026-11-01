@@ -1,5 +1,5 @@
-"""The Thermal Inspector's API: a task's thermal orthophoto read at a point and over a region, drawn in DJI's palettes
-and as isotherms (see inspector.py), a palette's colours for its legend, and the workset mosaics of a project it can
+"""The Thermal Inspector's API: a task's thermal orthophoto read at a point and over a region, drawn in a palette with
+the mosaics' adjustments and as isotherms (see inspector.py), a palette's colours for its legend, and the workset mosaics of a project it can
 lay on the map (their regions and isotherms: analyzer_api, with region_request and isotherm_request)"""
 import math
 import re
@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from app.api.tasks import TaskNestedView
 from app.models import Project
 
-from . import conversion_tasks, conversions, converter, correction, datasets, inspector, measurements, mosaics
+from . import colouring, conversion_tasks, conversions, converter, correction, datasets, inspector, measurements, mosaics
 
 # The mosaics' tabs laid on the map: those of temperatures (View angle stays in the Analyzer's viewer)
 MAP_TABS = ('as_converted', 'harmonized', 'source_frame')
@@ -56,22 +56,48 @@ def png(data):
     return HttpResponse(data, content_type='image/png')
 
 
+def tile_range(request):
+    """A tile's ?rescale=low,high (°C)"""
+    try:
+        low, high = (float(v) for v in (request.query_params.get('rescale') or '0,255').split(','))
+    except ValueError:
+        raise ValidationError({'error': "Invalid rescale"}) from None
+    if not (math.isfinite(low) and math.isfinite(high)) or low == high:
+        raise ValidationError({'error': "Invalid rescale"})
+    return low, high
+
+
+def tile_adjust(request):
+    """A tile's adjustments (?gamma=, ?equalize=1, ?sharpen=: colouring.parse_adjust)"""
+    try:
+        return colouring.parse_adjust(request.query_params)
+    except ValueError as e:
+        raise ValidationError({'error': str(e)}) from None
+
+
 class InspectorTiles(InspectorView):
     def get(self, request, pk=None, project_pk=None, z="", x="", y=""):
-        """A tile of the thermal orthophoto in one of DJI's palettes (?palette=), with the parameters of WebODM's
-        tiles the map keeps: rescale (°C), size (256 or 512) and crop"""
+        """A tile of the thermal orthophoto in a palette (?palette=: one of DJI's or of WebODM's colour maps), with the
+        parameters of WebODM's tiles the map keeps (rescale (°C), size (256 or 512) and crop) and the adjustments the
+        mosaics are drawn with (gamma, equalize, sharpen)"""
         task = self.thermal_task(request, pk)
-        lut = converter.palette_luts().get(request.query_params.get('palette') or '')
-        if lut is None:
-            raise ValidationError({'error': "Not one of DJI's palettes"})
-        try:
-            low, high = (float(v) for v in (request.query_params.get('rescale') or '0,255').split(','))
-        except ValueError:
-            raise ValidationError({'error': "Invalid rescale"}) from None
-        if not (math.isfinite(low) and math.isfinite(high)) or low == high:
-            raise ValidationError({'error': "Invalid rescale"})
+        colors = palette_colors(request.query_params.get('palette') or '')
+        if colors is None:
+            raise ValidationError({'error': "Not a palette"})
+        low, high = tile_range(request)
         size, crop = tile_params(request)
-        return png(inspector.tile(task, int(z), int(x), int(y), lut, low, high, size, crop))
+        return png(inspector.tile(task, int(z), int(x), int(y), colors, low, high, size, crop, tile_adjust(request)))
+
+
+class InspectorCurve(InspectorView):
+    def get(self, request, pk=None, project_pk=None):
+        """The palette's share at values evenly across ?rescale= (°C) as the tiles are drawn with the adjustments (the
+        equalization from the orthophoto's histogram), for the legend: {shares}"""
+        task = self.thermal_task(request, pk)
+        low, high = tile_range(request)
+        adjust = tile_adjust(request)
+        curve = colouring.equalization(inspector.histogram(task), low, high) if adjust['equalize'] else None
+        return Response({'shares': colouring.curve_shares(low, high, adjust, curve)})
 
 
 def isotherm_request(request):
@@ -105,19 +131,27 @@ class InspectorIsotherm(InspectorView):
         return png(inspector.isotherm(task, int(z), int(x), int(y), low, high, rgb, size, crop))
 
 
-def palette_response(name):
-    """The colours of name (one of DJI's palettes or of WebODM's colour maps) for the legend: {name, color_map},
-    encoded as WebODM's tiler gives colour maps (0xRRGGBBAA)"""
+def palette_colors(name):
+    """The colours of name (one of DJI's palettes or of WebODM's colour maps), encoded as WebODM's tiler gives colour
+    maps (0xRRGGBBAA); None when it is neither"""
     lut = converter.palette_luts().get(name)
     if lut is not None:
-        return Response({'name': name, 'color_map': mosaics.encoded(lut)})
+        return mosaics.encoded(lut)
     from app.api.tiler import get_colormap_encoded_values
+    if not re.fullmatch(r'[a-z0-9_]+', name):
+        return None
     try:
-        if not re.fullmatch(r'[a-z0-9_]+', name):
-            raise ValueError(name)
-        return Response({'name': name, 'color_map': get_colormap_encoded_values(name)})
+        return get_colormap_encoded_values(name)
     except Exception:  # noqa: BLE001 - rio-tiler refuses a name it doesn't have
-        raise NotFound({'error': "Not a palette"}) from None
+        return None
+
+
+def palette_response(name):
+    """The colours of name for the legend: {name, color_map} (palette_colors)"""
+    colors = palette_colors(name)
+    if colors is None:
+        raise NotFound({'error': "Not a palette"})
+    return Response({'name': name, 'color_map': colors})
 
 
 class InspectorPalette(InspectorView):

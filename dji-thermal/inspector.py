@@ -14,6 +14,7 @@ REGION_MAX_SIZE = 4096        # pixels along the longer side; a larger region is
 PERCENTILES = (2, 98)
 HISTOGRAM_BINS = 64
 MAX_HISTOGRAM_BINS = 255
+HISTOGRAM_FILE = 'histogram.json'     # the orthophoto's histogram, in the task's thermal folder, for the equalization
 # dji-thermal-cli's no-data marker: absolute zero, in each unit (a mosaic's pixels at or below it hold none)
 ABSOLUTE_ZERO = {'C': -273.15, 'F': -459.67, 'K': 0.0}
 # As dji-thermal-ui measures: a line's strip either side of it, a region's surroundings (m), a profile's samples
@@ -264,17 +265,56 @@ def _profile(line, data, usable, wt, crs, metre, frames=None):
     return out
 
 
-def tile(task, z, x, y, lut, low, high, size=256, crop=False):
+def tile(task, z, x, y, colors, low, high, size=256, crop=False, adjust=None):
     """
     A tile of the thermal orthophoto as WebODM's map draws it (its first band, bilinear, over low..high °C, within the
-    task's crop when crop), in a colour table (256 RGB colours), as PNG bytes; None outside the orthophoto. Where it
-    has no data comes from its alpha band.
+    task's crop when crop), in a palette (encoded colours: colouring's), drawn with the adjustments as a workset's
+    mosaics are (colouring.parse_adjust's; equalized from the whole orthophoto's histogram), as PNG bytes; None outside
+    the orthophoto. Where it has no data comes from its alpha band.
     """
-    data = _raster_tile(thermal_orthophoto(task), z, x, y, size, _crop(task) if crop else None)
-    if data is None:
+    import numpy as np
+
+    from . import colouring, mosaics
+    adjust = adjust or mosaics.NO_ADJUST
+    curve = None
+    if adjust['equalize']:
+        curve = colouring.equalization(histogram(task), low, high)
+    shares = colouring.curve_shares(low, high, adjust, curve) if adjust['equalize'] or adjust['gamma'] != 1.0 else None
+    margin = colouring.MARGIN if adjust['sharpen'] > 0 else 0
+    found = _raster_tile(thermal_orthophoto(task), z, x, y, size, _crop(task) if crop else None, buffer=margin,
+                         pixel=True)
+    if found is None:
         return None
-    cmap = {i: (int(c[0]), int(c[1]), int(c[2]), 255) for i, c in enumerate(lut)}
-    return data.post_process(in_range=((low, high),)).render(img_format='PNG', colormap=cmap)
+    data, pixel = found
+    values = np.asarray(data.data[0], dtype=np.float64)
+    values[~(data.mask > 0)] = np.nan
+    read_z = z - 1 if size == 512 else z
+    drawn = mosaics.tile_pixel_m(read_z, y) * mosaics.TILE_SIZE / size
+    rgba = colouring.colour(values, colors, (low, high), shares, adjust['sharpen'],
+                            sigma=colouring.sharpen_sigma(pixel, drawn), margin=margin)
+    return mosaics.png(rgba)
+
+
+def histogram(task):
+    """The thermal orthophoto's histogram (colouring.value_histogram), for the equalization: read once, at most
+    REGION_MAX_SIZE pixels a side, and kept in the task's thermal folder"""
+    from . import colouring, datasets
+    return colouring.kept_histogram(thermal_orthophoto(task), _overview_values, datasets.data_path(task, HISTOGRAM_FILE))
+
+
+def _overview_values(raster):
+    """A raster's first band, NaN where it has no data, read at most REGION_MAX_SIZE pixels a side"""
+    import numpy as np
+    import rasterio
+    from rasterio.windows import Window
+
+    with rasterio.open(raster) as src:
+        scale = max(1.0, max(src.width, src.height) / REGION_MAX_SIZE)
+        shape = (max(1, int(src.height / scale)), max(1, int(src.width / scale)))
+        window = Window(0, 0, src.width, src.height)
+        values = src.read(1, out_shape=shape).astype(np.float64)
+        values[~_valid(src, window, shape)] = np.nan
+    return values
 
 
 def isotherm(task, z, x, y, low, high, rgb, size=256, crop=False):
@@ -312,9 +352,10 @@ def raster_isotherm(raster, z, x, y, low, high, rgb, size=256, crop=None, unit=N
     return buf.getvalue()
 
 
-def _raster_tile(raster, z, x, y, size, crop=None, resampling='bilinear'):
+def _raster_tile(raster, z, x, y, size, crop=None, resampling='bilinear', buffer=0, pixel=False):
     """A tile of a raster's first band as WebODM's map reads the thermal orthophoto (rio-tiler's ImageData), within crop
-    (a GEOS geometry) when given; None outside it"""
+    (a GEOS geometry) when given, with buffer more pixels on each side; with pixel, (it, the raster's pixel width in
+    metres); None outside it"""
     from rio_tiler.errors import TileOutsideBounds
     from rio_tiler.io import COGReader
 
@@ -335,9 +376,15 @@ def _raster_tile(raster, z, x, y, size, crop=None, resampling='bilinear'):
             cutline, _bounds = geom_transform_wkt_bbox(crop, src.dataset)
             vrt_options = {'cutline': cutline}
         try:
-            return src.tile(x, y, z, indexes=(1,), tilesize=size, resampling_method=resampling, vrt_options=vrt_options)
+            data = src.tile(x, y, z, indexes=(1,), tilesize=size, resampling_method=resampling, vrt_options=vrt_options,
+                            tile_buffer=buffer or None)
         except TileOutsideBounds:
             return None
+        if not pixel:
+            return data
+        crs = src.dataset.crs
+        metre = crs.linear_units_factor[1] if crs.is_projected else DEGREE_M
+        return data, abs(src.dataset.res[0]) * metre
 
 
 def _valid(src, window, out_shape=None):

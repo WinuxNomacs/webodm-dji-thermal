@@ -382,8 +382,9 @@ class TestInspector(BootTestCase):
         res, (x, y) = self.tile(70, 40, palette='whitehot', rescale='0,200')
         self.assertEqual(np.array(Image.open(io.BytesIO(res.content)).convert('RGBA'))[y, x, 3], 255)
 
-    def test_a_tile_needs_a_dji_palette_and_a_range_on_the_orthophoto(self):
-        self.assertEqual(self.tile(50, 40, palette='magma')[0].status_code, status.HTTP_400_BAD_REQUEST)
+    def test_a_tile_needs_a_palette_and_a_range_on_the_orthophoto(self):
+        self.assertEqual(self.tile(50, 40, palette='nope')[0].status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.tile(50, 40, palette='../magma')[0].status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.tile(50, 40, palette='whitehot', rescale='10')[0].status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.tile(50, 40, palette='whitehot', rescale='5,5')[0].status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.tile(50, 40, palette='whitehot', size=300)[0].status_code, status.HTTP_400_BAD_REQUEST)
@@ -391,6 +392,49 @@ class TestInspector(BootTestCase):
         self.assertEqual(far.status_code, status.HTTP_404_NOT_FOUND)
         rgb = self.thermal_task(bands=('red', 'green'))
         self.assertEqual(self.tile(50, 40, task=rgb, palette='whitehot')[0].status_code, status.HTTP_404_NOT_FOUND)
+
+    def pixel(self, col, row, **params):
+        """A tile's colour at a pixel's centre (RGBA)"""
+        res, (x, y) = self.tile(col, row, **params)
+        self.assertEqual((res.status_code, res['Content-Type']), (status.HTTP_200_OK, 'image/png'), res.content[:200])
+        return np.array(Image.open(io.BytesIO(res.content)).convert('RGBA'))[y, x].astype(int)
+
+    def test_a_tile_draws_in_webodms_colour_maps_too(self):
+        from app.api.tiler import get_colormap_encoded_values
+        c = get_colormap_encoded_values('magma')[round((50 + 0.25 * 40) / 200 * 255)]
+        np.testing.assert_allclose(self.pixel(50, 40, palette='magma', rescale='0,200')[:3],
+                                   [(c >> 24) & 255, (c >> 16) & 255, (c >> 8) & 255], atol=8)
+
+    def test_a_tile_is_drawn_with_gamma_equalized_or_sharpened_as_the_mosaics_are(self):
+        # (50, 40) is at 60 °C: 30% of 0..200; gamma 2 draws it at its square root
+        self.assertLess(abs(self.pixel(50, 40, palette='whitehot', rescale='0,200', gamma=2)[0] - 0.3 ** 0.5 * 255), 4)
+        # Equalized: at the share of the orthophoto's pixels below it (its alpha band left out), kept in the task's
+        # thermal folder
+        values = temperatures()[:, TRANSPARENT_COLUMNS:]
+        share = float((values < 60).mean())
+        self.assertLess(abs(self.pixel(50, 40, palette='whitehot', rescale='0,200', equalize=1)[0] - share * 255), 8)
+        kept = os.path.join(self.task.task_path(), "thermal", "histogram.json")
+        self.assertTrue(os.path.exists(kept))
+        # Sharpened: the edge of its data stands out (beside it, only hotter pixels: (11, 40) is at 21 °C), and the
+        # middle of a steady slope stays
+        plain = self.pixel(TRANSPARENT_COLUMNS + 1, 40, palette='whitehot', rescale='17,25')[0]
+        self.assertLess(self.pixel(TRANSPARENT_COLUMNS + 1, 40, palette='whitehot', rescale='17,25', sharpen=5)[0], plain - 20)
+        self.assertLess(abs(self.pixel(50, 40, palette='whitehot', rescale='0,200', sharpen=5, size=512)[0] - 0.3 * 255), 4)
+        for params in ({'gamma': 9}, {'gamma': 'x'}, {'equalize': 2}, {'sharpen': -1}):
+            self.assertEqual(self.tile(50, 40, palette='whitehot', **params)[0].status_code, status.HTTP_400_BAD_REQUEST, params)
+
+    def test_the_legends_curve_is_the_tiles(self):
+        res = self.client.get(self.url(self.task, "curve"), {'rescale': '0,200', 'gamma': 2})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        shares = res.data['shares']
+        self.assertEqual((len(shares), shares[0], shares[-1]), (65, 0.0, 1.0))
+        self.assertAlmostEqual(shares[16], 0.25 ** 0.5, places=6)
+        equalized = self.client.get(self.url(self.task, "curve"), {'rescale': '0,200', 'equalize': 1}).data['shares']
+        # Nothing of the orthophoto is above 120 °C: the palette is spent by then
+        self.assertEqual(equalized[39:], [1.0] * 26)
+        self.assertEqual(equalized, sorted(equalized))
+        self.assertEqual(self.client.get(self.url(self.task, "curve"), {'rescale': '0,200', 'gamma': 0}).status_code,
+                         status.HTTP_400_BAD_REQUEST)
 
     def isotherm(self, col, row, **params):
         """The isotherm tile's colour at a pixel's centre (RGBA)"""
