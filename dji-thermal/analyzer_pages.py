@@ -1,7 +1,7 @@
 """
 The DJI Thermal Analyzer's pages, at the root of WebODM's menu for every user: the datasets of the projects they can
-view, a dataset's page, and a conversion's mosaics on a map (with WebODM's base layers). Their content comes from the Analyzer's API (analyzer_api), drawn by the scripts in
-public/.
+view, a dataset's page, a conversion's mosaics on a map (with WebODM's base layers) and its frames one at a time.
+Their content comes from the Analyzer's API (analyzer_api, frames_api), drawn by the scripts in public/.
 """
 
 import hashlib
@@ -58,7 +58,8 @@ def dataset_page(plugin):
     return view
 
 
-def viewer_page(plugin):
+def workset_page(plugin, template):
+    """A page of one of a dataset's worksets (conversions)"""
     @login_required
     def view(request, dataset_id, cid):
         try:
@@ -68,7 +69,15 @@ def viewer_page(plugin):
         record = conversions.record(task, cid)
         if not record:
             raise Http404("No such workset")
-        return render(request, plugin.template_path("viewer.html"), dict(
+        return render(request, plugin.template_path(template), dict(
             common(plugin, request), dataset={'id': str(task.id), 'name': datasets.name_of(task)},
             conversion={'id': cid, 'name': record.get('name') or cid}, basemaps=Basemap.get_cached_basemaps()))
     return view
+
+
+def viewer_page(plugin):
+    return workset_page(plugin, "viewer.html")
+
+
+def frame_page(plugin):
+    return workset_page(plugin, "frame.html")

@@ -1,0 +1,7 @@
+{% extends "app/plugins/templates/base.html" %}
+{% block content %}
+<div id="ta-frame" class="ta-page ta-frame" data-api="{{ api }}" data-public="{{ public }}" data-dataset="{{ dataset.id }}" data-id="{{ conversion.id }}">
+    {% csrf_token %}
+    <div class="ta-breadcrumb"><a href="{{ public }}dataset/{{ dataset.id }}/conversion/{{ conversion.id }}"><i class="fa fa-arrow-left"></i> {{ conversion.name }}</a></div>
+</div>
+{% endblock %}

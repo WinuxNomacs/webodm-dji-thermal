@@ -1,0 +1,215 @@
+"""
+Tests of the Analyzer's frame page API (frames.py, frames_api.py): a workset's frames measured as it converted them or
+with parameters changed, their values, shapes measured in their pixels, downloads and saved measurements.
+
+The flight test reads R-JPEGs from DJI_THERMAL_FLIGHT_DIR and is skipped without it.
+"""
+import contextlib
+import importlib
+import io
+from unittest import mock
+
+import numpy as np
+from django.contrib.auth.models import User
+from guardian.shortcuts import assign_perm
+from rest_framework import status
+
+from .test_analyzer import API, AnalyzerTestCase, flight_frames, jpeg
+from .test_converter import skip_without
+
+conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
+datasets = importlib.import_module("coreplugins.dji-thermal.datasets")
+frames = importlib.import_module("coreplugins.dji-thermal.frames")
+colouring = importlib.import_module("coreplugins.dji-thermal.colouring")
+
+
+def square(x0, y0, x1, y1):
+    return {"type": "Polygon", "coordinates": [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]]}
+
+
+class TestShapesOnAFrame(AnalyzerTestCase):
+    def setUp(self):
+        super().setUp()
+        self.values = np.full((40, 60), 20.0)
+        self.values[10:20, 30:40] = 50.0        # a hot square
+        self.values[0, :] = np.nan
+
+    def test_a_region_measures_the_pixels_it_touches_and_its_surroundings(self):
+        r = frames.region(self.values, square(30, 10, 40, 20), isotherm=(40, None))
+        s = r["statistics"]
+        self.assertTrue(r["valid"])
+        self.assertEqual((s["min"], s["max"], s["mean"]), (50.0, 50.0, 50.0))
+        self.assertEqual(s["count"], 100)
+        self.assertEqual((s["surroundings"], s["delta_t"]), (20.0, 30.0))
+        self.assertEqual(s["isotherm_share"], 1.0)
+        self.assertEqual(s["max_location"], [30.5, 10.5])
+
+    def test_a_pin_is_its_pixels_value_and_a_line_has_a_profile_in_pixels(self):
+        pin = frames.region(self.values, {"type": "Point", "coordinates": [35.2, 15.9]})
+        self.assertEqual((pin["statistics"]["count"], pin["statistics"]["mean"]), (1, 50.0))
+        line = frames.region(self.values, {"type": "LineString", "coordinates": [[5, 15.5], [55, 15.5]]})
+        self.assertEqual(line["length"], 50.0)
+        self.assertEqual(len(line["profile"]["values"]), 51)
+        self.assertEqual(line["profile"]["values"][30], 50.0)
+        self.assertEqual(line["profile"]["values"][0], 20.0)
+        self.assertEqual(line["profile"]["points"][0], [5.0, 15.5])
+
+    def test_shapes_off_the_frame_or_on_no_data_measure_nothing(self):
+        self.assertEqual(frames.region(self.values, square(100, 100, 110, 110))["reason"], "outside_raster")
+        self.assertEqual(frames.region(self.values, {"type": "Point", "coordinates": [3, 0.5]})["reason"], "nodata")
+        with self.assertRaises(frames.FrameError):
+            frames.region(self.values, {"type": "LineString", "coordinates": [[1, 1]]})
+        with self.assertRaises(frames.FrameError):
+            frames.region(self.values, {"type": "MultiPoint", "coordinates": [[1, 1]]})
+
+
+class TestFrameSettings(AnalyzerTestCase):
+    def workset(self, settings, results):
+        task = self.create()
+        self.upload(task, [jpeg("a.jpg")])
+        with mock.patch.object(datasets, "start_job"):
+            cid = conversions.create(task, "Nadir", dict(conversions.DEFAULTS, **settings), self.user)
+        datasets.write_json(conversions.path(task, cid, conversions.RESULTS_FILE), results)
+        return task, cid
+
+    def test_a_harmonized_worksets_frames_take_the_flights_medians_and_lose_their_offset_in_its_unit(self):
+        task, cid = self.workset({"normalize": True, "harmonize": True, "unit": "F", "ambient_temp": 70},
+                                 {"normalization": {"ambient_c": 20.0, "reflected_c": 10.0},
+                                  "files": [{"path": "a.jpg", "ok": True, "offset_c": 0.5}]})
+        s = frames.frame_settings(task, cid)
+        self.assertEqual((s.ambient_temp, s.reflected_temp, s.unit), (70, 50.0, "F"))
+        self.assertEqual(frames.frame_offset(task, cid, "a.jpg"), (0.9, True))
+        self.assertEqual(frames.frame_offset(task, cid, "b.jpg"), (0.0, False))
+        changed = frames.frame_settings(task, cid, {"reflected_temp": 60.0, "emissivity": 0.8})
+        self.assertEqual((changed.reflected_temp, changed.emissivity), (60.0, 0.8))
+
+    def test_a_workset_that_did_not_harmonize_subtracts_nothing(self):
+        task, cid = self.workset({}, {"files": [{"path": "a.jpg", "ok": True, "offset_c": None}]})
+        self.assertEqual(frames.frame_offset(task, cid, "a.jpg"), (0.0, True))
+        self.assertIsNone(frames.frame_settings(task, cid).reflected_temp)
+
+    def test_changes_are_checked_as_the_workset_forms_and_blanks_left_out(self):
+        self.assertEqual(frames.parse_changes({"emissivity": "0.9", "humidity": "", "palette": "x"}),
+                         {"emissivity": 0.9})
+        for bad in ({"emissivity": 5}, {"distance": "lrf"}, {"humidity": "wet"}):
+            with self.assertRaises(frames.FrameError):
+                frames.parse_changes(bad)
+
+
+class TestFramePage(AnalyzerTestCase):
+    def url(self, task, cid, rest):
+        return "{}/{}/conversions/{}/{}".format(API, task.id, cid, rest)
+
+    @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def test_a_flights_frame_is_measured_as_converted_or_with_changes_drawn_measured_downloaded_and_saved(self):
+        import rasterio
+        found = flight_frames(2)
+        task = self.create()
+        with contextlib.ExitStack() as stack:
+            self.upload(task, [stack.enter_context(open(f, "rb")) for f in found])
+        self.client.post("{}/{}/analyze".format(API, task.id))
+        res = self.client.post("{}/{}/conversions".format(API, task.id),
+                               {"name": "Nadir", "settings": {"outputs": ["temp_c:tiff"], "emissivity": 0.95,
+                                                              "mosaics": False}}, format="json")
+        cid = res.data["id"]
+        self.assertEqual(res.data["status"], "ready", res.data["error"])
+
+        page = self.client.get(self.url(task, cid, "frames")).data
+        self.assertEqual(len(page["frames"]), 2)
+        self.assertTrue(all(f["converted"] and f["mosaic"] is None for f in page["frames"]))
+        self.assertEqual((page["unit"], page["built"], page["can_change"]), ("C", False, True))
+        self.assertIn(page["default_palette"], [p["key"] for p in page["palettes"]])
+        rel = page["frames"][0]["path"]
+
+        # As converted: what the workset's own TIFF holds
+        info = self.client.get(self.url(task, cid, "frame"), {"frame": rel}).data
+        self.assertEqual((info["width"], info["height"]), (640, 512))
+        self.assertAlmostEqual(info["params"]["emissivity"], 0.95, places=6)
+        tiff = next(f for f in conversions.results(task, cid)["files"] if f["path"] == rel)["outputs"][0]
+        with rasterio.open(conversions.output_path(task, cid) + "/" + tiff) as src:
+            converted = src.read(1).astype(np.float64)
+        values = frames.measure(task, cid, rel)["values"]
+        np.testing.assert_allclose(values, converted, atol=1e-3)
+        self.assertAlmostEqual(info["stats"]["mean"], float(np.nanmean(converted)), places=3)
+        # Measured again with another emissivity: the SDK measured with it, and a high-emissivity surface reads cooler
+        changed = self.client.get(self.url(task, cid, "frame"), {"frame": rel, "emissivity": "0.7"}).data
+        self.assertAlmostEqual(changed["params"]["emissivity"], 0.7, places=6)
+        self.assertEqual(changed["changes"], {"emissivity": 0.7})
+        self.assertNotAlmostEqual(changed["stats"]["mean"], info["stats"]["mean"], places=1)
+        self.assertEqual(self.client.get(self.url(task, cid, "frame"), {"frame": rel, "emissivity": "5"}).status_code,
+                         status.HTTP_400_BAD_REQUEST)
+        for other in ("../" + rel, "nope.jpg", ""):
+            self.assertEqual(self.client.get(self.url(task, cid, "frame"), {"frame": other}).status_code,
+                             status.HTTP_400_BAD_REQUEST)
+
+        # Its values, as the browser decodes them, and asked again to check them
+        tile = self.client.get(self.url(task, cid, "frame/values"), {"frame": rel})
+        self.assertEqual((tile.status_code, tile["X-Values-Margin"]), (status.HTTP_200_OK, "0"))
+        from PIL import Image
+        rgba = np.asarray(Image.open(io.BytesIO(tile.content)).convert("RGBA")).astype(np.float64)
+        decoded = float(tile["X-Values-Offset"]) + (rgba[..., 0] * 256 + rgba[..., 1]) * float(tile["X-Values-Step"])
+        ok = np.isfinite(values)
+        self.assertLessEqual(np.abs(decoded[ok] - values[ok]).max(), float(tile["X-Values-Step"]))
+        again = self.client.get(self.url(task, cid, "frame/values"), {"frame": rel}, HTTP_IF_NONE_MATCH=tile["ETag"])
+        self.assertEqual(again.status_code, status.HTTP_304_NOT_MODIFIED)
+        changed_tile = self.client.get(self.url(task, cid, "frame/values"), {"frame": rel, "emissivity": "0.7"})
+        self.assertNotEqual(changed_tile["ETag"], tile["ETag"])
+
+        # A rectangle in its pixels, as converted and with the changes
+        region = {"frame": rel, "geometry": square(100, 100, 140, 130)}
+        r = self.client.post(self.url(task, cid, "frame/region"), region, format="json").data
+        self.assertTrue(r["valid"])
+        self.assertAlmostEqual(r["statistics"]["max"], float(np.nanmax(values[100:130, 100:140])), places=5)
+        r2 = self.client.post(self.url(task, cid, "frame/region"), dict(region, changes={"emissivity": 0.7}),
+                              format="json").data
+        self.assertNotAlmostEqual(r2["statistics"]["mean"], r["statistics"]["mean"], places=1)
+
+        # Downloads: CSV and a float TIFF of the same values
+        csv = self.client.get(self.url(task, cid, "frame/download"), {"frame": rel, "kind": "csv"})
+        rows = csv.content.decode().splitlines()
+        self.assertEqual((len(rows), len(rows[0].split(","))), (512, 640))
+        self.assertAlmostEqual(float(rows[5].split(",")[7]), values[5, 7], places=3)
+        tif = self.client.get(self.url(task, cid, "frame/download"), {"frame": rel, "kind": "tiff", "emissivity": "0.7"})
+        self.assertIn("-changed.tif", tif["Content-Disposition"])
+        with rasterio.MemoryFile(tif.content) as mem, mem.open() as src:
+            self.assertEqual((src.dtypes[0], src.crs), ("float32", None))
+        self.assertEqual(self.client.get(self.url(task, cid, "frame/download"),
+                                         {"frame": rel, "kind": "zip"}).status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Saved with its changes, listed by frame, renamed and deleted; a viewer sees it and can't save
+        saved = self.client.post(self.url(task, cid, "frame/measurements"),
+                                 dict(region, name="Hot corner", shape="rectangle", changes={"emissivity": 0.7}),
+                                 format="json")
+        self.assertEqual(saved.status_code, status.HTTP_201_CREATED, saved.data)
+        self.assertEqual((saved.data["frame"], saved.data["changes"]), (rel, {"emissivity": 0.7}))
+        self.assertAlmostEqual(saved.data["values"]["statistics"]["mean"], r2["statistics"]["mean"])
+        listed = self.client.get(self.url(task, cid, "frame/measurements"), {"frame": rel}).data
+        self.assertEqual([m["name"] for m in listed["measurements"]], ["Hot corner"])
+        other = page["frames"][1]["path"]
+        self.assertEqual(self.client.get(self.url(task, cid, "frame/measurements"), {"frame": other}).data["measurements"], [])
+        viewer = User.objects.create_user(username="viewer", password="test1234")
+        assign_perm("view_project", viewer, self.project)
+        as_viewer = self.client_for("viewer")
+        seen = as_viewer.get(self.url(task, cid, "frame/measurements")).data
+        self.assertEqual((len(seen["measurements"]), seen["can_change"]), (1, False))
+        self.assertEqual(as_viewer.post(self.url(task, cid, "frame/measurements"), dict(region, name="x", shape="rectangle"),
+                                        format="json").status_code, status.HTTP_404_NOT_FOUND)
+        mid = saved.data["id"]
+        renamed = self.client.patch(self.url(task, cid, "frame/measurements/" + mid), {"name": "Roof"}, format="json")
+        self.assertEqual(renamed.data["name"], "Roof")
+        self.assertEqual(self.client.delete(self.url(task, cid, "frame/measurements/" + mid)).status_code,
+                         status.HTTP_204_NO_CONTENT)
+        self.assertEqual(self.client.get(self.url(task, cid, "frame/measurements")).data["measurements"], [])
+
+    def test_the_frame_page_is_for_who_can_see_the_dataset(self):
+        task = self.create()
+        self.upload(task, [jpeg("a.jpg")])
+        with mock.patch.object(datasets, "start_job"):
+            cid = conversions.create(task, "Nadir", dict(conversions.DEFAULTS), self.user)
+        page = "/plugins/dji-thermal/dataset/{}/conversion/{}/frame".format(task.id, cid)
+        self.assertEqual(self.client.get(page).status_code, status.HTTP_200_OK)
+        self.assertEqual(self.client.get(page.replace(cid, "0" * 12)).status_code, status.HTTP_404_NOT_FOUND)
+        User.objects.create_user(username="stranger", password="test1234")
+        stranger = self.client_for("stranger")
+        self.assertEqual(stranger.get(self.url(task, cid, "frames")).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.client.get(self.url(task, cid, "frames")).data["frames"], [])

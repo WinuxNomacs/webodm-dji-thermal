@@ -207,13 +207,28 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
         lons, lats = transform(crs, 'EPSG:4326', [x], [y])
         return [lons[0], lats[0]]
 
+    out['valid'] = True
+    out['statistics'] = statistics(data, keep, around & usable, location, percentiles, bins, isotherm)
+    if line:
+        out['profile'] = _profile(local, data, usable, wt, crs, metre, frames)
+    return out
+
+
+def statistics(data, keep, around, location, percentiles=PERCENTILES, bins=HISTOGRAM_BINS, isotherm=None):
+    """
+    What raster_region (and a frame's region, frames.py) finds of the values of data where keep is true (some): {count,
+    min, max, mean, std, median, percentiles, histogram, min_location, max_location (location(flat index) of the
+    extremes), surroundings (the mean where around is true, or None), delta_t[, isotherm_share]}; isotherm as
+    raster_region's
+    """
+    import numpy as np
+    values = data[keep]
     masked = np.where(keep, data, np.nan)
     counts, edges = np.histogram(values, bins=bins)
     mean = float(values.mean())
-    ring_values = data[around & usable]
+    ring_values = data[around]
     surroundings = float(ring_values.mean()) if ring_values.size else None
-    out['valid'] = True
-    out['statistics'] = {
+    out = {
         'count': int(values.size), 'min': float(values.min()), 'max': float(values.max()),
         'mean': mean, 'std': float(values.std()), 'median': float(np.median(values)),
         'percentiles': {'{:g}'.format(p): float(np.percentile(values, p)) for p in percentiles},
@@ -228,9 +243,7 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
             within_isotherm &= values >= low
         if high is not None:
             within_isotherm &= values <= high
-        out['statistics']['isotherm_share'] = float(within_isotherm.mean())
-    if line:
-        out['profile'] = _profile(local, data, usable, wt, crs, metre, frames)
+        out['isotherm_share'] = float(within_isotherm.mean())
     return out
 
 
