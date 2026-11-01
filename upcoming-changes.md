@@ -258,6 +258,11 @@
   hosted from this GitHub repo, with quickstart tutorials and screenshots, kept current with every feature change.
   Done; GitHub Pages is turned on by the user once the repo is public.
 
+- **The mosaic viewer's image controls** (the user, 2026-10-31, from a screenshot of dji-thermal-ui's viewer panel:
+  "How much of this can be built into the mosaic/harmonized/source frame viewers?"; details under "Up next: The
+  mosaic viewer's image controls" below): the frame pixel under the cursor, brightness, contrast, gamma,
+  sharpening, Linear/Equalized, an isotherm, and a click keeping the readout with "Follow the cursor". In four steps.
+
 **Last**
 - **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
   (CHANGELOG, README, the zip rebuilt by `dev/package.sh` on the merge, its new sha256, the `release-check` skill);
@@ -313,6 +318,58 @@
   `Registered [coreplugins.dji-thermal.plugin]`. `ignored/WebODM` is at `v3.3.2`, `ignored/WebODM-Docs` and
   `ignored/WebODM-Plugins` on their upstream `main`. Ruff passes; Jest and ESLint have nothing to check until
   `dji-thermal/public/` exists.
+
+## Up next: The mosaic viewer's image controls
+
+**Request** (the user, 2026-10-31): dji-thermal-ui's viewer panel (`~/gitrepos/python/dji-thermal-ui`,
+`frontend/src/viewer/panel.tsx`) in the plugin's mosaic viewer (`viewer.html`, `viewer.js`: the Mosaic,
+Harmonized, Source frame and View angle tabs). Its "Open this frame" is left out for now (the plugin has no frame
+page; the user, 2026-10-31).
+
+**Builds on**: the viewer's palette, range and Auto (shared by the temperature tabs, `styleGroup`), its tiles and
+frame pictures drawn by the plugin (`mosaics.tile`, `mosaics.frame_image`, `mosaics.rendered`), its readout
+(`mosaics.point`, `MosaicPoint`) and frames window (`select`, `pipHtml`); the Thermal Inspector's isotherm tiles
+(`inspector.isotherm`); and dji-thermal-ui's drawing code (`analyzer/colouring.py`: the tone curve, the unsharp
+mask, the isotherm's grey; `analyzer/thermal_measure.py`: `tone`, `equalization`, `value_histogram`,
+`curve_shares`; `frontend/src/viewer/view.ts`: `slidRange`, `sliderPositions`, `SLIDERS`, `sliderGamma`), numpy
+only and AGPL as the plugin, adapted to Python 3.9 and ES5. Within the plugin rules: the plugin's own page,
+endpoints and data; nothing in WebODM. WebODM's own map (the Thermal Inspector) is not changed: its thermal layer
+is drawn by WebODM's tiler.
+
+**Decided** (the user, 2026-10-31):
+- **The isotherm keeps the palette inside and greys the rest**, as dji-thermal-ui (the Thermal Inspector keeps its
+  one colour over the pixels inside).
+- **A click keeps the point**: it keeps the "Under the cursor" readout on the clicked point (and opens the frames
+  window, as now); a "Follow the cursor" button under the readout lets go, so it follows the mouse again.
+- **Nothing remembered between visits**, as the range: each visit starts at the Auto range, no adjustments and no
+  isotherm; only the palette is saved, as now.
+
+**Design** (Claude's, to check while building):
+- **Drawn by the server, never in the browser**: the tiles and the frames window's pictures take the adjustments and
+  the isotherm as query parameters (with the palette and range), so the colour bar, drawn with the same curve, always
+  matches; the readout's temperatures never change.
+- **Brightness and Contrast move and narrow the range** (dji-thermal-ui's `slidRange`), around the Auto range; the
+  range boxes follow the sliders, and a typed range moves the sliders (`sliderPositions`).
+- **Equalized only on the temperature tabs**; its histogram of the whole mosaic is worked out the first time it is
+  asked for and kept beside the mosaic's other viewer files (until the mosaics are built again), so mosaics built
+  before work without a rebuild.
+- **Sharpening reads a margin around each tile** (`tile_buffer`, as the Source frame tab's seams), so tile edges
+  don't show.
+- **The temperature tabs share the adjustments and the isotherm**, as they share the palette and range; View angle
+  has gamma, sharpening and Linear only, and no isotherm.
+- **Layout**, as dji-thermal-ui: an "Image" section (the sliders, Linear/Equalized, Reset: the Auto range and no
+  adjustments) and an "Isotherm" section (None, Above, Below, Between, limits in the user's unit) below the range;
+  "Under the cursor" and "The mosaic" as now.
+
+**Steps**, each on its branch, with its tests (agreed with the user before they are written), a live check on
+HomerunObliqueII, and README and docs (`docs/`, screenshots retaken):
+1. **Frame pixel**: `mosaics.point` reads bands 4 and 5 (`source_u`, `source_v`, written by dji-thermal-cli since
+   1.4.0; the dev server's mosaics have them) as `frame_pixel`; the readout shows "Frame pixel x, y" (none for a
+   mosaic without them).
+2. **A click keeps the point, "Follow the cursor"** (`viewer.js`).
+3. **The Image section**: brightness, contrast, gamma, sharpening, Linear/Equalized, Reset; tiles, frame pictures
+   and the colour bar.
+4. **The Isotherm section**: tiles and frame pictures.
 
 ## Evaluation: porting the existing DJI thermal plugin (2026-10-29)
 
