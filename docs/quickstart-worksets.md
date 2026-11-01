@@ -61,10 +61,11 @@ The tabs:
 - **View angle**: the angle each pixel was seen at.
 
 The panel on the right sets the palette and the colour range (**Auto** uses the 2nd to 98th percentile). It shows the
-temperature, frame and view angle under the cursor, what dji-thermal-cli reports about the mosaic (seams,
+temperature, frame, frame pixel and view angle under the cursor, what dji-thermal-cli reports about the mosaic (seams,
 misalignment, frame offsets), and the files to download.
 
-Click the map to see **every frame that saw that point**, with the arrows to go through them:
+Click the map to keep the values at that point (**Follow the cursor**, or Esc, lets go of it) and to see **every frame
+that saw that point**, with the arrows to go through them:
 
 ![The frames that saw a point](images/mosaic-frames.png)
 

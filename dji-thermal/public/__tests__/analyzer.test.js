@@ -1950,6 +1950,12 @@ describe("the mosaic viewer", () => {
         el.innerHTML = viewer.readoutHtml({valid: true, temperature: 20, frame: "a_T.JPG", view_angle: 3.21, frame_pixel: [353, 256]}, "C");
         expect(el.textContent).toContain("Frame pixel");
         expect(el.textContent).toContain("x 353, y 256");
+        expect(el.querySelector("#ta-viewer-follow")).toBeNull();
+        el.innerHTML = viewer.readoutHtml({valid: true, temperature: 20, frame: "a_T.JPG"}, "C", true);
+        expect(el.querySelector("#ta-viewer-follow").textContent).toBe("Follow the cursor");
+        el.innerHTML = viewer.readoutHtml({valid: false, reason: "outside_raster"}, "C", true);
+        expect(el.textContent).toContain("Outside the mosaic");
+        expect(el.querySelector("#ta-viewer-follow")).not.toBeNull();
         expect(viewer.readoutHtml({valid: false, reason: "outside_raster"}, "C")).toContain("Outside the mosaic");
         expect(viewer.readoutHtml({valid: false, reason: "nodata"}, "C")).toContain("No data here");
 
@@ -2086,10 +2092,14 @@ describe("the mosaic viewer", () => {
         const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
                                 [C9 + "/mosaics/as_converted/frames" + at]: {frames: [frame(1, "b_T.JPG", 319.5, true), frame(0, "a_T.JPG", 63.5, false)], models: true},
                                 [C9 + "/mosaics/view_angle/frames" + at]: {frames: [frame(1, "b_T.JPG", 319.5, true), frame(0, "a_T.JPG", 63.5, false)], models: true},
-                                [C9 + "/mosaics/harmonized/frames" + at]: {frames: [], models: true}});
+                                [C9 + "/mosaics/harmonized/frames" + at]: {frames: [], models: true},
+                                [C9 + "/mosaics/as_converted/point" + at]: {valid: true, temperature: 30, frame: "b_T.JPG"},
+                                [C9 + "/mosaics/view_angle/point" + at]: {valid: true, frame: "b_T.JPG", view_angle: 3},
+                                [C9 + "/mosaics/harmonized/point" + at]: {valid: true, temperature: 30, frame: "b_T.JPG"}});
         await start(fetchFn, L);
         await ticks();
-        const map = L.maps[0], picked = map.layers.filter(l => l.group).pop();   // after the "None" base layer
+        // After the "None" base layer: the frames window's footprint, then the kept point's marker
+        const map = L.maps[0], groups = map.layers.filter(l => l.group), picked = groups[1], kept = groups[2];
         expect($("ta-viewer-pip").hidden).toBe(true);
         map.fire("click", {latlng: {lng: 10.0005, lat: 45.0005}});
         await ticks();
@@ -2101,8 +2111,9 @@ describe("the mosaic viewer", () => {
         expect(img().getAttribute("src")).toBe(C9 + "/mosaics/as_converted/frames/1.png?v=2026-10-18T11%3A05%3A00Z&color_map=dji_ironred&rescale=12.3,40.1");
         // The pixel's centre: (319.5 + 0.5) / 640 across, (255.5 + 0.5) / 512 down
         expect(pip.querySelector(".ta-pip-mark").getAttribute("style")).toBe("left: 50.00%; top: 50.00%;");
-        expect(picked.layers.map(l => l.marker || l.polygon && "footprint")).toEqual([{lng: 10.0005, lat: 45.0005}, "footprint"]);
-        expect(picked.layers[1].polygon[0]).toEqual([45, 10]);
+        expect(picked.layers.map(l => l.polygon && "footprint")).toEqual(["footprint"]);
+        expect(picked.layers[0].polygon[0]).toEqual([45, 10]);
+        expect(kept.layers.map(l => l.marker)).toEqual([{lng: 10.0005, lat: 45.0005}]);
         expect(pip.querySelector('[data-pip="prev"]').disabled).toBe(true);
 
         // The next frame; a palette changed redraws it
@@ -2125,7 +2136,7 @@ describe("the mosaic viewer", () => {
         click($("ta-viewer-tabs").querySelector('[data-tab="harmonized"]'));
         await ticks();
         expect(pip.textContent).toContain("No frame saw this point");
-        expect(picked.layers.length).toBe(1);
+        expect(picked.layers.length).toBe(0);
 
         // A frame that cannot be drawn says so; closed, the window and its marks go
         click($("ta-viewer-tabs").querySelector('[data-tab="as_converted"]'));
@@ -2135,6 +2146,61 @@ describe("the mosaic viewer", () => {
         click(pip.querySelector('[data-pip="close"]'));
         expect(pip.hidden).toBe(true);
         expect(picked.layers.length).toBe(0);
+        // The point stays kept, and marked
+        expect(kept.layers.length).toBe(1);
+    });
+
+    it("a click keeps the readout on its point until Follow the cursor or Esc", async () => {
+        const L = fakeLeaflet();
+        const at = "?lon=10.0005&lat=45.0005", elsewhere = "?lon=10.0002&lat=45.0002";
+        const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
+                                [C9 + "/mosaics/as_converted/frames" + at]: {frames: [], models: true},
+                                [C9 + "/mosaics/view_angle/frames" + at]: {frames: [], models: true},
+                                [C9 + "/mosaics/as_converted/point" + at]: {valid: true, temperature: 30, frame: "b_T.JPG"},
+                                [C9 + "/mosaics/view_angle/point" + at]: {valid: true, frame: "b_T.JPG", view_angle: 3},
+                                [C9 + "/mosaics/as_converted/point" + elsewhere]: {valid: true, temperature: 20, frame: "a_T.JPG"}});
+        await start(fetchFn, L);
+        await ticks();
+        const map = L.maps[0], kept = map.layers.filter(l => l.group)[2], readout = () => $("ta-viewer-readout").textContent;
+        const hover = async latlng => {
+            map.fire("mousemove", {latlng});
+            jest.advanceTimersByTime(200);
+            await ticks();
+        };
+        jest.useFakeTimers();
+        map.fire("click", {latlng: {lng: 10.0005, lat: 45.0005}});
+        await ticks();
+        expect(readout()).toContain("b_T.JPG");
+        expect($("ta-viewer-follow")).not.toBeNull();
+        expect(kept.layers.length).toBe(1);
+
+        // The cursor moving on leaves it; another tab reads the kept point for its mosaic
+        await hover({lng: 10.0002, lat: 45.0002});
+        expect(readout()).toContain("b_T.JPG");
+        expect(calls(fetchFn)).not.toContain("GET " + C9 + "/mosaics/as_converted/point" + elsewhere);
+        click($("ta-viewer-tabs").querySelector('[data-tab="view_angle"]'));
+        await ticks();
+        expect(readout()).toContain("3.0°");
+        expect($("ta-viewer-follow")).not.toBeNull();
+        click($("ta-viewer-tabs").querySelector('[data-tab="as_converted"]'));
+        await ticks();
+
+        // Follow the cursor lets go: the hint, no marker, and the readout follows the cursor again
+        click($("ta-viewer-follow"));
+        expect(readout()).toBe(viewer.READOUT_HINT);
+        expect(kept.layers.length).toBe(0);
+        await hover({lng: 10.0002, lat: 45.0002});
+        expect(readout()).toContain("a_T.JPG");
+        expect($("ta-viewer-follow")).toBeNull();
+
+        // So does Esc, but not while typing in a field
+        map.fire("click", {latlng: {lng: 10.0005, lat: 45.0005}});
+        await ticks();
+        $("ta-viewer-min").dispatchEvent(new KeyboardEvent("keydown", {key: "Escape", bubbles: true}));
+        expect(readout()).toContain("b_T.JPG");
+        document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape"}));
+        expect(readout()).toBe(viewer.READOUT_HINT);
+        expect(kept.layers.length).toBe(0);
     });
 
     it("asks for the mosaics to be built again when they have no frame positions", () => {
