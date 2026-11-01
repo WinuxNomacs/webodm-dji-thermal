@@ -55,6 +55,19 @@ def tiff_name(image_name):
     return os.path.splitext(os.path.basename(image_name))[0] + '.tif'
 
 
+def keep_in_dataset(dataset, upload):
+    """The photo uploaded also kept in the dataset's images, under its name (JPEGs only, as the dataset's own
+    upload); the dataset's size is counted when its analysis starts"""
+    rel = datasets.upload_path(upload.name or '')
+    if rel is None or not rel.lower().endswith(datasets.IMAGE_EXTENSIONS):
+        return
+    try:
+        datasets.save_image(dataset, rel, upload)
+    except SuspiciousFileOperation:
+        return
+    datasets.images_changed(dataset)
+
+
 class Describe(APIView):
     """
     The camera of one thermal photo, the measurement parameters it recorded and the range of each (see
@@ -79,7 +92,9 @@ class TaskConvert(APIView):
     """
     Converts one photo into a partial task's images, with the measurement values sent with it (see
     converter.settings). The answer's status is 'converted' (with the task's image name), 'ignored' (not a DJI
-    thermal image: the RGB photos taken with them, another camera's) or 'failed', with the reason.
+    thermal image: the RGB photos taken with them, another camera's) or 'failed', with the reason. With 'dataset',
+    the id of the dataset the task is linked to (TaskDataset), the photo is also kept in that dataset, whatever its
+    status.
     """
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -98,6 +113,12 @@ class TaskConvert(APIView):
         except ValueError as e:
             raise exceptions.ValidationError(detail=str(e)) from None
 
+        dataset = None
+        if request.data.get('dataset'):
+            dataset = conversion_tasks.linked_dataset(task)
+            if dataset is None or str(dataset.id) != str(request.data.get('dataset')):
+                raise exceptions.ValidationError(detail="The task is not linked to that dataset")
+
         name = tiff_name(upload.name or 'image')
         try:
             dest = task.get_image_path(name)
@@ -106,6 +127,8 @@ class TaskConvert(APIView):
 
         with work_folder() as folder:
             source = save_upload(upload, folder)
+            if dataset is not None:
+                keep_in_dataset(dataset, upload)
             if not converter.is_thermal_rjpeg(source):
                 return Response({'status': 'ignored', 'reason': NOT_THERMAL})
             # Converted outside the task's folder: WebODM counts every file there as an image

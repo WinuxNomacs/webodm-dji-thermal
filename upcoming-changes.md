@@ -466,6 +466,14 @@
        in that dataset (`TaskConvert`, only into the task's own linked dataset), and the dataset's analysis starts
        once the task is committed; a failed upload removes the dataset with the task. The result names the dataset
        with a link. Tests: `upload.test.js`, `test_api.py`.
+       Done (2026-11-01): `ThermalTaskPanel.jsx` (the tick box, off by default; the photos not converted, RGB or
+       another camera's, as `otherPhotos`), `upload.js` (`taskDataset`, `dataset` sent with each conversion,
+       `uploadOtherPhotos` 10 per request, `analyzeDataset` after the commit, `removeDataset` with the task),
+       `serverApi.js`, `ThermalTaskButton.jsx` (the result's link), `api.py` `keep_in_dataset`, `DatasetAnalyze`
+       counts the dataset's size first. README, `quickstart-thermal-task.md` sections 2 and 5; screenshot
+       `thermal-task-panel` retaken. `upload.test.js` (4), `test_api.py` (2). Live (3 thermal and 2 RGB photos of the
+       M4T flight, WebODM's commit intercepted so nothing processed): the task tagged and linked, the result's link,
+       the dataset with the photos (10 MB) and analyzing; the dataset and the task removed after.
 
 - **Faster image adjustments** (the user, 2026-11-01, from `new.md`): "can anything be done to improve the
   rendering response time of changes to the images sliders? How fast the tiles are rendered? etc.... Looking for it

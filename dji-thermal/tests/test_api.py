@@ -140,6 +140,29 @@ class TestConvert(ApiTestCase):
         self.assertEqual(self.task_images(), [])
         self.assertNoWorkFilesLeft()
 
+    def test_a_photo_is_kept_in_the_task_s_linked_dataset_whatever_its_conversion(self):
+        dataset = self.link_dataset()
+        res = self.post_file(convert_url(self.task), jpeg_upload("flight/DJI_0001_V.JPG"), dataset=str(dataset.id))
+        self.assertEqual(res.data["status"], "ignored")
+        self.assertEqual(datasets.image_files(dataset), [("DJI_0001_V.JPG", os.path.getsize(
+            os.path.join(datasets.images_path(dataset), "DJI_0001_V.JPG")))])
+        self.assertEqual(self.task_images(), [])
+        self.assertNoWorkFilesLeft()
+
+    def test_a_photo_is_kept_only_in_the_dataset_the_task_is_linked_to(self):
+        other = datasets.create(self.project, "Other", User.objects.get(username="testuser"))
+        self.addCleanup(shutil.rmtree, other.task_path(), True)
+        res = self.post_file(convert_url(self.task), jpeg_upload(), dataset=str(other.id))
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(datasets.image_files(other), [])
+
+    def link_dataset(self):
+        res = self.client.post(dataset_url(self.task))
+        dataset = Task.objects.get(pk=res.data["id"])
+        self.addCleanup(shutil.rmtree, dataset.task_path(), True)
+        self.task.refresh_from_db()
+        return dataset
+
     def test_a_converted_image_is_named_after_its_photo_with_no_folder(self):
         self.assertEqual(api.tiff_name("DJI_0001_T.JPG"), "DJI_0001_T.tif")
         self.assertEqual(api.tiff_name("../../flight/DJI_0001_T.jpeg"), "DJI_0001_T.tif")
