@@ -326,25 +326,30 @@ describe("the pages' dialog", () => {
         expect(await beside).toBe(false);
     });
 
-    it("edits the preferences: the unit as WebODM's, and the palette of DJI's or WebODM's, saved for the user", async () => {
+    it("edits the preferences: the unit as WebODM's, the palette of DJI's or WebODM's and the Inspector's legend, saved for the user", async () => {
         const saved = [];
         const fetchFn = jest.fn((url, opts) => {
             if (opts && opts.method === "PUT") { saved.push(JSON.parse(opts.body)); return jsonResponse(Object.assign({unit: null, palettes: []}, JSON.parse(opts.body))); }
-            return jsonResponse({unit: null, palette: "ironred", palettes: ["whitehot", "ironred"], colormaps: ["magma"]});
+            return jsonResponse({unit: null, palette: "ironred", legend: true, palettes: ["whitehot", "ironred"], colormaps: ["magma"]});
         });
         let edited = core.editPreferences(document, fetchFn, "/api/plugins/dji-thermal/", "tok");
         await flush();
         expect(shown().querySelector("h4").textContent).toBe("Preferences");
-        const [unit, palette] = shown().querySelectorAll("select");
+        const [unit, palette, legend] = shown().querySelectorAll("select");
         expect([].map.call(unit.options, o => o.value)).toEqual(["C", "F"]);
         expect(unit.value).toBe("C");
         expect(palette.value).toBe("ironred");
         expect([].map.call(palette.options, o => o.textContent)).toEqual(["Each image's own", "DJI whitehot", "DJI ironred", "magma"]);
+        // The legend under a Thermal Inspector heading
+        expect(shown().querySelector("h5").textContent).toBe("Thermal Inspector");
+        expect(legend.closest(".form-group").querySelector("label").textContent).toBe("Legend on the map");
+        expect(legend.value).toBe("shown");
         unit.value = "F";
         palette.value = "magma";
+        legend.value = "hidden";
         click(button("Save"));
         expect(await edited).toEqual({unit: null, palette: "magma"});
-        expect(saved).toEqual([{palette: "magma"}]);
+        expect(saved).toEqual([{palette: "magma", legend: false}]);
         expect(fetchFn.mock.calls[1][1].headers["X-CSRFToken"]).toBe("tok");
         expect(window.localStorage.getItem("unit_system")).toBe("imperial");
         expect(core.userUnit()).toBe("F");
@@ -2652,6 +2657,13 @@ describe("the mosaic viewer", () => {
         change($("ta-viewer-max"));
         expect($("ta-viewer-range-error").textContent).toMatch(/above the minimum/);
         expect(drawn(t).range).toEqual([0, 100]);
+        // The arrows between the fields widen and narrow the range by a tenth of it, about its middle
+        click($("ta-viewer-wider"));
+        expect(drawn(t).range).toEqual([-5, 105]);
+        expect([$("ta-viewer-min").value, $("ta-viewer-max").value]).toEqual(["23", "221"]);
+        expect($("ta-viewer-range-error").textContent).toBe("");
+        click($("ta-viewer-narrow").querySelector("i"));
+        expect(drawn(t).range).toEqual([0.5, 99.5]);
         click($("ta-viewer-auto"));
         expect(drawn(t).range.map(x => x.toFixed(1))).toEqual(["12.3", "40.1"]);
 

@@ -107,4 +107,4 @@ you're asked before it's replaced.
 - **Add images** adds photos to the dataset; run **Analyze again** afterwards.
 - The pencil renames the dataset and the bin deletes it. The link icon beside its name copies a link to the page.
 - The gear beside the DJI Thermal Analyzer's heading sets your preferences: the temperature unit and the palette
-  (see [Palettes and units](palettes.md)).
+  (see [Palettes and units](palettes.md)), and under Thermal Inspector whether its legend shows on WebODM's map.

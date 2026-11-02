@@ -106,6 +106,23 @@
         return [round(centre - half), round(centre + half)];
     }
 
+    // The range widened (by 1) or narrowed (by -1) by a tenth of its span, about its middle: each end a twentieth
+    function spanRange(range, by) {
+        var step = (range[1] - range[0]) / 20 * by;
+        var round = function (x) { return Math.round(x * 100) / 100; };
+        return [round(range[0] - step), round(range[1] + step)];
+    }
+
+    // The buttons between the range's fields that narrow and widen it (spanRange); field(name) gives each one's
+    // attributes (narrow, wider), size its Bootstrap button size
+    function spanButtonsHtml(field, size) {
+        var button = function (name, icon, title) {
+            return '<button type="button" class="btn btn-default ' + size + '" ' + field(name) + ' title="' + title + '" aria-label="' + title +
+                '"><i class="fa fa-caret-' + icon + '"></i></button>';
+        };
+        return button("narrow", "left", "Narrow the range") + button("wider", "right", "Widen the range");
+    }
+
     // Where the sliders sit for a range (within their ends)
     function sliderPositions(ref, range) {
         var clamp = function (x, limit) { return Math.max(-limit, Math.min(limit, Math.round(x * 100) / 100)); };
@@ -147,7 +164,7 @@
 
     var api = {colorCss: colorCss, paletteCss: paletteCss, gradientCss: gradientCss, scaleTicks: scaleTicks, rangeTicks: rangeTicks,
                SLIDERS: SLIDERS, defaultAdjust: defaultAdjust, adjusted: adjusted, adjustQuery: adjustQuery, toneShares: toneShares,
-               adjustShares: adjustShares, slidRange: slidRange, sliderPositions: sliderPositions, sliderGamma: sliderGamma,
+               adjustShares: adjustShares, slidRange: slidRange, spanRange: spanRange, spanButtonsHtml: spanButtonsHtml, sliderPositions: sliderPositions, sliderGamma: sliderGamma,
                gammaSlider: gammaSlider, imageControlsHtml: imageControlsHtml};
     root.ThermalScale = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

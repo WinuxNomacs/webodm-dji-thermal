@@ -28,6 +28,7 @@
 .ta-page .ta-dialog{ position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, .4); display: flex; align-items: center; justify-content: center; z-index: 1050; }
 .ta-page .ta-dialog-inner{ border-radius: 4px; padding: 20px; width: 460px; max-width: calc(100vw - 32px); box-shadow: 0 2px 10px rgba(0, 0, 0, .3); }
 .ta-page .ta-dialog-inner h4{ margin-top: 0; }
+.ta-page .ta-dialog-inner h5{ margin: 14px 0 8px; padding-top: 10px; border-top: 1px solid rgba(128, 128, 128, .25); font-weight: bold; }
 .ta-page .ta-dialog-actions{ display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 /* The picture viewer (picture_viewer.js): a bar, then the picture on a dark stage; on the page's body, above WebODM's
    menus (its top bar is at z-index 99999), so not under .ta-page; .ta-picture, as .ta-viewer is the mosaic viewer page */
@@ -287,7 +288,7 @@
 .ta-viewer .ta-map-legend[hidden]{ display: none; }
 .ta-viewer .ta-legend-caption{ font-size: 11px; margin-bottom: 2px; }
 .ta-viewer .ta-viewer-range{ display: flex; align-items: center; gap: 6px; }
-.ta-viewer .ta-viewer-range input{ width: 80px; }
+.ta-viewer .ta-viewer-range input{ flex: 1 1 64px; width: 64px; min-width: 0; }
 .ta-viewer .ta-viewer-values{ margin-bottom: 4px; }
 .ta-viewer .ta-viewer-values th{ font-weight: normal; opacity: .7; white-space: nowrap; }
 .ta-viewer .ta-viewer-values td{ overflow-wrap: anywhere; }

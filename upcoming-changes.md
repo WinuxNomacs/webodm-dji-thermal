@@ -3,6 +3,41 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **Two requests lost from `new.md`** (the user, 2026-11-02; found in VSCode's history of `new.md`): each was saved
+  there a minute or more after Claude read the file, and Claude's clearing of it wrote over them unread. From now on
+  `new.md` is read again just before it is cleared, and only the lines turned into phases are removed.
+  - **The scale's span from two arrow buttons** (saved 12:10): "Add a left arrow button and right arrow button
+    between min/max temperature of the scale. When the user clicks the right arrow button min and max temperature
+    values should get further apart; increasing the span of the range. Inversely when the user clicks the left arrow
+    button, min and max should get nearer each other; reducing the span of the range. The increments by which the
+    change occurs will be based upon 10% the numeric distance between the 2 values." Builds on the Thermal
+    Inspector's colour scale (WebODM's map › the thermometer button › the panel, its range fields "min to max °C" and
+    Auto, `inspector.js` `scaleHtml`, `typedRange`). Proposed: ◀ and ▶ in place of "to" between the two fields
+    ("Narrow the range", "Widen the range"); each click moves both ends about the range's middle, the range drawn at
+    once as a typed one is (Auto then puts it back). Open: how far a click moves the ends; whether the mosaic viewer's
+    and the frame page's panels (the same "min to max" fields, `viewer.js` `controlsHtml`) get them too.
+  - **"Legend on the map" in the Preferences** (saved 11:30): "Move \"Show legend on the map\" out of the thermal
+    inspector and into the DJI Thermal Analyzer settings under Thermal Inspector settings." Builds on the Inspector
+    panel's "Legend on the map" tickbox (kept per browser, `dji-thermal-inspector:legend`) and the Preferences dialog
+    (DJI Thermal Analyzer › the gear: Temperature unit, Palette; saved per user, `conversions.display`). Proposed: the
+    tickbox leaves the Inspector's panel; the Preferences dialog gets a "Thermal Inspector" section with "Show the
+    legend on the map" (shown by default), saved with the user's other preferences on the server, so it follows them
+    to any browser; the browser's old setting is removed. Open: that it's the Preferences dialog (per user) meant,
+    not Administration › DJI Thermal (for every user).
+  Decided (the user, 2026-11-02): the Preferences dialog; each click moves the span by a tenth (each end a twentieth);
+  the arrows in all three panels (the Thermal Inspector, the mosaic viewer, the frame page).
+  Done, `lost-requests`: `scale.js` `spanRange` and `spanButtonsHtml`, used by `inspector.js` (`scaleHtml`, the
+  `range-narrow`/`range-wider` clicks) and `viewer.js` (`controlsHtml`, `bindControls`; the frame page shares them).
+  The legend: `conversions.display` has `legend` (shown unless hidden), `parse_display` takes only the preferences
+  sent and `save_display` keeps the others (a palette chosen on the map no longer drops the legend's); the dialog's
+  selects can have a heading (`analyzer_core.js` `dialog`, `editPreferences`); `inspector.js` drops the tickbox, reads
+  the legend from the display preferences (shown when they can't be read) and removes the browser's old key. Tests:
+  Jest `inspector.test.js`, `analyzer.test.js`, `frame.test.js`; `test_analyzer`
+  (`test_a_user_hides_the_inspectors_legend_and_saving_the_palette_keeps_it_hidden`). Checked live (read only) on
+  "Thermal - 9/18/2026": the arrows on WebODM's map and in the viewer, the panel without the tickbox, the
+  Preferences dialog (not saved). README, `quickstart-inspector.md`, `quickstart-worksets.md`,
+  `quickstart-analyzer.md`, `api.md`; `inspector.png`, `inspector-image.png`, `mosaic-viewer.png` and
+  `frame-page.png` retaken.
 - **Manual Corrections off by default, and the frames window movable** (the user, 2026-11-02, from `new.md`):
   "Manual Corrections should be disabled by default." and "The Frame popout pane should be movable via drag and drop
   as well." Builds on the Thermal Inspector (WebODM's map › the thermometer button › the panel, `inspector.js`).

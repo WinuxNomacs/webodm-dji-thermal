@@ -453,17 +453,28 @@ class TestConversionSettings(AnalyzerTestCase):
         self.assertEqual(self.client.get(url).data["palette"], "magma")
         self.assertEqual(self.client_for("testuser2").get(url).data["palette"], None)
         self.assertContains(self.client.get("/plugins/dji-thermal/"),
-                            '<script id="ta-display" type="application/json">{"unit": null, "palette": "magma"}')
+                            '<script id="ta-display" type="application/json">{"unit": null, "palette": "magma", "legend": true}')
         self.client.put(url, {"palette": None}, format="json")
         self.assertEqual(self.client.get(url).data["palette"], None)
 
     def test_a_unit_saved_before_is_handed_to_the_page_once_and_dropped_when_it_saves_again(self):
         url = "/api/plugins/dji-thermal/display"
-        conversions.save_display(self.user, {"unit": "F", "palette": "ironred"})
+        conversions.preferences_store(self.user).set_json(conversions.DISPLAY_KEY, {"unit": "F", "palette": "ironred"})
         self.assertEqual((self.client.get(url).data["unit"], self.client.get(url).data["palette"]), ("F", "ironred"))
         res = self.client.put(url, {"unit": "K", "palette": "ironred"}, format="json")
         self.assertEqual((res.data["unit"], res.data["palette"]), (None, "ironred"))
         self.assertEqual(self.client.get(url).data["unit"], None)
+
+    def test_a_user_hides_the_inspectors_legend_and_saving_the_palette_keeps_it_hidden(self):
+        url = "/api/plugins/dji-thermal/display"
+        self.assertTrue(self.client.get(url).data["legend"])
+        self.assertIn("legend", self.client.put(url, {"legend": "no"}, format="json").data)
+        self.assertFalse(self.client.put(url, {"palette": "ironred", "legend": False}, format="json").data["legend"])
+        self.client.put(url, {"palette": "magma"}, format="json")
+        self.assertEqual((self.client.get(url).data["palette"], self.client.get(url).data["legend"]), ("magma", False))
+        self.assertTrue(self.client_for("testuser2").get(url).data["legend"])
+        self.client.put(url, {"legend": True}, format="json")
+        self.assertEqual((self.client.get(url).data["palette"], self.client.get(url).data["legend"]), ("magma", True))
 
     def test_new_conversions_start_with_the_preferred_palette_unless_the_saved_defaults_have_one(self):
         url = "/api/plugins/dji-thermal/preferences"

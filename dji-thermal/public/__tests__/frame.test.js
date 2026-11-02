@@ -306,6 +306,17 @@ describe("the frame page", () => {
         expect(location.assign).toHaveBeenLastCalledWith(BASE + "/frame/download?frame=a_T.JPG&emissivity=0.8&kind=tiff");
     });
 
+    it("widens and narrows the range with the arrows between its fields", async () => {
+        await start();
+        $("ta-viewer-min").value = "10";
+        $("ta-viewer-max").value = "30";
+        $("ta-viewer-max").dispatchEvent(new Event("change", {bubbles: true}));
+        $("ta-viewer-wider").click();
+        expect([$("ta-viewer-min").value, $("ta-viewer-max").value]).toEqual(["9", "31"]);
+        $("ta-viewer-narrow").click();
+        expect([$("ta-viewer-min").value, $("ta-viewer-max").value]).toEqual(["10.1", "29.9"]);
+    });
+
     it("recolours the frame as a slider moves, without asking the server", async () => {
         const {server} = await start();
         const before = server.calls.length, drawn = puts.length;

@@ -755,24 +755,39 @@ def display_palettes():
     return palettes() + list(COLORMAPS)
 
 
-def display(user):
-    """{'unit': a unit saved before (C, F or K) or None, 'palette': one of display_palettes() or None}"""
+def saved_display(user):
     saved = preferences_store(user).get_json(DISPLAY_KEY, None)
-    saved = saved if isinstance(saved, dict) else {}
+    return saved if isinstance(saved, dict) else {}
+
+
+def display(user):
+    """{'unit': a unit saved before (C, F or K) or None, 'palette': one of display_palettes() or None, 'legend':
+    whether the Thermal Inspector shows the legend on WebODM's map (shown unless hidden)}"""
+    saved = saved_display(user)
     return {'unit': saved.get('unit') if saved.get('unit') in UNITS else None,
-            'palette': saved.get('palette') if saved.get('palette') in display_palettes() else None}
+            'palette': saved.get('palette') if saved.get('palette') in display_palettes() else None,
+            'legend': saved.get('legend') is not False}
 
 
 def parse_display(raw):
-    """Display preferences from the API (blank: None) and {field: message} for what is not valid"""
+    """The display preferences the API was sent (a palette left blank: None), and {field: message} for what is not
+    valid; those not sent are left out"""
     raw = raw if isinstance(raw, dict) else {}
     out, errors = {}, {}
-    palette = raw.get('palette')
-    out['palette'] = None if blank(palette) else palette
-    if out['palette'] is not None and out['palette'] not in display_palettes():
-        errors['palette'] = "Not one of DJI's palettes or WebODM's colour maps"
+    if 'palette' in raw:
+        palette = raw.get('palette')
+        out['palette'] = None if blank(palette) else palette
+        if out['palette'] is not None and out['palette'] not in display_palettes():
+            errors['palette'] = "Not one of DJI's palettes or WebODM's colour maps"
+    if 'legend' in raw:
+        out['legend'] = raw.get('legend')
+        if not isinstance(out['legend'], bool):
+            errors['legend'] = "Must be true or false"
     return out, errors
 
 
 def save_display(user, value):
-    preferences_store(user).set_json(DISPLAY_KEY, value)
+    """The preferences sent saved over those saved before; a unit saved before is dropped"""
+    saved = {k: v for k, v in saved_display(user).items() if k != 'unit'}
+    saved.update(value)
+    preferences_store(user).set_json(DISPLAY_KEY, saved)

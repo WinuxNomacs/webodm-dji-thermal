@@ -156,7 +156,7 @@
                                                                            styleShares(style)) + "</div>";
         out += '<div class="ta-viewer-range">' +
             '<input type="number" step="0.1" class="form-control input-sm" id="ta-viewer-min" value="' + shown(style.range[0]) + '" title="Minimum">' +
-            "<span>to</span>" +
+            scale.spanButtonsHtml(function (name) { return 'id="ta-viewer-' + name + '"'; }, "btn-sm") +
             '<input type="number" step="0.1" class="form-control input-sm" id="ta-viewer-max" value="' + shown(style.range[1]) + '" title="Maximum">' +
             "<span>" + esc(symbol) + "</span>" +
             '<button type="button" class="btn btn-default btn-sm" id="ta-viewer-auto" title="The 2nd to 98th percentile of this ' + wholeName(tab.tab) + '">Auto</button></div>';
@@ -341,6 +341,16 @@
             if (!/^ta-viewer-(brightness|contrast|gamma|sharpen)$/.test(e.target.id)) return;
             slide(e.target);
             o.recolour();
+        });
+
+        // The arrows: the range narrowed or widened, as a range typed is
+        o.el.addEventListener("click", function (e) {
+            var b = e.target.closest ? e.target.closest("button") : null;
+            if (!b || (b.id !== "ta-viewer-narrow" && b.id !== "ta-viewer-wider")) return;
+            o.style().range = scale.spanRange(o.style().range, b.id === "ta-viewer-wider" ? 1 : -1);
+            $("ta-viewer-range-error").textContent = "";
+            showRange();
+            o.restyle();
         });
 
         // Auto: the range from the tab's percentiles; Reset: that range, and no adjustments
