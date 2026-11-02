@@ -5,6 +5,19 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - **A workset's Files: more figures, thumbnails and a detail pane** (the user, 2026-11-02, with a screenshot of a
+    workset's Files table: "should show more file information such as emissivity, background temp, temperature
+    min/max ... a thumbnail view of the image to the left of the filename. When you select an image, a detail pane on
+    the right should open with the full size frame and its properties in a table below it, along with controls to
+    download it. When no image is selected, the detail pane should follow the mouse's hover"), `workset-files-detail`.
+    Builds on the dataset's Files tab (`dataset.js`: thumbnails, `detailHtml`, Hover for Detail, selection) and the
+    frame page's measurement (`frames.info`). Design: columns thumbnail, Image, Result, Min, Max, Emissivity,
+    Reflected, Distance, Notes (temperatures in the user's unit); the pane: the frame at its own size in the user's
+    palette, what it was measured with, min/max/mean, the harmonizing offset, notes; downloads of its outputs, its
+    temperatures (CSV, float TIFF) and Open frame. A conversion records each frame's figures in `results.json`.
+    Decided (the user): **the Outputs column moves to the detail pane**; **older worksets are filled in once** (the
+    worker measures their frames the first time their Files open, with a progress line, and saves it); **several
+    images can be selected** (Ctrl/Shift-click, as on the dataset's Files tab), their outputs downloaded as one zip.
   - Done: **a DJI Thermal Task starts reliably** (the user, 2026-11-02: "hangs at 100% for many seconds before failing
     with 'task failed to start'", with two start buttons), `reliable-thermal-task-start`. Cause: a worker started
     before `commit_parent` existed converts and stops. Now the progress GET (api.py `TaskWorkset.progress`) commits a
