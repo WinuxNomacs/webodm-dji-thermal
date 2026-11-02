@@ -6,11 +6,13 @@ The tests with real R-JPEGs read them from DJI_THERMAL_FLIGHT_DIR and are skippe
 """
 import collections
 import contextlib
+import datetime
 import importlib
 import io
 import math
 import os
 import shutil
+import threading
 import zipfile
 from unittest import mock
 
@@ -243,6 +245,33 @@ class TestAnalysis(AnalyzerTestCase):
         self.assertEqual(d["status"], "failed")
         self.assertIn("could not be started (broker unreachable)", d["error"])
         self.assertEqual(datasets.job(task)["run_id"], "")
+
+    def test_a_started_analysis_whose_heartbeat_stopped_is_marked_failed_but_a_queued_one_keeps_waiting(self):
+        task = self.create()
+        long_ago = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)).isoformat()
+        with mock.patch.object(datasets, "job_gone", return_value=False):
+            # Waiting in the queue behind other jobs: no heartbeat yet, however long ago it was started
+            datasets.update_job(task, status="analyzing", run_id="run", started_at=long_ago, heartbeat_at="")
+            self.assertEqual(self.client.get("{}/{}".format(API, task.id)).data["status"], "analyzing")
+            # Running, its worker writing a heartbeat
+            datasets.update_job(task, heartbeat_at=datasets.now())
+            self.assertEqual(self.client.get("{}/{}".format(API, task.id)).data["status"], "analyzing")
+            # Its worker restarted mid-job: Celery still says PENDING, the heartbeat stopped
+            datasets.update_job(task, heartbeat_at=long_ago)
+            d = self.client.get("{}/{}".format(API, task.id)).data
+        self.assertEqual(d["status"], "failed")
+        self.assertIn("stopped before it finished", d["error"])
+
+    def test_a_running_job_writes_its_heartbeat_only_while_it_is_the_jobs_run(self):
+        task = self.create()
+        datasets.update_job(task, status="analyzing", run_id="run", heartbeat_at="")
+        stop = threading.Event()
+        stop.set()
+        datasets.beat(task, "other run", datasets.JOB_FILE, stop)
+        self.assertEqual(datasets.job(task)["heartbeat_at"], "")
+        datasets.beat(task, "run", datasets.JOB_FILE, stop)
+        self.assertTrue(datasets.job(task)["heartbeat_at"])
+        self.assertFalse(datasets.silent(datasets.job(task)))
 
     @skip_without("DJI_THERMAL_FLIGHT_DIR")
     def test_a_flights_frames_are_analyzed_with_the_webodm_plan(self):

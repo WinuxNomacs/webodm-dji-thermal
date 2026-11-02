@@ -13,7 +13,7 @@ Its records are JSON files there, each replaced whole (written aside, then renam
 the worker share, so a job's progress never overwrites a user's change:
 
     thermal/dataset.json    who created it
-    thermal/job.json        the analysis: its status, progress, error, run id and Celery job
+    thermal/job.json        the analysis: its status, progress, error, run id, Celery job and heartbeat
     thermal/analysis.json   what the analysis found (see analysis.compact)
     thermal/images/         the uploads, in the subfolders they came from
 
@@ -49,6 +49,9 @@ IMAGE_EXTENSIONS = ('.jpg', '.jpeg')
 MAX_FOLDER_DEPTH = 4                # subfolders kept from an uploaded folder (e.g. thermal/, 100MEDIA/)
 
 STATUSES = ('new', 'analyzing', 'ready', 'failed', 'canceled')
+
+HEARTBEAT_SECONDS = 60              # how often a running job writes its heartbeat (run_job)
+STALE_SECONDS = 5 * 60              # a started job silent this long lost its worker (check_stale)
 
 logger = logging.getLogger('app.logger')
 
@@ -199,7 +202,8 @@ def info(task):
 
 def job(task, rel=JOB_FILE):
     """
-    A job's state: {'status', 'progress', 'error', 'run_id', 'celery_task_id', 'started_at', 'finished_at'}
+    A job's state: {'status', 'progress', 'error', 'run_id', 'celery_task_id', 'started_at', 'finished_at',
+    'heartbeat_at': written by the worker while it runs the job, none while it waits in the queue}
     :param rel: its job file in the dataset's folder: the analysis's, or a conversion's (see conversions)
     """
     state = read_json(data_path(task, rel))
@@ -260,10 +264,23 @@ def job_gone(celery_task_id):
         return False
 
 
+def silent(state):
+    """A job that started in the worker, but whose heartbeat stopped: the worker stopped with it (restarted,
+    crashed), which Celery never reports. A job waiting in the queue has no heartbeat, and is never silent."""
+    beat = state.get('heartbeat_at')
+    if not beat:
+        return False
+    try:
+        age = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(beat)
+    except (TypeError, ValueError):
+        return False
+    return age.total_seconds() > STALE_SECONDS
+
+
 def check_stale(task, rel=JOB_FILE, running='analyzing', what='analysis'):
     """A job that is gone (the worker stopped, or the job failed) is not left running forever"""
     state = job(task, rel)
-    if state['status'] == running and job_gone(state.get('celery_task_id')):
+    if state['status'] == running and (silent(state) or job_gone(state.get('celery_task_id'))):
         update_job(task, if_run=state.get('run_id'), rel=rel, status='failed', progress=0, run_id='',
                    error="The {} job stopped before it finished".format(what))
     return task
@@ -318,13 +335,35 @@ def images_changed(task):
         pass
 
 
-def run_job(module, function, *args):
+def run_job(module, function, *args, rel=None):
     """
     Runs in WebODM's worker: run_function_async ships this function's source, so it imports what it needs.
+    :param args: the task's id and the run id, then the function's own
+    :param rel: the job's file, given its heartbeat while it runs (see beat)
     :return: {'output': what the run did}
     """
     import importlib
-    return {'output': getattr(importlib.import_module(module), function)(*args)}
+    import threading
+    stop = threading.Event()
+    datasets = importlib.import_module(module.rsplit('.', 1)[0] + '.datasets')
+    # A worker started before the plugin was updated runs its old datasets module, without a heartbeat
+    if rel is not None and hasattr(datasets, 'beat'):
+        task = datasets.Task.objects.filter(pk=args[0]).first()
+        if task is not None:
+            threading.Thread(target=datasets.beat, args=(task, args[1], rel, stop), daemon=True).start()
+    try:
+        return {'output': getattr(importlib.import_module(module), function)(*args)}
+    finally:
+        stop.set()
+
+
+def beat(task, run_id, rel, stop):
+    """A running job's heartbeat (see silent), until it ends or is no longer the job's run"""
+    try:
+        while update_job(task, if_run=run_id, rel=rel, heartbeat_at=now()) and not stop.wait(HEARTBEAT_SECONDS):
+            pass
+    except OSError as e:     # the dataset being deleted under it
+        logger.info("A job's heartbeat stopped: {}".format(e))
 
 
 def start_job(task, module, function, *args, rel=JOB_FILE, running='analyzing', **fields):
@@ -335,10 +374,10 @@ def start_job(task, module, function, *args, rel=JOB_FILE, running='analyzing', 
     from app.plugins.worker import run_function_async
     run_id = uuid.uuid4().hex
     update_job(task, rel=rel, status=running, progress=0, error='', run_id=run_id, started_at=now(),
-               celery_task_id='', **fields)
+               celery_task_id='', heartbeat_at='', **fields)
     module = __name__.rsplit('.', 1)[0] + '.' + module
     try:
-        celery_task_id = run_function_async(run_job, module, function, str(task.pk), run_id, *args).task_id
+        celery_task_id = run_function_async(run_job, module, function, str(task.pk), run_id, *args, rel=rel).task_id
     except Exception as e:  # noqa: BLE001 - the broker unreachable: the job would show as running forever
         logger.error("Cannot start the job {}.{}: {}".format(module, function, e))
         update_job(task, if_run=run_id, rel=rel, status='failed', progress=0, run_id='', finished_at=now(),
