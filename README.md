@@ -245,7 +245,9 @@ After converting (on by default in the settings, or **Build mosaics** from a wor
 places the frames side by side from their positions and angles, with no WebODM task needed: as converted, and
 harmonized (the frames made to agree on temperature: one ambient and reflected temperature for every frame, and
 each frame shifted to match its neighbours where they overlap, removing the camera's drift between its
-self-calibrations). **View mosaics** shows them on a map
+self-calibrations). Placing the frames means aligning them from their overlaps, most of a build's time: a harmonized
+workset has done that while converting, so its mosaics are placed as Harmonize aligned the frames, not aligned again
+(the mosaic's report says so), unless frames were removed from the workset since. **View mosaics** shows them on a map
 over WebODM's base layers:
 
 - a tab for each mosaic (**Mosaic**, as converted, and **Harmonized**), **Source frame** (the mosaic with a black and

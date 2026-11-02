@@ -2256,6 +2256,20 @@ describe("a conversion's mosaics on the dataset page", () => {
         expect(document.querySelector("strong").textContent).toBe("2 mosaics selected");
         expect(document.querySelector('[data-act="download-mosaics"]').textContent).toContain("Download their 4 files");
     });
+
+    it("says in a mosaic's report when it was placed with Harmonize's alignment, or why it was aligned again", () => {
+        const report = alignment => {
+            const m = MOSAIC("harmonized");
+            m.report = Object.assign({}, m.report, {alignment});
+            document.body.innerHTML = conversions.mosaicDetailHtml(Object.assign({}, CONVERSION, {mosaics: [m]}), ["harmonized"], false, {base: C9, viewer: null});
+            const row = [...document.querySelectorAll("tr")].find(tr => tr.firstChild.textContent === "Alignment");
+            return row ? row.lastChild.textContent : null;
+        };
+        expect(report({boresight_deg: {}, saved_alignment_used: true})).toBe("Harmonize's, not aligned again");
+        expect(report({boresight_deg: {}, saved_alignment_not_used: "it was made for other frames (9, not 8)"}))
+            .toBe("aligned again: it was made for other frames (9, not 8)");
+        expect(report({boresight_deg: {}})).toBeNull();
+    });
 });
 
 describe("a task made from a conversion", () => {
