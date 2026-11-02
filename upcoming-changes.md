@@ -159,7 +159,19 @@
   screenshots are up to date. Including the installation, quickstart and walthroughs." Builds on `docs/` and README.
   Proposed: every page read against the plugin as it is now (each step done on the dev stack where it can be), what
   is out of date corrected, every screenshot retaken and looked at, the links checked; U2 to U4 then update their own
-  pages as they go.
+  pages as they go. Done (2026-11-02), `docs-up-to-date`: every page read against the code and the dev stack.
+  Corrected: DJI Thermal Task's pitch limit is a field (README, `quickstart-thermal-task.md`); the workset settings'
+  sections as the form has them (Colours, Outputs, Measurement, Frames, Adjustments; README); the workset's ⋯ menu
+  (Open on WebODM's map, Build mosaics again; README, `quickstart-worksets.md`); Normalize and Harmonize also in DJI
+  Thermal Task (`measurement.md`, its anchor); the Task panel's palette (`palettes.md`); photos kept and a
+  normalized task's images (`converted-images.md`); the Task's workset messages and the Inspector button on a
+  project's map (`troubleshooting.md`); the analysis' `stage` and a workset's counts and `frames` (`api.md`); the
+  Inspector's correction fields under the scale (`quickstart-inspector.md` section 3); README's list of the
+  plugin's parts (the Inspector, frame page, measurements, correction, colouring, portable were missing).
+  `dev/screenshots.js` clears the browser's storage before each shot (a run of all of them left Files and Mosaics
+  open on `create-task` and earlier pins on the Inspector's). Every screenshot retaken and looked at: the changed
+  ones show the user's newer datasets and projects (no place in their names), and `picture-viewer` at the Files
+  tab's 1600 × 900.
 - **U2. The Workset Creation Settings form** (UX review, 2026-11-02). Dataset page › Worksets › Workset Creation
   Settings:
   - U2-1: a new dataset starts from dji-thermal-cli's defaults, four chips "≠ plan", though step 2 says to start from

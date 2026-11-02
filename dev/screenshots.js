@@ -443,6 +443,8 @@ async function shoot(p, target, file) {
     for (const name of names) {
         const file = path.join(OUT, name + ".png");
         try {
+            // Each shot as a first visit: nothing kept from the shots before it (open sections, pins, regions)
+            await p.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
             await p.setViewportSize(SIZE);
             const target = await SHOTS[name](p, env);
             await hidePrivate(p);
