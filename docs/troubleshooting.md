@@ -17,6 +17,8 @@ They're R-JPEGs from a camera dji-thermal-cli doesn't decode. See [Cameras](inde
 **"… photos could not be converted:"**, with a reason for each
 
 Those photos are left out and the task goes on with the others. The reason says what went wrong with the photo.
+"The server did not answer in time" or "Cannot reach the server": the photo was sent three times without an answer
+(a slow or dropped connection); add it to a new task once the connection is back.
 
 **"Converted, but the task didn't start: ..."**, with a **Start processing** button
 

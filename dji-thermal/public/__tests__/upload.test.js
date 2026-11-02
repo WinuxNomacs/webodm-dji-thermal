@@ -1,4 +1,4 @@
-import ThermalUpload, { NO_IMAGES, taskData } from "../thermal/upload";
+import ThermalUpload, { NO_IMAGES, RETRIES, taskData } from "../thermal/upload";
 
 // jsdom's File has no text()
 function readText(file){
@@ -11,6 +11,11 @@ function readText(file){
 
 const TASK_INFO = {name: "Thermal - 10/12/2026", options: [{name: "fast-orthophoto", value: true}],
                    selectedNode: {id: 1, key: 1}, alignTo: "auto"};
+
+// A request the server answered with an error status, or (without one) never answered
+function failure(message, status){
+    return Object.assign(new Error(message), {status});
+}
 
 function photo(name){
     return new File(["thermal"], name);
@@ -68,7 +73,7 @@ describe("a thermal task's upload", () => {
     test("a photo ignored or failed stays out with its reason, and the others make the task", async () => {
         const api = fakeApi({"DJI_0002_V.JPG": {status: "ignored", reason: "not a DJI thermal image"},
                              "DJI_0003_T.JPG": {status: "failed", reason: "bad thermal block"},
-                             "DJI_0004_T.JPG": new Error("502 Bad Gateway")});
+                             "DJI_0004_T.JPG": failure("502 Bad Gateway", 502)});
         const photos = ["DJI_0001_T.JPG", "DJI_0002_V.JPG", "DJI_0003_T.JPG", "DJI_0004_T.JPG"].map(photo);
         const result = await upload(api, photos).start();
 
@@ -78,6 +83,40 @@ describe("a thermal task's upload", () => {
                                        {name: "DJI_0004_T.JPG", reason: "502 Bad Gateway"}]);
         expect(api.commit).toHaveBeenCalled();
         expect(api.removeTask).not.toHaveBeenCalled();
+    });
+
+    test("a photo the server never answered is sent again, and fails with the reason once it never answers", async () => {
+        const api = fakeApi({"DJI_0002_T.JPG": failure("The server did not answer in time")});
+        let dropped = 1;
+        const convert = api.convert;
+        api.convert = jest.fn((projectId, taskId, file, fields) => file.name === "DJI_0001_T.JPG" && dropped-- > 0 ?
+            Promise.reject(failure("Cannot reach the server")) : convert(projectId, taskId, file, fields));
+        const result = await upload(api, ["DJI_0001_T.JPG", "DJI_0002_T.JPG"].map(photo)).start();
+
+        expect(result.converted).toEqual(["DJI_0001_T.tif"]);
+        expect(result.failed).toEqual([{name: "DJI_0002_T.JPG", reason: "The server did not answer in time"}]);
+        expect(api.calls.filter(n => n === "DJI_0002_T.JPG")).toHaveLength(1 + RETRIES);
+        expect(api.convert.mock.calls.filter(c => c[2].name === "DJI_0001_T.JPG")).toHaveLength(2);
+    });
+
+    test("normalized, a batch of photos the server never answered is sent again instead of removing the task", async () => {
+        const api = fakeApi();
+        api.uploadToDataset = jest.fn()
+            .mockImplementationOnce(() => Promise.reject(failure("The server did not answer in time")))
+            .mockImplementation(() => Promise.resolve({}));
+        const result = await upload(api, [photo("DJI_0001_T.JPG")], {frames: {normalize: true}}).start();
+
+        expect(api.uploadToDataset).toHaveBeenCalledTimes(2);
+        expect(api.removeTask).not.toHaveBeenCalled();
+        expect(result).toMatchObject({workset: "w1"});
+    });
+
+    test("a batch the server refused is not sent again", async () => {
+        const api = fakeApi();
+        api.uploadToDataset = jest.fn(() => Promise.reject(failure("Over quota", 400)));
+        await expect(upload(api, [photo("DJI_0001_T.JPG")], {frames: {normalize: true}}).start()).rejects.toThrow("Over quota");
+        expect(api.uploadToDataset).toHaveBeenCalledTimes(1);
+        expect(api.removeTask).toHaveBeenCalledWith(7, "t1");
     });
 
     test("a task left with no image is removed and not committed", async () => {
