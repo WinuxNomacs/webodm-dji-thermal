@@ -60,6 +60,20 @@ A workset's Files table shows each frame's temperatures and measurement values, 
 message gives the reason; **Measure again** retries. A worker started before the plugin was updated runs its old
 code (the reason then names a missing function): restart WebODM's worker, then Measure again.
 
+**"Wait for the mosaics to be built, or cancel them, before removing frames"**
+
+Frames can't be removed from a workset while its mosaics are being built. Wait for them, or cancel them, then
+remove the frames and build the mosaics again.
+
+**"A workset keeps at least one converted frame: delete the workset instead"**
+
+Removing frames would leave the workset with none converted. Delete the workset from its **⋯** menu.
+
+**"The mosaics were built with frames since removed"**
+
+Frames have been removed from the workset since its mosaics were built, and the mosaics still include them.
+**Build again** builds them from the frames the workset keeps.
+
 **Settings marked "≠ plan"**
 
 Not an error: the setting differs from what the WebODM plan recommends for processing into a map. Hover over it to

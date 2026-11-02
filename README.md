@@ -172,7 +172,10 @@ its **Mosaics** below them once built (their files to download, by mosaic, close
 **Download all** (a zip), and **Rename** and **Delete** in its menu. Beside the table, a detail pane shows the image
 under the mouse, or the one clicked: the frame at its own size, all it was measured with, and its downloads (the
 workset's files, its temperatures as CSV or a float TIFF, and Open frame). Ctrl/Cmd-click or Shift-click selects
-several, to download their files as one zip. The figures are measured once, in WebODM's worker, after a workset
+several, to download their files as one zip. **Remove from workset**, in the pane, takes the image (or those
+selected) out of the workset for those who can change the project, once confirmed: their files and the measurements
+saved on them are deleted, the workset counts them as removed, and new tasks and mosaics leave them out (the tasks
+made before keep their images; mosaics built with them are marked out of date, with **Build again**). The figures are measured once, in WebODM's worker, after a workset
 converts (an older workset's the first time its Files are opened). DJI's own
 SDK measures them when an administrator has installed it.
 

@@ -232,6 +232,7 @@
 .ta-page .ta-figures-progress{ font-size: 12px; }
 
 .ta-page .ta-mosaic-status{ margin-top: 4px; font-size: 13px; }
+.ta-page .ta-file-detail-remove{ margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(128, 128, 128, .3); }
 .ta-page .ta-mosaic-files{ margin: 4px 0 0 14px; font-size: 13px; }
 .ta-page .ta-mosaic-files a{ margin-right: 10px; white-space: nowrap; }
 

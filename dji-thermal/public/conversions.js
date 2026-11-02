@@ -382,8 +382,9 @@
         return label;
     }
 
-    // A conversion's mosaics as its card shows them: being built, failed or canceled (built ones: its main action)
-    function mosaicHtml(c) {
+    // A conversion's mosaics as its card shows them: being built, failed or canceled, or built with frames removed since
+    // (built ones: its main action; canChange: they can be built again from here)
+    function mosaicHtml(c, canChange) {
         if (c.mosaic_status === "building") {
             return '<div class="progress"><div class="progress-bar progress-bar-striped active" style="width: ' +
                 Math.round((c.mosaic_progress || 0) * 100) + '%;"></div></div><div class="text-muted">' +
@@ -391,6 +392,11 @@
         }
         if (c.mosaic_status === "failed") return '<div class="text-danger">The mosaics failed: ' + esc(c.mosaic_error) + "</div>";
         if (c.mosaic_status === "canceled") return '<div class="text-muted">Building the mosaics was canceled.</div>';
+        if (c.mosaic_status === "ready" && c.mosaic_outdated) {
+            return '<div class="text-warning ta-mosaic-status"><i class="fa fa-exclamation-triangle"></i> The mosaics were built with frames since removed.' +
+                (canChange ? ' <button type="button" class="btn btn-default btn-xs" data-act="mosaics" title="Build the mosaics again, of the frames the workset keeps">' +
+                    '<i class="fa fa-th"></i> Build again</button>' : "") + "</div>";
+        }
         return "";
     }
 
@@ -616,6 +622,7 @@
             var figures = [];
             if (c.status !== "converting") {
                 if (c.converted || c.skipped) figures.push(c.converted + " converted" + (c.skipped ? ", " + c.skipped + " skipped" : ""));
+                if (c.removed) figures.push(c.removed + " removed");
                 figures.push(c.file_count + " file(s), " + core.formatBytes(c.size));
             }
             figures.push(core.formatDate(c.created_at) + (c.created_by ? " by " + c.created_by : ""));
@@ -632,7 +639,7 @@
                 '<div class="ta-conversion-head"><strong>' + esc(c.name) + '</strong> <span class="label label-' + cls + '">' + esc(statusLabel(c)) + "</span>" +
                 '<span class="ta-conversion-actions">' + actionsHtml(c, canChange, base, menu, viewerBase ? viewerBase + c.id : null,
                     !(c.tasks || []).length && !parentHtml(c, parent, dashboard)) + "</span></div>" +
-                settings + progress + mosaicHtml(c) +
+                settings + progress + mosaicHtml(c, canChange) +
                 (c.error ? '<div class="text-danger">' + esc(c.error) + "</div>" : "") +
                 '<div class="ta-conversion-figures text-muted">' + esc(figures.join(" · ")) + "</div>" +
                 parentHtml(c, parent, dashboard) + tasksHtml(c, dashboard) + '<div class="ta-conversion-task" data-task="' + c.id + '"></div>' +
@@ -735,19 +742,31 @@
         return rows.filter(function (row) { return row[1] !== "" && row[1] !== null && row[1] !== undefined; });
     }
 
+    // The detail pane's button removing the images shown from the workset (n of them), for those who can change it: once
+    // it is converted, and not while its mosaics are being built
+    function removeButtonHtml(c, n) {
+        var building = c.mosaic_status === "building";
+        return '<div class="ta-file-detail-remove"><button type="button" class="btn btn-default btn-xs text-danger" data-act="remove-frames"' +
+            (building ? ' disabled title="Wait for the mosaics to be built, or cancel them"' :
+                ' title="Delete ' + (n === 1 ? "its files" : "their files") + ' from the workset: new tasks and mosaics leave ' + (n === 1 ? "it" : "them") + ' out"') +
+            '><i class="fa fa-trash"></i> ' + (n === 1 ? "Remove from workset" : "Remove " + n + " from workset") + "</button></div>";
+    }
+
     // The detail pane of a conversion's images selected, or of the one under the mouse; "" for none (urls: {picture:
     // the dataset's thumbnail URL, palette: the user's preferred DJI palette or "", download: the conversion's
-    // download URL, frameDownload: its frame download URL, frame: its frame page or null})
+    // download URL, frameDownload: its frame download URL, frame: its frame page or null, canRemove: the user can
+    // remove images from the workset})
     function resultDetailHtml(c, paths, selected, urls) {
         if (!paths.length) return "";
         var close = selected ? '<button type="button" class="close" data-act="detail-close" title="Unselect" aria-label="Unselect">&times;</button>' : "";
         var rows = resultRows(c, {});
+        var remove = urls.canRemove && c.status === "ready" ? removeButtonHtml(c, paths.length) : "";
         if (paths.length > 1) {
             var outputs = rows.filter(function (f) { return paths.indexOf(f.path) >= 0; }).reduce(function (n, f) { return n + (f.outputs || []).length; }, 0);
             return '<div class="ta-file-detail-head"><strong>' + paths.length + " images selected</strong>" + close + "</div>" +
                 (outputs ? '<button type="button" class="btn btn-primary btn-sm" data-act="download-selected"><i class="fa fa-download"></i> Download their ' +
                     outputs + " files</button>" : '<p class="text-muted">None of them was converted.</p>') +
-                '<p class="text-muted ta-files-hint">As a zip of the files the workset wrote for them. Ctrl/Cmd-click adds or removes an image, Shift-click a range.</p>';
+                '<p class="text-muted ta-files-hint">As a zip of the files the workset wrote for them. Ctrl/Cmd-click adds or removes an image, Shift-click a range.</p>' + remove;
         }
         var f = rows.filter(function (x) { return x.path === paths[0]; })[0];
         if (!f) return "";
@@ -768,7 +787,7 @@
             (frame ? ' <a class="btn btn-default btn-xs" href="' + esc(frame) + '"><i class="fa fa-th-large"></i> Open frame</a>' : "") + "</div>" +
             '<table class="table table-condensed ta-file-detail-table"><tbody>' + resultDetailRows(f).map(function (row) {
                 return "<tr><th>" + esc(row[0]) + "</th><td>" + esc(row[1]) + "</td></tr>";
-            }).join("") + "</tbody></table>";
+            }).join("") + "</tbody></table>" + remove;
     }
 
     // ctx: {doc, fetchFn, api, csrf, datasetId, onChange (the dataset's conversions changed: reload it)}
@@ -960,7 +979,7 @@
         // A workset's detail pane: the images selected, else the one under the mouse
         function detailUrls(id) {
             return {picture: thumbnailUrl + "?workset=" + id, palette: palette, download: base + id + "/download", frameDownload: base + id + "/frame/download",
-                    frame: viewerBase ? viewerBase + id + "/frame" : null};
+                    frame: viewerBase ? viewerBase + id + "/frame" : null, canRemove: !!(dataset && dataset.can_change)};
         }
 
         function renderDetail(id) {
@@ -1047,6 +1066,33 @@
             doc.body.appendChild(form);
             form.submit();
             doc.body.removeChild(form);
+        }
+
+        // The images the detail pane shows (those selected, else the one under the mouse) removed from the workset, once
+        // confirmed: the table, the workset's figures and its mosaics' state then reloaded
+        function removeFrames(id) {
+            var p = pick(id), c = results[id];
+            var paths = p.selected.length ? p.selected : p.hovered ? [p.hovered] : [];
+            if (!paths.length || !c) return;
+            var what = paths.length === 1 ? paths[0].split("/").pop() : paths.length + " images";
+            var text = ["Remove " + what + " from " + c.name + "?",
+                (paths.length === 1 ? "Its files are deleted, with the measurements saved on it. New tasks and mosaics leave it out; " :
+                    "Their files are deleted, with the measurements saved on them. New tasks and mosaics leave them out; ") +
+                    "the tasks made before keep their images."];
+            if (c.mosaic_status === "ready") text.push("The mosaics stay as they were built until you build them again.");
+            text.push("This cannot be undone.");
+            return core.ask(doc, "Remove from workset", text, "Remove", "danger").then(function (yes) {
+                return yes && send(base + id + "/remove", "POST", {frames: paths});
+            }).then(function (r) {
+                if (!r) return;
+                if (!r.ok) return message(esc(core.errorText(r.data, "Could not remove the images from " + c.name + ".")), "text-danger");
+                results[id] = r.data;
+                p.selected = [];
+                p.hovered = null;
+                p.anchor = null;
+                renderFiles(id);
+                return ctx.onChange();
+            });
         }
 
         // A workset's files; loaded again every few seconds while its frames are being measured
@@ -1250,6 +1296,7 @@
                     return selectionChanged(fid);
                 }
                 if (e.target.closest('[data-act="download-selected"]')) return downloadSelected(fid);
+                if (e.target.closest('[data-act="remove-frames"]')) return removeFrames(fid);
                 if (e.target.closest('[data-act="figures-again"]')) {
                     return send(base + fid + "/figures", "POST", {}).then(function (r) {
                         if (!r.ok) return message(esc(core.errorText(r.data, "Could not measure the frames again.")), "text-danger");
@@ -1354,7 +1401,7 @@
                differences: differences, chipsHtml: chipsHtml, markForm: markForm, resetSetting: resetSetting,
                mosaicHtml: mosaicHtml, mapUrl: mapUrl, actionsHtml: actionsHtml, listHtml: listHtml, mosaicFilesHtml: mosaicFilesHtml, parentHtml: parentHtml, taskStatusLabel: taskStatusLabel, tasksHtml: tasksHtml,
                taskHtml: taskHtml, readTaskForm: readTaskForm, optionsFormHtml: optionsFormHtml, readOptions: readOptions, skipReasons: skipReasons, resultRows: resultRows, resultsHtml: resultsHtml,
-               resultDetailRows: resultDetailRows, resultDetailHtml: resultDetailHtml, init: init};
+               resultDetailRows: resultDetailRows, resultDetailHtml: resultDetailHtml, removeButtonHtml: removeButtonHtml, init: init};
     root.ThermalAnalyzerConversions = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});
