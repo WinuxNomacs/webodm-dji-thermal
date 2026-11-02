@@ -77,7 +77,7 @@ with no adjustments.
 
 The panel and the legend can be moved out of the way: drag the panel by its heading (the frames window comes along,
 beside it), or the legend by any part. Both stay inside the map. Closing the panel, hiding the legend or reloading
-the page puts them back where they started.
+the page puts them back where they started. The frames window (section 5) can be dragged on its own too.
 
 Temperatures are shown in WebODM's units: °F when its map is set to Imperial, °C otherwise. See
 [Palettes and units](palettes.md).
@@ -122,6 +122,8 @@ panel, opens them too.
   ODM refined: the point can be a little off.
 - **Open this frame** opens the frame on its own page in the Analyzer, in a new tab, to measure it in its pixels or
   measure it again with other values: see [One frame at a time](quickstart-worksets.md#one-frame-at-a-time).
+- Drag it by its heading to move it on its own: it stays where you drop it, even as the panel moves, until it's
+  closed. Opened again, it's beside the panel.
 - The cross closes the window; closing the Inspector closes it too.
 
 On other layers a click in Hover is WebODM's own: its popup with the task's downloads.
@@ -164,5 +166,5 @@ emissivity from 0.1 to 1 and any reflected temperature from −100 to 1000 °C. 
 The correction is approximate: a broadband model, with the air's transmission taken as 1, as at drone distances.
 It's for comparing surfaces, not for calibrated values; for exact values, make a workset with the measurement
 settings you want. A layer that doesn't record how it was measured (an orthophoto that wasn't made from the plugin's
-TIFFs) isn't corrected, and the panel says so. Your browser keeps the correction for the same tasks. Untick the box
-to go back: the values you typed are forgotten and the fields grey out with the layer's own again.
+TIFFs) isn't corrected, and the panel says so. Each visit starts with the box unticked. Untick it to go back: the
+values you typed are forgotten and the fields grey out with the layer's own again.

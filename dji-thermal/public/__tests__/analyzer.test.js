@@ -2621,6 +2621,45 @@ describe("the mosaic viewer", () => {
         expect(kept.layers.length).toBe(1);
     });
 
+    it("drags the frames window by its heading over the map, back in its corner once closed", async () => {
+        const L = fakeLeaflet();
+        const at = "?lon=10.0005&lat=45.0005";
+        const frame = {index: 0, file: "a_T.JPG", x: 63.5, y: 255.5, width: 640, height: 512, view_angle: 2.25, source: true,
+                       footprint: [[10, 45], [10.001, 45], [10.001, 45.001], [10, 45.001]]};
+        const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
+                                [C9 + "/mosaics/as_converted/frames" + at]: {frames: [frame], models: true},
+                                [C9 + "/mosaics/as_converted/point" + at]: {valid: true, temperature: 30, frame: "a_T.JPG"}});
+        await start(fetchFn, L);
+        await ticks();
+        const map = L.maps[0], pip = $("ta-viewer-pip");
+        const rect = (el, r) => {
+            el.getBoundingClientRect = () => {
+                const m = /translate\((-?\d+)px, (-?\d+)px\)/.exec(el.style.transform) || [0, 0, 0];
+                const left = r.left + Number(m[1]), top = r.top + Number(m[2]);
+                return {left, top, right: left + r.width, bottom: top + r.height, width: r.width, height: r.height};
+            };
+        };
+        const press = (el, x, y) => el.dispatchEvent(new MouseEvent("pointerdown", {clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true}));
+        const move = (x, y) => document.dispatchEvent(new MouseEvent("pointermove", {clientX: x, clientY: y, bubbles: true, cancelable: true}));
+        const release = () => document.dispatchEvent(new MouseEvent("pointerup", {bubbles: true}));
+        rect(pip.parentNode, {left: 0, top: 0, width: 900, height: 600});
+        rect(pip, {left: 10, top: 270, width: 300, height: 300});
+        map.fire("click", {latlng: {lng: 10.0005, lat: 45.0005}});
+        await ticks();
+
+        press(pip.querySelector('[data-pip="close"]'), 300, 280);      // a button is not a handle
+        move(500, 100);
+        release();
+        expect(pip.style.transform).toBe("");
+        press(pip.querySelector(".ta-pip-title"), 100, 280);
+        move(400, -500);                                                // kept inside the map's top
+        release();
+        expect(pip.style.transform).toBe("translate(300px, -270px)");
+        click(pip.querySelector('[data-pip="close"]'));
+        expect(pip.hidden).toBe(true);
+        expect(pip.style.transform).toBe("");
+    });
+
     it("a click keeps the readout on its point until Follow the cursor or Esc", async () => {
         const L = fakeLeaflet();
         const at = "?lon=10.0005&lat=45.0005", elsewhere = "?lon=10.0002&lat=45.0002";

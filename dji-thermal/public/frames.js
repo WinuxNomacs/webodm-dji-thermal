@@ -1,6 +1,7 @@
 // The source frames window, shared by the Analyzer's mosaic viewer (viewer.js) and the Thermal Inspector on WebODM's map
 // (inspector.js): the frames that saw a point (the Analyzer's API, mosaics/<tab>/frames), shown one at a time with a
-// crosshair on the point, each drawn as a mosaic tab draws it (mosaics/<tab>/frames/<index>.png).
+// crosshair on the point, each drawn as a mosaic tab draws it (mosaics/<tab>/frames/<index>.png), and dragged over the
+// map by its heading (movable, which the Inspector's panel and legend use too).
 (function (root) {
     function escapeHtml(t) {
         return String(t === null || t === undefined ? "" : t).replace(/[&<>"']/g, function (c) {
@@ -66,7 +67,61 @@
             "</div>";
     }
 
-    var api = {framesUrl: framesUrl, frameUrl: frameUrl, framePageUrl: framePageUrl, orthophotoFrames: orthophotoFrames, pipHtml: pipHtml};
+    // A box (the Inspector's panel and legend, a frames window) dragged over the map: moved by an offset (a CSS
+    // translate) that keeps it inside area (the map's element); grabs(target) says whether a press there starts a drag
+    // (not on a link or a field); moved(offset, dragged) follows each move, dragged when the user moved it. The box grabbed last is drawn over the map's other controls (its Leaflet corner
+    // raised) until it is back in its place. reset puts it back
+    function movable(box, area, grabs, moved, doc) {
+        var offset = {x: 0, y: 0}, drag = null;
+        doc = doc || box.ownerDocument;
+        function corner() { return box.closest(".leaflet-top, .leaflet-bottom") || box; }
+        function set(x, y) {
+            offset = {x: x, y: y};
+            box.style.transform = x || y ? "translate(" + x + "px, " + y + "px)" : "";
+            if (!x && !y) corner().style.zIndex = "";
+            if (moved) moved(offset, !!drag);
+        }
+        function place(x, y) {
+            var r = box.getBoundingClientRect(), a = area.getBoundingClientRect();
+            var left = r.left - offset.x, top = r.top - offset.y;       // where it is unmoved
+            // Inside the area; a box wider or taller than the area keeps its left or top edge in it
+            x = Math.max(a.left - left, Math.min(x, a.right - (left + r.width)));
+            y = Math.max(a.top - top, Math.min(y, a.bottom - (top + r.height)));
+            set(Math.round(x) || 0, Math.round(y) || 0);
+        }
+        function onMove(e) {
+            if (!drag) return;
+            e.preventDefault();
+            place(drag.x + e.clientX - drag.startX, drag.y + e.clientY - drag.startY);
+        }
+        function onUp() {
+            drag = null;
+            box.classList.remove("dt-moving");
+            doc.removeEventListener("pointermove", onMove);
+            doc.removeEventListener("pointerup", onUp);
+            doc.removeEventListener("pointercancel", onUp);
+        }
+        box.addEventListener("pointerdown", function (e) {
+            if ((e.button && e.button !== 0) || !grabs(e.target)) return;
+            e.preventDefault();
+            e.stopPropagation();        // not the map's own dragging
+            drag = {x: offset.x, y: offset.y, startX: e.clientX, startY: e.clientY};
+            corner().style.zIndex = String(++movedOnTop);
+            box.classList.add("dt-moving");
+            doc.addEventListener("pointermove", onMove);
+            doc.addEventListener("pointerup", onUp);
+            doc.addEventListener("pointercancel", onUp);
+        });
+        return {
+            reset: function () { onUp(); set(0, 0); },
+            to: function (o) { set(o.x, o.y); },        // moved along with another box (not clamped)
+            keep: function () { if (offset.x || offset.y) place(offset.x, offset.y); },     // after the area or the box changed size
+            offset: function () { return offset; }
+        };
+    }
+    var movedOnTop = 1000;      // Leaflet's corners are at 1000: the box grabbed last goes over them
+
+    var api = {movable: movable, framesUrl: framesUrl, frameUrl: frameUrl, framePageUrl: framePageUrl, orthophotoFrames: orthophotoFrames, pipHtml: pipHtml};
     root.ThermalFrames = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

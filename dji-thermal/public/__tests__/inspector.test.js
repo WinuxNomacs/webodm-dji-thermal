@@ -584,7 +584,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         expect(bodies[bodies.length - 1].correction).toEqual({emissivity: 0.8, reflected: 21});
         const want = model(30, 0.8, 21, 0.91, 21);
         expect(panel().querySelector("[data-pin]").textContent).toContain(want.toFixed(2) + " °C");
-        expect(JSON.parse(window.localStorage.getItem(inspector.correctionKey(["abc-1"])))).toEqual({on: true, emissivity: 0.8, reflected: 21});
+        expect(Object.keys(window.localStorage).filter(k => k.indexOf("correction") >= 0)).toEqual([]);
         // The colour scale keeps the temperatures it shows, so the layer is drawn over others of its own values
         expect(panel().querySelector('[data-act="range-min"]').value).toBe("10");
         expect(panel().querySelector('[data-act="range-max"]').value).toBe("40");
@@ -632,19 +632,33 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         tick(false);
         expect(ins.state.correction).toEqual({on: false});
         expect([field("emissivity").disabled, field("emissivity").value]).toEqual([true, "0.91"]);
-        expect(window.localStorage.getItem(inspector.correctionKey(["abc-1"]))).toBe(null);
         // Ticked again: from what the layer was measured with
         tick(true);
         expect(ins.state.correction).toEqual({on: true, emissivity: 0.91, reflected: 21});
         map.remove();
     });
 
+    it("starts every visit with Manual Corrections unticked, and removes a correction an earlier version kept", async () => {
+        const map = leafletMap();
+        window.localStorage.setItem("dji-thermal-inspector:correction:abc-1", JSON.stringify({on: true, emissivity: 0.8, reflected: 21}));
+        window.localStorage.setItem("dji-thermal-inspector:correction:other", JSON.stringify({on: true, emissivity: 0.7, reflected: 20}));
+        const {ins, panel} = start(map, {["GET " + SAVED]: {measurements: [], can_change: true, baseline: BASELINE}}, {L});
+        await ins.ready; await flush();
+        ins.open();
+        expect(ins.state.correction).toEqual({on: false});
+        expect(panel().querySelector('[data-act="correction-on"]').checked).toBe(false);
+        expect(Object.keys(window.localStorage).filter(k => k.indexOf("correction") >= 0)).toEqual([]);
+        map.remove();
+    });
+
     it("says when a layer doesn't record how it was measured, and doesn't correct it", async () => {
         const map = leafletMap();
-        window.localStorage.setItem(inspector.correctionKey(["abc-1"]), JSON.stringify({on: true, emissivity: 0.8, reflected: 21}));
         const {ins, fetchFn, panel} = start(map, {[REGION]: STATS, ["GET " + SAVED]: {measurements: [], can_change: true, baseline: null}}, {L});
         await ins.ready; await flush();
         ins.open();
+        const on = panel().querySelector('[data-act="correction-on"]');
+        on.checked = true;
+        on.dispatchEvent(new Event("change", {bubbles: true}));
         expect(panel().textContent).toContain("Roof survey: doesn't record how it was measured, so isn't corrected");
         panel().querySelector('[data-mode="rectangle"]').click();
         drawRectangle(map);
@@ -1091,6 +1105,57 @@ describe("the Thermal Inspector's workset mosaics", () => {
         change(panel().querySelector('[data-act="mosaic-on"]'), false);
         expect(laid().length).toBe(0);
         expect(frameBox(map).hidden).toBe(true);
+        map.remove();
+    });
+
+    it("drags the frames window by its heading on its own, where it stays as the panel moves, back beside the panel once closed", async () => {
+        const rect = (el, r) => {
+            el.getBoundingClientRect = () => {
+                const m = /translate\((-?\d+)px, (-?\d+)px\)/.exec(el.style.transform) || [0, 0, 0];
+                const left = r.left + Number(m[1]), top = r.top + Number(m[2]);
+                return {left, top, right: left + r.width, bottom: top + r.height, width: r.width, height: r.height};
+            };
+        };
+        const press = (el, x, y) => el.dispatchEvent(new MouseEvent("pointerdown", {clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true}));
+        const move = (x, y) => document.dispatchEvent(new MouseEvent("pointermove", {clientX: x, clientY: y, bubbles: true, cancelable: true}));
+        const release = () => document.dispatchEvent(new MouseEvent("pointerup", {bubbles: true}));
+        const map = leafletMap();
+        const frames = jest.fn(() => jsonResponse(FRAMES));
+        const {ins, panel} = begin(map, [], {["GET " + BASE + "as_converted/frames"]: frames});
+        await ins.mosaicsReady;
+        ins.open();
+        change(panel().querySelector('[data-act="mosaic-on"]'), true);
+        ins.click({latlng: L.latLng(0.5, 0.5)});
+        await flush(); await flush();
+        rect(map.getContainer(), {left: 0, top: 0, width: 1200, height: 800});
+        rect(panel(), {left: 880, top: 10, width: 280, height: 400});
+        rect(frameBox(map), {left: 556, top: 10, width: 300, height: 300});
+
+        // Not by its buttons; by its heading, kept inside the map
+        press(frameBox(map).querySelector('[data-pip="next"]'), 700, 20);
+        move(400, 300);
+        release();
+        expect(frameBox(map).style.transform).toBe("");
+        press(frameBox(map).querySelector(".ta-pip-title"), 600, 20);
+        move(100, 2000);
+        release();
+        expect(frameBox(map).style.transform).toBe("translate(-500px, 490px)");
+
+        // The panel moved, a frame stepped to or another point clicked: it stays where it was dropped
+        press(panel().querySelector(".dt-inspector-head strong"), 900, 20);
+        move(800, 60);
+        release();
+        expect(panel().style.transform).toBe("translate(-100px, 40px)");
+        pip(map, "next");
+        ins.click({latlng: L.latLng(0.5, 0.5)});
+        await flush(); await flush();
+        expect(frameBox(map).style.transform).toBe("translate(-500px, 490px)");
+
+        // Closed, it opens beside the panel again
+        pip(map, "close");
+        ins.click({latlng: L.latLng(0.5, 0.5)});
+        await flush(); await flush();
+        expect(frameBox(map).style.transform).toBe("translate(-100px, 40px)");
         map.remove();
     });
 

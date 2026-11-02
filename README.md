@@ -263,7 +263,7 @@ over WebODM's base layers:
   window over the map with the **frames that saw that point** (the mosaic's own first, the
   others in turn with the arrows), each drawn in the tab's palette and range (on View angle, the angle each of its
   pixels saw the ground at), with a crosshair on the point and its outline on the map, and **Open this frame** (the
-  frame page, below, in a new tab); mosaics built before version 1.5.0 of dji-thermal-cli are built again to show them;
+  frame page, below, in a new tab); dragged by its heading, it stays where it's dropped until closed; mosaics built before version 1.5.0 of dji-thermal-cli are built again to show them;
 - what dji-thermal-cli reports (seams, misalignment, frame offsets, heights) and the mosaic files to download (also
   in the workset's zip);
 - **Open on WebODM's map** (also in the workset's menu): WebODM's map of the project with this mosaic laid on it by
@@ -388,8 +388,8 @@ Inspector:
   taken as 1), for comparing surfaces, not calibrated values. The readout, pins, regions, lines, the legend's marks
   and the isotherm's limits change, and the colour scale keeps the temperatures it shows, so the map's colours change
   with the correction (Auto stretches the scale over the corrected layer again). A layer that doesn't record its values (an orthophoto
-  not made from the plugin's TIFFs) isn't corrected, and the panel says so. Kept in your browser for the same tasks;
-  unticking it forgets the values and greys the fields out again.
+  not made from the plugin's TIFFs) isn't corrected, and the panel says so. It's unticked on every visit; unticking
+  it forgets the values and greys the fields out again.
 - **Palette**: the thermal layer's palette, from the same list as the Analyzer's: DJI's palettes (drawn by the
   plugin) and WebODM's colour maps. It is your palette everywhere: the
   Analyzer's preference, saved when you choose one here or in WebODM's own layer panel, and the one the map opens
@@ -415,8 +415,9 @@ Inspector:
 - **The panel's top stays in view**: its heading, the mode buttons, the temperature under the cursor, Palette and
   the colour scale stay at the top while the sections below scroll under them.
 - **Moving them**: drag the panel by its heading, or the legend by any part, to move it out of the way; both stay
-  inside the map, and the frames window moves with the panel. Closing the panel, hiding the legend or reloading the
-  page puts them back in their places.
+  inside the map, and the frames window moves with the panel, until it's dragged by its own heading: then it stays
+  where it's dropped. Closing the panel or the frames window, hiding the legend or reloading the page puts them back
+  in their places.
 - **Isotherm**: paints the temperatures above, below or between limits (typed in your unit) in a colour of six,
   over each thermal layer, hidden with it, within the task's crop; the legend marks the part painted. Kept in your
   browser for the same tasks; Off removes it.
