@@ -213,6 +213,30 @@ describe("the frame page", () => {
         expect($("ta-viewer-controls").textContent).toContain("This frame: 15.0 to 15.0 °C");
     });
 
+    it("lists all the frames when the frame a link asks for isn't in its list", async () => {
+        const {history} = await start("?frame=c_T.JPG&list=mosaic");
+        expect($("ta-frame-name").textContent).toBe("c_T.JPG");
+        expect(document.querySelector("[data-list='']").getAttribute("aria-pressed")).toBe("true");
+        expect(history.replaceState).toHaveBeenLastCalledWith(null, "", "?frame=c_T.JPG");
+    });
+
+    it("scrolls the list to the frame shown once the page shows it, centred, and leaves it when it's in view", async () => {
+        // The list 100 px high; the frame shown 20 px high, 400 px down it, until scrolled
+        const box = $("ta-frame-list");
+        let top = 0, seen = [];
+        Object.defineProperty(box, "scrollTop", {get: () => top, set: v => { seen.push([v, $("ta-frame-main").hidden]); top = v; }});
+        jest.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function () {
+            if (this === box) return {top: 0, bottom: 100, height: 100};
+            const at = this.getAttribute("aria-current") ? 400 - top : 1000;
+            return {top: at, bottom: at + 20, height: 20};
+        });
+        await start("?frame=sub%2Fb_T.JPG");
+        expect(seen).toEqual([[360, false]]);
+        document.querySelector("#ta-frame-list [data-list=mosaic]").click();
+        await settle();
+        expect(seen.length).toBe(1);
+    });
+
     it("reads the pixel under the cursor, and steps through the list with the arrow keys, keeping the frame in the URL", async () => {
         const {L, history} = await start();
         L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 0.5}});

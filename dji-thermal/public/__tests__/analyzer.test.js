@@ -2746,9 +2746,9 @@ describe("the mosaic viewer", () => {
         expect(picked.layers[0].polygon[0]).toEqual([45, 10]);
         expect(kept.layers.map(l => l.marker)).toEqual([{lng: 10.0005, lat: 45.0005}]);
         expect(pip.querySelector('[data-pip="prev"]').disabled).toBe(true);
-        // The frame on its own page, in a new tab
+        // The frame on its own page, in a new tab, listed among the frames in the mosaic
         const open = pip.querySelector('[data-pip="open"]');
-        expect(open.getAttribute("href")).toBe("/plugins/dji-thermal/dataset/5/conversion/9/frame?frame=b_T.JPG");
+        expect(open.getAttribute("href")).toBe("/plugins/dji-thermal/dataset/5/conversion/9/frame?frame=b_T.JPG&list=mosaic");
         expect(open.getAttribute("target")).toBe("_blank");
 
         // The next frame; a palette changed redraws it

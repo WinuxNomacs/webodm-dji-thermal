@@ -18,10 +18,11 @@
         return base + "/mosaics/" + tab + "/frames/" + index + ".png?" + query;
     }
 
-    // A frame's page in the Analyzer (frame.html), from the workset's API URL (base) and the frame's file
-    function framePageUrl(base, file) {
+    // A frame's page in the Analyzer (frame.html), from the workset's API URL (base) and the frame's file; list, the
+    // frames it lists ("mosaic": those in the mosaic), all of them when none
+    function framePageUrl(base, file, list) {
         return base.replace("/api/plugins/dji-thermal/datasets/", "/plugins/dji-thermal/dataset/").replace("/conversions/", "/conversion/") +
-            "/frame?frame=" + encodeURIComponent(file);
+            "/frame?frame=" + encodeURIComponent(file) + (list ? "&list=" + encodeURIComponent(list) : "");
     }
 
     // The frames as a WebODM orthophoto made from the workset's TIFFs shows them: ODM blended them, so none is the
@@ -62,7 +63,7 @@
             '<div class="ta-pip-foot">' + escapeHtml(f.file) + '<br><span class="ta-message">' +
             (f.source ? "The mosaic's pixel here comes from this frame; " : "") + "seen " + escapeHtml(angle) + " from straight down" +
             (pick.orthophoto ? ". Placed from the frames' GPS and gimbal, not ODM's cameras: the point may be a little off." : "") +
-            "</span>" + (base ? '<br><a href="' + escapeHtml(framePageUrl(base, f.file)) + '" target="_blank" rel="noopener" data-pip="open" ' +
+            "</span>" + (base ? '<br><a href="' + escapeHtml(framePageUrl(base, f.file, pick.orthophoto ? "" : "mosaic")) + '" target="_blank" rel="noopener" data-pip="open" ' +
                 'title="The frame on its own page: measure it, or measure it again with other parameters"><i class="fa fa-external-link-alt"></i> Open this frame</a>' : "") +
             "</div>";
     }
