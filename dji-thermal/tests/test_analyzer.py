@@ -37,6 +37,7 @@ colouring = importlib.import_module("coreplugins.dji-thermal.colouring")
 conversion_tasks = importlib.import_module("coreplugins.dji-thermal.conversion_tasks")
 correction = importlib.import_module("coreplugins.dji-thermal.correction")
 measurements = importlib.import_module("coreplugins.dji-thermal.measurements")
+analyzer_api = importlib.import_module("coreplugins.dji-thermal.analyzer_api")
 
 API = "/api/plugins/dji-thermal/datasets"
 
@@ -957,6 +958,31 @@ class TestMosaics(AnalyzerTestCase):
                          status.HTTP_404_NOT_FOUND)
         with zipfile.ZipFile(io.BytesIO(b"".join(self.client.get(download).streaming_content))) as z:
             self.assertIn("mosaics/harmonized/" + name, z.namelist())
+
+        # The workset's Mosaics table: each mosaic's figures and files, but where it is; its preview small, or large
+        # for the detail pane; the files of those selected as a zip, with images' outputs or without
+        listed = self.client.get("{}/{}/conversions/{}".format(API, task.id, cid)).data["mosaics"]
+        self.assertEqual([m["kind"] for m in listed], ["as_converted", "harmonized"])
+        harmonized = listed[1]
+        self.assertNotIn("bounds", harmonized)
+        self.assertEqual((harmonized["frames"], harmonized["width"], harmonized["unit"], harmonized["preview"]),
+                         (v["kinds"]["harmonized"]["frames"], v["kinds"]["harmonized"]["width"], "C", True))
+        self.assertEqual((harmonized["min"], harmonized["max"]), (v["kinds"]["harmonized"]["temperature"]["min"],
+                                                                  v["kinds"]["harmonized"]["temperature"]["max"]))
+        self.assertEqual([f["name"] for f in harmonized["files"]], sorted(v["kinds"]["harmonized"]["files"]))
+        self.assertTrue(all(f["size"] > 0 for f in harmonized["files"]))
+        small = self.client.get(self.url(task, cid, "/harmonized/preview"))
+        self.assertEqual((small.status_code, small["Content-Type"]), (status.HTTP_200_OK, "image/png"))
+        self.assertLessEqual(max(Image.open(io.BytesIO(small.content)).size), max(analyzer_api.THUMBNAIL_SIZE))
+        large = Image.open(io.BytesIO(self.client.get(self.url(task, cid, "/harmonized/preview"), {"size": "large"}).content))
+        self.assertGreater(max(large.size), max(analyzer_api.THUMBNAIL_SIZE))
+        self.assertEqual(self.client.get(self.url(task, cid, "/source_frame/preview")).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(other.get(self.url(task, cid, "/harmonized/preview")).status_code, status.HTTP_404_NOT_FOUND)
+        chosen = ["as_converted/" + name, "harmonized/" + name]
+        res = self.client.post(download, {"mosaic": chosen + ["harmonized/../conversion.json"]})
+        with zipfile.ZipFile(io.BytesIO(b"".join(res.streaming_content))) as z:
+            self.assertEqual(sorted(z.namelist()), ["mosaics/" + f for f in chosen])
+        self.assertEqual(self.client.post(download, {"mosaic": ["../conversion.json"]}).status_code, status.HTTP_400_BAD_REQUEST)
 
         # Built again: a new build time, so new tile URLs
         built_at = v["built_at"]

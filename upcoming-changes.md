@@ -5,6 +5,18 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **a workset's Mosaics as a table with previews** (the user, 2026-11-02: "Instead of a set of links for
+    Mosaics, can we give them a similar preview and interactive table format like we do for images under the Files
+    table?"), `workset-mosaics-table`. Decided (the user, 2026-11-02): one row per mosaic (As converted, Harmonized),
+    its columns the preview, frames used, size and GSD, and min and max; everything else in the detail pane. The pane,
+    as the Files' (the mosaic under the mouse, or the one clicked; Ctrl/Cmd or Shift for both, downloaded as one zip;
+    Esc unselects): the preview at its own size (click: the picture viewer over both), a button per file, **View
+    mosaic** (the viewer on that tab) and dji-thermal-cli's report (`core.mosaicReportRows`, shared with the viewer). No
+    sorting (two rows). The summary's `mosaics` (`mosaics.summary`, without the bounds), `GET .../mosaics/<kind>/preview`
+    (`mosaics.preview`, `?size=large`), the download's POST taking `mosaic`. `conversions.js` (`mosaicsHtml`,
+    `mosaicDetailHtml`), `analyzer.css`. README, `quickstart-worksets.md`, `api.md`, new `workset-mosaics.png`
+    (`dev/screenshots.js`). Django (in the flight test: the summary, the previews, the zip), Jest (the table, the pane,
+    hover, selection, zip, picture viewer). Live (read only): Roof Sample.
   - Done: **a workset's Mosaics in a section of their own** (the user, 2026-11-02, from `new.md`: "On the Files view
     in a workset, move the Mosaics download links out of the Files section into their own collapsible section below
     Files."), `workset-mosaics-section`. A **Mosaics** toggle below Files, with the file count, shown once mosaics

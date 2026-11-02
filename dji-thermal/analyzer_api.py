@@ -119,6 +119,7 @@ def conversion_summary(task, cid):
     mosaic_job = mosaics.job(task, cid)
     settings = record.get('settings') or {}
     count, size = conversions.files_size(task, cid)
+    built = mosaics.result(task, cid)
     return {
         'id': cid,
         'dataset': str(task.id),
@@ -140,8 +141,9 @@ def conversion_summary(task, cid):
         'mosaic_stage': mosaic_job.get('stage') or {},
         'mosaic_error': mosaic_job.get('error') or '',
         'mosaic_files': mosaics.files(task, cid),
+        'mosaics': mosaics.summary(task, cid, built),
         # Built with frames removed from the workset since: to build again
-        'mosaic_outdated': bool(conversions.removed_paths(task, cid) & set(mosaics.result(task, cid).get('frames') or [])),
+        'mosaic_outdated': bool(conversions.removed_paths(task, cid) & set(built.get('frames') or [])),
         'tasks': [task_summary(t) for t in conversion_tasks.made(task, cid)],
         'file_count': count,
         'size': size,
@@ -590,18 +592,25 @@ class ConversionDownload(DatasetView):
         return download_file_stream(request, zs, 'attachment', download_filename=name + ".zip")
 
     def post(self, request, pk, cid):
-        """Some of the conversion's outputs as a zip (file=<path in the outputs>, several times: a form posted)"""
+        """Some of the conversion's outputs and mosaics' files as a zip (file=<path in the outputs>, mosaic=<kind>/<file>,
+        each several times: a form posted), the mosaics' in mosaics/"""
         task = get_conversion(request, pk, cid)
         out_dir = conversions.output_path(task, cid)
-        wanted = set(request.data.getlist('file') if hasattr(request.data, 'getlist') else request.data.get('file') or [])
-        files = [f for f in conversions.output_files(task, cid) if f in wanted]
-        if not files:
+        mosaic_dir = conversions.path(task, cid, mosaics.MOSAICS_DIR)
+
+        def wanted(key):
+            return set(request.data.getlist(key) if hasattr(request.data, 'getlist') else request.data.get(key) or [])
+        files = [f for f in conversions.output_files(task, cid) if f in wanted('file')]
+        mosaic_files = [f for f in mosaics.files(task, cid) if f in wanted('mosaic')]
+        if not files and not mosaic_files:
             raise ValidationError({'file': "None of these files is in the workset"})
         zs = ZipStream(sized=True)
         for f in files:
             zs.add_path(os.path.join(out_dir, f), f)
+        for f in mosaic_files:
+            zs.add_path(os.path.join(mosaic_dir, f), mosaics.MOSAICS_DIR + '/' + f)
         name = download_name("{}-{}-{}".format(datasets.name_of(task), conversions.record(task, cid).get('name', ''),
-                                               len(files)))
+                                               len(files) + len(mosaic_files)))
         return download_file_stream(request, zs, 'attachment', download_filename=name + ".zip")
 
 
@@ -705,6 +714,19 @@ class Mosaics(DatasetView):
             raise ValidationError({'error': OVER_QUOTA})
         mosaics.start(task, cid)
         return Response(conversion_detail(task, cid))
+
+
+class MosaicPreview(DatasetView):
+    def get(self, request, pk, cid, kind):
+        """A mosaic's preview as a small PNG, for the workset's Mosaics table; with ?size=large, up to LARGE_SIZE, for
+        its detail pane"""
+        task = get_conversion(request, pk, cid)
+        data = mosaics.preview(task, cid, kind, LARGE_SIZE if request.query_params.get('size') == 'large' else THUMBNAIL_SIZE)
+        if data is None:
+            raise NotFound({'error': "The mosaic has no preview"})
+        response = HttpResponse(data, content_type="image/png")
+        response['Cache-Control'] = 'private, max-age=86400'
+        return response
 
 
 class MosaicTile(DatasetView):

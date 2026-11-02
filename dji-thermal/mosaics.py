@@ -20,6 +20,7 @@ offset) and frame models (dji-thermal-cli's FrameModels: where each frame saw a 
 
 import dataclasses
 import functools
+import io
 import json
 import math
 import os
@@ -59,6 +60,9 @@ NO_ADJUST = {'gamma': 1.0, 'equalize': False, 'sharpen': 0.0}
 KEPT_FILES = (measurements.FILE, measurements.FRAMES_FILE)
 # While a workset with frames removed builds its mosaics: links to the frames it keeps, as the dataset holds them
 FRAMES_DIR = "mosaic-frames"
+PREVIEW_FILE = 'mosaic_preview.png'
+# What the workset's Mosaics table shows of a mosaic, as the build keeps it (where it is left out)
+SUMMARY_KEYS = ('frames', 'oblique', 'unusable', 'width', 'height', 'gsd_m', 'normalization', 'report')
 
 
 def conversions_module():
@@ -171,6 +175,40 @@ def files(task, cid):
         if os.path.isdir(d):
             out += sorted('{}/{}'.format(kind, f) for f in os.listdir(d) if os.path.isfile(os.path.join(d, f)))
     return out
+
+
+def summary(task, cid, built=None):
+    """The mosaics built, for the workset's Mosaics table: each one's figures as the viewer reports them (but where it
+    is), its temperature range and its files with their sizes (built: what result returns, when already read)"""
+    built = result(task, cid) if built is None else built
+    out = []
+    for kind, _ in KINDS:
+        info = (built.get('kinds') or {}).get(kind)
+        d = path(task, cid, MOSAICS_DIR, kind)
+        if not info or not os.path.isdir(d):
+            continue
+        temperature = info.get('temperature') or {}
+        names = sorted(f for f in os.listdir(d) if os.path.isfile(os.path.join(d, f)))
+        out.append(dict({k: info.get(k) for k in SUMMARY_KEYS}, kind=kind, unit=built.get('unit'),
+                        min=temperature.get('min'), max=temperature.get('max'), preview=PREVIEW_FILE in names,
+                        files=[{'name': f, 'size': os.path.getsize(os.path.join(d, f))} for f in names]))
+    return out
+
+
+def preview(task, cid, kind, size):
+    """A mosaic's preview, as dji-thermal-cli drew it, scaled down to fit size: PNG bytes (its transparency kept), or
+    None when it has none"""
+    from PIL import Image
+    if kind not in dict(KINDS):
+        return None
+    out = io.BytesIO()
+    try:
+        with Image.open(path(task, cid, MOSAICS_DIR, kind, PREVIEW_FILE)) as im:
+            im.thumbnail(size)
+            im.save(out, 'PNG', optimize=False)
+    except FileNotFoundError:
+        return None
+    return out.getvalue()
 
 
 def kept_frames(root, jpegs, removed, frames_dir):

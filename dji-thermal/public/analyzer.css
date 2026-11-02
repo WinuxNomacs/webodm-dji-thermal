@@ -233,8 +233,10 @@
 
 .ta-page .ta-mosaic-status{ margin-top: 4px; font-size: 13px; }
 .ta-page .ta-file-detail-remove{ margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(128, 128, 128, .3); }
-.ta-page .ta-mosaic-files{ margin: 4px 0 0 14px; font-size: 13px; }
-.ta-page .ta-mosaic-files a{ margin-right: 10px; white-space: nowrap; }
+/* A workset's Mosaics: a table like its Files' */
+.ta-page .ta-mosaics-table tbody tr[data-kind]{ cursor: pointer; }
+.ta-page .ta-mosaics-table tbody tr[data-kind]:hover td{ background: rgba(0, 0, 0, .04); }
+.ta-page .ta-mosaics-table thead th{ cursor: default; }
 
 .ta-viewer{ max-width: none; }
 .ta-viewer .ta-viewer-body{ display: flex; gap: 12px; align-items: stretch; }
