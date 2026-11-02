@@ -172,6 +172,42 @@
   open on `create-task` and earlier pins on the Inspector's). Every screenshot retaken and looked at: the changed
   ones show the user's newer datasets and projects (no place in their names), and `picture-viewer` at the Files
   tab's 1600 × 900.
+- **Top use cases in the README and docs** (the user, 2026-11-02, from `new.md`): "Ensure we mention our top use
+  cases in the readme and documentation. Our quickstart and tutorials should cover most of them as well. Start by
+  building a list of our top use cases including but not limited to: Ability to preview mosaics and normalize,
+  harmonize, change the color palette and much more! Resulting edits of which can then be used to create WebODM
+  models. / Compare Mosaics & Orthophotos and adjust their attributes in realtime / Create a thermal task to avoid
+  preprocessing your DJI thermal images for a WebODM task. / Analyze your results with thermal optimization and
+  analysis tools." Builds on the README's opening, `docs/index.md` and the four quickstarts (all brought up to date
+  by "Documentation up to date"). Proposed: the list of use cases first, for the user to approve (drafted below);
+  then a "What you can do" section near the top of README and `docs/index.md`, each use case a short headline and a
+  line, linked to the quickstart section that walks through it; gaps in the quickstarts filled there, screenshots
+  retaken only where a page changes. Draft list:
+  1. A temperature map straight from the drone's photos: DJI Thermal Task converts the R-JPEGs as they upload, no
+     preprocessing (quickstart-thermal-task).
+  2. Check a flight before processing it: what each photo is, the problems found, coverage, the WebODM options to
+     use, saved as a preset (quickstart-analyzer).
+  3. Preview mosaics without a WebODM task, and try settings on them: normalize, harmonize, palette, measurement
+     values, oblique frames left out; several worksets side by side, then a WebODM task from the one you pick, or
+     several tried in one task (quickstart-worksets 1 to 4).
+  4. Compare mosaics and orthophotos on WebODM's map, swiped or overlaid, adjusting palette, range, brightness,
+     contrast, gamma and isotherms live (quickstart-inspector 3 and 4; the mosaic viewer, quickstart-worksets 3).
+  5. Measure and analyze on the map: temperature under the cursor, pins, lines with profiles, regions with
+     statistics, histograms, surroundings and ΔT, isotherms, saved measurements, emissivity corrections
+     (quickstart-inspector 2, 3, 6, 7).
+  6. Trace a temperature back to its photos: the frames that saw a point, each frame measured in its own pixels or
+     measured again with other values (quickstart-inspector 5; quickstart-worksets "One frame at a time").
+  7. Clean a dataset: hottest frames first, frames without GPS, noisy frames or files removed, oblique frames left
+     out (quickstart-analyzer 3; quickstart-worksets 2).
+  8. Export the temperatures: TIFFs in °C, °F or K, CSV, colour PNGs, R-JPEGs, zips, with the location stripped
+     when sharing (converted-images; quickstart-worksets 2).
+  9. Everything on your own server: no outside service; DJI's own SDK for an administrator who wants it
+     (README, dji-sdk).
+  Decided (the user, 2026-11-02): the list as drafted; the headlines in the user's style, a plain line under each;
+  links to the existing quickstart sections, no new tutorial pages. Done, `use-cases`: "What you can do" in
+  `README.md` (before the link to the documentation) and `docs/index.md` (before the quickstarts), each use case
+  linked to its quickstart section; the README's opening says "three things" (it said "two ways in" over three).
+  The quickstarts already walk through every use case, so they were left as they are and no screenshot changed.
 - **U2. The Workset Creation Settings form** (UX review, 2026-11-02). Dataset page › Worksets › Workset Creation
   Settings:
   - U2-1: a new dataset starts from dji-thermal-cli's defaults, four chips "≠ plan", though step 2 says to start from
