@@ -23,6 +23,28 @@
   Decided (the user, 2026-11-02): **the whole M4T flight** (thermal and RGB); **everything it creates deleted**
   afterwards; **all three flows**: the Thermal Analyzer, DJI Thermal Task (the dashboard's button, its dialog and
   converted task), and the mosaic viewer and frame page.
+  Done (2026-11-02), walked through on a "Live check walk-through" project: New Dataset of the whole flight (434
+  photos, 791 MB, uploaded in about 16 s, analyzed in about 30 s), a workset with the WebODM plan's settings
+  (harmonized, nadir, mosaics: about 4 min to convert, then the mosaics) beside one with the defaults canceled part
+  way, the Mosaics table, the viewer (readout, a click's frames, Open this frame) and the frame page, Create task and
+  Use for parent task, then DJI Thermal Task harmonized with mosaics (all 434 photos picked: uploaded in 15 s,
+  converted and committed in about 2.5 min, processed by node-odx); everything deleted afterwards. Fixed, each with
+  tests:
+  - `poll-retry`: the dataset page, the datasets list, the mosaic viewer and a workset's Files table stopped
+    reloading after one failed request (a dropped connection, WebODM restarting), leaving a job's progress frozen;
+    they try again every few seconds while a job runs. A job whose start fails (Redis not answering) is marked failed
+    with the reason (`datasets.start_job`), instead of running forever with no Celery job to find stale.
+  - `unreachable-message`: a button whose request never reached the server did nothing visible (Create task's
+    stayed disabled); the pages' requests answer it as a refusal, "Could not reach the server: check the connection,
+    then try again." (`core.unreachable`).
+  - `thermal-task-timeouts`: DJI Thermal Task's requests had no timeout, so one dropped request left its upload
+    waiting forever, and normalized, one failed batch removed the whole task; requests sending files now time out
+    (`serverApi.filesTimeout`, as the Analyzer's upload) and a request with no answer is sent again twice
+    (`upload.retried`); a refusal is not.
+  - `untrack-node-modules`: `.gitignore` ignored only a `node_modules/` folder, so a worktree's link of that name
+    could be committed.
+  Larger, planned below: **Jobs left running by a stopped worker** and **Use for parent task with an unreachable
+  node**. Wording and layout found on the way go to the UX review.
 - **UX review of the same workflows** (the user, 2026-11-02, from `new.md`): "As a UX design expert, walk through
   the workflows for creating datasets, worksets and tasks. Look for cumbersome and unintuitive design experiences
   that should be improved upon. Create a Claude Artifact with your findings for us to review after." Builds on the
@@ -31,6 +53,20 @@
   screenshot (no location or serial shown), sorted into quick fixes and larger changes; published as a private
   Artifact for the user to review; nothing changed until they choose. Decided (the user, 2026-11-02): as the walk-through's (the whole
   flight, deleted afterwards, the same three flows).
+- **Jobs left running by a stopped worker** (found in the walk-through, 2026-11-02): when WebODM's worker stops in
+  the middle of a job (`docker restart`, a crash, the machine restarting), Celery never marks the job failed (the
+  message was taken; no result is ever written), so `datasets.check_stale` never finds it gone: the analysis, workset,
+  mosaics or measuring shows as running until the user cancels it, and DJI Thermal Task's task waits for its workset
+  forever. Proposed: each job writes a heartbeat (`updated_at`) with its progress, at least every minute even when a
+  long step reports nothing (a thread in `run_job`); a job without one for several minutes is checked with Celery
+  (`inspect().active()` / `reserved()`, once per check, cached), and marked failed with "The … job stopped before it
+  finished" when no worker has it. Open: how long a queued job (behind another one) may wait before it counts as
+  lost, or whether only jobs that had started count.
+- **Use for parent task with an unreachable node** (found in the walk-through, 2026-11-02): sending a workset to
+  the dataset's own task removes the task's old run from its processing node (`conversion_tasks.clear_parent`,
+  `node.remove_task`) inside the transaction that holds the task's row: a node that doesn't answer holds the request
+  (and the row) for up to a minute (WebODM's client waits 30 s, for the task and then its removal). Proposed: remove it from the node after the transaction, with a short
+  timeout, logged when it fails (the node purges old tasks itself).
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
   - Done: **removing files from a dataset** (the user, 2026-11-02: "For the Files view under dataset we should add the
