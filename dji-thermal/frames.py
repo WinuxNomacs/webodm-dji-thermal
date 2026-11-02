@@ -8,6 +8,7 @@ import functools
 import io
 import math
 import os
+import time
 
 from . import conversions, converter, datasets, inspector, mosaics
 
@@ -294,3 +295,82 @@ def download(task, cid, rel, fmt, changes=None):
             dst.write(values.astype(np.float32), 1)
             dst.update_tags(1, unit=unit_of(task, cid))
         return mem.read(), 'image/tiff', 'tif'
+
+
+# Each frame's figures, for a workset's Files table: measured once in WebODM's worker after it converts (an older
+# workset's the first time its Files are asked for), kept in its folder as {path: figures}
+
+FIGURES_FILE = 'figures.json'
+FIGURES_JOB_FILE = 'figures-job.json'
+
+
+def figures(task, cid):
+    """The figures measured of a workset's frames, {path: frame_figures}, or {} before"""
+    return datasets.read_json(conversions.path(task, cid, FIGURES_FILE))
+
+
+def figures_job(task, cid):
+    return datasets.job(task, conversions.rel(cid, FIGURES_JOB_FILE))
+
+
+def start_figures(task, cid):
+    """Measures (again) a workset's frames in WebODM's worker"""
+    with datasets.locked(task):
+        datasets.write_json(conversions.path(task, cid, FIGURES_JOB_FILE), {'status': 'measuring'})
+    datasets.start_job(task, 'frames', 'measure_all', cid, rel=conversions.rel(cid, FIGURES_JOB_FILE),
+                       running='measuring')
+
+
+def check_stale_figures(task, cid):
+    return datasets.check_stale(task, conversions.rel(cid, FIGURES_JOB_FILE), 'measuring', 'measuring')
+
+
+def frame_figures(path, settings, offset_c):
+    """A frame's figures as a workset converted it (temperatures in °C, its offset subtracted): {min, max, mean,
+    emissivity, reflected, ambient, humidity, distance, distance_source}, min/max/mean None without values"""
+    import numpy as np
+    m = converter.library().measure(path, settings, unit='C')
+    values = np.asarray(m.temperature, dtype=np.float64)
+    found = values[np.isfinite(values) & (values > mosaics.low_value('C'))] - (offset_c or 0.0)
+    p = dict(m.params)
+    stat = (lambda f: float(f(found))) if found.size else (lambda f: None)
+    return {'min': stat(np.min), 'max': stat(np.max), 'mean': stat(np.mean), 'emissivity': p.get('emissivity'),
+            'reflected': p.get('reflection'), 'ambient': p.get('ambient_temp'), 'humidity': p.get('humidity'),
+            'distance': p.get('distance'), 'distance_source': m.distance_source or ""}
+
+
+def measure_all(task_id, run_id, cid):
+    """
+    Measures the frames a workset converted (its task's id), while its run is still run_id; a frame dji-thermal-cli
+    can't measure is left out.
+    :return: what the run did, for the job's result
+    """
+    from app.models import Task
+
+    task = Task.objects.filter(pk=task_id).first()
+    job_rel = conversions.rel(cid, FIGURES_JOB_FILE)
+    if task is None or figures_job(task, cid).get('run_id') != run_id:
+        return {'canceled': True}
+    try:
+        settings = frame_settings(task, cid)
+        harmonized = conversions.harmonized(conversions.record(task, cid).get('settings') or {})
+        files = [f for f in conversions.results(task, cid).get('files') or [] if f.get('ok')]
+        out, written = {}, time.time()
+        for i, f in enumerate(files):
+            try:
+                # The results' own paths, so a workset converted before any analysis is measured too
+                found = os.path.join(datasets.images_path(task), f['path'])
+                out[f['path']] = frame_figures(found, settings, f.get('offset_c') if harmonized else None)
+            except Exception:  # noqa: BLE001, S110 - a frame gone or unreadable has no figures
+                pass
+            if time.time() - written >= conversions.PROGRESS_INTERVAL:
+                written = time.time()
+                if not datasets.update_job(task, if_run=run_id, rel=job_rel, progress=(i + 1) / len(files)):
+                    return {'canceled': True}
+    except Exception as e:  # noqa: BLE001 - shown on the workset's Files
+        datasets.update_job(task, if_run=run_id, rel=job_rel, status='failed', error=str(e) or type(e).__name__,
+                            progress=0, run_id='', finished_at=datasets.now())
+        return {'error': str(e)}
+    if not datasets.finish_job(task, run_id, out, rel=job_rel, result_rel=conversions.rel(cid, FIGURES_FILE)):
+        return {'canceled': True}
+    return {'measured': len(out)}

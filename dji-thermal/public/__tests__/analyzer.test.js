@@ -1427,13 +1427,59 @@ describe("a dataset's conversions", () => {
             files: [{path: "a_T.JPG", ok: true, outputs: ["sub/a_T_temp_c.tiff"], notes: [], distance: 21.4, distance_source: "lrf"},
                     {path: "b_T.JPG", ok: false, reason: "oblique (gimbal pitch -45 above -80)", outputs: [], notes: []}],
             normalization: {ambient_c: 20, reflected_c: 20, frames: 2, without_offset: 0, offset_min: -0.2, offset_max: 0.3}}}), base);
-        expect(files).toContain('href="' + base + '9/download?file=sub%2Fa_T_temp_c.tiff">a_T_temp_c.tiff</a>');
+        // The outputs are downloaded from the detail pane, not the table
+        expect(files).not.toContain("9/download?file=");
         expect(files).toContain("oblique (gimbal pitch -45 above -80)");
         expect(files).toContain("Skipped: oblique (1).");
         expect(conversions.skipReasons([{ok: false, reason: "oblique (gimbal pitch -45 above -80)"}, {ok: false, reason: "no DJI thermal data found (not an R-JPEG)"},
             {ok: false, reason: "oblique (gimbal pitch -30 above -80)"}, {ok: true}])).toEqual([["oblique", 2], ["no DJI thermal data found", 1]]);
-        expect(files).toContain("distance 21.4 m (lrf)");
+        expect(files).toContain('<td class="ta-num" title="lrf">21.4 m</td>');
         expect(files).toContain("offsets -0.20 to 0.30 °C");
+    });
+
+    it("shows each image's figures in a workset's Files, and how far measuring them is", () => {
+        const c = Object.assign({}, CONVERSION, {results: {files: [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: [], distance: 16.4, distance_source: "rangefinder"}]},
+            figures: {"a_T.JPG": {min: 10.04, max: 41.26, mean: 20, emissivity: 0.95, reflected: 19.44, ambient: 21, humidity: 50, distance: 16.4, distance_source: "rangefinder"}},
+            figures_status: "ready"});
+        document.body.innerHTML = conversions.resultsHtml(c, "/x/", {thumbs: "/thumb?file="});
+        const cells = [...document.querySelectorAll(".ta-results tbody td")].map(td => td.textContent);
+        expect(cells).toEqual(["", "a_T.JPG", "Converted", "10.0 °C", "41.3 °C", "0.95", "19.4 °C", "16.4 m", ""]);
+        expect(document.querySelector(".ta-thumb img").getAttribute("src")).toBe("/thumb?file=a_T.JPG");
+        expect(document.querySelector(".ta-figures-progress")).toBeNull();
+        expect(conversions.resultsHtml(Object.assign({}, c, {figures: {}, figures_status: "measuring", figures_progress: 0.4}), "/x/"))
+            .toContain("Measuring the frames for the table: 40%");
+        expect(conversions.resultsHtml(Object.assign({}, c, {figures_status: "failed", figures_error: "no SDK"}), "/x/")).toMatch(/Could not measure the frames for the table: no SDK .*data-act="figures-again"/);
+        // A workset converted before: its figures not measured yet, the columns empty
+        document.body.innerHTML = conversions.resultsHtml(Object.assign({}, c, {figures: undefined}), "/x/");
+        expect([...document.querySelectorAll(".ta-results tbody td")].map(td => td.textContent)[3]).toBe("");
+    });
+
+    it("details one image of a workset with its figures and downloads, or several with their zip", () => {
+        const c = Object.assign({}, CONVERSION, {results: {files: [
+            {path: "sub/a_T.JPG", ok: true, outputs: ["sub/a_T_temp_c.tiff", "sub/a_T_pseudo.png"], notes: ["a note"], offset_c: -0.5},
+            {path: "b_T.JPG", ok: false, reason: "oblique", outputs: [], notes: []}]},
+            figures: {"sub/a_T.JPG": {min: 10, max: 40, mean: 20, emissivity: 0.95, reflected: 19, ambient: 21, humidity: 50, distance: 16.4, distance_source: "rangefinder"}}});
+        const urls = {picture: "/ds/thumbnail", palette: "iron_red", download: "/x/9/download", frameDownload: "/x/9/frame/download", frame: "/p/dataset/5/conversion/9/frame"};
+        expect(conversions.resultDetailHtml(c, [], false, urls)).toBe("");
+        document.body.innerHTML = conversions.resultDetailHtml(c, ["sub/a_T.JPG"], true, urls);
+        expect(document.querySelector(".ta-file-detail-head strong").textContent).toBe("a_T.JPG");
+        expect(document.querySelector('[data-act="detail-close"]')).not.toBeNull();
+        expect(document.querySelector(".ta-file-detail-img").getAttribute("src")).toBe("/ds/thumbnail?size=large&palette=iron_red&file=sub%2Fa_T.JPG");
+        const links = [...document.querySelectorAll(".ta-file-detail-actions a")].map(a => [a.textContent.trim(), a.getAttribute("href")]);
+        expect(links).toEqual([["a_T_temp_c.tiff", "/x/9/download?file=sub%2Fa_T_temp_c.tiff"], ["a_T_pseudo.png", "/x/9/download?file=sub%2Fa_T_pseudo.png"],
+            ["Temperatures (CSV)", "/x/9/frame/download?frame=sub%2Fa_T.JPG&kind=csv"], ["Temperatures (float TIFF)", "/x/9/frame/download?frame=sub%2Fa_T.JPG&kind=tiff"],
+            ["Open frame", "/p/dataset/5/conversion/9/frame?frame=sub%2Fa_T.JPG"]]);
+        const rows = Object.fromEntries([...document.querySelectorAll(".ta-file-detail-table tr")].map(tr => [tr.firstChild.textContent, tr.lastChild.textContent]));
+        expect(rows).toMatchObject({Result: "Converted", Min: "10.0 °C", Max: "40.0 °C", Mean: "20.0 °C", Emissivity: "0.95", Reflected: "19.0 °C",
+            Ambient: "21.0 °C", Humidity: "50 %", Distance: "16.4 m (rangefinder)", "Harmonizing offset": "-0.50 °C", Note: "a note"});
+        // Hovered, not selected: no ×; a skipped image: its reason, nothing to download
+        document.body.innerHTML = conversions.resultDetailHtml(c, ["b_T.JPG"], false, urls);
+        expect(document.querySelector('[data-act="detail-close"]')).toBeNull();
+        expect(document.querySelectorAll(".ta-file-detail-actions a").length).toBe(0);
+        expect(document.querySelector(".ta-file-detail-table").textContent).toContain("oblique");
+        // Several: their files as one zip
+        document.body.innerHTML = conversions.resultDetailHtml(c, ["sub/a_T.JPG", "b_T.JPG"], true, urls);
+        expect(document.querySelector('[data-act="download-selected"]').textContent).toContain("Download their 2 files");
     });
 
     it("converts with the form's settings, polls while it runs, and saves or resets the user's defaults", async () => {
@@ -1579,7 +1625,8 @@ describe("a dataset's conversions", () => {
     it("lets a viewer download the conversions but not convert or delete them", async () => {
         const fetchFn = server({
             [URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS, can_change: false, can_delete: false, conversions: [CONVERSION]}),
-            "/api/plugins/dji-thermal/datasets/5/conversions/9": Object.assign({}, CONVERSION, {results: {files: [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []}]}})
+            "/api/plugins/dji-thermal/datasets/5/conversions/9": Object.assign({}, CONVERSION, {results: {files: [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []},
+                {path: "b_T.JPG", ok: true, outputs: ["b.tiff"], notes: []}]}})
         });
         dataset.init(document, fetchFn);
         await flush();
@@ -1599,8 +1646,32 @@ describe("a dataset's conversions", () => {
         await flush();
         expect(toggle().getAttribute("aria-expanded")).toBe("true");
         expect(list.querySelector('[data-files="9"]').hidden).toBe(false);
-        expect(list.querySelector('[data-files="9"]').innerHTML).toContain("a.tiff");
         expect(JSON.parse(window.localStorage.getItem("dji-thermal-analyzer:files-shown:5"))).toEqual([9]);
+        // The detail pane: none at first, then the image under the mouse, then the one clicked, kept while hovering others
+        const files = list.querySelector('[data-files="9"]');
+        const pane = () => files.querySelector(".ta-file-detail");
+        expect(pane().hidden).toBe(true);
+        const row = path => files.querySelector('.ta-results tbody tr[data-path="' + path + '"]');
+        row("a_T.JPG").dispatchEvent(new MouseEvent("mouseover", {bubbles: true}));
+        expect(pane().hidden).toBe(false);
+        expect(pane().innerHTML).toContain("/conversions/9/download?file=a.tiff");
+        expect(pane().querySelector('[data-act="detail-close"]')).toBeNull();
+        click(row("a_T.JPG").children[1]);
+        expect(row("a_T.JPG").classList.contains("ta-selected")).toBe(true);
+        row("b_T.JPG").dispatchEvent(new MouseEvent("mouseover", {bubbles: true}));
+        expect(pane().querySelector("strong").textContent).toBe("a_T.JPG");
+        // Ctrl-click adds one: both downloaded as a zip, a form posted with their files
+        row("b_T.JPG").children[1].dispatchEvent(new MouseEvent("click", {bubbles: true, ctrlKey: true}));
+        expect(pane().textContent).toContain("2 images selected");
+        const submit = jest.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(function () {
+            expect(this.getAttribute("action")).toBe("/api/plugins/dji-thermal/datasets/5/conversions/9/download");
+            expect([...this.querySelectorAll('input[name="file"]')].map(i => i.value)).toEqual(["a.tiff", "b.tiff"]);
+        });
+        click(pane().querySelector('[data-act="download-selected"]'));
+        expect(submit).toHaveBeenCalledTimes(1);
+        submit.mockRestore();
+        document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape"}));
+        expect(row("a_T.JPG").classList.contains("ta-selected")).toBe(false);
         click(toggle());
         expect(list.querySelector('[data-files="9"]').hidden).toBe(true);
         expect(window.localStorage.getItem("dji-thermal-analyzer:files-shown:5")).toBeNull();
@@ -1618,7 +1689,8 @@ describe("a dataset's conversions", () => {
         expect(order()).toEqual(["a_T.JPG", "b_T.JPG", "c_T.JPG"]);
         expect(order({sort: "path", desc: true})).toEqual(["c_T.JPG", "b_T.JPG", "a_T.JPG"]);
         expect(order({sort: "result", desc: true})).toEqual(["c_T.JPG", "b_T.JPG", "a_T.JPG"]);
-        expect([...document.querySelectorAll(".ta-results th")].map(th => th.getAttribute("data-sort"))).toEqual(["path", "result", null, null]);
+        expect([...document.querySelectorAll(".ta-results th")].map(th => th.getAttribute("data-sort")))
+            .toEqual(["path", "result", "min", "max", "emissivity", "reflected", "distance", null]);
         expect(document.querySelector('.ta-results th[data-sort="result"] .fa-caret-down')).not.toBeNull();
     });
 });

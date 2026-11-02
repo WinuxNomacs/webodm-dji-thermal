@@ -102,6 +102,20 @@ const SHOTS = {
         await openDataset(p, env);
         return p.locator(".ta-conversion").first();
     },
+    "workset-files": async (p, env) => {
+        // The first workset's Files, the detail pane following the mouse on its second image (its figures measured
+        // once, in WebODM's worker, the first time they're asked for)
+        await openDataset(p, env);
+        const first = p.locator(".ta-conversion").first();
+        await first.locator('.ta-conversion-files-head [data-act="files"]').click();
+        const files = first.locator(".ta-conversion-files");
+        await files.locator(".ta-results tbody tr").first().waitFor();
+        await p.waitForFunction(() => !document.querySelector(".ta-figures-progress .fa-spin"), null, {timeout: 120000});
+        await files.locator(".ta-results tbody tr").nth(1).hover();
+        await files.locator(".ta-file-detail-img").waitFor();
+        await p.waitForTimeout(1500);
+        return files;
+    },
     "create-task": async (p, env) => {
         await openDataset(p, env);
         const first = p.locator(".ta-conversion").first();

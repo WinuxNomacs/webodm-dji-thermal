@@ -30,8 +30,8 @@ from app.models import Project, Task
 from app.security import path_traversal_check
 from nodeodm import status_codes
 
-from . import (conversion_tasks, conversions, converter, correction, datasets, inspector, inspector_api, measurements,
-               mosaics, portable)
+from . import (conversion_tasks, conversions, converter, correction, datasets, frames, inspector, inspector_api,
+               measurements, mosaics, portable)
 
 THUMBNAIL_SIZE = (96, 96)
 LARGE_SIZE = (1280, 1280)      # the Files tab's detail pane (?size=large): a frame at its own size, up to this
@@ -157,6 +157,12 @@ def task_summary(t):
 def conversion_detail(task, cid):
     out = conversion_summary(task, cid)
     out['results'] = conversions.results(task, cid)
+    # Each frame's figures for its Files table, as far as they're measured ('' before they're asked for)
+    figures_job = frames.figures_job(task, cid)
+    out['figures'] = frames.figures(task, cid)
+    out['figures_status'] = figures_job['status'] if figures_job['status'] != 'new' else ''
+    out['figures_progress'] = figures_job.get('progress') or 0
+    out['figures_error'] = figures_job.get('error') or ''
     return out
 
 
@@ -429,7 +435,13 @@ class ConversionListCreate(DatasetView):
 class ConversionDetail(DatasetView):
     def get(self, request, pk, cid):
         task = get_conversion(request, pk, cid)
-        return Response(conversion_detail(conversions.check_stale(task, cid), cid))
+        conversions.check_stale(task, cid)
+        frames.check_stale_figures(task, cid)
+        # A workset converted before its frames' figures were measured has them measured, once
+        if (conversions.job(task, cid)['status'] == 'ready' and frames.figures_job(task, cid)['status'] == 'new'
+                and conversions.results(task, cid).get('converted')):
+            frames.start_figures(task, cid)
+        return Response(conversion_detail(task, cid))
 
     def patch(self, request, pk, cid):
         task = get_conversion(request, pk, cid, 'change_project')
@@ -443,6 +455,18 @@ class ConversionDetail(DatasetView):
         task = get_conversion(request, pk, cid, 'change_project')
         conversions.delete(task, cid)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ConversionFigures(DatasetView):
+    def post(self, request, pk, cid):
+        """Measures the frames' figures again (after it failed): as opening the Files does, for whoever can see them"""
+        task = get_conversion(request, pk, cid)
+        frames.check_stale_figures(task, cid)
+        if conversions.job(task, cid)['status'] != 'ready' or not conversions.results(task, cid).get('converted'):
+            raise ValidationError({'figures': "The workset has no converted frames to measure"})
+        if frames.figures_job(task, cid)['status'] != 'measuring':
+            frames.start_figures(task, cid)
+        return Response(conversion_detail(task, cid))
 
 
 class ConversionCancel(DatasetView):
@@ -541,6 +565,21 @@ class ConversionDownload(DatasetView):
         for f in mosaics.files(task, cid):
             zs.add_path(os.path.join(mosaic_dir, f), mosaics.MOSAICS_DIR + '/' + f)
         name = download_name("{}-{}".format(datasets.name_of(task), conversions.record(task, cid).get('name', '')))
+        return download_file_stream(request, zs, 'attachment', download_filename=name + ".zip")
+
+    def post(self, request, pk, cid):
+        """Some of the conversion's outputs as a zip (file=<path in the outputs>, several times: a form posted)"""
+        task = get_conversion(request, pk, cid)
+        out_dir = conversions.output_path(task, cid)
+        wanted = set(request.data.getlist('file') if hasattr(request.data, 'getlist') else request.data.get('file') or [])
+        files = [f for f in conversions.output_files(task, cid) if f in wanted]
+        if not files:
+            raise ValidationError({'file': "None of these files is in the workset"})
+        zs = ZipStream(sized=True)
+        for f in files:
+            zs.add_path(os.path.join(out_dir, f), f)
+        name = download_name("{}-{}-{}".format(datasets.name_of(task), conversions.record(task, cid).get('name', ''),
+                                               len(files)))
         return download_file_stream(request, zs, 'attachment', download_filename=name + ".zip")
 
 
