@@ -84,7 +84,11 @@
   the dataset's own task removes the task's old run from its processing node (`conversion_tasks.clear_parent`,
   `node.remove_task`) inside the transaction that holds the task's row: a node that doesn't answer holds the request
   (and the row) for up to a minute (WebODM's client waits 30 s, for the task and then its removal). Proposed: remove it from the node after the transaction, with a short
-  timeout, logged when it fails (the node purges old tasks itself).
+  timeout, logged when it fails (the node purges old tasks itself). Decided (the user, 2026-11-02): as proposed.
+  Done, `parent-node-timeout`: `conversion_tasks.clear_parent` returns the old run, which `use_for_parent` removes
+  once the task is saved (`remove_old_run`, `NODE_TIMEOUT` = 5 s, a failure logged). Test in `test_analyzer`
+  (`test_a_conversion_sent_to_the_datasets_task_replaces_what_was_sent_there_before`: removed after the save, a node
+  timing out doesn't fail the request).
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
   - Done: **removing files from a dataset** (the user, 2026-11-02: "For the Files view under dataset we should add the
