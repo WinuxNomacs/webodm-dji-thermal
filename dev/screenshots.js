@@ -141,6 +141,8 @@ const SHOTS = {
         return first;
     },
     "dataset-files": async (p, env) => {
+        // Wide enough for all its columns beside the detail pane
+        await p.setViewportSize({width: 1600, height: 900});
         await openDataset(p, env);
         await p.click('#ta-tabs a[data-tab="files"]');
         await p.locator(".ta-files tbody tr.ta-kind-thermal").nth(2).click();

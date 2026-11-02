@@ -124,7 +124,7 @@ photos to temperatures on a map, each done (✓) or a link to where it is done: 
 Then:
 
 - **Files**: every file with its capture time, height, gimbal pitch, temperatures, distance (recorded and the
-  rangefinder's) and emissivity, and the problems that name it; filtered by name, by kind or to those with
+  rangefinder's) and emissivity (the problems that name it in its detail pane); filtered by name, by kind or to those with
   problems, sorted by any column, with thumbnails if you like (in your preferred DJI palette, if you chose one).
   Click a file to open a detail pane beside the table: its picture (a thermal frame drawn from its temperatures in
   your preferred DJI palette, else in the one it was shot in) and everything the analysis read from it (camera, position, gimbal, temperatures, measurement
