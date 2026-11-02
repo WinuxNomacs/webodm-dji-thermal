@@ -16,10 +16,13 @@ export default class WorksetProgress extends React.Component {
 
     constructor(props){
         super(props);
-        this.state = {workset: null, error: null, none: false};
+        this.state = {workset: null, error: null, none: false, starting: false};
     }
 
     componentDidMount(){
+        // In a task's panel, a line of its own above the panel's other buttons (main.js adds it first)
+        const wrapper = this.root && this.root.parentNode;
+        if (wrapper && wrapper.parentNode && wrapper.parentNode.classList.contains("plugin-action-buttons")) wrapper.style.display = "block";
         this.poll();
     }
 
@@ -45,36 +48,55 @@ export default class WorksetProgress extends React.Component {
         });
     };
 
+    handleStart = () => {
+        this.setState({starting: true, error: null});
+        serverApi.startWorksetTask(this.props.projectId, this.props.taskId).then(workset => {
+            if (this.unmounted) return;
+            this.setState({workset, starting: false});
+            if (this.props.onStarted) this.props.onStarted();
+        }, e => {
+            if (!this.unmounted) this.setState({starting: false, error: e.message});
+        });
+    };
+
     text(state, photos){
         switch (state.kind){
         case "waiting": return interpolate(_("Waiting for WebODM's worker to convert the %(count)s photos…"), {count: photos});
         case "converting": return interpolate(_("Converting the %(count)s photos: %(progress)s…"),
                                               {count: photos, progress: state.stage || state.percent + "%"});
         case "committing": return _("Converted: putting the images in the task…");
-        case "started": return _("Converted: the task is processing in WebODM.");
-        case "not_started": return interpolate(_("Converted, but the task could not start: %(error)s"), {error: state.error});
+        case "started": return <React.Fragment><i className="fa fa-check"></i> <strong>{_("Complete!")}</strong> {_("The task is processing in WebODM.")}</React.Fragment>;
+        case "not_started": return state.error ? interpolate(_("Converted, but the task didn't start: %(error)s"), {error: state.error})
+                                               : _("Converted, but the task didn't start.");
         case "failed": return interpolate(_("The conversion failed: %(error)s"), {error: state.error});
         default: return _("The conversion was canceled: the task will not start.");
         }
     }
 
     render(){
-        const { workset, error, none } = this.state;
-        if (none) return "";
-        if (!workset) return <div className="dji-thermal-workset-progress">{error ? interpolate(_("Cannot tell how far the conversion is: %(error)s"), {error}) : _("Asking how far the conversion is…")}</div>;
+        const { workset, error, none, starting } = this.state;
+        if (none) return <span ref={r => { this.root = r; }}></span>;
+        if (!workset) return <div className="dji-thermal-workset-progress" ref={r => { this.root = r; }}>{error ? interpolate(_("Cannot tell how far the conversion is: %(error)s"), {error}) : _("Asking how far the conversion is…")}</div>;
         const state = worksetState(workset);
-        // Normalizing compares the frames before any is written: its stages move a full bar, with no percentage
+        // Normalizing compares the frames before any is written: its stages move a full bar, with no percentage. Done:
+        // the theme's success colour, as WebODM's Completed (its progress-bar-success is the link colour)
         const staged = state.stage && !state.percent;
+        const started = state.kind === "started";
         return (
-            <div className="dji-thermal-workset-progress">
+            <div className="dji-thermal-workset-progress" ref={r => { this.root = r; }}>
                 {state.percent !== undefined ?
                     <div className="progress">
-                        <div className="progress-bar progress-bar-striped active" role="progressbar"
+                        <div className={"progress-bar " + (started ? "progress-bar-success theme-background-success" : "progress-bar-striped active")} role="progressbar"
                              style={{width: (staged ? 100 : state.percent) + "%"}}
                              aria-valuenow={staged ? undefined : state.percent} aria-valuemin="0" aria-valuemax="100">
-                            {staged ? "" : state.percent + "%"}</div>
+                            {staged || started ? "" : state.percent + "%"}</div>
                     </div> : ""}
-                <div>{this.text(state, workset.photos)}</div>
+                <div className={started ? "text-success" : ""}>{this.text(state, workset.photos)}</div>
+                {state.kind === "not_started" ?
+                    <button type="button" className="btn btn-sm btn-primary dji-thermal-workset-start" disabled={starting} onClick={this.handleStart}
+                            title={_("Put the converted images in the task and start it: WebODM's own Start Processing would start it without them")}>
+                        <i className={starting ? "fa fa-circle-notch fa-spin" : "fa fa-play"}></i> {_("Start processing")}
+                    </button> : ""}
                 {error ? <div className="text-warning">{interpolate(_("Cannot tell how far the conversion is: %(error)s"), {error})}</div> : ""}
                 {!state.done ? <div className="help-block">{_("You can refresh or close this page: WebODM's worker converts the photos, then starts the task.")}</div> : ""}
             </div>

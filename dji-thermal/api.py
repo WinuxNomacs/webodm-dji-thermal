@@ -5,6 +5,7 @@ WebODM's API. Photos are converted one per request, so the browser can show each
 expanded panel on the dashboard (main.js) makes a DJI Thermal Analyzer dataset for it here, to hold its photos.
 """
 
+import datetime
 import os
 import shutil
 import tempfile
@@ -185,20 +186,37 @@ class TaskWorkset(APIView):
             raise exceptions.NotFound() from None
         return task
 
-    def get(self, request, project_pk=None, pk=None):
-        """The task's workset converting its photos, as the project page shows its progress (WorksetProgress.jsx):
-        {id, status, progress, stage, error, photos, committed: the task has its images, task_error}"""
+    @staticmethod
+    def workset_of(task):
+        """The workset converting the task's photos (the last one made to go into it), or 404"""
         from . import conversions
-        task = self.get_task(request, project_pk, pk, ('view_project',))
         cid = next((c for c in reversed(conversions.ids(task)) if conversions.record(task, c).get('then')), None)
         if cid is None:
             raise exceptions.NotFound(detail="The task has no workset converting its photos")
+        return cid
+
+    @staticmethod
+    def progress(task, cid):
+        """{id, status, progress, stage, error, photos, committed: the task has its images, task_error,
+        since_converted: seconds since the workset was converted, or None}"""
+        from . import conversions
         conversions.check_stale(task, cid)
         job = conversions.job(task, cid)
-        return Response({'id': cid, 'status': job['status'], 'progress': job.get('progress') or 0,
-                         'stage': job.get('stage') or {}, 'error': job.get('error') or '',
-                         'photos': len(datasets.image_files(task)), 'committed': not task.partial,
-                         'task_error': task.last_error or ''})
+        since = None
+        if job['status'] == 'ready' and job.get('finished_at'):
+            try:
+                finished = datetime.datetime.fromisoformat(job['finished_at'])
+                since = max(0, int((datetime.datetime.now(datetime.timezone.utc) - finished).total_seconds()))
+            except (TypeError, ValueError):
+                pass
+        return {'id': cid, 'status': job['status'], 'progress': job.get('progress') or 0, 'stage': job.get('stage') or {},
+                'error': job.get('error') or '', 'photos': len(datasets.image_files(task)), 'committed': not task.partial,
+                'task_error': task.last_error or '', 'since_converted': since}
+
+    def get(self, request, project_pk=None, pk=None):
+        """The task's workset converting its photos, as the project page shows its progress (WorksetProgress.jsx)"""
+        task = self.get_task(request, project_pk, pk, ('view_project',))
+        return Response(self.progress(task, self.workset_of(task)))
 
     def post(self, request, project_pk=None, pk=None):
         from . import conversions
@@ -212,7 +230,7 @@ class TaskWorkset(APIView):
         if datasets.over_quota(task):
             raise exceptions.ValidationError(detail=OVER_QUOTA)
         sent = request.data.get('settings') if isinstance(request.data.get('settings'), dict) else {}
-        raw = dict(conversions.DEFAULTS, outputs=['temp_c:tiff'], mosaics=True,
+        raw = dict(conversions.DEFAULTS, outputs=['temp_c:tiff'], mosaics=bool(sent.get('mosaics')),
                    normalize=bool(sent.get('normalize')) or bool(sent.get('harmonize')), harmonize=bool(sent.get('harmonize')))
         raw.update({k: sent[k] for k in self.MEASUREMENT if k in sent})
         raw['palette'] = sent.get('palette') or None
@@ -225,3 +243,26 @@ class TaskWorkset(APIView):
         cid = conversions.create(task, "DJI Thermal Task", settings, request.user, then={
             'processing_node': task.processing_node_id, 'auto_processing_node': task.auto_processing_node})
         return Response({'id': cid}, status=status.HTTP_201_CREATED)
+
+
+class TaskWorksetStart(TaskWorkset):
+    """The workset's TIFFs put in the task, which starts processing (conversion_tasks.commit_parent), when that didn't
+    happen once it was converted: the project page's Start processing (WorksetProgress.jsx). WebODM's own would start
+    the task without them."""
+    def get(self, request, project_pk=None, pk=None):
+        raise exceptions.MethodNotAllowed('GET')
+
+    def post(self, request, project_pk=None, pk=None):
+        from . import conversions
+        task = self.get_task(request, project_pk, pk, ('change_project',))
+        cid = self.workset_of(task)
+        if not task.partial:
+            raise exceptions.ValidationError(detail="The task has its images already")
+        conversions.check_stale(task, cid)
+        if conversions.job(task, cid)['status'] != 'ready':
+            raise exceptions.ValidationError(detail="The workset isn't converted")
+        if conversion_tasks.commit_parent(task, cid, conversions.record(task, cid)['then']) is None:
+            task.refresh_from_db()
+            raise exceptions.ValidationError(detail=task.last_error or "The task could not start")
+        task.refresh_from_db()
+        return Response(self.progress(task, cid))

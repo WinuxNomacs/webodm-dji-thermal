@@ -67,5 +67,8 @@ export default {
     worksetProgress: (projectId, taskId) =>
         request({url: `${PLUGIN_API}/projects/${projectId}/tasks/${taskId}/workset`, type: "GET", dataType: "json"}),
 
+    startWorksetTask: (projectId, taskId) =>
+        request({url: `${PLUGIN_API}/projects/${projectId}/tasks/${taskId}/workset/start`, type: "POST", dataType: "json"}),
+
     removeDataset: datasetId => request({url: `${PLUGIN_API}/datasets/${datasetId}`, type: "DELETE"})
 };

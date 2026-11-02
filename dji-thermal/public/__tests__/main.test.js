@@ -44,7 +44,7 @@ const DATASET = "0f1e2d3c-4b5a-4697-8877-665544332211";
 function taskButton(task){
     sideMenu(false);
     loadMain();
-    return global.PluginsAPI.Dashboard.addTaskActionButton.mock.calls[0][0]({task});
+    return global.PluginsAPI.Dashboard.addTaskActionButton.mock.calls[1][0]({task});
 }
 
 test("a dataset's own task gets a Thermal dataset button to the dataset", () => {
@@ -55,10 +55,10 @@ test("a dataset's own task gets a Thermal dataset button to the dataset", () => 
     expect(button.children[1]).toBe(" Thermal dataset");
 });
 
-test("a DJI Thermal Task's partial task shows its workset's progress in its panel, until it is committed", () => {
+test("a DJI Thermal Task's partial task shows its workset's progress first in its panel, until it is committed", () => {
     sideMenu(false);
     loadMain();
-    const add = global.PluginsAPI.Dashboard.addTaskActionButton.mock.calls[1][0];
+    const add = global.PluginsAPI.Dashboard.addTaskActionButton.mock.calls[0][0];
     const progress = add({task: {id: DATASET, project: 12, partial: true, tags: [".dji-thermal-task", ".dji-thermal-dataset"]}});
     expect(progress.props).toEqual({projectId: 12, taskId: DATASET});
     expect(add({task: {id: DATASET, project: 12, partial: false, tags: [".dji-thermal-task"]}})).toBe(null);

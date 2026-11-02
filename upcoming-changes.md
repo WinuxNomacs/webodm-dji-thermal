@@ -5,6 +5,20 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **polish, the progress's place and finish, and no mosaics by default** (the user, 2026-11-01, with a
+    screenshot of the panel: "move the buttons below progress bar and message, or vice versa", a green bar with
+    "Complete!" and a checkmark, "creating a task shouldn't create mosaics by default"), `workset-progress-polish`.
+    Decided (the user): **the task starts by itself**, Complete! once it has; one that didn't gets the plugin's own
+    Start processing (WebODM's would start it without the TIFFs). `main.js` adds the progress first, on a line of its
+    own (`WorksetProgress` sets its wrapper to block); the finished bar in the theme's success colour
+    (`theme-background-success`, as WebODM's Completed; its `progress-bar-success` is the link colour);
+    `worksetProgress.js` `not_started` also when still waiting a minute after the conversion (`since_converted`,
+    `START_S`); `api.py` `TaskWorksetStart` (`workset/start`), `mosaics` off unless sent; `ThermalTaskPanel.jsx`
+    "Also build the workset's mosaics" (with Normalize, off). README, `quickstart-thermal-task.md`,
+    `troubleshooting.md`, `api.md`. `test_api.py` (1 new, 2 changed), `worksetProgress.test.js`, `main.test.js`.
+    Live (read only): Thermal-Fulgurite (converted by the old worker, never committed) showed "Converted, but the
+    task didn't start" with Start processing (not pressed); a faked started answer the green Complete!; the panel's
+    tick box with Harmonize.
   - Done: **polish, a DJI Thermal Task's conversion shows its progress** (the user, 2026-11-01, with a screenshot of
     the "Thermal task created" message: "is there a way for this to show progress? Otherwise the page appears hung
     and I'm afraid to refresh."), `workset-progress`. Decided (the user): **in the message and in the task's panel**
