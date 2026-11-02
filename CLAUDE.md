@@ -83,4 +83,6 @@ The `test`, `live-check`, `release-check` and `docs` skills in `.claude/skills` 
   and WebODM's `run_function_async` sends a function's lines from the changed file (a `KeyError` naming the
   function). Ask the user to restart it (`docker restart dt-worker`) before a check that runs jobs.
 - After changing `requirements.txt`, reload the dev server (touch `dji-thermal/plugin.py`) and check the version it
-  installed in `app/media/plugins/dji-thermal/site-packages` (in `dt-webapp`).
+  installed in `app/media/plugins/dji-thermal/site-packages` (in `dt-webapp`). Pin a version only once it is on PyPI: WebODM
+  checks the installed packages by name only, so a failed install still records the file as installed
+  (`site-packages/install_md5`); remove that file and reload to install again.
