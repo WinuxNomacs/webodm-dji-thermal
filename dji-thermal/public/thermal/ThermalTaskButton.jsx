@@ -64,13 +64,14 @@ export default class ThermalTaskButton extends React.Component {
                 <button type="button" className="close" title={_("Close")} onClick={() => this.setState({result: null})}><span aria-hidden="true">&times;</span></button>
                 {r.workset ?
                     <React.Fragment>
-                        {interpolate(r.frames.harmonize ? _("Thermal task created: its %(count)s photos are being harmonized in a workset of its") :
-                                     _("Thermal task created: its %(count)s photos are being normalized in a workset of its"), {count: r.total})}
+                        {interpolate(r.frames.harmonize ? _("Thermal task created: its %(count)s thermal photos are being harmonized in a workset of its") :
+                                     _("Thermal task created: its %(count)s thermal photos are being normalized in a workset of its"), {count: r.thermal})}
                         {" "}<a href={"/plugins/dji-thermal/dataset/" + r.dataset}>{_("DJI Thermal Analyzer dataset")}</a>
                         {". " + _("It starts processing once they are converted.")}
                         <WorksetProgress projectId={this.props.projectId} taskId={r.task.id} onStarted={this.props.onNewTaskAdded} />
                     </React.Fragment>
                 : interpolate(_("Thermal task created with %(count)s images."), {count: r.converted.length})}
+                {r.oblique ? " " + interpolate(_("%(count)s oblique photos left out."), {count: r.oblique}) : ""}
                 {r.dataset && !r.workset ? <React.Fragment>{" "}{_("Its photos are in a")}{" "}
                     <a href={"/plugins/dji-thermal/dataset/" + r.dataset}>{_("DJI Thermal Analyzer dataset")}</a>
                     {r.analysisError ? ", " + interpolate(_("not analyzed yet: %(error)s"), {error: r.analysisError}) : ""}.</React.Fragment> : ""}

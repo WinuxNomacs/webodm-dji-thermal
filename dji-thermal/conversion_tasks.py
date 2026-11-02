@@ -32,6 +32,7 @@ whose own preference is each image's palette): chosen in DJI Thermal Task, or th
 import os
 import re
 import shutil
+import time
 
 from django.core.exceptions import SuspiciousFileOperation
 from django.db import transaction
@@ -48,6 +49,7 @@ PARENT_FILE = 'parent.json'
 TIFF_SUFFIX = '_temp_c.tiff'
 MIN_FRAMES = 2      # as WebODM's own task creation
 NODE_TIMEOUT = 5    # seconds a processing node may take to remove a task's old run (remove_old_run)
+ANALYSIS_WAIT_SECONDS = 10 * 60     # a converted DJI Thermal Task's wait for the analysis its options come from
 FROM_TAG = '.dji-thermal-from-'     # then the dataset's id; hidden, as datasets.TAG
 THERMAL_TASK_TAG = '.dji-thermal-task'  # a task made by the Thermal Task button (public/thermal/upload.js)
 TASK_FILE = 'task.json'
@@ -328,10 +330,11 @@ def remove_old_run(node, uuid):
         datasets.logger.warning("Could not remove {} from its processing node: {}".format(uuid, e))
 
 
-def use_for_parent(task, cid, user=None):
+def use_for_parent(task, cid, user=None, with_plan=False):
     """
     The conversion's TIFFs in the dataset's own task, in place of the images sent there before and what it processed
-    from them, waiting for a processing node. Its options are kept; a task without any gets the plan's recommended ones.
+    from them, waiting for a processing node. Its options are kept; a task without any gets the plan's recommended ones,
+    and so does one with_plan (DJI Thermal Task's, left as its panel started them), over its own.
     :return: the task
     :raises ValueError: the task is processing, or the TIFFs are no longer on the server
     """
@@ -348,8 +351,10 @@ def use_for_parent(task, cid, user=None):
             t.save()
             raise ValueError("The workset's TIFFs are no longer on the server")
         t.images_count = count
-        if not t.options:
-            options = [{'name': o['name'], 'value': o['value']} for o in plan_options(task) if o['recommended']]
+        if not t.options or with_plan:
+            recommended = [{'name': o['name'], 'value': o['value']} for o in plan_options(task) if o['recommended']]
+            names = {o['name'] for o in recommended}
+            options = [o for o in t.options or [] if o.get('name') not in names] + recommended
             serializer = TaskSerializer(t, data={'options': options}, partial=True)
             serializer.is_valid(raise_exception=True)
             t.options = serializer.validated_data['options']
@@ -363,6 +368,22 @@ def use_for_parent(task, cid, user=None):
         datasets.write_json(datasets.data_path(task, PARENT_FILE), {
             'conversion': cid, 'sent_at': datasets.now(), 'sent_by': getattr(user, 'username', None)})
     return t
+
+
+def awaits_plan(task, then):
+    """The task's options wait for the dataset's analysis still running (api.py TaskWorkset: 'plan_options')"""
+    return bool(then.get('plan_options')) and datasets.job(datasets.check_stale(task))['status'] == 'analyzing'
+
+
+def wait_for_plan(task, then, timeout=ANALYSIS_WAIT_SECONDS):
+    """The worker, its workset converted: waits up to timeout for the analysis the task's options come from. :return:
+    whether it finished"""
+    deadline = time.monotonic() + timeout
+    while awaits_plan(task, then):
+        if time.monotonic() > deadline:
+            return False
+        time.sleep(2)
+    return True
 
 
 def commit_parent(task, cid, then):
@@ -387,7 +408,7 @@ def commit_parent(task, cid, then):
                 with open(task.get_image_path(name), 'rb') as f:
                     texts[name] = f.read()
         try:
-            t = use_for_parent(task, cid)
+            t = use_for_parent(task, cid, with_plan=bool(then.get('plan_options')))
         except Exception as e:  # noqa: BLE001 - shown on the task
             Task.objects.filter(pk=task.pk).update(last_error=str(e) or type(e).__name__)
             return None

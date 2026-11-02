@@ -70,9 +70,10 @@ export default {
 
     analyzeDataset: datasetId => request({url: `${PLUGIN_API}/datasets/${datasetId}/analyze`, type: "POST", dataType: "json"}),
 
-    startWorkset: (projectId, taskId, settings) => request({
+    // more: {plan_options, frames} (api.py TaskWorkset)
+    startWorkset: (projectId, taskId, settings, more) => request({
         url: `${PLUGIN_API}/projects/${projectId}/tasks/${taskId}/workset`, type: "POST", contentType: "application/json",
-        data: JSON.stringify({settings}), dataType: "json"
+        data: JSON.stringify(Object.assign({settings}, more)), dataType: "json"
     }),
 
     worksetProgress: (projectId, taskId) =>

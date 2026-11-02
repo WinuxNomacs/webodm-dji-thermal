@@ -211,10 +211,42 @@ describe("a thermal task's upload", () => {
         expect(api.uploadToDataset.mock.calls.map(c => c[1].length)).toEqual([10, 2]);
         expect(progress).toEqual([10, 12]);
         expect(await readText(api.uploadFiles.mock.calls[0][2][0])).toContain("DJI_0001_T_temp_c.tiff gcp1");
-        expect(api.startWorkset).toHaveBeenCalledWith(7, "t1", {unit: "C", distance: "lrf", normalize: true, harmonize: false, mosaics: false});
+        expect(api.startWorkset).toHaveBeenCalledWith(7, "t1", {unit: "C", distance: "lrf", normalize: true, harmonize: false, mosaics: false,
+                                                               max_pitch: null}, {plan_options: false, frames: 11});
         expect(api.convert).not.toHaveBeenCalled();
         expect(api.commit).not.toHaveBeenCalled();
-        expect(result).toMatchObject({dataset: "d1", workset: "w1", frames: {normalize: true, harmonize: false}, total: 12});
+        expect(result).toMatchObject({dataset: "d1", workset: "w1", frames: {normalize: true, harmonize: false}, total: 12, thermal: 11});
+    });
+
+    test("normalized, every photo is uploaded, the workset is given the pitch limit and the frames it keeps, and the plan's options asked for", async () => {
+        const api = fakeApi();
+        const thermal = [photo("DJI_0001_T.JPG"), photo("DJI_0002_T.JPG"), photo("DJI_0003_T.JPG")];
+        const pitches = new Map([[thermal[0], -90], [thermal[1], -45], [thermal[2], null]]);
+        const job = upload(api, thermal, {frames: {harmonize: true}, maxPitch: -80, pitches, planOptions: true,
+                                          otherPhotos: [photo("DJI_0001_V.JPG")]});
+        expect(job.initialProgress()).toMatchObject({done: 0, total: 4, uploading: true});
+        const result = await job.start();
+        expect(api.uploadToDataset.mock.calls[0][1].map(f => f.name)).toEqual(["DJI_0001_T.JPG", "DJI_0002_T.JPG", "DJI_0003_T.JPG", "DJI_0001_V.JPG"]);
+        expect(api.startWorkset.mock.calls[0][2]).toMatchObject({max_pitch: -80, harmonize: true});
+        // A photo whose pitch isn't known is kept, as the workset does
+        expect(api.startWorkset.mock.calls[0][3]).toEqual({plan_options: true, frames: 2});
+        expect(result).toMatchObject({thermal: 2, oblique: 1});
+    });
+
+    test("as is, the oblique photos are not converted but go to the dataset with the other photos", async () => {
+        const api = fakeApi();
+        const thermal = [photo("DJI_0001_T.JPG"), photo("DJI_0002_T.JPG"), photo("DJI_0003_T.JPG")];
+        const pitches = new Map([[thermal[0], -90], [thermal[1], -45], [thermal[2], -85]]);
+        const job = upload(api, thermal, {keepPhotos: true, maxPitch: -80, pitches, otherPhotos: [photo("DJI_0001_V.JPG")]});
+        expect(job.initialProgress()).toMatchObject({done: 0, total: 2});
+        const result = await job.start();
+        expect(api.calls.sort()).toEqual(["DJI_0001_T.JPG", "DJI_0003_T.JPG"]);
+        expect(api.uploadToDataset.mock.calls[0][1].map(f => f.name)).toEqual(["DJI_0002_T.JPG", "DJI_0001_V.JPG"]);
+        expect(result).toMatchObject({oblique: 1, total: 2});
+        // No limit: every photo
+        const all = fakeApi();
+        await upload(all, thermal, {pitches}).start();
+        expect(all.calls.length).toBe(3);
     });
 
     test("the workset's mosaics are asked for when ticked, and only for a normalized task", async () => {
