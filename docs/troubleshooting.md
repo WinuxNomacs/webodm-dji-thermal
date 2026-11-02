@@ -59,7 +59,9 @@ again once WebODM answers.
 
 **"The … job stopped before it finished"**
 
-WebODM's worker stopped while running it, for example when WebODM restarted. Start it again.
+WebODM's worker stopped while running it, for example when WebODM restarted or its worker crashed. A job the worker
+has started and stopped hearing from for five minutes is marked so; a job still waiting its turn behind others is
+not. Start it again.
 
 **"The job could not be started (…). Try again in a moment."**
 

@@ -72,8 +72,14 @@
   forever. Proposed: each job writes a heartbeat (`updated_at`) with its progress, at least every minute even when a
   long step reports nothing (a thread in `run_job`); a job without one for several minutes is checked with Celery
   (`inspect().active()` / `reserved()`, once per check, cached), and marked failed with "The … job stopped before it
-  finished" when no worker has it. Open: how long a queued job (behind another one) may wait before it counts as
-  lost, or whether only jobs that had started count.
+  finished" when no worker has it. Decided (the user, 2026-11-02): **only jobs that have started count**; a job
+  waiting in the queue is never marked lost. Done, `stopped-worker-jobs`: `datasets.run_job` starts a thread
+  (`datasets.beat`) writing `heartbeat_at` in the job's file every minute while the job is its run; `check_stale`
+  marks a running job failed when its heartbeat is over five minutes old (`datasets.silent`), as well as when Celery
+  reports it failed. A queued job has no heartbeat, so it waits however long. Without the Celery inspect check: a
+  live worker's thread keeps beating, so a silent heartbeat is enough. A worker running an older copy of the plugin
+  skips the heartbeat. Tests in `test_analyzer` (`...heartbeat_stopped_is_marked_failed_but_a_queued_one_keeps_waiting`,
+  `...writes_its_heartbeat_only_while_it_is_the_jobs_run`); `docs/troubleshooting.md`.
 - **Use for parent task with an unreachable node** (found in the walk-through, 2026-11-02): sending a workset to
   the dataset's own task removes the task's old run from its processing node (`conversion_tasks.clear_parent`,
   `node.remove_task`) inside the transaction that holds the task's row: a node that doesn't answer holds the request
