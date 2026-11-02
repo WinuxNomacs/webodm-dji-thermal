@@ -549,6 +549,9 @@ def convert(task_id, run_id, cid):
         left_behind(task, cid)
         return {'canceled': True}
     datasets.update_size(task)
+    if ok:
+        from . import frames
+        frames.start_figures(task, cid)
     then = record(task, cid).get('then')
     if ok and then:
         from . import conversion_tasks

@@ -18,6 +18,7 @@
     ];
     var GIMBAL = [["gimbal_yaw", "Yaw"], ["gimbal_pitch", "Pitch"], ["gimbal_roll", "Roll"]];
     var RESULTS_SHOWN = 500;   // files listed in a conversion's results
+    var FIGURES_POLL_MS = 2000;     // a conversion's Files loaded again while its frames are being measured
 
     // The settings that are temperatures (in the settings' unit, the files'): the form shows them in the user's
     var TEMPERATURES = ["reflected_temp", "ambient_temp", "range_min", "range_max", "replace_above", "replace_above_value",
@@ -626,10 +627,35 @@
         return Object.keys(counts).map(function (r) { return [r, counts[r]]; }).sort(function (a, b) { return b[1] - a[1]; });
     }
 
-    var RESULT_COLUMNS = [{key: "path", label: "Image"}, {key: "result", label: "Result"}, {label: "Outputs"}, {label: "Notes"}];
+    var RESULT_COLUMNS = [{key: "path", label: "Image"}, {key: "result", label: "Result"}, {key: "min", label: "Min"}, {key: "max", label: "Max"},
+        {key: "emissivity", label: "Emissivity"}, {key: "reflected", label: "Reflected"}, {key: "distance", label: "Distance"}, {label: "Notes"}];
 
-    // What a conversion wrote for each image, with each output's download, sorted (view: {sort: a sortable
-    // RESULT_COLUMNS key, desc}; by image, ascending, at first)
+    // A conversion's images with their figures (c: the conversion as its detail has it, with its figures), sorted as
+    // the view has them (view: {sort: a sortable RESULT_COLUMNS key, desc}; by image, ascending, at first)
+    function resultRows(c, view) {
+        view = view || {};
+        var figures = c.figures || {};
+        var rows = ((c.results || {}).files || []).map(function (f) {
+            return Object.assign({}, f, figures[f.path] || {}, {result: f.ok ? "Converted" : "Skipped: " + (f.reason || "")});
+        });
+        return core.sortRows(rows, view.sort || "path", !!view.desc);
+    }
+
+    // How far measuring the frames' figures is, above the table ("" once they are)
+    function figuresHtml(c) {
+        if (c.figures_status === "measuring") {
+            return '<p class="text-muted ta-figures-progress"><i class="fa fa-circle-notch fa-spin"></i> Measuring the frames for the table: ' +
+                Math.round((c.figures_progress || 0) * 100) + "%…</p>";
+        }
+        if (c.figures_status === "failed") {
+            return '<p class="text-warning ta-figures-progress">Could not measure the frames for the table: ' + esc(c.figures_error) +
+                ' <button type="button" class="btn btn-default btn-xs" data-act="figures-again"><i class="fa fa-redo"></i> Measure again</button></p>';
+        }
+        return "";
+    }
+
+    // What a conversion wrote for each image, with its figures, sorted (view: {sort, desc} as resultRows', selected:
+    // the paths selected, thumbs: the source frames' thumbnail URL, followed by the path); its detail pane beside it
     function resultsHtml(c, base, view) {
         view = view || {};
         var r = c.results || {};
@@ -647,31 +673,81 @@
         if (reasons.length) html += '<p class="ta-skip-reasons">Skipped: ' + reasons.map(function (r) {
             return esc(r[0]) + " (" + r[1] + ")";
         }).join(", ") + ".</p>";
-        var sort = view.sort || "path";
-        var rows = core.sortRows(files.map(function (f) {
-            return Object.assign({}, f, {result: f.ok ? "Converted" : "Skipped: " + (f.reason || "")});
-        }), sort, !!view.desc);
-        html += '<div class="ta-table-scroll"><table class="table table-condensed ta-results"><thead><tr>' + RESULT_COLUMNS.map(function (col) {
-            if (!col.key) return "<th>" + esc(col.label) + "</th>";
-            var arrow = sort === col.key ? ' <i class="fa fa-caret-' + (view.desc ? "down" : "up") + '"></i>' : "";
-            return '<th data-sort="' + col.key + '" title="Sort by ' + esc(col.label.toLowerCase()) + '">' + esc(col.label) + arrow + "</th>";
-        }).join("") + "</tr></thead><tbody>" +
+        html += figuresHtml(c);
+        var sort = view.sort || "path", selected = view.selected || [];
+        var rows = resultRows(c, view);
+        var temp = function (v) { return esc(core.formatTemp(v, "C", 1)); };
+        html += '<div class="ta-files-layout"><div class="ta-files-table"><div class="ta-table-scroll"><table class="table table-condensed ta-results"><thead><tr>' +
+            (view.thumbs ? "<th></th>" : "") + RESULT_COLUMNS.map(function (col) {
+                if (!col.key) return "<th>" + esc(col.label) + "</th>";
+                var arrow = sort === col.key ? ' <i class="fa fa-caret-' + (view.desc ? "down" : "up") + '"></i>' : "";
+                return '<th data-sort="' + col.key + '" title="Sort by ' + esc(col.label.toLowerCase()) + '">' + esc(col.label) + arrow + "</th>";
+            }).join("") + "</tr></thead><tbody>" +
             rows.slice(0, RESULTS_SHOWN).map(function (f) {
-                var outputs = (f.outputs || []).map(function (o) {
-                    return '<a href="' + esc(base + c.id + "/download?file=" + encodeURIComponent(o)) + '">' + esc(o.split("/").pop()) + "</a>";
-                }).join("<br>");
-                var notes = (f.notes || []).slice();
-                if (f.distance_source) notes.unshift("distance " + core.formatNumber(f.distance, 1, " m") + " (" + f.distance_source + ")");
-                return '<tr class="' + (f.ok ? "" : "ta-skipped") + '"><td>' + esc(f.path) + "</td><td>" +
+                return '<tr class="' + (f.ok ? "" : "ta-skipped") + (selected.indexOf(f.path) >= 0 ? " ta-selected" : "") + '" data-path="' + esc(f.path) + '">' +
+                    (view.thumbs ? '<td class="ta-thumb"><img loading="lazy" alt="" src="' + esc(view.thumbs + encodeURIComponent(f.path)) + '"></td>' : "") +
+                    "<td>" + esc(f.path) + "</td><td>" +
                     (f.ok ? '<span class="text-success">Converted</span>' : '<span class="text-warning">Skipped</span>: ' + esc(f.reason)) +
-                    "</td><td>" + outputs + "</td><td>" + esc(notes.join("; ")) + "</td></tr>";
+                    '</td><td class="ta-num">' + temp(f.min) + '</td><td class="ta-num">' + temp(f.max) + '</td><td class="ta-num">' +
+                    esc(core.formatNumber(f.emissivity, 2)) + '</td><td class="ta-num">' + temp(f.reflected) + '</td><td class="ta-num"' +
+                    (f.distance_source ? ' title="' + esc(f.distance_source) + '"' : "") + ">" + esc(core.formatNumber(f.distance, 1, " m")) + "</td><td>" +
+                    esc((f.notes || []).join("; ")) + "</td></tr>";
             }).join("") + "</tbody></table></div>";
         if (files.length > RESULTS_SHOWN) html += '<p class="text-muted">And ' + (files.length - RESULTS_SHOWN) + " more: download all to see them.</p>";
+        html += '</div><aside class="ta-file-detail" hidden></aside></div>';
         var mosaicFiles = c.mosaic_files || [];
         if (mosaicFiles.length) html += '<p class="ta-mosaic-files"><strong>Mosaics:</strong> ' + mosaicFiles.map(function (f) {
             return '<a href="' + esc(base + c.id + "/download?mosaic=" + encodeURIComponent(f)) + '">' + esc(f) + "</a>";
         }).join(", ") + "</p>";
         return html;
+    }
+
+    // What a conversion's detail pane shows of one image, as [label, value] (values as shown, empty ones left out)
+    function resultDetailRows(f) {
+        var temp = function (v) { return core.formatTemp(v, "C", 1); };
+        var rows = [["Result", f.ok ? "Converted" : "Skipped"], ["Reason", f.ok ? "" : f.reason], ["Min", temp(f.min)], ["Max", temp(f.max)],
+            ["Mean", temp(f.mean)], ["Emissivity", core.formatNumber(f.emissivity, 2)], ["Reflected", temp(f.reflected)], ["Ambient", temp(f.ambient)],
+            ["Humidity", core.formatNumber(f.humidity, 0, " %")],
+            ["Distance", core.formatNumber(f.distance, 1, " m") + (f.distance_source && f.distance !== null && f.distance !== undefined ? " (" + f.distance_source + ")" : "")],
+            ["Harmonizing offset", core.formatDelta(f.offset_c, "C", 2, true)]];
+        (f.notes || []).forEach(function (n) { rows.push(["Note", n]); });
+        return rows.filter(function (row) { return row[1] !== "" && row[1] !== null && row[1] !== undefined; });
+    }
+
+    // The detail pane of a conversion's images selected, or of the one under the mouse; "" for none (urls: {picture:
+    // the dataset's thumbnail URL, palette: the user's preferred DJI palette or "", download: the conversion's
+    // download URL, frameDownload: its frame download URL, frame: its frame page or null})
+    function resultDetailHtml(c, paths, selected, urls) {
+        if (!paths.length) return "";
+        var close = selected ? '<button type="button" class="close" data-act="detail-close" title="Unselect" aria-label="Unselect">&times;</button>' : "";
+        var rows = resultRows(c, {});
+        if (paths.length > 1) {
+            var outputs = rows.filter(function (f) { return paths.indexOf(f.path) >= 0; }).reduce(function (n, f) { return n + (f.outputs || []).length; }, 0);
+            return '<div class="ta-file-detail-head"><strong>' + paths.length + " images selected</strong>" + close + "</div>" +
+                (outputs ? '<button type="button" class="btn btn-primary btn-sm" data-act="download-selected"><i class="fa fa-download"></i> Download their ' +
+                    outputs + " files</button>" : '<p class="text-muted">None of them was converted.</p>') +
+                '<p class="text-muted ta-files-hint">As a zip of the files the workset wrote for them. Ctrl/Cmd-click adds or removes an image, Shift-click a range.</p>';
+        }
+        var f = rows.filter(function (x) { return x.path === paths[0]; })[0];
+        if (!f) return "";
+        var picture = urls.picture + (urls.picture.indexOf("?") >= 0 ? "&" : "?") + "size=large&" + (urls.palette ? "palette=" + encodeURIComponent(urls.palette) + "&" : "") + "file=" + encodeURIComponent(f.path);
+        var frame = urls.frame && f.ok ? urls.frame + "?frame=" + encodeURIComponent(f.path) : null;
+        var temperatures = f.ok ? ["csv", "tiff"].map(function (kind) {
+            return '<a class="btn btn-default btn-xs" href="' + esc(urls.frameDownload + "?frame=" + encodeURIComponent(f.path) + "&kind=" + kind) +
+                '" title="The frame\'s temperatures, as the workset measured it, in its unit"><i class="fa fa-download"></i> ' +
+                (kind === "csv" ? "Temperatures (CSV)" : "Temperatures (float TIFF)") + "</a>";
+        }).join(" ") : "";
+        return '<div class="ta-file-detail-head"><strong title="' + esc(f.path) + '">' + esc(f.path.split("/").pop()) + "</strong>" + close + "</div>" +
+            '<a href="' + esc(picture) + '" target="_blank" rel="noopener" data-act="view-picture" data-path="' + esc(f.path) +
+                '" title="View the picture"><img class="ta-file-detail-img" alt="" src="' + esc(picture) + '"></a>' +
+            '<div class="ta-file-detail-actions">' + (f.outputs || []).map(function (o) {
+                return '<a class="btn btn-primary btn-xs" href="' + esc(urls.download + "?file=" + encodeURIComponent(o)) + '" title="' + esc(o) +
+                    '"><i class="fa fa-download"></i> ' + esc(o.split("/").pop()) + "</a>";
+            }).join(" ") + (temperatures ? " " + temperatures : "") +
+            (frame ? ' <a class="btn btn-default btn-xs" href="' + esc(frame) + '"><i class="fa fa-th-large"></i> Open frame</a>' : "") + "</div>" +
+            '<table class="table table-condensed ta-file-detail-table"><tbody>' + resultDetailRows(f).map(function (row) {
+                return "<tr><th>" + esc(row[0]) + "</th><td>" + esc(row[1]) + "</td></tr>";
+            }).join("") + "</tbody></table>";
     }
 
     // ctx: {doc, fetchFn, api, csrf, datasetId, onChange (the dataset's conversions changed: reload it)}
@@ -683,6 +759,12 @@
         var storage = ctx.storage !== undefined ? ctx.storage : root.localStorage;
         var open = shownFiles(storage, ctx.datasetId);    // the worksets whose Files are shown, kept in the browser
         var results = {}, sorts = {};                     // each one's files as loaded, and how its table is sorted
+        var picks = {}, polls = {};                       // each one's images selected and under the mouse; its reload while measuring
+        // The source frames' thumbnails and pictures, in the user's preferred DJI palette when they have one
+        var palette = core.preferences().palette || "";
+        // (a workset's own frames, even in a dataset never analyzed)
+        var thumbnailUrl = ctx.api + "datasets/" + ctx.datasetId + "/thumbnail";
+        var thumbsUrl = function (id) { return thumbnailUrl + "?workset=" + id + "&" + (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file="; };
         var fresh = null; // the conversion just started, highlighted for a few seconds
         var editing = null; // the form unfolded: at first only for a dataset without conversions, then once opened
         var menu = null;    // the conversion whose menu is open
@@ -838,17 +920,123 @@
             });
         }
 
-        function renderFiles(id) {
-            var el = panel.querySelector('[data-files="' + id + '"]');
-            if (el && results[id]) el.innerHTML = resultsHtml(results[id], base, sorts[id]);
-            else if (el) el.innerHTML = '<p class="text-muted">Loading…</p>';
+        function pick(id) {
+            if (!picks[id]) picks[id] = {selected: [], anchor: null, hovered: null};
+            return picks[id];
         }
 
+        function filesPanel(id) { return panel.querySelector('[data-files="' + id + '"]'); }
+
+        function renderFiles(id) {
+            var el = filesPanel(id);
+            if (el && results[id]) {
+                el.innerHTML = resultsHtml(results[id], base, Object.assign({}, sorts[id], {selected: pick(id).selected, thumbs: thumbsUrl(id)}));
+                renderDetail(id);
+            } else if (el) el.innerHTML = '<p class="text-muted">Loading…</p>';
+        }
+
+        // A workset's detail pane: the images selected, else the one under the mouse
+        function detailUrls(id) {
+            return {picture: thumbnailUrl + "?workset=" + id, palette: palette, download: base + id + "/download", frameDownload: base + id + "/frame/download",
+                    frame: viewerBase ? viewerBase + id + "/frame" : null};
+        }
+
+        function renderDetail(id) {
+            var el = filesPanel(id), pane = el && el.querySelector(".ta-file-detail");
+            if (!pane || !results[id]) return;
+            var p = pick(id);
+            var paths = p.selected.length ? p.selected : p.hovered ? [p.hovered] : [];
+            var html = resultDetailHtml(results[id], paths, p.selected.length > 0, detailUrls(id));
+            pane.hidden = !html;
+            if (pane.innerHTML !== html) pane.innerHTML = html;
+        }
+
+        // The selection changed: the rows marked (the table kept as it is, scrolled where it was) and the pane
+        function selectionChanged(id) {
+            var el = filesPanel(id);
+            if (!el) return;
+            [].forEach.call(el.querySelectorAll(".ta-results tbody tr[data-path]"), function (tr) {
+                tr.classList.toggle("ta-selected", pick(id).selected.indexOf(tr.getAttribute("data-path")) >= 0);
+            });
+            renderDetail(id);
+        }
+
+        // A click on a row: it alone selected (unselected when it was), Ctrl/Cmd adds or removes it, Shift the range
+        // from the last one clicked, in the table's order
+        function selectRow(id, path, e) {
+            var p = pick(id);
+            if (e.shiftKey && p.anchor !== null) {
+                var order = resultRows(results[id], sorts[id]).map(function (f) { return f.path; });
+                var i = order.indexOf(p.anchor), j = order.indexOf(path);
+                if (i >= 0 && j >= 0) {
+                    p.selected = order.slice(Math.min(i, j), Math.max(i, j) + 1);
+                    if (root.getSelection) root.getSelection().removeAllRanges();
+                    return selectionChanged(id);
+                }
+            }
+            if (e.ctrlKey || e.metaKey) {
+                p.selected = p.selected.indexOf(path) >= 0 ? p.selected.filter(function (x) { return x !== path; }) : p.selected.concat([path]);
+            } else {
+                p.selected = p.selected.length === 1 && p.selected[0] === path ? [] : [path];
+            }
+            p.anchor = path;
+            selectionChanged(id);
+        }
+
+        // The picture viewer, opened at an image's frame: the image shown is the one selected, its row scrolled to
+        function viewPicture(id, path) {
+            var viewer = root.ThermalPictureViewer;
+            var urls = detailUrls(id);
+            var items = resultRows(results[id], sorts[id]).map(function (f) {
+                var src = urls.picture + (urls.picture.indexOf("?") >= 0 ? "&" : "?") + "size=large&" + (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file=" + encodeURIComponent(f.path);
+                var first = (f.outputs || [])[0];
+                return {name: f.path.split("/").pop(), path: f.path, src: src, download: first ? urls.download + "?file=" + encodeURIComponent(first) : src};
+            });
+            var index = items.map(function (it) { return it.path; }).indexOf(path);
+            if (!viewer || index < 0) return false;
+            viewer.open(doc, {items: items, index: index, onShow: function (i) {
+                var p = pick(id), shown = items[i].path;
+                p.anchor = shown;
+                if (p.selected.length === 1 && p.selected[0] === shown) return;
+                p.selected = [shown];
+                selectionChanged(id);
+                var tr = [].filter.call(filesPanel(id).querySelectorAll(".ta-results tbody tr[data-path]"), function (row) { return row.getAttribute("data-path") === shown; })[0];
+                if (tr && tr.scrollIntoView) tr.scrollIntoView({block: "nearest"});
+            }});
+            return true;
+        }
+
+        // The selected images' files as a zip: a form posted, so the browser downloads it however many there are
+        function downloadSelected(id) {
+            var chosen = pick(id).selected;
+            var files = [];
+            resultRows(results[id], {}).forEach(function (f) { if (chosen.indexOf(f.path) >= 0) files = files.concat(f.outputs || []); });
+            var form = doc.createElement("form");
+            form.method = "POST";
+            form.action = base + id + "/download";
+            form.hidden = true;
+            [["csrfmiddlewaretoken", ctx.csrf]].concat(files.map(function (f) { return ["file", f]; })).forEach(function (f) {
+                var input = doc.createElement("input");
+                input.type = "hidden";
+                input.name = f[0];
+                input.value = f[1];
+                form.appendChild(input);
+            });
+            doc.body.appendChild(form);
+            form.submit();
+            doc.body.removeChild(form);
+        }
+
+        // A workset's files; loaded again every few seconds while its frames are being measured
         function loadFiles(id) {
+            clearTimeout(polls[id]);
             return fetchFn(base + id, {credentials: "same-origin"}).then(core.readJson).then(function (r) {
                 if (!r.ok) return;
                 results[id] = r.data;
                 renderFiles(id);
+                if (r.data.figures_status === "measuring") {
+                    polls[id] = setTimeout(function () { if (open.indexOf(id) >= 0) loadFiles(id); }, FIGURES_POLL_MS);
+                }
             });
         }
 
@@ -921,7 +1109,27 @@
             if (menu !== null && !(e.target.closest && e.target.closest(".ta-menu"))) closeMenu();
         });
         doc.addEventListener("keydown", function (e) {
-            if (e.key === "Escape") closeMenu();
+            if (e.key !== "Escape") return;
+            closeMenu();
+            // A picture viewer open takes the key itself
+            if (doc.querySelector(".ta-picture")) return;
+            Object.keys(picks).forEach(function (id) {
+                if (!picks[id].selected.length) return;
+                picks[id].selected = [];
+                selectionChanged(id);
+            });
+        });
+
+        // While none of its images is selected, a workset's detail pane follows the image under the mouse
+        root$("ta-conversions").addEventListener("mouseover", function (e) {
+            if (!e.target.closest) return;
+            var tr = e.target.closest(".ta-results tbody tr[data-path]");
+            var fid = tr ? filesOf(tr) : undefined;
+            if (fid === undefined) return;
+            var p = pick(fid);
+            if (p.selected.length || tr.getAttribute("data-path") === p.hovered) return;
+            p.hovered = tr.getAttribute("data-path");
+            renderDetail(fid);
         });
 
         root$("ta-convert-start").addEventListener("click", function () {
@@ -998,14 +1206,42 @@
             });
         });
 
+        // The workset whose Files hold an element, or undefined
+        function filesOf(el) {
+            var files = el.closest("[data-files]");
+            if (!files) return undefined;
+            var attr = files.getAttribute("data-files");
+            return ((dataset && dataset.conversions) || []).map(function (x) { return x.id; }).filter(function (x) { return String(x) === attr; })[0];
+        }
+
         root$("ta-conversions").addEventListener("click", function (e) {
-            var th = e.target.closest ? e.target.closest(".ta-results th[data-sort]") : null;
-            if (th) {
-                var files = th.closest("[data-files]").getAttribute("data-files");
-                var sid = ((dataset && dataset.conversions) || []).map(function (x) { return x.id; }).filter(function (x) { return String(x) === files; })[0];
-                var key = th.getAttribute("data-sort"), before = sorts[sid] || {sort: "path"};
-                sorts[sid] = {sort: key, desc: before.sort === key ? !before.desc : false};
-                return renderFiles(sid);
+            var fid = e.target.closest ? filesOf(e.target) : undefined;
+            if (fid !== undefined && results[fid]) {
+                var th = e.target.closest(".ta-results th[data-sort]");
+                if (th) {
+                    var key = th.getAttribute("data-sort"), before = sorts[fid] || {sort: "path"};
+                    sorts[fid] = {sort: key, desc: before.sort === key ? !before.desc : false};
+                    return renderFiles(fid);
+                }
+                if (e.target.closest('[data-act="detail-close"]')) {
+                    pick(fid).selected = [];
+                    return selectionChanged(fid);
+                }
+                if (e.target.closest('[data-act="download-selected"]')) return downloadSelected(fid);
+                if (e.target.closest('[data-act="figures-again"]')) {
+                    return send(base + fid + "/figures", "POST", {}).then(function (r) {
+                        if (!r.ok) return message(esc(core.errorText(r.data, "Could not measure the frames again.")), "text-danger");
+                        return loadFiles(fid);
+                    });
+                }
+                // The pane's picture opens the viewer (Ctrl/Cmd-click, or the middle button, still opens a tab)
+                var picture = e.target.closest('[data-act="view-picture"]');
+                if (picture && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button)) {
+                    if (viewPicture(fid, picture.getAttribute("data-path"))) e.preventDefault();
+                    return;
+                }
+                var tr = e.target.closest(".ta-results tbody tr[data-path]");
+                if (tr && !e.target.closest("a")) return selectRow(fid, tr.getAttribute("data-path"), e);
             }
             var btn = e.target.closest ? e.target.closest("button[data-act]") : null;
             if (!btn) return;
@@ -1089,7 +1325,8 @@
     var api = {recorded: recorded, settingsIn: settingsIn, formHtml: formHtml, readForm: readForm, formProblem: formProblem, planSettings: planSettings, statusLabel: statusLabel,
                differences: differences, chipsHtml: chipsHtml, markForm: markForm, resetSetting: resetSetting,
                mosaicHtml: mosaicHtml, mapUrl: mapUrl, actionsHtml: actionsHtml, listHtml: listHtml, parentHtml: parentHtml, taskStatusLabel: taskStatusLabel, tasksHtml: tasksHtml,
-               taskHtml: taskHtml, readTaskForm: readTaskForm, optionsFormHtml: optionsFormHtml, readOptions: readOptions, skipReasons: skipReasons, resultsHtml: resultsHtml, init: init};
+               taskHtml: taskHtml, readTaskForm: readTaskForm, optionsFormHtml: optionsFormHtml, readOptions: readOptions, skipReasons: skipReasons, resultRows: resultRows, resultsHtml: resultsHtml,
+               resultDetailRows: resultDetailRows, resultDetailHtml: resultDetailHtml, init: init};
     root.ThermalAnalyzerConversions = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

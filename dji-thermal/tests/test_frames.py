@@ -201,6 +201,66 @@ class TestFramePage(AnalyzerTestCase):
                          status.HTTP_204_NO_CONTENT)
         self.assertEqual(self.client.get(self.url(task, cid, "frame/measurements")).data["measurements"], [])
 
+    @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def test_a_worksets_files_have_each_frames_figures_measured_once_and_some_of_its_files_download_as_a_zip(self):
+        import os
+
+        import rasterio
+        task = self.create()
+        with contextlib.ExitStack() as stack:
+            self.upload(task, [stack.enter_context(open(f, "rb")) for f in flight_frames(2)])
+        res = self.client.post("{}/{}/conversions".format(API, task.id),
+                               {"name": "Nadir", "settings": {"outputs": ["temp_c:tiff", "pseudo:png"], "emissivity": 0.95,
+                                                              "mosaics": False}}, format="json")
+        cid = res.data["id"]
+        self.assertEqual(res.data["status"], "ready", res.data["error"])
+
+        # Measured once converted: each frame's figures, its temperatures those of its TIFF
+        detail = self.client.get(self.url(task, cid, "")[:-1]).data
+        self.assertEqual(detail["figures_status"], "ready", detail["figures_error"])
+        files = detail["results"]["files"]
+        self.assertEqual(sorted(detail["figures"]), sorted(f["path"] for f in files))
+        f = files[0]
+        figures = detail["figures"][f["path"]]
+        with rasterio.open(os.path.join(conversions.output_path(task, cid), f["outputs"][0])) as src:
+            converted = src.read(1).astype(np.float64)
+        converted[converted <= -273] = np.nan
+        self.assertAlmostEqual(figures["min"], float(np.nanmin(converted)), places=2)
+        self.assertAlmostEqual(figures["max"], float(np.nanmax(converted)), places=2)
+        self.assertAlmostEqual(figures["emissivity"], 0.95, places=6)
+        self.assertEqual(figures["distance_source"], f["distance_source"])
+        self.assertIsNotNone(figures["reflected"])
+
+        # A workset converted before they were measured has them measured when its Files are asked for, once
+        for name in (frames.FIGURES_FILE, frames.FIGURES_JOB_FILE):
+            os.remove(conversions.path(task, cid, name))
+        with mock.patch.object(frames, "start_figures", wraps=frames.start_figures) as start:
+            self.assertEqual(self.client.get(self.url(task, cid, "")[:-1]).data["figures"], detail["figures"])
+            self.client.get(self.url(task, cid, "")[:-1])
+        start.assert_called_once()
+        # Measured again when asked (after it failed)
+        again = self.client.post(self.url(task, cid, "figures"))
+        self.assertEqual((again.status_code, again.data["figures_status"]), (status.HTTP_200_OK, "ready"))
+
+        # Its frames' thumbnails, in a dataset never analyzed: through the workset, for the frames it converted
+        thumbnail = "{}/{}/thumbnail".format(API, task.id)
+        self.assertEqual(self.client.get(thumbnail, {"file": f["path"]}).status_code, status.HTTP_404_NOT_FOUND)
+        for size in ("", "large"):
+            res = self.client.get(thumbnail, {"file": f["path"], "workset": cid, "palette": "ironred", "size": size})
+            self.assertEqual((res.status_code, res["Content-Type"]), (status.HTTP_200_OK, "image/jpeg"))
+        self.assertEqual(self.client.get(thumbnail, {"file": "../" + f["path"], "workset": cid}).status_code,
+                         status.HTTP_404_NOT_FOUND)
+
+        # Some of its files as a zip, those of the workset only
+        url = self.url(task, cid, "download")
+        chosen = [f["outputs"][0], files[1]["outputs"][1]]
+        zipped = self.client.post(url, {"file": chosen + ["../conversion.json"]})
+        self.assertEqual(zipped.status_code, status.HTTP_200_OK)
+        import zipfile
+        with zipfile.ZipFile(io.BytesIO(b"".join(zipped.streaming_content))) as z:
+            self.assertEqual(sorted(z.namelist()), sorted(chosen))
+        self.assertEqual(self.client.post(url, {"file": ["../conversion.json"]}).status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_the_frame_page_is_for_who_can_see_the_dataset(self):
         task = self.create()
         self.upload(task, [jpeg("a.jpg")])

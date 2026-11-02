@@ -28,11 +28,12 @@ workset's id (12 hexadecimal characters).
 | POST | `datasets/<dataset>/upload` | Adds photos. |
 | POST | `datasets/<dataset>/analyze`, `.../cancel` | Starts the analysis; cancels the running job. |
 | GET, POST | `datasets/<dataset>/files` | One file as uploaded (`?file=`, `&download=1` to download); several files as a zip. |
-| GET | `datasets/<dataset>/thumbnail` | A file's thumbnail (`?file=`, `?palette=`, `?size=large` for the detail pane). |
+| GET | `datasets/<dataset>/thumbnail` | A file's thumbnail (`?file=`, `?palette=`, `?size=large` for the detail pane; `?workset=` also for a frame that workset converted, in a dataset not analyzed). |
 | GET, POST | `datasets/<dataset>/conversions` | The worksets; a new workset from settings. |
-| GET, PATCH, DELETE | `datasets/<dataset>/conversions/<workset>` | A workset; rename it; delete it. |
+| GET, PATCH, DELETE | `datasets/<dataset>/conversions/<workset>` | A workset, with each frame's `figures` (`min`, `max`, `mean`, `reflected`, `ambient` in °C, `emissivity`, `humidity`, `distance`, `distance_source`, as it measured them) and how far measuring them is (`figures_status`, `figures_progress`, `figures_error`; a workset converted before they were measured starts measuring them); rename it; delete it. |
+| POST | `.../conversions/<workset>/figures` | Measures its frames' figures again. |
 | POST | `.../conversions/<workset>/cancel` | Cancels its conversion or mosaics. |
-| GET | `.../conversions/<workset>/download` | The workset's files as a zip, or one of them. |
+| GET, POST | `.../conversions/<workset>/download` | The workset's files as a zip, or one of them; some of them as a zip (`file`, repeated: a form posted). |
 | GET, POST | `.../conversions/<workset>/task` | What a task from the workset would be (the plan's options, what stops it); makes the task. |
 | POST | `.../conversions/<workset>/parent` | Sends the workset's TIFFs to the dataset's own task. |
 | GET, POST | `.../conversions/<workset>/mosaics` | The mosaics as the viewer shows them; builds them. |

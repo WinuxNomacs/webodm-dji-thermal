@@ -54,6 +54,12 @@ processing it. Wait for it to finish, or cancel it on the dashboard.
 
 WebODM's worker stopped while running it, for example when WebODM restarted. Start it again.
 
+**"Could not measure the frames for the table: …"**
+
+A workset's Files table shows each frame's temperatures and measurement values, measured in WebODM's worker. The
+message gives the reason; **Measure again** retries. A worker started before the plugin was updated runs its old
+code (the reason then names a missing function): restart WebODM's worker, then Measure again.
+
 **Settings marked "≠ plan"**
 
 Not an error: the setting differs from what the WebODM plan recommends for processing into a map. Hover over it to

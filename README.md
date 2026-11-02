@@ -166,8 +166,13 @@ closed. A chip marked **≠ plan** differs from the WebODM plan's settings (hove
   goes back to dji-thermal-cli's).
 
 Each workset is kept beside the others, with what it changed from the defaults, its **Files** (a table, closed at
-first and remembered in your browser, of each image's outputs and why any was skipped, sortable by image or result),
-**Download all** (a zip) or each file, and **Rename** and **Delete** in its menu. DJI's own
+first and remembered in your browser, of each image with its thumbnail, result, minimum and maximum temperature,
+emissivity, reflected temperature and distance as the workset measured it, and why any was skipped, sortable by each),
+**Download all** (a zip), and **Rename** and **Delete** in its menu. Beside the table, a detail pane shows the image
+under the mouse, or the one clicked: the frame at its own size, all it was measured with, and its downloads (the
+workset's files, its temperatures as CSV or a float TIFF, and Open frame). Ctrl/Cmd-click or Shift-click selects
+several, to download their files as one zip. The figures are measured once, in WebODM's worker, after a workset
+converts (an older workset's the first time its Files are opened). DJI's own
 SDK measures them when an administrator has installed it.
 
 ### Mosaics

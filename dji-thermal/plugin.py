@@ -85,6 +85,7 @@ class Plugin(PluginBase):
             MountPoint(DATASET + '/conversions$', analyzer_api.ConversionListCreate.as_view()),
             MountPoint(CONVERSION + '$', analyzer_api.ConversionDetail.as_view()),
             MountPoint(CONVERSION + '/cancel$', analyzer_api.ConversionCancel.as_view()),
+            MountPoint(CONVERSION + '/figures$', analyzer_api.ConversionFigures.as_view()),
             MountPoint(CONVERSION + '/download$', analyzer_api.ConversionDownload.as_view()),
             MountPoint(CONVERSION + '/task$', analyzer_api.ConversionTask.as_view()),
             MountPoint(CONVERSION + '/parent$', analyzer_api.ConversionParent.as_view()),

@@ -105,11 +105,12 @@
 .ta-page .ta-files-shown{ margin-left: auto; font-size: 12px; }
 .ta-page .ta-files-filter{ width: 200px; margin: 0 8px; }
 .ta-page .ta-files-hint{ font-size: 12px; margin: 0 0 6px; }
-.ta-page .ta-files td.ta-thumb{ padding: 1px 4px; width: 52px; }
+.ta-page .ta-files td.ta-thumb, .ta-page .ta-results td.ta-thumb{ padding: 1px 4px; width: 52px; }
 .ta-page .ta-thumb img{ display: block; max-width: 48px; max-height: 40px; }
-.ta-page .ta-files tbody tr[data-path]{ cursor: pointer; }
-.ta-page .ta-files tbody tr[data-path]:hover td{ background: rgba(0, 0, 0, .04); }
-.ta-page .ta-files tbody tr.ta-selected td, .ta-page .ta-files tbody tr.ta-selected:hover td{ background: #d9edf7; }
+.ta-page .ta-files tbody tr[data-path], .ta-page .ta-results tbody tr[data-path]{ cursor: pointer; }
+.ta-page .ta-files tbody tr[data-path]:hover td, .ta-page .ta-results tbody tr[data-path]:hover td{ background: rgba(0, 0, 0, .04); }
+.ta-page .ta-files tbody tr.ta-selected td, .ta-page .ta-files tbody tr.ta-selected:hover td,
+.ta-page .ta-results tbody tr.ta-selected td, .ta-page .ta-results tbody tr.ta-selected:hover td{ background: #d9edf7; }
 /* The Files tab's detail pane, beside the table, in view while the list scrolls */
 .ta-page .ta-files-layout{ display: flex; align-items: flex-start; gap: 12px; }
 .ta-page .ta-files-table{ flex: 1 1 auto; min-width: 0; }
@@ -221,6 +222,8 @@
 .ta-page .ta-task-message:not(:empty){ margin-top: 6px; }
 .ta-page .ta-results td{ font-size: 12px; }
 .ta-page .ta-results tr.ta-skipped td{ opacity: .7; }
+.ta-page .ta-results td.ta-num{ text-align: right; white-space: nowrap; }
+.ta-page .ta-figures-progress{ font-size: 12px; }
 
 .ta-page .ta-mosaic-status{ margin-top: 4px; font-size: 13px; }
 .ta-page .ta-mosaic-files{ font-size: 13px; }
