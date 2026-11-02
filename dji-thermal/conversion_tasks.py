@@ -47,6 +47,7 @@ TASKS_FILE = 'tasks.json'
 PARENT_FILE = 'parent.json'
 TIFF_SUFFIX = '_temp_c.tiff'
 MIN_FRAMES = 2      # as WebODM's own task creation
+NODE_TIMEOUT = 5    # seconds a processing node may take to remove a task's old run (remove_old_run)
 FROM_TAG = '.dji-thermal-from-'     # then the dataset's id; hidden, as datasets.TAG
 THERMAL_TASK_TAG = '.dji-thermal-task'  # a task made by the Thermal Task button (public/thermal/upload.js)
 TASK_FILE = 'task.json'
@@ -287,7 +288,9 @@ def parent(task):
 
 def clear_parent(task):
     """The dataset's task without the images sent to it and what it processed from them, waiting for a processing
-    node: as WebODM itself starts a task again (no node task, no status), the old one removed from its node"""
+    node: as WebODM itself starts a task again (no node task, no status)
+    :return: (processing node, uuid) of its old run, for remove_old_run once the task is saved
+    """
     node, uuid = task.processing_node, task.uuid
     for name in task.scan_images():
         try:
@@ -311,11 +314,18 @@ def clear_parent(task):
     task.epsg = None
     task.images_count = 0
     task.options = [o for o in task.options or [] if o.get('name') != 'rerun-from']
-    if node is not None and uuid:
-        try:
-            node.remove_task(uuid)
-        except (GenericError, OSError) as e:     # the node purges its tasks itself in time
-            datasets.logger.warning("Could not remove {} from its processing node: {}".format(uuid, e))
+    return node, uuid
+
+
+def remove_old_run(node, uuid):
+    """A task's old run removed from its processing node, outside any transaction: a node that doesn't answer is
+    given up on after NODE_TIMEOUT seconds (it purges its old tasks itself in time)"""
+    if node is None or not uuid:
+        return
+    try:
+        node.api_client(timeout=NODE_TIMEOUT).get_task(uuid).remove()
+    except (GenericError, OSError) as e:
+        datasets.logger.warning("Could not remove {} from its processing node: {}".format(uuid, e))
 
 
 def use_for_parent(task, cid, user=None):
@@ -330,7 +340,7 @@ def use_for_parent(task, cid, user=None):
         t = Task.objects.select_for_update().get(pk=task.pk)
         if parent_busy(t):
             raise ValueError("The dataset's task is processing in WebODM: cancel it there first")
-        clear_parent(t)
+        old_run = clear_parent(t)
         count = link_frames(task, cid, t)
         if count < MIN_FRAMES:
             for name in t.scan_images():
@@ -344,6 +354,7 @@ def use_for_parent(task, cid, user=None):
             serializer.is_valid(raise_exception=True)
             t.options = serializer.validated_data['options']
         t.save()
+    remove_old_run(*old_run)
     t.update_size(commit=True)
     palette = (conversions.record(task, cid).get('settings') or {}).get('palette')
     if palette:

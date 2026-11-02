@@ -16,6 +16,7 @@ import threading
 import zipfile
 from unittest import mock
 
+import requests
 from django.contrib.auth.models import User
 from guardian.shortcuts import assign_perm
 from PIL import Image
@@ -1374,12 +1375,22 @@ class TestConversionTasks(AnalyzerTestCase):
                                                available_assets=["orthophoto.tif"], options=[{"name": "dsm", "value": True}])
         self.assertTrue(self.client.get("{}/{}".format(API, task.id)).data["parent"]["processed"])
 
-        # Another conversion replaces its images and what it processed; its options are kept
+        # Another conversion replaces its images and what it processed; its options are kept. The old run is removed
+        # from its node once the task is saved (not while its row is locked), and a node that doesn't answer in time
+        # is given up on
         task, cid2 = self.converted(frames=("DJI_0005_T.JPG", "DJI_0006_T.JPG"), task=task)
-        with mock.patch.object(ProcessingNode, "remove_task") as remove:
+        uuids_seen = []
+
+        def remove():
+            uuids_seen.append(Task.objects.get(pk=task.pk).uuid)
+            raise requests.exceptions.ConnectTimeout("the node does not answer")
+        with mock.patch.object(ProcessingNode, "api_client") as client:
+            client.return_value.get_task.return_value.remove.side_effect = remove
             res = self.client.post(self.parent_url(task, cid2), format="json")
         self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
-        remove.assert_called_once_with("old-uuid")
+        client.assert_called_once_with(timeout=conversion_tasks.NODE_TIMEOUT)
+        client.return_value.get_task.assert_called_once_with("old-uuid")
+        self.assertEqual(uuids_seen, [""])
         task.refresh_from_db()
         self.assertEqual(sorted(task.scan_images()), ["DJI_0005_T_temp_c.tiff", "DJI_0006_T_temp_c.tiff"])
         self.assertEqual((task.status, task.uuid, task.processing_node, task.available_assets, task.images_count),
