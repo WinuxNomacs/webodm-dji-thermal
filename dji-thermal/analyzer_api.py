@@ -342,11 +342,16 @@ class DatasetThumbnail(DatasetView):
     def get(self, request, pk):
         """A small JPEG of one of the files its analysis lists (?file=), for the Files tab: its embedded picture, or a
         thermal frame's temperatures in one of DJI's palettes (?palette=, the user's preferred), cached in the dataset;
-        with ?size=large, at the file's own size (up to LARGE_SIZE), for the detail pane"""
+        with ?size=large, at the file's own size (up to LARGE_SIZE), for the detail pane; with ?workset=, also a frame
+        that workset converted (a dataset never analyzed has its frames' thumbnails in the workset's Files)"""
         from PIL import Image
         task = get_dataset(request, pk)
         rel = request.query_params.get('file') or ""
         kinds = file_kinds(task)
+        cid = request.query_params.get('workset') or ""
+        converted = conversions.results(task, cid).get('files') or [] if conversions.valid_id(cid) else []
+        if rel not in kinds and any(f.get('ok') and f.get('path') == rel for f in converted):
+            kinds[rel] = 'thermal'
         path = dataset_file(task, rel, kinds)
         palette = request.query_params.get('palette') or ""
         size = LARGE_SIZE if request.query_params.get('size') == 'large' else THUMBNAIL_SIZE

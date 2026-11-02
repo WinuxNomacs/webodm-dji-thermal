@@ -730,7 +730,7 @@
         }
         var f = rows.filter(function (x) { return x.path === paths[0]; })[0];
         if (!f) return "";
-        var picture = urls.picture + "?size=large&" + (urls.palette ? "palette=" + encodeURIComponent(urls.palette) + "&" : "") + "file=" + encodeURIComponent(f.path);
+        var picture = urls.picture + (urls.picture.indexOf("?") >= 0 ? "&" : "?") + "size=large&" + (urls.palette ? "palette=" + encodeURIComponent(urls.palette) + "&" : "") + "file=" + encodeURIComponent(f.path);
         var frame = urls.frame && f.ok ? urls.frame + "?frame=" + encodeURIComponent(f.path) : null;
         var temperatures = f.ok ? ["csv", "tiff"].map(function (kind) {
             return '<a class="btn btn-default btn-xs" href="' + esc(urls.frameDownload + "?frame=" + encodeURIComponent(f.path) + "&kind=" + kind) +
@@ -762,8 +762,9 @@
         var picks = {}, polls = {};                       // each one's images selected and under the mouse; its reload while measuring
         // The source frames' thumbnails and pictures, in the user's preferred DJI palette when they have one
         var palette = core.preferences().palette || "";
+        // (a workset's own frames, even in a dataset never analyzed)
         var thumbnailUrl = ctx.api + "datasets/" + ctx.datasetId + "/thumbnail";
-        var thumbsUrl = thumbnailUrl + "?" + (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file=";
+        var thumbsUrl = function (id) { return thumbnailUrl + "?workset=" + id + "&" + (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file="; };
         var fresh = null; // the conversion just started, highlighted for a few seconds
         var editing = null; // the form unfolded: at first only for a dataset without conversions, then once opened
         var menu = null;    // the conversion whose menu is open
@@ -929,14 +930,14 @@
         function renderFiles(id) {
             var el = filesPanel(id);
             if (el && results[id]) {
-                el.innerHTML = resultsHtml(results[id], base, Object.assign({}, sorts[id], {selected: pick(id).selected, thumbs: thumbsUrl}));
+                el.innerHTML = resultsHtml(results[id], base, Object.assign({}, sorts[id], {selected: pick(id).selected, thumbs: thumbsUrl(id)}));
                 renderDetail(id);
             } else if (el) el.innerHTML = '<p class="text-muted">Loading…</p>';
         }
 
         // A workset's detail pane: the images selected, else the one under the mouse
         function detailUrls(id) {
-            return {picture: thumbnailUrl, palette: palette, download: base + id + "/download", frameDownload: base + id + "/frame/download",
+            return {picture: thumbnailUrl + "?workset=" + id, palette: palette, download: base + id + "/download", frameDownload: base + id + "/frame/download",
                     frame: viewerBase ? viewerBase + id + "/frame" : null};
         }
 
@@ -987,7 +988,7 @@
             var viewer = root.ThermalPictureViewer;
             var urls = detailUrls(id);
             var items = resultRows(results[id], sorts[id]).map(function (f) {
-                var src = urls.picture + "?size=large&" + (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file=" + encodeURIComponent(f.path);
+                var src = urls.picture + (urls.picture.indexOf("?") >= 0 ? "&" : "?") + "size=large&" + (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file=" + encodeURIComponent(f.path);
                 var first = (f.outputs || [])[0];
                 return {name: f.path.split("/").pop(), path: f.path, src: src, download: first ? urls.download + "?file=" + encodeURIComponent(first) : src};
             });

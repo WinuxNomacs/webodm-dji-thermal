@@ -242,6 +242,15 @@ class TestFramePage(AnalyzerTestCase):
         again = self.client.post(self.url(task, cid, "figures"))
         self.assertEqual((again.status_code, again.data["figures_status"]), (status.HTTP_200_OK, "ready"))
 
+        # Its frames' thumbnails, in a dataset never analyzed: through the workset, for the frames it converted
+        thumbnail = "{}/{}/thumbnail".format(API, task.id)
+        self.assertEqual(self.client.get(thumbnail, {"file": f["path"]}).status_code, status.HTTP_404_NOT_FOUND)
+        for size in ("", "large"):
+            res = self.client.get(thumbnail, {"file": f["path"], "workset": cid, "palette": "ironred", "size": size})
+            self.assertEqual((res.status_code, res["Content-Type"]), (status.HTTP_200_OK, "image/jpeg"))
+        self.assertEqual(self.client.get(thumbnail, {"file": "../" + f["path"], "workset": cid}).status_code,
+                         status.HTTP_404_NOT_FOUND)
+
         # Some of its files as a zip, those of the workset only
         url = self.url(task, cid, "download")
         chosen = [f["outputs"][0], files[1]["outputs"][1]]
