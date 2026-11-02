@@ -491,6 +491,7 @@
             var box = $("ta-viewer-pip"), f = pick.frames[pick.at];
             box.hidden = false;
             box.innerHTML = pipHtml(pick, f ? frameUrl(base, tab, f.index, style(), v.built_at) : "", base);
+            if (pipMove) pipMove.keep();
             pickLayer.clearLayers();
             if (f && f.footprint) {
                 L.polygon(f.footprint.map(function (c) { return [c[1], c[0]]; }),
@@ -500,6 +501,7 @@
 
         function closePick() {
             pick = null;
+            if (pipMove) pipMove.reset();
             $("ta-viewer-pip").hidden = true;
             $("ta-viewer-pip").innerHTML = "";
             if (pickLayer) pickLayer.clearLayers();
@@ -609,6 +611,12 @@
             var f = pick && pick.frames[pick.at];
             if (pick) select(pick.latlng, f && f.index);
         });
+
+        // The frames window is dragged by its heading over the map, and goes back to its corner when closed
+        var pipMove = Frames.movable($("ta-viewer-pip"), $("ta-viewer-pip").parentNode, function (t) {
+            return !!t.closest(".ta-pip-head") && !t.closest("a, button");
+        }, null, doc);
+        if (doc.defaultView) doc.defaultView.addEventListener("resize", function () { pipMove.keep(); });
 
         $("ta-viewer-pip").addEventListener("click", function (e) {
             var b = e.target.closest ? e.target.closest("button[data-pip]") : null;

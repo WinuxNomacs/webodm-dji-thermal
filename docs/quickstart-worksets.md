@@ -103,7 +103,8 @@ temperature, frame, frame pixel and view angle under the cursor, what dji-therma
 misalignment, frame offsets), and the files to download.
 
 Click the map to keep the values at that point (**Follow the cursor**, or Esc, lets go of it) and to see **every frame
-that saw that point**, with the arrows to go through them:
+that saw that point**, with the arrows to go through them. Drag the window by its heading to move it out of the way;
+closed, it goes back to its corner:
 
 ![The frames that saw a point](images/mosaic-frames.png)
 

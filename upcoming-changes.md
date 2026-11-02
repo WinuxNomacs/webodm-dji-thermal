@@ -3,6 +3,25 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **Manual Corrections off by default, and the frames window movable** (the user, 2026-11-02, from `new.md`):
+  "Manual Corrections should be disabled by default." and "The Frame popout pane should be movable via drag and drop
+  as well." Builds on the Thermal Inspector (WebODM's map › the thermometer button › the panel, `inspector.js`).
+  - Manual Corrections, under the colour scale: unticked for a task nobody corrected, but the tick and its values are
+    kept in the browser per task (`loadCorrection`, `dji-thermal-inspector:correction:<tasks>`), so a map opens
+    corrected after an earlier visit. Proposed: every visit starts unticked, nothing kept (as the colour scale and
+    Image already are); an old kept correction is removed.
+  - The frames that saw a point (the frames window): on WebODM's map it moves only with the panel, beside it; in the
+    Analyzer's mosaic viewer it sits fixed at the map's bottom left. The panel and the legend are dragged already
+    (`movable`). Proposed: dragged by its heading (`.ta-pip-head`, "Frame 1 of 4 that saw this point") in both,
+    kept inside the map; once dragged on its own it stays where it was dropped (the panel moved later leaves it),
+    and closing it puts it back.
+  Decided (the user, 2026-11-02): every visit starts unticked, nothing kept; both windows movable.
+  Done, `inspector-requests`: the correction starts off on every page, and the corrections earlier versions kept are
+  removed (`inspector.js` `forgetCorrections`); `movable` moved to `frames.js`, which both pages load, the Inspector's
+  frames window dragged by its heading (`frameMove`, `framesMoved`: it then stays put as the panel moves, until
+  closed) and the viewer's (`pipMove`, back in its corner once closed). Tests in `inspector.test.js` and
+  `analyzer.test.js`; checked live on the "Thermal - 9/18/2026" dataset's viewer and WebODM's map. README,
+  `quickstart-inspector.md`, `quickstart-worksets.md`; no screenshot changed.
 - **The SDK settings note** (the user, 2026-11-02, from `new.md`): "on the plugin settings page, under \"Use DJI's own
   Thermal SDK\"; add a note in bold that it's usually only needed for development purposes reduces the performance
   of the DJI Thermal Analyzer." Builds on the DJI Thermal page under Administration (`templates/sdk.html`, the

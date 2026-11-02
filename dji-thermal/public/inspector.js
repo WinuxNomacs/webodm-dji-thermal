@@ -21,7 +21,7 @@
     var PINS_PREFIX = "dji-thermal-inspector:pins:";
     var REGIONS_PREFIX = "dji-thermal-inspector:regions:";
     var ISOTHERM_PREFIX = "dji-thermal-inspector:isotherm:";
-    var CORRECTION_PREFIX = "dji-thermal-inspector:correction:";
+    var CORRECTION_PREFIX = "dji-thermal-inspector:correction:";   // where earlier versions kept a correction, removed
     var LEGEND_KEY = "dji-thermal-inspector:legend";
     var KELVIN = 273.15;
     var EMISSIVITY = [0.1, 1], REFLECTED = [-100, 1000];     // correction.py's limits (°C)
@@ -35,6 +35,7 @@
     var Regions = root.ThermalRegions || (typeof require !== "undefined" ? require("./regions.js") : null);
     var Scale = root.ThermalScale || (typeof require !== "undefined" ? require("./scale.js") : null);
     var Frames = root.ThermalFrames || (typeof require !== "undefined" ? require("./frames.js") : null);
+    var movable = Frames.movable;
     var Recolour = root.ThermalRecolour || (typeof require !== "undefined" ? require("./recolour.js") : null);
     var META = root.Symbol ? root.Symbol["for"]("meta") : "meta";      // where WebODM's map keeps a layer's metadata
     var TILE_META = root.Symbol ? root.Symbol["for"]("tile-meta") : "tile-meta";   // and its tiles' (their statistics)
@@ -406,23 +407,20 @@
         return "Between " + formatTemp(iso.low, unit) + " and " + formatTemp(iso.high, unit);
     }
 
-    // The correction: {on, emissivity, reflected (°C)}, remembered in the browser for the same tasks. A layer's: {wanted:
-    // {emissivity, reflected}, baseline: what it was measured with, as its saved measurements' API gives it}, or null
-    function correctionKey(tasks) { return CORRECTION_PREFIX + tasks.slice().sort().join(","); }
+    // The correction: {on, emissivity, reflected (°C)}, off on every visit. A layer's: {wanted: {emissivity, reflected},
+    // baseline: what it was measured with, as its saved measurements' API gives it}, or null
     function validCorrection(c) {
         return !!c && typeof c.emissivity === "number" && c.emissivity >= EMISSIVITY[0] && c.emissivity <= EMISSIVITY[1] &&
             typeof c.reflected === "number" && c.reflected >= REFLECTED[0] && c.reflected <= REFLECTED[1];
     }
-    function loadCorrection(storage, key) {
-        var c;
-        try { c = JSON.parse(storage.getItem(key) || "null"); } catch (e) { c = null; }
-        return validCorrection(c) ? {on: !!c.on, emissivity: c.emissivity, reflected: c.reflected} : {on: false};
-    }
-    function saveCorrection(storage, key, c) {
+    // The corrections earlier versions kept in the browser
+    function forgetCorrections(storage) {
         try {
-            if (validCorrection(c)) storage.setItem(key, JSON.stringify(c));
-            else storage.removeItem(key);
-        } catch (e) { /* kept for this page only */ }
+            for (var i = storage.length - 1; i >= 0; i--) {
+                var k = storage.key(i);
+                if (k && k.indexOf(CORRECTION_PREFIX) === 0) storage.removeItem(k);
+            }
+        } catch (e) { /* nothing to remove */ }
     }
     // The object's radiance with the parameters wanted is gain * its radiance with the baseline's + offset
     function gainOffset(fix) {
@@ -930,58 +928,6 @@
                                function () { return {ok: res.ok, data: {}}; });
     }
 
-    // A box (the panel, the legend) dragged over the map: moved by an offset (a CSS translate) that keeps it inside
-    // area (the map's element); grabs(target) says whether a press there starts a drag (not on a link or a field);
-    // moved(offset) follows each move. The box grabbed last is drawn over the map's other controls (its Leaflet corner
-    // raised) until it is back in its place. reset puts it back
-    function movable(box, area, grabs, moved, doc) {
-        var offset = {x: 0, y: 0}, drag = null;
-        doc = doc || box.ownerDocument;
-        function corner() { return box.closest(".leaflet-top, .leaflet-bottom") || box; }
-        function set(x, y) {
-            offset = {x: x, y: y};
-            box.style.transform = x || y ? "translate(" + x + "px, " + y + "px)" : "";
-            if (!x && !y) corner().style.zIndex = "";
-            if (moved) moved(offset);
-        }
-        function place(x, y) {
-            var r = box.getBoundingClientRect(), a = area.getBoundingClientRect();
-            var left = r.left - offset.x, top = r.top - offset.y;       // where it is unmoved
-            // Inside the area; a box wider or taller than the area keeps its left or top edge in it
-            x = Math.max(a.left - left, Math.min(x, a.right - (left + r.width)));
-            y = Math.max(a.top - top, Math.min(y, a.bottom - (top + r.height)));
-            set(Math.round(x) || 0, Math.round(y) || 0);
-        }
-        function onMove(e) {
-            if (!drag) return;
-            e.preventDefault();
-            place(drag.x + e.clientX - drag.startX, drag.y + e.clientY - drag.startY);
-        }
-        function onUp() {
-            drag = null;
-            box.classList.remove("dt-moving");
-            doc.removeEventListener("pointermove", onMove);
-            doc.removeEventListener("pointerup", onUp);
-            doc.removeEventListener("pointercancel", onUp);
-        }
-        box.addEventListener("pointerdown", function (e) {
-            if ((e.button && e.button !== 0) || !grabs(e.target)) return;
-            e.preventDefault();
-            e.stopPropagation();        // not the map's own dragging
-            drag = {x: offset.x, y: offset.y, startX: e.clientX, startY: e.clientY};
-            corner().style.zIndex = String(++movedOnTop);
-            box.classList.add("dt-moving");
-            doc.addEventListener("pointermove", onMove);
-            doc.addEventListener("pointerup", onUp);
-            doc.addEventListener("pointercancel", onUp);
-        });
-        return {
-            reset: function () { onUp(); set(0, 0); },
-            keep: function () { if (offset.x || offset.y) place(offset.x, offset.y); },     // after the area or the box changed size
-            offset: function () { return offset; }
-        };
-    }
-    var movedOnTop = 1000;      // Leaflet's corners are at 1000: the box grabbed last goes over them
     var FIELDS = "a, button, input, select, textarea, label";      // a press on these is theirs, not a drag
     var FRAMES_WIDTH = 300, FRAMES_GAP = 8;                         // the source frames window beside the panel (px)
 
@@ -995,17 +941,18 @@
         var storage = deps.storage || root.localStorage;
         var plugins = deps.pluginsApi || root.PluginsAPI;
         var tasks = (args.tiles || []).map(function (t) { return t.meta && t.meta.task && t.meta.task.id; }).filter(Boolean);
-        var key = pinsKey(tasks), rkey = regionsKey(tasks), ikey = isothermKey(tasks), ckey = correctionKey(tasks);
+        var key = pinsKey(tasks), rkey = regionsKey(tasks), ikey = isothermKey(tasks);
+        forgetCorrections(storage);
         var regions = loadPins(storage, rkey).filter(function (r) { return r && r.geometry && SHAPES[r.shape]; });
         var state = {open: false, mode: "hover", readout: null, pins: loadPins(storage, key), pinsVisible: true,
                      regions: regions, regionsVisible: true, shown: regions.length ? regions[regions.length - 1].id : null,
                      notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
                      legendVisible: legendShown(), mosaics: null, laid: {}, frames: false, pick: null,
-                     correction: loadCorrection(storage, ckey), correctionNotice: "", sources: {}, onMap: [], savedVisible: true,
+                     correction: {on: false}, correctionNotice: "", sources: {}, onMap: [], savedVisible: true,
                      savedShown: null, form: null, savable: {}, scale: null, rangeError: ""};
         var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
         var search = deps.search !== undefined ? deps.search : root.location && root.location.search;
-        var container, panel, frameBox, panelMove, legendMove, cursor, pinLayer, regionLayer, savedLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
+        var container, panel, frameBox, panelMove, legendMove, frameMove, framesMoved = false, cursor, pinLayer, regionLayer, savedLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
         var profileMarker = null, profileAt = null;     // the point of the profile hovered, on the map
         var pickSeq = 0;                    // the frames asked for last
         var overlays = [], colors = {};     // the isotherm's layer over each thermal layer; each palette's colours
@@ -1064,7 +1011,7 @@
                 }, function () {}).then(function () {
                     src.loading = false;
                     openInTaskPalette();
-                    correctionChanged(true);
+                    correctionChanged();
                     drawSaved();
                 });
             });
@@ -1085,10 +1032,9 @@
         // A pin's temperature shown: corrected for the layer it was read on
         function pinTemp(p) { return p.source ? corrected(p.temperature, fixForKey(p.source)) : p.temperature; }
 
-        // The correction or a layer's baseline changed (known): the temperatures shown again, the regions measured with
-        // another correction measured again
-        function correctionChanged(known) {
-            if (!known) saveCorrection(storage, ckey, state.correction);
+        // The correction or a layer's baseline changed: the temperatures shown again, the regions measured with another
+        // correction measured again
+        function correctionChanged() {
             state.regions.forEach(function (r) {
                 if (r.loading || (!r.statistics && !r.reason)) return;
                 var t = thermalLayerAt(map, regionBounds(r).getCenter()) || thermalLayers(map)[0];
@@ -1742,7 +1688,8 @@
             frameBox.hidden = false;
             var src = framesSource(thermalLayer(pick.t.layer), state.mosaics, state.palette, state.display);
             frameBox.innerHTML = Frames.pipHtml(pick, frameImageUrl(pick), src && src.base);
-            placeFrames(panelMove.offset());
+            if (framesMoved) frameMove.keep();
+            else placeFrames(panelMove.offset());
             if (pick.error) frameBox.querySelector(".ta-message").textContent = pick.error;
             pickLayer.clearLayers();
             L.circleMarker(pick.latlng, {radius: 6, color: "#000", weight: 1, fillColor: "#fff", fillOpacity: 1, interactive: false}).addTo(pickLayer);
@@ -1760,9 +1707,11 @@
             if (url && img.getAttribute("src") !== url) img.setAttribute("src", url);
         }
 
-        // The source frames window moves with the panel, beside it: on its left, or on its right when only that has room
+        // The source frames window moves with the panel, beside it: on its left, or on its right when only that has room;
+        // once dragged on its own, it stays where it was dropped until it is closed
         function placeFrames(offset) {
-            frameBox.style.transform = panel.style.transform;
+            if (framesMoved) return;
+            frameMove.to(offset);
             var a = map.getContainer().getBoundingClientRect(), p = panel.getBoundingClientRect();
             var room = (frameBox.offsetWidth || FRAMES_WIDTH) + FRAMES_GAP;
             frameBox.classList.toggle("dt-inspector-frames-right", !!(offset.x || offset.y) && p.left - a.left < room && a.right - p.right >= room);
@@ -1772,6 +1721,8 @@
             pickSeq++;
             state.pick = null;
             if (!frameBox) return;
+            framesMoved = false;
+            frameMove.reset();
             frameBox.hidden = true;
             frameBox.innerHTML = "";
             pickLayer.clearLayers();
@@ -2125,10 +2076,13 @@
                 }, true);
                 L.DomEvent.disableClickPropagation(container);
                 L.DomEvent.disableScrollPropagation(container);
-                // The panel is dragged by its heading, the frames window with it
+                // The panel is dragged by its heading, the frames window with it, or on its own by its heading
                 panelMove = movable(panel, map.getContainer(), function (t) {
                     return !!t.closest(".dt-inspector-head") && !t.closest(FIELDS);
                 }, placeFrames, doc);
+                frameMove = movable(frameBox, map.getContainer(), function (t) {
+                    return !!t.closest(".ta-pip-head") && !t.closest(FIELDS);
+                }, function (offset, dragged) { if (dragged) framesMoved = true; }, doc);
                 // Over the panel the cursor is not over the map
                 container.addEventListener("mousemove", function (e) { e.stopPropagation(); onOut(); });
                 container.querySelector(".dt-inspector-button").addEventListener("click", function () { if (state.open) close(); else open(); });
@@ -2174,7 +2128,7 @@
         drawPins();
         drawRegions();
         loadSources();
-        map.on("resize", function () { panelMove.keep(); legendMove.keep(); });
+        map.on("resize", function () { panelMove.keep(); legendMove.keep(); if (framesMoved) frameMove.keep(); });
         map.on("mousemove", onMove);
         map.on("mouseout", onOut);
         map.on("layeradd", onLayerAdd);
@@ -2241,7 +2195,7 @@
                panelHtml: panelHtml, hasThermal: hasThermal, projectOf: projectOf, linkedMosaic: linkedMosaic, paletteKey: paletteKey,
                mosaicRange: mosaicRange, laidMosaic: laidMosaic, mosaicValuesUrl: mosaicValuesUrl, isothermStyle: isothermStyle, valuesUrl: valuesUrl,
                framesSource: framesSource, fromCelsius: fromCelsius, corrected: corrected, uncorrected: uncorrected,
-               rawIsotherm: rawIsotherm, keptRange: keptRange, correctionHtml: correctionHtml, loadCorrection: loadCorrection, correctionKey: correctionKey,
+               rawIsotherm: rawIsotherm, keptRange: keptRange, correctionHtml: correctionHtml, forgetCorrections: forgetCorrections,
                savedHtml: savedHtml, savedCsv: savedCsv, savedGeoJson: savedGeoJson, formHtml: formHtml, pinsHtml: pinsHtml,
                mosaicsHtml: mosaicsHtml, toCelsius: toCelsius, movable: movable, adjustOf: adjustOf, autoRange: autoRange,
                scaleHtml: scaleHtml, imageHtml: imageHtml, create: create};

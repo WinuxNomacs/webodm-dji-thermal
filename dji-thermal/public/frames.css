@@ -1,7 +1,8 @@
 /* The source frames window (frames.js), in the Analyzer's mosaic viewer and the Thermal Inspector on WebODM's map */
 .ta-pip-head { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
 .ta-pip-head .ta-pip-title { margin-right: auto; font-weight: bold; }
-.ta-pip-head .btn { padding: 0 6px; }
+.ta-pip-head .btn { padding: 0 6px; cursor: pointer; }
+.ta-pip-head { cursor: move; touch-action: none; user-select: none; }
 .ta-pip-image { position: relative; background: #222; line-height: 0; }
 .ta-pip-image img { display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; }
 .ta-pip-mark { position: absolute; width: 17px; height: 17px; margin: -8px 0 0 -8px; pointer-events: none;

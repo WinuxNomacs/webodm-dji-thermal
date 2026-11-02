@@ -93,7 +93,7 @@
 .leaflet-tooltip.dt-inspector-saved-tip { border-color: #2e7d32; }
 
 /* The panel (by its heading) and the legend are dragged over the map; the frames window follows the panel, on its
-   right when the left has no room */
+   right when the left has no room, until it is dragged by its own heading */
 .dt-inspector-head { cursor: move; touch-action: none; user-select: none; }
 .dt-inspector-head a { cursor: pointer; }
 .dt-legend { cursor: move; touch-action: none; user-select: none; }
