@@ -1,5 +1,5 @@
-// A thermal dataset's Convert tab: dji-thermal-cli's settings (starting from the user's saved preferences, which can be
-// saved or reset to the defaults), converting with them, and the dataset's conversions side by side, each with its
+// A thermal dataset's Convert tab: dji-thermal-cli's settings (starting from the user's saved defaults, else the WebODM
+// plan's, else dji-thermal-cli's, or any of them chosen), converting with them, and the dataset's conversions side by side, each with its
 // settings, the files written and its downloads.
 (function (root) {
     var core = root.ThermalAnalyzerCore || (typeof require !== "undefined" ? require("./analyzer_core") : null);
@@ -17,6 +17,7 @@
         {key: "humidity", label: "Relative humidity", unit: "%", hint: "humidity", digits: 0}
     ];
     var GIMBAL = [["gimbal_yaw", "Yaw"], ["gimbal_pitch", "Pitch"], ["gimbal_roll", "Roll"]];
+    var PITCH_LIMIT = -80;     // the pitch limit ticked: the nadir frames, as the WebODM plan
     var RESULTS_SHOWN = 500;   // files listed in a conversion's results
     var FIGURES_POLL_MS = 2000;     // a conversion's Files loaded again while its frames are being measured
 
@@ -114,7 +115,13 @@
                 numberInput("range_max", s.range_max, ' step="any" placeholder="to"') + "</div>",
                 "Both, or neither for each image's own range. Also the range of the 16-bit grey outputs.");
 
-        var frames = '<div class="ta-normalize"><div class="checkbox"><label><input type="checkbox" name="normalize"' + (s.normalize ? " checked" : "") +
+        var pitched = !blank(s.max_pitch);
+        var frames = '<div class="checkbox ta-pitch"><label><input type="checkbox" name="pitch_limit"' + (pitched ? " checked" : "") +
+                "> Only frames looking down: a gimbal pitch at or below</label> " +
+                numberInput("max_pitch", pitched ? s.max_pitch : PITCH_LIMIT, ' step="1" min="-90" max="90" aria-label="Pitch limit"' + (pitched ? "" : " disabled")) +
+                ' <span class="text-muted">°</span><span class="help-block">As the WebODM plan: oblique frames mix viewing angles and sky into a map\'s ' +
+                "temperatures. Unticked, every frame goes in (for a 3D model).</span></div>" +
+            '<div class="ta-normalize"><div class="checkbox"><label><input type="checkbox" name="normalize"' + (s.normalize ? " checked" : "") +
                 "> Normalize: one ambient and reflected temperature for every frame</label>" +
                 '<span class="help-block">The flight\'s medians of the values the camera recorded, unless given in Measurement: ' +
                 "no jumps between frames where the recorded values change.</span></div>" +
@@ -122,9 +129,7 @@
                 "> Harmonize: each frame's drift against its overlapping neighbours removed</label>" +
                 '<span class="help-block">The camera drifts between its recalibrations: removing it leaves no seams in a map. ' +
                 "Compares the frames' overlaps, which takes a while; frames that can't be placed keep theirs. Normalizes too. " +
-                "Recommended for processing into a map.</span></div></div>" +
-            field("Only frames with a gimbal pitch at or below (°)", numberInput("max_pitch", s.max_pitch, ' step="1" min="-90" max="90" placeholder="all frames"'),
-                "-80 keeps the nadir frames only.");
+                "Recommended for processing into a map.</span></div></div>";
 
         var adjust = field("Gimbal override (°)", '<div class="ta-inline">' + GIMBAL.map(function (g) {
                 return numberInput(g[0], s[g[0]], ' step="any" placeholder="' + g[1] + '" title="' + g[1] + '"');
@@ -140,7 +145,8 @@
             '<div class="checkbox"><label><input type="checkbox" name="strip_location"' + (s.strip_location ? " checked" : "") +
             "> Strip the location and identifiers from the outputs</label></div>";
 
-        return '<div class="ta-section"><h4>Colours</h4>' + look + "</div>" +
+        // In the order of the work: which frames, what is written, how it is measured, how it is coloured, the rest
+        return '<details class="ta-section" open><summary><h4>Frames</h4></summary>' + frames + "</details>" +
             '<details class="ta-section ta-section-outputs"><summary><h4>Outputs</h4> <span class="ta-section-chips" data-chips="outputs"></span></summary>' + products +
             field("Compression (TIFF)", '<select class="form-control input-sm" name="compression">' + ["deflate", "none"].map(function (c) {
                 return '<option value="' + c + '"' + (c === s.compression ? " selected" : "") + ">" + c + "</option>";
@@ -150,7 +156,7 @@
             '<span class="help-block">Built after converting, from the frames\' positions and angles (no WebODM task needed).</span></div>' +
             "</details>" +
             '<details class="ta-section" open><summary><h4>Measurement</h4></summary><p class="text-muted">Left empty, each photo keeps the value its camera recorded.</p>' + measurement + "</details>" +
-            '<details class="ta-section" open><summary><h4>Frames</h4></summary>' + frames + "</details>" +
+            '<details class="ta-section ta-section-colours" open' + (colours(s) ? "" : " hidden") + '><summary><h4>Colours</h4></summary>' + look + "</details>" +
             '<details class="ta-section"' + (!blank(s.gimbal_yaw) || !blank(s.gimbal_pitch) || !blank(s.gimbal_roll) || !blank(s.replace_above) ||
                 !blank(s.replace_below) || s.strip_location ? " open" : "") + '><summary><h4>Adjustments</h4></summary>' + adjust + "</details>";
     }
@@ -177,7 +183,7 @@
         s.strip_location = get("strip_location").checked;
         s.harmonize = get("harmonize").checked;
         s.normalize = get("normalize").checked || s.harmonize;
-        s.max_pitch = num("max_pitch");
+        s.max_pitch = get("pitch_limit").checked ? (num("max_pitch") === null ? PITCH_LIMIT : num("max_pitch")) : null;
         s.compression = get("compression").value;
         s.mosaics = get("mosaics").checked;
         s.outputs = [].filter.call(form.querySelectorAll('input[name="output"]'), function (c) { return c.checked; }).map(function (c) {
@@ -253,6 +259,10 @@
     }
     function colouredOutputs(s) {
         return (s.outputs || []).filter(function (o) { return COLOURED.indexOf(o.split(":")[0]) >= 0; });
+    }
+    // Whether the Colours section applies: a colour output (its palette and range) or a 16-bit grey one (its range)
+    function colours(s) {
+        return colouredOutputs(s).length > 0 || (s.outputs || []).some(function (o) { return o.split(":")[0] === "gray16"; });
     }
 
     // The settings told apart in the summaries: each with its form fields and its text (u: the temperatures' unit symbol)
@@ -358,10 +368,11 @@
             note.className = "ta-mark-note";
             note.innerHTML = (diff.offPlan ? '<span title="' + esc(OFF_PLAN_TITLE + diff.plan) + '">≠ plan: ' + esc(diff.plan) + "</span> " : "") +
                 (diff.changed ? '<a href="#" data-reset="' + d.key + '" title="Back to dji-thermal-cli\'s default">default</a>' : "");
-            var label = box.querySelector("label, h4");
-            if (d.key === "outputs") box.querySelector("h4").appendChild(note);
-            else if (label && box.classList.contains("ta-field")) label.appendChild(note);
-            else box.appendChild(note);
+            // On its own control's line: a field's label, a checkbox's (harmonized or not, the one it's about)
+            var label = d.key === "outputs" ? box.querySelector("h4") : d.key === "normalize" ?
+                form.querySelector('[name="' + (diff.plan === "harmonized" || diff.text === "harmonized" ? "harmonize" : "normalize") + '"]').closest("label") :
+                box.querySelector("label");
+            (label || box).appendChild(note);
         });
     }
 
@@ -844,7 +855,10 @@
         var doc = ctx.doc, fetchFn = ctx.fetchFn, root$ = function (i) { return doc.getElementById(i); };
         var base = ctx.api + "datasets/" + ctx.datasetId + "/conversions/";
         var viewerBase = ctx.publicUrl ? ctx.publicUrl + "dataset/" + ctx.datasetId + "/conversion/" : null;
-        var meta = null, settings = null, saved = false, dataset = null, built = false, loading = null;
+        var meta = null, settings = null, dataset = null, built = false, loading = null;
+        var mine = null;        // the user's saved defaults, or null
+        var start = null;       // what the form was filled from (Start from): "saved", "plan", "defaults" or "other"
+        var auto = false;       // and it was chosen for them, nothing changed since: the plan replaces dji-thermal-cli's once analyzed
         var storage = ctx.storage !== undefined ? ctx.storage : root.localStorage;
         var open = shownFiles(storage, ctx.datasetId);    // the worksets whose Files are shown, kept in the browser
         var mosaicsOpen = shownFiles(storage, ctx.datasetId, MOSAICS_PREFIX);   // and whose Mosaics are
@@ -886,10 +900,28 @@
             form.innerHTML = formHtml(settings, meta, recorded(dataset && dataset.analysis));
             drawnWith = dataset && dataset.analyzed_at;
             if (sections) [].forEach.call(form.querySelectorAll("details.ta-section"), function (d, i) { d.open = sections[i]; });
-            root$("ta-convert-origin").textContent = saved ? "Starting from your saved defaults." : "Starting from dji-thermal-cli's defaults.";
+            var from = root$("ta-convert-from");
+            from.querySelector('[value="saved"]').disabled = !mine;
+            from.querySelector('[value="plan"]').disabled = !plan();
+            from.value = start;
+            root$("ta-convert-forget").hidden = !mine;
             built = true;
             if (editing === null) editing = !((dataset && dataset.conversions) || []).length;
             summarize();
+        }
+
+        // The form filled with settings, from where (Start from's choice, or "other")
+        function fill(s, from) {
+            settings = s;
+            start = from;
+            auto = false;
+            renderForm();
+        }
+
+        // The form filled as Start from's choice says
+        var STARTS = {saved: "your saved defaults", plan: "the WebODM plan's settings", defaults: "dji-thermal-cli's defaults"};
+        function startFrom(which) {
+            fill(which === "saved" ? mine : which === "plan" ? plan() : meta.defaults, which);
         }
 
         function plan() {
@@ -910,6 +942,8 @@
                 outputs.innerHTML = chipsHtml(diffs.filter(function (d) { return OUTPUT_KEYS.indexOf(d.key) >= 0; }), "the defaults", true);
             }
             form.hidden = !editing;
+            var section = form.querySelector(".ta-section-colours");
+            if (section) section.hidden = !colours(readForm(form));
             markForm(form, diffs);
         }
 
@@ -1252,9 +1286,9 @@
             loading = fetchFn(ctx.api + "preferences", {credentials: "same-origin"}).then(core.readJson, core.unreachable).then(function (r) {
                 if (!r.ok) return message("Could not load the settings.", "text-danger");
                 meta = r.data;
-                settings = r.data.settings;
-                saved = r.data.saved;
-                renderForm();
+                mine = r.data.saved ? r.data.settings : null;
+                startFrom(mine ? "saved" : plan() ? "plan" : "defaults");
+                auto = true;
                 useFrom();
             });
             return loading;
@@ -1265,9 +1299,8 @@
             var c = ctx.from && !fromUsed && meta && dataset && (dataset.conversions || []).filter(function (x) { return String(x.id) === ctx.from.id; })[0];
             if (!c) return;
             fromUsed = true;
-            settings = Object.assign({}, c.settings, ctx.from.changes);
             editing = true;
-            renderForm();
+            fill(Object.assign({}, c.settings, ctx.from.changes), "other");
             var changed = Object.keys(ctx.from.changes).map(function (k) { return k.replace(/_/g, " ") + " " + ctx.from.changes[k]; }).join(", ");
             message("The form has " + esc(c.name) + "'s settings" + (changed ? " with " + esc(changed) : "") + ", from the frame page. Create Workset when the settings are ready.", "text-muted");
         }
@@ -1276,10 +1309,15 @@
             dataset = d;
             setProductNames(d.product_names);
             root$("ta-convert-settings").hidden = !d.can_change;
-            root$("ta-convert-plan").hidden = !((d.analysis || {}).webodm || {}).process_args;
             renderList();
             if (d.can_change && !loading) loadPreferences();
             else if (meta && !built) renderForm();
+            else if (built && auto && start === "defaults" && plan() &&
+                     !differences(readForm(root$("ta-convert-form")), meta.defaults, null, core.userUnit()).length) {
+                // Analyzed since it opened, nothing changed: the form starts from the plan, as it would have
+                startFrom("plan");
+                auto = true;
+            }
             else if (built && d.analyzed_at !== drawnWith) {
                 // An analysis that finished since: its recorded values beside the fields, what was typed kept
                 settings = readForm(root$("ta-convert-form"));
@@ -1291,19 +1329,26 @@
         panel.addEventListener("change", function (e) {
             var t = e.target;
             if (t.name === "distance_mode") panel.querySelector('[name="distance"]').hidden = t.value !== "fixed";
+            if (t.name === "pitch_limit") panel.querySelector('[name="max_pitch"]').disabled = !t.checked;
             if (/^replace_(above|below)_nodata$/.test(t.name)) panel.querySelector('[name="' + t.name.replace("_nodata", "_value") + '"]').disabled = t.checked;
         });
 
         ["input", "change"].forEach(function (type) {
-            root$("ta-convert-form").addEventListener(type, function () { if (meta) summarize(); });
+            root$("ta-convert-form").addEventListener(type, function () {
+                if (!meta) return;
+                // Changed by hand: no longer what it started from
+                start = "other";
+                auto = false;
+                root$("ta-convert-from").value = start;
+                summarize();
+            });
         });
 
         root$("ta-convert-form").addEventListener("click", function (e) {
             var a = e.target.closest ? e.target.closest("a[data-reset]") : null;
             if (!a || !meta) return;
             e.preventDefault();
-            settings = resetSetting(readForm(root$("ta-convert-form")), meta.defaults, a.getAttribute("data-reset"));
-            renderForm();
+            fill(resetSetting(readForm(root$("ta-convert-form")), meta.defaults, a.getAttribute("data-reset")), "other");
         });
 
         root$("ta-convert-summary").addEventListener("click", function (e) {
@@ -1385,9 +1430,8 @@
             if (formProblem(s)) return message(esc(formProblem(s)), "text-danger");
             send(ctx.api + "preferences", "PUT", {settings: s}).then(function (r) {
                 if (!r.ok) return message(esc(core.errorText(r.data, "Could not save your defaults.")), "text-danger");
-                settings = r.data.settings;
-                saved = true;
-                renderForm();
+                mine = r.data.settings;
+                fill(mine, "saved");
                 message('<i class="fa fa-check"></i> Saved: new worksets start from these settings.', "text-success");
             });
         });
@@ -1396,8 +1440,7 @@
         function usePlan() {
             var plan = (((dataset || {}).analysis || {}).webodm || {}).process_args;
             if (!meta || !plan) return false;
-            settings = planSettings(plan, meta.defaults);
-            renderForm();
+            fill(planSettings(plan, meta.defaults), "plan");
             message("The form has the WebODM plan's settings: <code>" + esc(plan.join(" ")) + "</code>", "text-muted");
             return true;
         }
@@ -1405,25 +1448,29 @@
         // Settings from a finding on the Problems tab ({field: value}; what: their name), the rest of the form kept
         function useSettings(changes, what) {
             if (!meta) return false;
-            settings = Object.assign(readForm(root$("ta-convert-form")), changes);
             editing = true;
-            renderForm();
+            fill(Object.assign(readForm(root$("ta-convert-form")), changes), "other");
             message("Set in the form: " + esc(what) + ". Create Workset when the settings are ready.", "text-muted");
             return true;
         }
 
-        root$("ta-convert-plan").addEventListener("click", usePlan);
+        root$("ta-convert-from").addEventListener("change", function (e) {
+            if (!meta || !STARTS[e.target.value]) return;
+            startFrom(e.target.value);
+            message("The form has " + STARTS[e.target.value] + ".", "text-muted");
+        });
 
-        root$("ta-convert-reset").addEventListener("click", function () {
-            core.ask(doc, "Reset defaults", "Go back to dji-thermal-cli's defaults? Your saved defaults are forgotten.", "Reset").then(function (yes) {
+        root$("ta-convert-forget").addEventListener("click", function () {
+            core.ask(doc, "Forget my defaults", "Forget your saved defaults? New worksets start from the WebODM plan's settings, " +
+                "else dji-thermal-cli's. The form keeps its settings.", "Forget").then(function (yes) {
                 return yes && send(ctx.api + "preferences", "DELETE");
             }).then(function (r) {
                 if (!r) return;
-                if (!r.ok) return message("Could not reset your defaults.", "text-danger");
-                settings = r.data.settings;
-                saved = false;
+                if (!r.ok) return message("Could not forget your defaults.", "text-danger");
+                mine = null;
+                if (start === "saved") start = "other";
                 renderForm();
-                message("Back to dji-thermal-cli's defaults.", "text-muted");
+                message("Your saved defaults are forgotten.", "text-muted");
             });
         });
 
@@ -1515,9 +1562,8 @@
                 createTask();
             } else if (act === "task-plan") {
                 if (!meta || !task || !task.info) return;
-                settings = planSettings(task.info.process_args, c.settings);
                 editing = true;
-                renderForm();
+                fill(planSettings(task.info.process_args, c.settings), "other");
                 message("The form has " + esc(c.name) + "'s settings with the WebODM plan's: <code>" + esc(task.info.process_args.join(" ")) +
                     "</code>. Create the workset, then create the task from it.", "text-muted");
                 if (root$("ta-convert-settings").scrollIntoView) root$("ta-convert-settings").scrollIntoView();
@@ -1532,8 +1578,7 @@
             } else if (act === "parent") {
                 useForParent(c);
             } else if (act === "use") {
-                settings = c.settings;
-                renderForm();
+                fill(c.settings, "other");
                 message("The form has " + esc(c.name) + "'s settings.", "text-muted");
             } else if (act === "cancel") {
                 send(base + id + "/cancel", "POST", {}).then(function (r) {

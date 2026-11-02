@@ -220,6 +220,33 @@
     Reset also forgets the saved defaults; a "Start from" choice above the form (WebODM plan · My defaults ·
     dji-thermal-cli defaults), Save as my defaults beside it, "Forget my defaults" in its menu.
   - U5-5, from U5: DJI Thermal Task's panel in the form's new order, labels and help text.
+  Design (Claude's, 2026-11-02, from the code: `public/conversions.js` `formHtml`, `markForm`, `renderForm`, the
+  buttons in `templates/dataset.html`; `public/thermal/ThermalTaskPanel.jsx`, `MeasurementSettings.jsx`):
+  - U2-1: the form starts from the saved defaults when there are some (`preferences`' `saved`), else from the plan
+    (`planSettings` on the analysis' `process_args`); a dataset not yet analyzed starts from dji-thermal-cli's, and
+    takes the plan when its analysis arrives, if the form wasn't touched meanwhile. The line above the form says
+    which ("Starting from the WebODM plan's settings").
+  - U2-2: sections Frames (pitch limit, Normalize, Harmonize), Outputs (with Mosaics), Measurement, Colours (hidden
+    while no colour output is ticked), Adjustments. A "≠ plan" or "default" note goes at the end of its own control's
+    label (a checkbox's too), never at the end of its group.
+  - U2-3: the buttons are replaced by a **Start from** choice above the form (WebODM plan, My defaults, dji-thermal-cli's
+    defaults; each fills the form, My defaults only when saved), with **Save as my defaults** and **Forget my
+    defaults** (when saved, asks first) beside it; under the form only the name and **Create Workset**.
+  - U5-5: DJI Thermal Task's panel in the same order (Frames: pitch limit, Normalize, Harmonize, mosaics; then
+    Measurement; then Palette) and the same words for the same settings. "Temperature unit" (the panel: the unit
+    of the values typed, the images always °C) and "Unit of the files" (the form) stay apart: they are different
+    settings.
+  Decided (the user, 2026-11-02): the **Start from** choice as designed; the pitch limit a checkbox in both, "Only
+  frames looking down: a gimbal pitch at or below", the limit beside it (-80° when ticked), unticked keeping every
+  frame; labels each as its page (left in the Task panel, as WebODM's panel under it; above in the form), the order
+  and words shared.
+  Done (U2-1, U2-2, U2-3, U5-5), `u2-settings-form`: `public/conversions.js` (`formHtml`'s order, the pitch checkbox
+  and `colours`, `markForm`'s notes on their own label, `fill`/`startFrom` and the Forget button in `init`),
+  `templates/dataset.html` (Start from), `analyzer.css`, `thermal/ThermalTaskPanel.jsx` (Palette after Measurement,
+  the shared help texts); tests in `__tests__/analyzer.test.js` (the order and Colours, the pitch checkbox, starting
+  from the plan once analyzed, Start from, saving and forgetting). Checked live on the "Thermal - 9/18/2026" dataset
+  (read only). README, `quickstart-worksets.md`, `quickstart-thermal-task.md`; `workset-settings.png`, `dataset.png`
+  and `thermal-task-panel.png` retaken. U2-4 waits for the dji-thermal-cli release (D2).
   - U2-4 (larger, its own phase): harmonize and the mosaics each align the frames (about 2.5 and 3 minutes of a
     6-minute plan workset). Open (D2): reuse harmonize's alignment for the mosaics, later, after a dji-thermal-cli
     release that saves and accepts an alignment (recommended), or keep both. Decided (D2, the user, 2026-11-02):

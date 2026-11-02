@@ -199,6 +199,10 @@
 .ta-page .ta-menu .dropdown-menu > li > a:hover, .ta-page .ta-menu .dropdown-menu > li > a:focus{ background: rgba(128, 128, 128, .15); }
 .ta-page .ta-menu .dropdown-menu > li > button.text-danger{ color: #c0392b; }
 .ta-page .ta-menu .dropdown-menu .fa{ width: 16px; margin-right: 6px; text-align: center; }
+.ta-page .ta-pitch input[type="number"]{ display: inline-block; width: 80px; }
+.ta-page .ta-convert-from{ display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.ta-page .ta-convert-from label{ font-weight: normal; margin: 0; }
+.ta-page .ta-convert-from select{ width: auto; }
 .ta-page .ta-convert-actions{ display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
 .ta-page .ta-convert-actions input{ width: 220px; }
 .ta-page .ta-convert-message{ margin-top: 6px; font-size: 13px; }

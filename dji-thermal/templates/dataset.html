@@ -48,15 +48,23 @@
     <div class="ta-tab" id="ta-tab-convert" data-tab="convert">
         <div class="ta-convert-settings" id="ta-convert-settings" hidden>
             <p class="text-muted">Create a workset: the images converted by dji-thermal-cli with these settings. Every workset is kept beside
-                the others, to compare settings. <span id="ta-convert-origin"></span></p>
+                the others, to compare settings.</p>
+            <div class="ta-convert-from">
+                <label for="ta-convert-from">Start from</label>
+                <select id="ta-convert-from" class="form-control input-sm" title="Fills the form with these settings">
+                    <option value="plan">The WebODM plan's settings</option>
+                    <option value="saved">My defaults</option>
+                    <option value="defaults">dji-thermal-cli's defaults</option>
+                    <option value="other" disabled>Other settings</option>
+                </select>
+                <button type="button" class="btn btn-default btn-sm" id="ta-convert-save" title="New worksets start from these settings"><i class="fa fa-save"></i> Save as my defaults</button>
+                <button type="button" class="btn btn-link btn-sm" id="ta-convert-forget" hidden>Forget my defaults</button>
+            </div>
             <div class="ta-convert-summary" id="ta-convert-summary"></div>
             <div id="ta-convert-form" hidden></div>
             <div class="ta-convert-actions">
                 <input type="text" id="ta-convert-name" class="form-control input-sm" maxlength="255" placeholder="Name (optional)">
                 <button type="button" class="btn btn-primary btn-sm" id="ta-convert-start" title="Convert the images into a new workset with these settings"><i class="fa fa-play"></i> Create Workset</button>
-                <button type="button" class="btn btn-default btn-sm" id="ta-convert-plan" hidden title="The outputs and options the WebODM plan recommends"><i class="fa fa-magic"></i> Use the WebODM plan's settings</button>
-                <button type="button" class="btn btn-default btn-sm" id="ta-convert-save" title="New worksets start from these settings"><i class="fa fa-save"></i> Save as my defaults</button>
-                <button type="button" class="btn btn-default btn-sm" id="ta-convert-reset"><i class="fa fa-undo"></i> Reset to defaults</button>
             </div>
             <div class="ta-convert-message" id="ta-convert-message"></div>
         </div>
