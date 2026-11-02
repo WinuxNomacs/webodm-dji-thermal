@@ -298,6 +298,13 @@
     and highlight it.
   - U4-2: from a mosaic, open on "In the mosaic" (42) rather than "All" (217).
   Open (D5): the order U5, U1, U2, U3, U4. Decided (D5, the user, 2026-11-02): that order.
+  Done, `u4-frame-page`: U4-1 the list was drawn while the page was still hidden, so its scroll did nothing; now
+  `frame.js` `scrollList` centres the frame shown once the page shows it, and again whenever it leaves the list's
+  view (stepping within view leaves the list still). U4-2 the mosaic viewer's and the map's mosaic overlay's **Open
+  this frame** add `list=mosaic` (`frames.js` `framePageUrl`; not from a WebODM orthophoto); a frame not in the list
+  asked for opens on All. Tests in `frame.test.js`, `analyzer.test.js`, `inspector.test.js`; checked live on the
+  "Thermal - 9/18/2026" dataset (frame 0111: centred, "In the mosaic 200"). README, `quickstart-worksets.md`; no
+  screenshot changed (the frame page's opens on the first frame).
 - **Jobs left running by a stopped worker** (found in the walk-through, 2026-11-02): when WebODM's worker stops in
   the middle of a job (`docker restart`, a crash, the machine restarting), Celery never marks the job failed (the
   message was taken; no result is ever written), so `datasets.check_stale` never finds it gone: the analysis, workset,

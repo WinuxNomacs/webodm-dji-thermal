@@ -638,11 +638,20 @@
             var frames = shown(), built = all.some(inMosaic);
             var sizes = built ? LISTS.map(function (l) { return listFrames(all, l[0]).length; }) : null;
             $("ta-frame-list").innerHTML = listHtml(frames, frame, list, sizes, meta.max_pitch, meta.built);
-            var at = $("ta-frame-list").querySelector("[aria-current=true]");
-            if (at && at.scrollIntoView) at.scrollIntoView({block: "nearest"});
+            scrollList();
             var i = frames.map(function (f) { return f.path; }).indexOf(frame);
             $("ta-frame-prev").disabled = i <= 0;
             $("ta-frame-next").disabled = i < 0 || i >= frames.length - 1;
+        }
+
+        // The frame shown, centred in the list when it's out of view (the list scrolled, not the page); nothing while
+        // the page is hidden, before the first frame is drawn
+        function scrollList() {
+            var box = $("ta-frame-list"), at = box.querySelector("[aria-current=true]");
+            if (!at || $("ta-frame-main").hidden) return;
+            var b = box.getBoundingClientRect(), r = at.getBoundingClientRect();
+            if (r.top >= b.top && r.bottom <= b.bottom) return;
+            box.scrollTop += r.top - b.top - (b.height - r.height) / 2;
         }
 
         // The frame and list in the URL, so a link or a reload comes back to them
@@ -686,6 +695,7 @@
             $("ta-frame-subtitle").textContent = [meta.dataset_name, meta.name, timeText(entry.time), frame !== fileName(frame) ? frame : ""]
                 .filter(Boolean).join(" · ");
             $("ta-frame-main").hidden = false;
+            scrollList();
             $("ta-frame-title-0").hidden = $("ta-frame-pane-1").hidden = !tiles[1];
             $("ta-viewer-controls").innerHTML = Viewer.controlsHtml(current(), style, meta.palettes || [], unit());
             $("ta-frame-info").innerHTML = infoHtml(f, meta);
@@ -728,10 +738,11 @@
                 if (!r.ok) return status(esc(core.errorText(r.data, "Could not load the frames.")), "text-danger");
                 meta = r.data;
                 all = meta.frames || [];
-                if (!all.some(inMosaic) || !listFrames(all, list).length) list = "";
+                var wanted = asked.get("frame");
+                // All of them when the list asked for is empty or hasn't the frame asked for
+                if (!all.some(inMosaic) || !listFrames(all, list).some(function (f) { return f.path === wanted || !wanted; })) list = "";
                 var paths = shown().map(function (f) { return f.path; });
                 if (!paths.length) return status("The dataset has no thermal frames to show.", "text-muted");
-                var wanted = asked.get("frame");
                 return choose(paths.indexOf(wanted) >= 0 ? wanted : paths[0]);
             }, function () { status("Could not load the frames.", "text-danger"); });
         }
