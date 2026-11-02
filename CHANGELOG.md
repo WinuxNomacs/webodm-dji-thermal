@@ -33,8 +33,8 @@ installer.
 - **Worksets** with every dji-thermal-cli setting (frames, outputs, measurement, colours, adjustments), kept side by
   side, each with its files measured (thumbnails, figures, a detail pane, removing frames), downloaded as a zip or
   file by file; each user's defaults saved.
-- **Mosaics** of a workset (as converted and harmonized), placed from the frames' positions with no WebODM task, in
-  a map viewer: palettes, range and image adjustments changed live, an isotherm, the temperature, frame and view
+- **Mosaics** of a workset (as converted and harmonized), placed from the frames' positions with no WebODM task (a
+  harmonized workset's with Harmonize's alignment, not aligned again), in a map viewer: palettes, range and image adjustments changed live, an isotherm, the temperature, frame and view
   angle under the cursor, the frames that saw a point, the reports and files.
 - **The frame page**: one frame at a time, measured in its pixels (pins, lines, regions), measurements saved on it,
   and measured again with other parameters by dji-thermal-cli.
@@ -58,5 +58,5 @@ installer.
   runs in a process of its own; without it, dji-thermal-cli's built-in port is used.
 
 **Cameras**: H20N, H20T, H30T, M2EA, M30T, M3T, M3TD, M4T and XT S (temperatures by
-[dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/) 1.10.0). The M4T checked on a real flight, the others
+[dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/) 1.12.0). The M4T checked on a real flight, the others
 on DJI's Thermal SDK sample images. The server calls no outside service.
