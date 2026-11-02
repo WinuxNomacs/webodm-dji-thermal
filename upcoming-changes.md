@@ -5,6 +5,13 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **a workset's Mosaics in a section of their own** (the user, 2026-11-02, from `new.md`: "On the Files view
+    in a workset, move the Mosaics download links out of the Files section into their own collapsible section below
+    Files."), `workset-mosaics-section`. A **Mosaics** toggle below Files, with the file count, shown once mosaics
+    are built, closed at first and remembered in the browser apart from Files (`MOSAICS_PREFIX`); the files grouped
+    by mosaic (As converted, Harmonized). `conversions.js` (`mosaicFilesHtml`), `analyzer.css`. README,
+    `quickstart-worksets.md`, `workset.png` retaken. Jest (the section, and its toggle remembered). Live (read only):
+    Roof Sample, opened and a mosaic's file downloaded.
   - Done: **building the mosaics again kept no saved measurements** (found 2026-11-02 while planning removing frames),
     `keep-measurements-on-rebuild`. `mosaics.remove`, run before each build and after a failed or canceled one,
     deleted the whole `viewer/` folder, with the measurements saved on the mosaics (`measurements.json`) and on the
@@ -25,12 +32,6 @@
     workset's summary line counting the removed frames ("217 converted · 3 removed"); **mosaics built before are
     kept, marked out of date** ("built with frames since removed", with Build again); **measurements saved on a
     removed frame are deleted with it**.
-  - Next: **a workset's Mosaics in a section of their own** (the user, 2026-11-02, from `new.md`): "On the Files view
-    in a workset, move the Mosaics download links out of the Files section into their own collapsible section below
-    Files." Now `resultsHtml` lists `mosaic_files` at the end of the Files section, seen only once Files is open.
-    Proposed: a **Mosaics** heading below Files, collapsed at first and remembered in the browser as Files is
-    (`FILES_PREFIX`), with the file count in the heading and shown only when the workset has mosaics. No open
-    decision.
   - Done: **a workset's Files table: its header in view, aligned and sortable** (the user, 2026-11-02, with a
     screenshot: "Make the Files table header row sticky ... Shade the background of the header row ... Align the
     column contents with the header row ... Each column should be sortable ascending/descending where sensible.

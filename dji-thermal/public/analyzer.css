@@ -232,7 +232,8 @@
 .ta-page .ta-figures-progress{ font-size: 12px; }
 
 .ta-page .ta-mosaic-status{ margin-top: 4px; font-size: 13px; }
-.ta-page .ta-mosaic-files{ font-size: 13px; }
+.ta-page .ta-mosaic-files{ margin: 4px 0 0 14px; font-size: 13px; }
+.ta-page .ta-mosaic-files a{ margin-right: 10px; white-space: nowrap; }
 
 .ta-viewer{ max-width: none; }
 .ta-viewer .ta-viewer-body{ display: flex; gap: 12px; align-items: stretch; }

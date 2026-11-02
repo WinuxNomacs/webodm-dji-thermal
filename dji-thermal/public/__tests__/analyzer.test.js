@@ -1624,7 +1624,8 @@ describe("a dataset's conversions", () => {
 
     it("lets a viewer download the conversions but not convert or delete them", async () => {
         const fetchFn = server({
-            [URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS, can_change: false, can_delete: false, conversions: [CONVERSION]}),
+            [URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS, can_change: false, can_delete: false,
+                                                conversions: [Object.assign({}, CONVERSION, {mosaic_files: ["harmonized/mosaic.tif"]})]}),
             "/api/plugins/dji-thermal/datasets/5/conversions/9": Object.assign({}, CONVERSION, {results: {files: [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []},
                 {path: "b_T.JPG", ok: true, outputs: ["b.tiff"], notes: []}]}})
         });
@@ -1675,6 +1676,14 @@ describe("a dataset's conversions", () => {
         click(toggle());
         expect(list.querySelector('[data-files="9"]').hidden).toBe(true);
         expect(window.localStorage.getItem("dji-thermal-analyzer:files-shown:5")).toBeNull();
+        // The mosaics' files: their own toggle, remembered apart from the Files'
+        const mosaics = () => list.querySelector('button[data-act="mosaic-files"]');
+        click(mosaics());
+        expect(list.querySelector(".ta-mosaic-files").hidden).toBe(false);
+        expect(JSON.parse(window.localStorage.getItem("dji-thermal-analyzer:mosaics-shown:5"))).toEqual([9]);
+        expect(window.localStorage.getItem("dji-thermal-analyzer:files-shown:5")).toBeNull();
+        click(mosaics());
+        expect(window.localStorage.getItem("dji-thermal-analyzer:mosaics-shown:5")).toBeNull();
     });
 
     it("sorts a workset's files by any column but the thumbnail, ascending or descending, the figures' headers aligned with them", () => {
@@ -1790,14 +1799,23 @@ describe("a conversion's mosaics on the dataset page", () => {
         expect(conversions.differences(read, DEFAULTS, null, "C").map(d => [d.key, d.text])).toEqual([["mosaics", "no mosaics"]]);
     });
 
-    it("lists the mosaic files with the conversion's files", () => {
-        const html = conversions.resultsHtml(Object.assign({}, CONVERSION, {
-            results: {files: [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []}]},
-            mosaic_files: ["harmonized/mosaic.tif", "harmonized/report.json"]}), C9.replace(/9$/, ""));
-        expect(html).toContain('href="' + C9 + '/download?mosaic=harmonized%2Fmosaic.tif"');
-        expect(html).toContain("harmonized/report.json");
-        expect(conversions.resultsHtml(Object.assign({}, CONVERSION, {results: {files: [{path: "a_T.JPG", ok: true, outputs: [], notes: []}]}}), "/x/"))
-            .not.toContain("Mosaics:");
+    it("lists the mosaics' files in a section of their own below the Files, by mosaic, collapsed at first", () => {
+        const c = Object.assign({}, CONVERSION, {results: {files: [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []}]},
+            mosaic_files: ["as_converted/mosaic.tif", "harmonized/mosaic.tif", "harmonized/report.json"]});
+        expect(conversions.resultsHtml(c, C9.replace(/9$/, ""))).not.toContain("mosaic.tif");
+        document.body.innerHTML = conversions.listHtml([c], true, C9.replace(/9$/, ""), [9], null, null, null, null, null, null, []);
+        const head = document.querySelector('button[data-act="mosaic-files"]');
+        expect(head.getAttribute("aria-expanded")).toBe("false");
+        expect(head.parentNode.textContent).toBe(" Mosaics 3 files");
+        expect(document.querySelector('[data-files="9"]').compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        const files = document.querySelector(".ta-mosaic-files");
+        expect(files.hidden).toBe(true);
+        expect([...files.children].map(d => d.querySelector("strong").textContent)).toEqual(["As converted:", "Harmonized:"]);
+        expect(files.querySelector('a[title="harmonized/mosaic.tif"]').getAttribute("href")).toBe(C9 + "/download?mosaic=harmonized%2Fmosaic.tif");
+        expect(files.lastChild.textContent).toBe("Harmonized:  mosaic.tif  report.json");
+        document.body.innerHTML = conversions.listHtml([c], true, "/x/", [], null, null, null, null, null, null, [9]);
+        expect(document.querySelector(".ta-mosaic-files").hidden).toBe(false);
+        expect(conversions.listHtml([Object.assign({}, c, {mosaic_files: []})], true, "/x/", [])).not.toContain("mosaic-files");
     });
 });
 
