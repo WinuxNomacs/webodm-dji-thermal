@@ -582,7 +582,7 @@
 
         function post(url, failure) {
             return fetchFn(url, {method: "POST", credentials: "same-origin", headers: {"X-CSRFToken": csrf}})
-                .then(core.readJson).then(function (r) {
+                .then(core.readJson, core.unreachable).then(function (r) {
                     if (!r.ok) return status({text: esc(core.errorText(r.data, failure)), cls: "text-danger"});
                     return load();
                 });

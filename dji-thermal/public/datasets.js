@@ -224,7 +224,7 @@
                 opts.headers["Content-Type"] = "application/json";
                 opts.body = JSON.stringify(data);
             }
-            return fetchFn(url, opts).then(core.readJson);
+            return fetchFn(url, opts).then(core.readJson, core.unreachable);
         }
 
         body.addEventListener("click", function (e) {

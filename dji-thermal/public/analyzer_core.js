@@ -443,6 +443,11 @@
                                function () { return {ok: res.ok, data: {}}; });
     }
 
+    // A request that never reached the server (the connection dropped, WebODM restarting), answered as a refusal is:
+    // the page then says so, rather than doing nothing (or leaving a button disabled)
+    var UNREACHABLE = "Could not reach the server: check the connection, then try again.";
+    function unreachable() { return {ok: false, data: {detail: UNREACHABLE}}; }
+
     // The first message of a DRF error ({field: ["message"]} or {detail: "message"})
     function errorText(data, fallback) {
         if (data) {
@@ -524,7 +529,7 @@
     var api = {
         escapeHtml: escapeHtml, formatBytes: formatBytes, formatDate: formatDate, formatNumber: formatNumber,
         statusLabel: statusLabel, severityLabel: severityLabel, kindLabel: kindLabel, uploadName: uploadName,
-        isImage: isImage, batches: batches, uploadFiles: uploadFiles, readJson: readJson, errorText: errorText,
+        isImage: isImage, batches: batches, uploadFiles: uploadFiles, readJson: readJson, unreachable: unreachable, errorText: errorText,
         unitOf: unitOf, userUnit: userUnit, unitSymbol: unitSymbol, convertTemp: convertTemp, convertDelta: convertDelta,
         formatTemp: formatTemp, formatDelta: formatDelta, stageText: stageText, mosaicLabel: mosaicLabel,
         batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName,
