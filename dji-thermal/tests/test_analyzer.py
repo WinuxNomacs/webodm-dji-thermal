@@ -281,8 +281,13 @@ class TestAnalysis(AnalyzerTestCase):
         with contextlib.ExitStack() as stack:
             files = [stack.enter_context(open(f, "rb")) for f in frames]
             self.assertEqual(self.upload(task, files).data["saved"], len(frames))
-        d = self.client.post("{}/{}/analyze".format(API, task.id)).data
+        with mock.patch.object(datasets, "update_job", wraps=datasets.update_job) as update:
+            d = self.client.post("{}/{}/analyze".format(API, task.id)).data
         self.assertEqual((d["status"], d["thermal"]), ("ready", len(frames)), d["error"])
+        # Once the last file is checked, the summary is its own stage, at the files' share of the bar
+        progress = [c.kwargs for c in update.call_args_list if c.kwargs.get("progress")]
+        self.assertEqual((progress[-1]["progress"], progress[-1]["stage"]), (analysis.FILES_SHARE, "summary"))
+        self.assertEqual(d["stage"], "")
         self.assertEqual(d["cameras"], ["M4T"])
         self.assertIsNotNone(d["analysis"]["webodm"])
         row = d["analysis"]["files"][0]
@@ -493,6 +498,39 @@ class TestConversions(AnalyzerTestCase):
         d = self.client.get("{}/{}".format(API, task.id)).data
         self.assertEqual((d["conversion_count"], d["conversions_ready"], d["busy"]), (1, 0, False))
         self.assertEqual(d["conversions"][0]["id"], res.data["id"])
+
+    def test_a_conversions_images_are_counted_by_the_reason_dji_thermal_cli_gives(self):
+        files = [{"ok": True}, {"ok": False, "reason": "oblique (gimbal pitch -45 above -80)"},
+                 {"ok": False, "reason": "no DJI thermal data found (not an R-JPEG)"},
+                 {"ok": False, "reason": "unsupported R-JPEG: no curve"}, {"ok": False},
+                 # An RGB photo above the pitch limit: dji-thermal-cli says oblique, the conversion knows better
+                 {"ok": False, "reason": "oblique (gimbal pitch -45 above -80)", "not_thermal": True}]
+        self.assertEqual(conversions.counts(files), {"converted": 1, "oblique": 1, "not_thermal": 2, "skipped": 2})
+
+    @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def test_a_conversions_progress_counts_only_the_frames_it_converts(self):
+        frames = flight_frames(3)
+        task = self.create()
+        with contextlib.ExitStack() as stack:
+            self.upload(task, [stack.enter_context(open(f, "rb")) for f in frames] + [jpeg("DJI_0001_V.JPG")])
+        root = datasets.images_path(task)
+        dtc = converter.library()
+        thermal = conversions.thermal_jpegs(dtc, dtc.scan(root).jpegs)
+        self.assertEqual(sorted(p.name for p in thermal), sorted(os.path.basename(f) for f in frames))
+        self.assertEqual(conversions.frames_to_convert(dtc, thermal, {}), thermal)
+        # Above the pitch limit, set for all of them, none is converted; at or below it, all are
+        self.assertEqual(conversions.frames_to_convert(dtc, thermal, {"max_pitch": -80, "gimbal_pitch": -45}), set())
+        self.assertEqual(conversions.frames_to_convert(dtc, thermal, {"max_pitch": -80, "gimbal_pitch": -90}), thermal)
+
+        with mock.patch.object(datasets, "update_job", wraps=datasets.update_job) as update:
+            res = self.convert(task, {"outputs": ["temp_c:tiff"], "mosaics": False})
+        written = [c.kwargs["frames"] for c in update.call_args_list if c.kwargs.get("frames")]
+        self.assertEqual((written[0], written[-1]), ({"done": 0, "total": 3}, {"done": 3, "total": 3}))
+        self.assertEqual([res.data[k] for k in ("status", "converted", "oblique", "not_thermal", "skipped")],
+                         ["ready", 3, 0, 1, 0])
+        # All above the pitch limit: the RGB photo is still counted as not thermal, not as oblique
+        res = self.convert(task, {"outputs": ["temp_c:tiff"], "mosaics": False, "max_pitch": -80, "gimbal_pitch": -45})
+        self.assertEqual([res.data[k] for k in ("converted", "oblique", "not_thermal")], [0, 3, 1])
 
     def test_a_conversion_is_renamed_and_deleted_with_its_files(self):
         task = self.create()

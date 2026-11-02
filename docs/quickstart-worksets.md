@@ -33,11 +33,15 @@ That isn't an error: the plan is for processing into a map, and other settings s
 **Save as my defaults** keeps your settings for new worksets; **Reset to defaults** goes back to dji-thermal-cli's.
 
 Give the workset a name if you like, then press **Create Workset**. It's converted in WebODM's background worker,
-with its progress and a **Cancel** button.
+with its progress and a **Cancel** button. A harmonized workset first compares the frames' overlaps: its label shows
+the stage ("Harmonizing 3/4") and the bar how far the stages are. Then the bar counts the frames converted ("12 of 42
+frames converted"), not the RGB photos or the oblique frames, which are skipped at once. While its mosaics are built,
+the label reads "Building mosaics" and **Cancel mosaics** stops them.
 
 ## 2. The workset
 
-Each workset is listed with the settings it changed, how many images it converted, and its size.
+Each workset is listed with the settings it changed, how many images it converted, left out as oblique, found not
+thermal (the RGB photos) and skipped (those that failed), and its size.
 
 ![A converted workset](images/workset.png)
 

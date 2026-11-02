@@ -119,6 +119,21 @@
     it as a stage with its own share.
   - U1-5: on a converted card **Create task** (the next step) is grey beside a dark **View mosaics**; make it primary.
     While mosaics build the label says "Converted" beside a bare **Cancel**: "Building mosaics" and "Cancel mosaics".
+  Done (2026-11-02), `workset-card-progress`: U1-1 while harmonizing the label reads "Harmonizing 3/4" and the bar
+  fills from `mosaics.stage_fraction` (the stage's `fraction`, `conversions.convert`; `convertingHtml` in
+  `public/conversions.js`). U1-2 the conversion counts its frames before it starts (`thermal_jpegs`,
+  `frames_to_convert`: thermal, within the pitch limit), writes `frames` {done, total} ("12 of 42 frames converted"),
+  the last one at once. U1-3 `conversions.counts`: converted · oblique left out · not thermal · skipped (failed); the
+  results mark the non-thermal JPEGs (`not_thermal`), since dji-thermal-cli reports an RGB photo above the pitch
+  limit as oblique; older results are counted by their reasons. U1-4 the analysis' files fill 80% of the bar
+  (`analysis.FILES_SHARE`), then stage `summary` ("Analyzing: working out the flight's coverage and the WebODM
+  plan…", Dataset page header). U1-5 on a converted card in no task yet **Create task** is the primary button beside
+  **View mosaics**; while mosaics build, a blue "Building mosaics N%" and **Cancel mosaics**. Tests: `test_analyzer.py`
+  (counts by reason, the frames' progress, the summary stage), Jest `analyzer.test.js`. Live (dt-worker restarted):
+  the whole M4T flight harmonized with mosaics, the card through Harmonizing 1/4 to 4/4, "1 of 42 frames converted",
+  Building mosaics, then Create task primary; the counts, wrong for the oblique RGB photos (350 oblique, 42 not
+  thermal), fixed and checked on that workset's results (42 · 175 · 217); deleted afterwards. README,
+  `docs/quickstart-worksets.md`, `docs/quickstart-analyzer.md`, `create-task.png` retaken.
 - **U2. The Workset Creation Settings form** (UX review, 2026-11-02). Dataset page › Worksets › Workset Creation
   Settings:
   - U2-1: a new dataset starts from dji-thermal-cli's defaults, four chips "≠ plan", though step 2 says to start from

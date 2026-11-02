@@ -15,7 +15,8 @@ also drop them on the page).
 ![The New Dataset dialog](images/new-dataset.png)
 
 Only JPEGs are uploaded. Visible photos are listed but not analyzed. Once uploaded, the photos are analyzed in
-WebODM's background worker; the page shows its progress and a **Cancel** button.
+WebODM's background worker; the page shows its progress and a **Cancel** button. Once every photo is checked, the
+analysis works out the flight's coverage and the WebODM plan, which can take a little while on a large flight.
 
 The dataset is kept in a task of the project called "Thermal dataset: *name*" (a dataset made for a
 [DJI Thermal Task](quickstart-thermal-task.md#5-look-at-the-photos-in-the-dji-thermal-analyzer)'s task is kept in

@@ -62,6 +62,8 @@ def summary(task, user):
         'project': {'id': task.project.id, 'name': task.project.name},
         'status': job['status'],
         'progress': job.get('progress') or 0,
+        # 'summary' once the files are checked, while the coverage and the plan are worked out
+        'stage': job.get('stage') or '',
         'error': job.get('error') or '',
         'file_count': len(images),
         'image_bytes': sum(size for _, size in images),
@@ -133,8 +135,10 @@ def conversion_summary(task, cid):
         'progress': job.get('progress') or 0,
         'stage': job.get('stage') or {},
         'error': job.get('error') or '',
-        'converted': r.get('converted', 0),
-        'skipped': r.get('skipped', 0),
+        # The images by result (worked out again for results kept before they were counted so)
+        **conversions.counts(r.get('files') or []),
+        # How many frames it converts, and has, while converting
+        'frames': job.get('frames') or {},
         'removed': len(r.get('removed') or []),
         # '' before any build
         'mosaic_status': mosaic_job['status'] if mosaic_job['status'] != 'new' else '',

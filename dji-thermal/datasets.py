@@ -387,7 +387,7 @@ def start_job(task, module, function, *args, rel=JOB_FILE, running='analyzing', 
 
 
 def start_analysis(task):
-    start_job(task, 'analysis', 'analyze')
+    start_job(task, 'analysis', 'analyze', stage='')
 
 
 def cancel_analysis(task):

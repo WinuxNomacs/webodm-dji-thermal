@@ -1018,6 +1018,15 @@ describe("a dataset's page", () => {
         expect(dataset.planHtml(ANALYSIS, false)).not.toContain("ta-plan-convert");
     });
 
+    it("says what the analysis works out once its files are checked", async () => {
+        jest.useFakeTimers();
+        const summary = Object.assign({}, DATASET, {status: "analyzing", progress: 0.8, stage: "summary", analysis: {}, analyzed: false});
+        dataset.init(document, server({"/api/plugins/dji-thermal/datasets/5": summary}));
+        await ticks();
+        expect(document.getElementById("ta-status").textContent).toContain("Analyzing: working out the flight's coverage and the WebODM plan…");
+        expect(document.getElementById("ta-status").innerHTML).toContain("width: 80%");
+    });
+
     it("loads the dataset, switches tabs and polls while it is analyzed", async () => {
         jest.useFakeTimers();
         const analyzing = Object.assign({}, DATASET, {status: "analyzing", progress: 0.4, analysis: {}, analyzed: false});
@@ -1469,13 +1478,22 @@ describe("a dataset's conversions", () => {
         let html = conversions.listHtml([running, CONVERSION], true, base, null);
         expect(html).toContain("Converting 30%");
         const starting = Object.assign({}, running, {progress: 0, settings: Object.assign({}, DEFAULTS, {normalize: true})});
-        expect(conversions.listHtml([starting], true, base, null)).toContain("Normalizing: reading the frames' recorded temperatures");
+        expect(conversions.listHtml([starting], true, base, null)).toContain("Normalizing: reading the frames&#39; recorded temperatures");
+        // Harmonizing: the label shows the step, the bar how far the stages are
         const harmonizing = Object.assign({}, starting, {settings: Object.assign({}, DEFAULTS, {normalize: true, harmonize: true}),
-                                                          stage: {stage: "frames", step: 2, steps: 5, done: 40, total: 217, unit: "files"}});
-        expect(conversions.listHtml([harmonizing], true, base, null)).toContain("Harmonizing: step 2 of 5, reading frames, 40/217 files…");
+                                                          stage: {stage: "frames", step: 2, steps: 5, done: 40, total: 217, unit: "files", fraction: 0.237}});
+        const harmonizingHtml = conversions.listHtml([harmonizing], true, base, null);
+        expect(harmonizingHtml).toContain("Harmonizing: step 2 of 5, reading frames, 40/217 files…");
+        expect(harmonizingHtml).toContain(">Harmonizing 2/5</span>");
+        expect(harmonizingHtml).toContain("width: 24%");
+        // Then the frames converted, not the RGB photos or oblique frames skipped beside them
+        const frames = Object.assign({}, running, {progress: 12 / 42, frames: {done: 12, total: 42}});
+        expect(conversions.listHtml([frames], true, base, null)).toContain("12 of 42 frames converted");
         expect(html).toContain('href="' + base + '9/download"');
         expect(html).not.toContain(base + '10/download');
-        expect(html).toContain("2 converted, 1 skipped");
+        expect(html).toContain("2 converted · 1 skipped");
+        const counted = Object.assign({}, CONVERSION, {converted: 42, oblique: 175, not_thermal: 217, skipped: 0});
+        expect(conversions.listHtml([counted], true, base, null)).toContain("42 converted · 175 oblique left out · 217 not thermal · ");
         expect(html).toContain('data-act="cancel"');
         html = conversions.listHtml([CONVERSION], false, base, null);
         expect(html).not.toContain('data-act="delete"');
@@ -1816,7 +1834,7 @@ describe("a dataset's conversions", () => {
         expect(JSON.parse(sent[1].body)).toEqual({frames: ["a_T.JPG", "b_T.JPG"]});
         expect([...list.querySelectorAll(".ta-results tbody tr")].map(tr => tr.getAttribute("data-path"))).toEqual(["c_T.JPG"]);
         expect(pane().hidden).toBe(true);
-        expect(list.querySelector(".ta-conversion-figures").textContent).toMatch(/^1 converted, 1 skipped · 2 removed · /);
+        expect(list.querySelector(".ta-conversion-figures").textContent).toMatch(/^1 converted · 1 skipped · 2 removed · /);
         expect(list.querySelector(".ta-mosaic-status").textContent).toContain("built with frames since removed");
         expect(list.querySelector('.ta-mosaic-status button[data-act="mosaics"]')).not.toBeNull();
         window.localStorage.removeItem("dji-thermal-analyzer:files-shown:5");
@@ -1894,8 +1912,17 @@ describe("a conversion's mosaics on the dataset page", () => {
         el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "building"}), true, C9.replace(/9$/, ""), null, viewerUrl);
         expect(el.firstChild.getAttribute("data-act")).toBe("cancel");
         expect(el.firstChild.getAttribute("title")).toBe("Stop building the mosaics");
+        expect(el.firstChild.textContent.trim()).toBe("Cancel mosaics");
+        const buildingCard = Object.assign({}, CONVERSION, {mosaic_status: "building", mosaic_progress: 0.45});
+        expect(conversions.statusLabel(buildingCard)).toBe("Building mosaics 45%");
+        expect(conversions.listHtml([buildingCard], true, C9.replace(/9$/, ""), null)).toContain('label-info">Building mosaics 45%');
         expect(el.querySelector('[data-act="mosaics"]')).toBe(null);
         expect(el.querySelector('a[href="' + viewerUrl + '"]').textContent).toContain("Mosaics");
+
+        // In no task yet, Create task, the next step, is the primary action beside them
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready"}), true, C9.replace(/9$/, ""), null, viewerUrl, true);
+        expect(el.querySelector('[data-act="task"]').className).toContain("btn-primary");
+        expect(el.firstChild.className).not.toContain("btn-primary");
 
         // Who cannot change the dataset can look, not build
         el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready"}), false, C9.replace(/9$/, ""), null, viewerUrl);
