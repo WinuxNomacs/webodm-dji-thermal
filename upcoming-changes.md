@@ -137,7 +137,9 @@
 - **The SDK note's wording** (the user, 2026-11-02, from `new.md`): "Change this statement in the admin page \"it
   reduces the performance of the DJI Thermal Analyzer.\" to say \"will reduce performance of the DJI Thermal Analyzer
   when used in this WebODM environment.\"" Builds on the SDK settings note (`templates/sdk.html`,
-  `#dji-thermal-sdk-note`, Administration › DJI Thermal › "Use DJI's own Thermal SDK"). Their wording as is.
+  `#dji-thermal-sdk-note`, Administration › DJI Thermal › "Use DJI's own Thermal SDK"). Their wording as is. Done
+  (2026-11-02), `sdk-note-wording`: "Usually only needed for development purposes: will reduce performance of the
+  DJI Thermal Analyzer when used in this WebODM environment." README, `docs/dji-sdk.md`, `dji-sdk.png` retaken.
 - **Emissivity and Reflected under the Inspector's scale** (the user, 2026-11-02, from `new.md`): "In Thermal
   Inspector, move Emissivity and Reflected beneath the scale temperatures. Move the Manual Corrections checkbox
   beneath them and remove it's description text. Emissivity and Reflected should remain visible at all times though
