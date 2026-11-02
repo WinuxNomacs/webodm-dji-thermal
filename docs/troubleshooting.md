@@ -20,6 +20,19 @@ Those photos are left out and the task goes on with the others. The reason says 
 "The server did not answer in time" or "Cannot reach the server": the photo was sent three times without an answer
 (a slow or dropped connection); add it to a new task once the connection is back.
 
+**"None of the photos could be converted: the task was not created."**
+
+Every photo picked failed to convert. The reasons are listed under the project; a photo of a camera dji-thermal-cli
+decodes, as the drone saved it, converts.
+
+**"The conversion failed: …"** / **"The conversion was canceled: the task will not start."** (Normalize or Harmonize)
+
+With Normalize or Harmonize ticked, the photos are converted by a workset of the task's dataset in WebODM's worker,
+and the task starts once it's done. The workset failed, for the reason given, or was canceled in the DJI Thermal
+Analyzer. The photos are kept in the dataset: create a workset there with the settings you want, then **Use for
+parent task** from its menu to put its images in the task (see
+[Trying several worksets in one task](quickstart-worksets.md#trying-several-worksets-in-one-task)).
+
 **"Converted, but the task didn't start: ..."**, with a **Start processing** button
 
 The photos were converted, but putting their images in the task failed, for the reason given; the task still waits
@@ -119,6 +132,7 @@ the dataset, so the next views are quick.
 
 The Inspector appears on a task whose orthophoto holds temperatures: a single thermal band, as ODM makes from the
 DJI Thermal Task's or a workset's temperature TIFFs. An orthophoto of colour pictures has no temperatures to read.
+On a project's map it also appears when a workset of one of the project's datasets has built mosaics.
 
 **"This task has no thermal orthophoto"**
 

@@ -13,6 +13,8 @@ It's used:
 
 - in the DJI Thermal Analyzer, for the Files tab's thumbnails and detail pane (drawn from the frames' temperatures, on
   the server; the first view of a large dataset takes a while), and as the palette new worksets start with;
+- in the DJI Thermal Task panel, where the palette the task's map opens in starts on yours (else on the one the
+  photos were shot in);
 - in the mosaic viewer, where its temperature tabs open in it;
 - on WebODM's map of a thermal task, where the Thermal Inspector draws DJI's palettes itself, over the range set in
   its colour scale or in WebODM's layer panel (the same range). Its Image section, as the mosaic viewer's, changes

@@ -54,6 +54,8 @@ the next time you open the same task; to share one, save it (section 6).
   layer" gives its own coldest and hottest temperatures. The range is the same one WebODM's layer panel sets: a
   range set there shows here, and the map draws the one set here. WebODM's panel only shows its new value when the
   page is next loaded.
+- **Emissivity** and **Reflected**, under the colour scale: what the layer was measured with, greyed out until you
+  tick **Manual Corrections** to correct for others (section 7).
 - **Image**: how the layer is drawn, as in the Analyzer's mosaic viewer. **Brightness** and **Contrast** move and
   narrow the range from Auto's; **Gamma** above 1 brightens the cooler part of the range; **Equalized** spreads the
   colours over the temperatures the whole layer has most of; **Sharpening** brings out edges. **Reset** goes back to

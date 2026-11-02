@@ -24,13 +24,13 @@ workset's id (12 hexadecimal characters).
 | Method | Path | What it does |
 | --- | --- | --- |
 | GET, POST | `datasets` | The datasets you can view; a new dataset. |
-| GET, PATCH, DELETE | `datasets/<dataset>` | A dataset and its analysis; rename it; delete it. |
+| GET, PATCH, DELETE | `datasets/<dataset>` | A dataset and its analysis (while it runs, `progress` and `stage`: `summary` once every file is checked and the coverage and plan are worked out); rename it; delete it. |
 | POST | `datasets/<dataset>/upload` | Adds photos. |
 | POST | `datasets/<dataset>/analyze`, `.../cancel` | Starts the analysis; cancels the running job. |
 | POST | `datasets/<dataset>/remove` | Deletes images from the dataset (`files`: their paths), and from each converted workset that has them (as its `remove`), and drops them from the analysis' `files`, which is kept but no longer matches the images (`status` back to `new`). Answers the dataset, with `files_removed`. Refused while it is analyzed or a workset converts or builds its mosaics, and when a workset would be left without a converted frame. |
 | GET, POST | `datasets/<dataset>/files` | One file as uploaded (`?file=`, `&download=1` to download); several files as a zip. |
 | GET | `datasets/<dataset>/thumbnail` | A file's thumbnail (`?file=`, `?palette=`, `?size=large` for the detail pane; `?workset=` also for a frame that workset converted, in a dataset not analyzed). |
-| GET, POST | `datasets/<dataset>/conversions` | The worksets; a new workset from settings. |
+| GET, POST | `datasets/<dataset>/conversions` | The worksets, each with how many images it `converted`, left out as `oblique`, found `not_thermal` and `skipped` (failed), and while it converts its `progress`, harmonizing `stage` (`stage`, `step`, `steps`, `fraction`) and `frames` (`done`, `total`: the frames to convert, thermal and within the pitch limit); a new workset from settings. |
 | GET, PATCH, DELETE | `datasets/<dataset>/conversions/<workset>` | A workset, with each frame's `figures` (`min`, `max`, `mean`, `reflected`, `ambient` in °C, `emissivity`, `humidity`, `distance`, `distance_source`, as it measured them) and how far measuring them is (`figures_status`, `figures_progress`, `figures_error`; a workset converted before they were measured starts measuring them); rename it; delete it. |
 | POST | `.../conversions/<workset>/figures` | Measures its frames' figures again. |
 | POST | `.../conversions/<workset>/remove` | Removes frames from a converted workset (`frames`: their paths): their files and the measurements saved on them are deleted, and they move from `results.files` to `results.removed` (`path`, `removed_by`, `removed_at`), so new tasks and mosaics leave them out. Answers the workset, with `frames_removed`; its `removed` counts them, and `mosaic_outdated` says its mosaics were built with frames since removed. Refused while its mosaics are being built, and for the last converted frame. |

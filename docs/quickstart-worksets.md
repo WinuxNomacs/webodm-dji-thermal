@@ -67,8 +67,9 @@ thermal (the RGB photos) and skipped (those that failed), and its size.
   **Download all**'s zip has the mosaics too.
 
 ![A workset's Mosaics, the harmonized mosaic selected](images/workset-mosaics.png)
-- The **⋯** menu has **Download all** (a zip), **Copy settings to form**, **Build mosaics**, **Create task** (once
-  the workset is in a task), **Use for parent task**, **Rename** and **Delete**.
+- The **⋯** menu has **Download all** (a zip), **Open on WebODM's map** (once the mosaics are built), **Copy
+  settings to form**, **Build mosaics** (**Build mosaics again** once built), **Create task** (once the workset is
+  in a task), **Use for parent task**, **Rename** and **Delete**.
 
 ## 3. The mosaics
 

@@ -52,7 +52,8 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
    hold temperatures, so the map can show them in any palette later. A task made from a workset opens in the
    workset's palette, if it has one.
 3. **Only frames looking down**, under it, ticked by default: as the WebODM plan, only the frames with a gimbal pitch
-   at or below -80° (read from each photo) go into the task, with the count kept beside it ("42 of 217 frames");
+   at or below the limit beside it (-80° to start with, which you can change; read from each photo) go into the task,
+   with the count kept beside it ("42 of 217 frames");
    oblique frames mix viewing angles and sky into the map's temperatures. Untick it to keep every frame (for a 3D
    model). As is, the others are not converted (but kept in the dataset, if any); normalized, the workset leaves
    them out.
@@ -168,13 +169,15 @@ frames it converted, left out as oblique, found not thermal and skipped. **Works
 Creation Settings:** opens and closes the settings, its chips showing what differs from the defaults either way; the **Outputs** section shows its own when
 closed. A chip marked **≠ plan** differs from the WebODM plan's settings (hover for the plan's value).
 
+- **Colours**: the palette and colour range of the pictures.
 - **Outputs**: temperature TIFFs in °C, °F or K, pseudo-colour PNGs, gray16, raw counts, DJI R-JPEGs and the others
-  dji-thermal-cli writes, and their compression; the palette and colour range of the pictures.
+  dji-thermal-cli writes, their compression, and whether to build the mosaics.
 - **Measurement**: each parameter, with the flight's recorded median beside it (left empty, each image keeps its
   own), and the unit of the files.
-- **Corrections**: **Normalize** (one ambient and reflected temperature for every frame, the flight's medians) and
-  **Harmonize** (also each frame's drift against its overlapping neighbours removed), a gimbal pitch limit for nadir frames only, gimbal overrides, temperatures above or below a threshold
-  replaced, the location stripped.
+- **Frames**: **Normalize** (one ambient and reflected temperature for every frame, the flight's medians),
+  **Harmonize** (also each frame's drift against its overlapping neighbours removed) and a gimbal pitch limit for
+  nadir frames only.
+- **Adjustments**: gimbal overrides, temperatures above or below a threshold replaced, the location stripped.
 - **Use the WebODM plan's settings** fills in what the plan recommends; **Copy settings to form**, in a workset's
   menu, fills in that workset's; **Save as my defaults** keeps your settings for new worksets (**Reset to defaults**
   goes back to dji-thermal-cli's).
@@ -186,7 +189,8 @@ its **Mosaics** below them once built (a table like the Files', closed at first 
 preview, frames, size, ground sample distance and temperature range, and beside it a pane with the preview at its
 own size, its files to download, what dji-thermal-cli reports about it and **View mosaic**; Ctrl/Cmd-click selects
 both, to download their files as one zip),
-**Download all** (a zip), and **Rename** and **Delete** in its menu. Beside the table, a detail pane shows the image
+**Download all** (a zip), and in its menu **Copy settings to form**, **Build mosaics** (again), **Open on WebODM's
+map**, **Use for parent task**, **Rename** and **Delete**. Beside the table, a detail pane shows the image
 under the mouse, or the one clicked: the frame at its own size, all it was measured with, and its downloads (the
 workset's files, its temperatures as CSV or a float TIFF, and Open frame). Ctrl/Cmd-click or Shift-click selects
 several, to download their files as one zip. **Remove from workset**, in the pane, takes the image (or those
@@ -443,20 +447,33 @@ checked on a real flight; the others on DJI's Thermal SDK sample images only.
 `CLAUDE.md` describes the dev environment (WebODM in Docker on port 8002, `dev/webodm.sh`) and the checks. `dev/screenshots.js`
 takes the documentation's screenshots from it.
 
-The plugin's parts: `converter.py` (R-JPEG to TIFF), `api.py` (its API, under `/api/plugins/dji-thermal/`: `describe` a
-photo's camera, recorded values and ranges; `projects/<id>/tasks/<id>/convert` one photo into a partial task, with
-WebODM's project permission), `sdk.py` with `page.py` and `templates/sdk.html` (DJI's own SDK and the DJI Thermal page,
-`/plugins/dji-thermal/sdk/`), the DJI Thermal Analyzer (`datasets.py`: the holder tasks and their records; `analysis.py`:
-the analysis job, run by WebODM's worker; `conversions.py`: the conversions, their settings and job, and each user's
-defaults; `mosaics.py`: a conversion's mosaics, their job, and the viewer's tiles and values with WebODM's rio-tiler;
-`conversion_tasks.py`: a WebODM task from a conversion, or the dataset's own task given its TIFFs; `analyzer_api.py`:
-its API under `/api/plugins/dji-thermal/datasets`, with a conversion's `task` and `parent`; `analyzer_pages.py` with
-`templates/datasets.html`, `dataset.html` and `viewer.html`: its pages, `/plugins/dji-thermal/`,
-`/plugins/dji-thermal/dataset/<id>` and its conversions' mosaics, `.../dataset/<id>/conversion/<id>`), and `public/`
-(`main.js`, which adds the button and the DJI Thermal page's link under Administration; `analyzer_core.js`,
-`datasets.js`, `dataset.js`, `conversions.js`, `viewer.js` and `analyzer.css`, the Analyzer's pages, plain scripts; and
-`thermal/`, the button and panel (JSX) and WebODM's own Leaflet for the viewer (`Leaflet.js`), built by WebODM's webpack
-when the plugin is installed).
+The plugin's parts:
+
+- **DJI Thermal Task**: `converter.py` (R-JPEG to TIFF) and `api.py` (its API, under `/api/plugins/dji-thermal/`:
+  `describe` a photo's camera, recorded values and ranges; `projects/<id>/tasks/<id>/convert` one photo into a
+  partial task, with WebODM's project permission); in `public/`, `main.js` (the button beside "Select Images and
+  GCP", and the DJI Thermal page's link under Administration) and `thermal/` (the button and panel, JSX, and WebODM's
+  own Leaflet for the viewer, `Leaflet.js`, built by WebODM's webpack when the plugin is installed).
+- **DJI's own SDK**: `sdk.py` with `page.py` and `templates/sdk.html` (the DJI Thermal page,
+  `/plugins/dji-thermal/sdk/`).
+- **The DJI Thermal Analyzer**: `datasets.py` (the holder tasks, their records and the jobs WebODM's worker runs),
+  `analysis.py` (the analysis job), `conversions.py` (the worksets, their settings and job, and each user's defaults),
+  `mosaics.py` (a workset's mosaics, their job, and the viewer's tiles and values with WebODM's rio-tiler),
+  `colouring.py` (how tiles and frames are drawn: range, tone curve, sharpening, isotherm), `conversion_tasks.py` (a
+  WebODM task from a workset, or the dataset's own task given its TIFFs), `frames.py` and `frames_api.py` (the frame
+  page: a frame as converted or measured again), `analyzer_api.py` (its API under
+  `/api/plugins/dji-thermal/datasets`) and `analyzer_pages.py` with `templates/datasets.html`, `dataset.html`,
+  `viewer.html` and `frame.html` (its pages, `/plugins/dji-thermal/`, `.../dataset/<id>`, a workset's mosaics
+  `.../dataset/<id>/conversion/<id>` and its frames `.../conversion/<id>/frame`); in `public/`, `analyzer_core.js`,
+  `datasets.js`, `dataset.js`, `conversions.js`, `viewer.js`, `frame.js`, `picture_viewer.js`, `analyzer.css` and
+  `frames.css`, plain scripts.
+- **The Thermal Inspector**: `inspector.py` and `inspector_api.py` (a task's thermal orthophoto read at a point and
+  over a region, drawn in a palette, and the project's workset mosaics), `measurements.py` (the saved measurements)
+  and `correction.py` (the approximate correction for another emissivity); in `public/`, `inspector.js`,
+  `regions.js` and `inspector.css`.
+- **Shared**: `portable.py` (files the web app and the worker share, alike on Linux, macOS and Windows), and in
+  `public/`, `scale.js` (colour scales and the Image section's controls), `recolour.js` (tiles coloured in the
+  browser) and `frames.js` (the window of the frames that saw a point), for the mosaic viewer and the Inspector.
 
 The tests never use images or DJI's files from this repository: none is committed or published. Those that need
 real R-JPEGs or DJI's SDK read them from your machine, set in an untracked `.env` file at the repo root, and are

@@ -3,7 +3,9 @@
 ## A DJI Thermal Task's images
 
 Each thermal R-JPEG becomes a single-band 32-bit float TIFF of its temperatures in degrees Celsius, measured with
-the [measurement settings](measurement.md) of the task. The photos themselves aren't kept.
+the [measurement settings](measurement.md) of the task. The photos themselves aren't kept, unless you tick **Also
+keep the photos in a DJI Thermal Analyzer dataset**. A normalized or harmonized task's images are its workset's °C
+temperature TIFFs, the same kind of file.
 
 The TIFF keeps all of the photo's EXIF and DJI XMP metadata, including what ODM uses: GPS, altitudes, capture time,
 camera and gimbal angles, and RTK accuracy. It's marked as a thermal band (`Camera:BandName` = `LWIR`), so ODM

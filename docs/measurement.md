@@ -55,11 +55,12 @@ The unit of the values you type: Celsius, Fahrenheit or Kelvin. The DJI Thermal 
 Celsius. In the Workset Creation Settings, **Unit of the files** sets the unit of a workset's temperature TIFFs
 separately.
 
-## Normalize and harmonize (worksets only)
+## Normalize and harmonize
 
 The camera recalibrates itself during a flight, and the recorded ambient and reflected temperatures can change from
 photo to photo. So overlapping frames of the same ground can read a degree or two apart, and a map made from them
-shows seams. The Workset Creation Settings' Frames section has two settings for it:
+shows seams. The Workset Creation Settings' Frames section has two settings for it, and the DJI Thermal Task panel
+has the same two (the task's photos are then converted by a workset of its dataset):
 
 - **Normalize** measures every frame with one ambient and reflected temperature: the flight's medians of the values
   the frames recorded (a value typed in Measurement is used instead). It's quick, and removes the jumps where the

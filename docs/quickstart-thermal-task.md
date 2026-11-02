@@ -23,16 +23,17 @@ opens in, starting on the one the photos were shot in. It doesn't change the tas
 and your own palette, if you've chosen one in the DJI Thermal Analyzer's preferences, comes first; the map can show
 any palette later.
 
-**Only frames looking down**, ticked by default, keeps only the frames with a gimbal pitch at or below -80°, as the
-WebODM plan does, and says how many that is ("42 of 217 frames"): oblique frames mix viewing angles and sky into the
-map's temperatures. Untick it to keep every frame, for a 3D model.
+**Only frames looking down**, ticked by default, keeps only the frames with a gimbal pitch at or below the limit
+beside it, -80° as the WebODM plan has it, and says how many that is ("42 of 217 frames"): oblique frames mix viewing
+angles and sky into the map's temperatures. Change the limit to keep more or fewer, or untick it to keep every
+frame, for a 3D model.
 
 Then two settings, off by default:
 
 - **Normalize** measures every frame with one ambient and reflected temperature, the flight's medians of the values
   the camera recorded, so there are no jumps between frames where those values change.
 - **Harmonize** also removes each frame's drift against the frames overlapping it, so the map has no seams. It takes
-  longer, and ticks Normalize. [Measurement settings](measurement.md#normalize-and-harmonize-worksets-only) explains
+  longer, and ticks Normalize. [Measurement settings](measurement.md#normalize-and-harmonize) explains
   both.
 
 Both need every photo before any is converted. With either ticked, the photos are uploaded to the task's
