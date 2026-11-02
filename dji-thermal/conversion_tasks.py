@@ -358,31 +358,38 @@ def commit_parent(task, cid, then):
     """
     A DJI Thermal Task's task (the dataset's own, still partial) normalized or harmonized through a workset (api.py
     TaskWorkset), once the workset is converted: its TIFFs put in the task, which is committed to the processing node
-    chosen when it was made (then: {processing_node, auto_processing_node}), as WebODM's own commit does. What goes
-    wrong is the task's error, as WebODM shows one.
+    chosen when it was made (then: {processing_node, auto_processing_node}), as WebODM's own commit does. The worker
+    does it at the end of the conversion, and the project page's progress (api.py TaskWorkset.get) when the worker
+    didn't: the first one commits, the other finds the task committed. What goes wrong is the task's error, as WebODM
+    shows one.
+    :return: the task, or None when it could not start
     """
     from worker import tasks as worker_tasks
-    # The GCP file and WebODM's text files sent with the photos, kept through use_for_parent's clearing of the folder
-    texts = {}
-    for name in task.scan_images():
-        if name.lower().endswith('.txt'):
-            with open(task.get_image_path(name), 'rb') as f:
-                texts[name] = f.read()
-    try:
-        t = use_for_parent(task, cid)
-    except ValueError as e:
-        Task.objects.filter(pk=task.pk).update(last_error=str(e))
-        return None
-    finally:
-        for name, content in texts.items():
-            with open(task.get_image_path(name), 'wb') as f:
-                f.write(content)
-    t.processing_node_id = then.get('processing_node')
-    t.auto_processing_node = bool(then.get('auto_processing_node'))
-    t.partial = False
-    t.images_count = len(t.scan_images())
-    t.update_size()
-    t.save()
+    with transaction.atomic():
+        t = Task.objects.select_for_update().get(pk=task.pk)
+        if not t.partial:
+            return t
+        # The GCP file and WebODM's text files sent with the photos, kept through use_for_parent's clearing of the folder
+        texts = {}
+        for name in task.scan_images():
+            if name.lower().endswith('.txt'):
+                with open(task.get_image_path(name), 'rb') as f:
+                    texts[name] = f.read()
+        try:
+            t = use_for_parent(task, cid)
+        except Exception as e:  # noqa: BLE001 - shown on the task
+            Task.objects.filter(pk=task.pk).update(last_error=str(e) or type(e).__name__)
+            return None
+        finally:
+            for name, content in texts.items():
+                with open(task.get_image_path(name), 'wb') as f:
+                    f.write(content)
+        t.processing_node_id = then.get('processing_node')
+        t.auto_processing_node = bool(then.get('auto_processing_node'))
+        t.partial = False
+        t.images_count = len(t.scan_images())
+        t.update_size()
+        t.save()
     worker_tasks.process_task.delay(t.id)
     return t
 

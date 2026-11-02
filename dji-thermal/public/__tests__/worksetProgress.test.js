@@ -18,9 +18,8 @@ test("once converted it waits for the task to start, and says why it couldn't", 
     expect(worksetState(workset({status: "ready", committed: true}))).toEqual({kind: "started", percent: 100, done: true});
     expect(worksetState(workset({status: "ready", task_error: "The dataset's task is processing"}))).toEqual(
         {kind: "not_started", error: "The dataset's task is processing", done: true});
-    // Still without its images a minute after: it didn't start (the page then offers to start it)
-    expect(worksetState(workset({status: "ready", since_converted: 20})).kind).toBe("committing");
-    expect(worksetState(workset({status: "ready", since_converted: 3600}))).toEqual({kind: "not_started", error: "", done: true});
+    // However long it has been: the server puts the TIFFs in the task when asked, so only an error stops it
+    expect(worksetState(workset({status: "ready", since_converted: 3600})).kind).toBe("committing");
 });
 
 test("a failed or canceled conversion is the end of it", () => {

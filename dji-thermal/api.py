@@ -5,7 +5,6 @@ WebODM's API. Photos are converted one per request, so the browser can show each
 expanded panel on the dashboard (main.js) makes a DJI Thermal Analyzer dataset for it here, to hold its photos.
 """
 
-import datetime
 import os
 import shutil
 import tempfile
@@ -197,21 +196,18 @@ class TaskWorkset(APIView):
 
     @staticmethod
     def progress(task, cid):
-        """{id, status, progress, stage, error, photos, committed: the task has its images, task_error,
-        since_converted: seconds since the workset was converted, or None}"""
+        """{id, status, progress, stage, error, photos, committed: the task has its images, task_error}. A converted
+        workset whose TIFFs aren't in the task yet goes in now: the worker that converted it may run an older copy of
+        the plugin, without that step (conversion_tasks.commit_parent)"""
         from . import conversions
         conversions.check_stale(task, cid)
         job = conversions.job(task, cid)
-        since = None
-        if job['status'] == 'ready' and job.get('finished_at'):
-            try:
-                finished = datetime.datetime.fromisoformat(job['finished_at'])
-                since = max(0, int((datetime.datetime.now(datetime.timezone.utc) - finished).total_seconds()))
-            except (TypeError, ValueError):
-                pass
+        if job['status'] == 'ready' and task.partial and not task.last_error:
+            conversion_tasks.commit_parent(task, cid, conversions.record(task, cid)['then'])
+            task.refresh_from_db()
         return {'id': cid, 'status': job['status'], 'progress': job.get('progress') or 0, 'stage': job.get('stage') or {},
                 'error': job.get('error') or '', 'photos': len(datasets.image_files(task)), 'committed': not task.partial,
-                'task_error': task.last_error or '', 'since_converted': since}
+                'task_error': task.last_error or ''}
 
     def get(self, request, project_pk=None, pk=None):
         """The task's workset converting its photos, as the project page shows its progress (WorksetProgress.jsx)"""
@@ -246,8 +242,8 @@ class TaskWorkset(APIView):
 
 
 class TaskWorksetStart(TaskWorkset):
-    """The workset's TIFFs put in the task, which starts processing (conversion_tasks.commit_parent), when that didn't
-    happen once it was converted: the project page's Start processing (WorksetProgress.jsx). WebODM's own would start
+    """The workset's TIFFs put in the task, which starts processing (conversion_tasks.commit_parent), again after that
+    failed with the task's error: the project page's Start processing (WorksetProgress.jsx). WebODM's own would start
     the task without them."""
     def get(self, request, project_pk=None, pk=None):
         raise exceptions.MethodNotAllowed('GET')
