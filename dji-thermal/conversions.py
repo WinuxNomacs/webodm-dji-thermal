@@ -436,6 +436,55 @@ def remove_frames(task, cid, frames, user):
     return len(gone)
 
 
+def remove_images(task, paths, user):
+    """
+    Images deleted from a dataset: from each converted conversion that has them too (see remove_frames), then from the
+    images folder and from its analysis' files, which is kept but no longer matches the images (as after adding some)
+    :return: the paths removed, as the dataset lists them
+    :raises NotRemoved: the dataset is being analyzed, a conversion converting or building its mosaics, none of paths
+        is one of its images, or a conversion would be left without a converted frame
+    """
+    from . import mosaics
+    if datasets.job(task)['status'] == 'analyzing':
+        raise NotRemoved("Wait for the analysis to finish, or cancel it, before removing files")
+    images = {rel.replace(os.sep, '/') for rel, _ in datasets.image_files(task)}
+    gone = sorted(set(paths) & images)
+    if not gone:
+        raise NotRemoved("None of these files is in the dataset")
+    affected = []
+    for cid in ids(task):
+        name = record(task, cid).get('name') or cid
+        if job(task, cid)['status'] == 'converting':
+            raise NotRemoved("Wait for {} to finish converting, or cancel it, before removing files".format(name))
+        if mosaics.job(task, cid)['status'] == 'building':
+            raise NotRemoved("Wait for {}'s mosaics to be built, or cancel them, before removing files".format(name))
+        if job(task, cid)['status'] != 'ready':
+            continue
+        files = results(task, cid).get('files') or []
+        if not any(f.get('path') in gone for f in files):
+            continue
+        if not any(f.get('ok') for f in files if f.get('path') not in gone):
+            raise NotRemoved("That would leave {} without a converted frame: delete it first, or keep one of its "
+                             "frames".format(name))
+        affected.append(cid)
+    for cid in affected:
+        remove_frames(task, cid, gone, user)
+    root = datasets.images_path(task)
+    for rel in gone:
+        try:
+            os.remove(os.path.join(root, *rel.split('/')))
+        except FileNotFoundError:
+            pass
+    with datasets.locked(task):
+        a = datasets.analysis(task)
+        if a.get('files'):
+            a['files'] = [f for f in a['files'] if f.get('path') not in gone]
+            datasets.write_json(datasets.data_path(task, datasets.ANALYSIS_FILE), a)
+    datasets.images_changed(task)
+    datasets.update_size(task)
+    return gone
+
+
 def files_size(task, cid):
     """A conversion's files: (the outputs and mosaics to download, the bytes of all it holds)"""
     from . import mosaics

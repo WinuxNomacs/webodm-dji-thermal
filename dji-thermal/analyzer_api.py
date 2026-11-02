@@ -11,6 +11,7 @@ outputs, changing it allows uploading, renaming, analyzing and converting (and d
 from them), and deleting a dataset needs the project's delete permission (as a task does).
 """
 
+import glob
 import hashlib
 import io
 import os
@@ -278,6 +279,31 @@ class DatasetUpload(DatasetView):
                          'image_bytes': sum(size for _, size in images)})
 
 
+class DatasetRemoveFiles(DatasetView):
+    def post(self, request, pk):
+        """Images deleted from the dataset ({files: [paths]}), and from its worksets (see conversions.remove_images)"""
+        task = datasets.check_stale(get_dataset(request, pk, 'change_project'))
+        asked = request.data.get('files') if isinstance(request.data, dict) else None
+        if not isinstance(asked, list) or not asked or not all(isinstance(f, str) for f in asked):
+            raise ValidationError({'error': "Which files? (files: a list of their paths)"})
+        # The cached thumbnails are named by the images as they are: found before they are deleted
+        root = datasets.images_path(task)
+        keys = {}
+        for rel in asked:
+            try:
+                keys[rel] = thumbnail_key(path_traversal_check(root + '/' + rel, root))
+            except SuspiciousFileOperation:
+                pass
+        try:
+            removed = conversions.remove_images(task, asked, request.user)
+        except conversions.NotRemoved as e:
+            raise ValidationError({'error': str(e)}) from None
+        for rel in removed:
+            if keys.get(rel):
+                remove_thumbnails(task, keys[rel])
+        return Response(dict(detail(task, request.user), files_removed=len(removed)))
+
+
 class DatasetAnalyze(DatasetView):
     def post(self, request, pk):
         task = datasets.check_stale(get_dataset(request, pk, 'change_project'))
@@ -388,15 +414,31 @@ def thumbnail_response(data):
     return response
 
 
-def palette_thumbnail(task, path, palette, size=THUMBNAIL_SIZE):
-    """A thermal frame's thumbnail (up to size) in a DJI palette, as JPEG bytes, kept in the dataset's
-    thumbnails/<palette>/ by the file's path, size and time; None when the frame cannot be drawn (its embedded picture
-    is shown instead)"""
+def thumbnail_key(path):
+    """What a frame's cached thumbnails are named by (its path, size and time), or None when it isn't there"""
     try:
         st = os.stat(path)
     except OSError:
         return None
-    key = hashlib.sha1("{}|{}|{}".format(path, st.st_size, st.st_mtime_ns).encode()).hexdigest()
+    return hashlib.sha1("{}|{}|{}".format(path, st.st_size, st.st_mtime_ns).encode()).hexdigest()
+
+
+def remove_thumbnails(task, key):
+    """A frame's cached thumbnails deleted, in every palette and size (key: its thumbnail_key)"""
+    for cached in glob.glob(os.path.join(glob.escape(datasets.data_path(task, THUMBNAILS_DIR)), '*', key + '*.jpg')):
+        try:
+            os.remove(cached)
+        except OSError:
+            pass
+
+
+def palette_thumbnail(task, path, palette, size=THUMBNAIL_SIZE):
+    """A thermal frame's thumbnail (up to size) in a DJI palette, as JPEG bytes, kept in the dataset's
+    thumbnails/<palette>/ by the file's path, size and time; None when the frame cannot be drawn (its embedded picture
+    is shown instead)"""
+    key = thumbnail_key(path)
+    if key is None:
+        return None
     if size != THUMBNAIL_SIZE:
         key += "-{}x{}".format(*size)
     cached = datasets.data_path(task, THUMBNAILS_DIR, palette, key + '.jpg')

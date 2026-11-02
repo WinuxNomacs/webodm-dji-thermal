@@ -136,6 +136,10 @@ Then:
   picture in a new tab instead). In the table, Ctrl/Cmd-click adds or removes a file and Shift-click selects a range;
   with several selected, the pane counts them and downloads them as a zip. Clicking the only selected file, its ×
   or Esc unselects. **Hover for Detail** makes the pane follow the file under the mouse while none is selected.
+  **Remove from dataset**, at the bottom of the pane, deletes the file (or those selected) once confirmed, for those
+  who can change the project, while nothing runs: from the dataset, and from each workset that converted it (as
+  Remove from workset does; the tasks made before keep their images). The analysis is kept, without the files, until
+  **Analyze again**.
 - **Problems**: what dji-thermal-cli found (errors, warnings, notes), each with what addresses it in the Workset
   Creation Settings' terms and the files it names (a file's value in its tooltip). Where one setting addresses it
   (Normalize, frames at or below −80°), a button sets it in the form on the Worksets tab.

@@ -285,18 +285,35 @@
         return {id: id, changes: changes};
     }
 
+    // The detail pane's button removing the files shown from the dataset (n of them), for those who can change it;
+    // disabled with why while that can't be done (busy: why, or "")
+    function removeFilesHtml(n, busy) {
+        return '<div class="ta-file-detail-remove"><button type="button" class="btn btn-default btn-xs text-danger" data-act="remove-files"' +
+            (busy ? ' disabled title="' + esc(busy) + '"' : ' title="Delete ' + (n === 1 ? "it" : "them") + ' from the dataset, and from its worksets"') +
+            '><i class="fa fa-trash"></i> ' + (n === 1 ? "Remove from dataset" : "Remove " + n + " from dataset") + "</button></div>";
+    }
+
+    // Why files can't be removed from a dataset now ("" when they can): an analysis or a workset running
+    function removeBusy(d) {
+        if (d.status === "analyzing") return "Wait for the analysis to finish, or cancel it";
+        var c = (d.conversions || []).filter(function (x) { return x.status === "converting" || x.mosaic_status === "building"; })[0];
+        return c ? "Wait for " + c.name + (c.status === "converting" ? " to finish converting" : "'s mosaics to be built") + ", or cancel it" : "";
+    }
+
     // The detail pane of the files selected, or of the one under the mouse (urls: {files: the source file's URL
     // without the file, picture: the thumbnail URL, frames: the frame page or null, palette: the user's preferred DJI
-    // palette or ""}); "" when there is none. A thermal frame is drawn in that palette (the server draws it in its own
-    // when it isn't one of DJI's).
+    // palette or "", remove: why files can't be removed now, "" when they can, null for those who can't change the
+    // dataset}); "" when there is none. A thermal frame is drawn in that palette (the server draws it in its own when
+    // it isn't one of DJI's).
     function detailHtml(a, paths, selected, urls) {
         if (!paths.length) return "";
         var close = selected ? '<button type="button" class="close" data-act="detail-close" title="Unselect" aria-label="Unselect">&times;</button>' : "";
+        var remove = urls.remove === null || urls.remove === undefined ? "" : removeFilesHtml(paths.length, urls.remove);
         if (paths.length > 1) {
             return '<div class="ta-file-detail-head"><strong>' + paths.length + " images selected</strong>" + close + "</div>" +
                 '<button type="button" class="btn btn-primary btn-sm" data-act="download-selected"><i class="fa fa-download"></i> Download ' +
                 paths.length + " images</button>" +
-                '<p class="text-muted ta-files-hint">As a zip, each at its path in the dataset. Ctrl/Cmd-click adds or removes an image, Shift-click a range.</p>';
+                '<p class="text-muted ta-files-hint">As a zip, each at its path in the dataset. Ctrl/Cmd-click adds or removes an image, Shift-click a range.</p>' + remove;
         }
         var r = (a.files || []).filter(function (f) { return f.path === paths[0]; })[0];
         if (!r) return "";
@@ -312,7 +329,7 @@
             (frame ? ' <a class="btn btn-default btn-xs" href="' + esc(frame) + '"><i class="fa fa-th-large"></i> Open frame</a>' : "") + "</div>" +
             '<table class="table table-condensed ta-file-detail-table"><tbody>' + detailRows(r, flagsByFile(a.findings)[r.path]).map(function (row) {
                 return "<tr><th>" + esc(row[0]) + "</th><td>" + esc(row[1]) + "</td></tr>";
-            }).join("") + "</tbody></table>";
+            }).join("") + "</tbody></table>" + remove;
     }
 
     // dji-thermal-cli's options, as the Workset Creation Settings name them, for its findings and notes (which are
@@ -684,7 +701,8 @@
 
         // The detail pane: the files selected, else (with Hover for Detail) the one under the mouse
         function detailUrls() {
-            return {files: url + "/files?file=", picture: url + "/thumbnail", palette: palette || "", frames: view.frames || null};
+            return {files: url + "/files?file=", picture: url + "/thumbnail", palette: palette || "", frames: view.frames || null,
+                    remove: dataset.can_change ? removeBusy(dataset) : null};
         }
 
         function renderDetail() {
@@ -759,6 +777,31 @@
             doc.body.removeChild(form);
         }
 
+        // The files the detail pane shows (those selected, else the one under the mouse) removed from the dataset and
+        // its worksets, once confirmed: the page then drawn from what the server answers
+        function removeFiles() {
+            var paths = view.selected.length ? view.selected : view.hover && hovered ? [hovered] : [];
+            if (!paths.length) return;
+            var one = paths.length === 1;
+            var text = ["Remove " + (one ? paths[0].split("/").pop() : paths.length + " files") + " from " + dataset.name + "?",
+                (one ? "Its file is deleted from the server. The worksets that converted it lose it too: its files there, and the measurements saved on it, " :
+                    "Their files are deleted from the server. The worksets that converted them lose them too: their files there, and the measurements saved on them, ") +
+                    "are deleted, and mosaics built with " + (one ? "it" : "them") + " are marked out of date. The tasks made before keep their images.",
+                "The analysis is kept: Analyze again to bring the summary, problems and plan up to date.", "This cannot be undone."];
+            return core.ask(doc, "Remove from dataset", text, "Remove", "danger").then(function (yes) {
+                return yes && send(url + "/remove", "POST", {files: paths});
+            }).then(function (r) {
+                if (!r) return;
+                if (!r.ok) return status(esc(core.errorText(r.data, "Could not remove the files.")), "text-danger");
+                view.selected = [];
+                hovered = null;
+                anchor = null;
+                render(r.data);
+                status('<i class="fa fa-check"></i> ' + esc(core.count(r.data.files_removed, "file", "files")) +
+                    " removed. Analyze again to bring the summary, problems and plan up to date.", "text-success");
+            });
+        }
+
         function showTab(t) {
             tab = t;
             tabChosen = true;
@@ -811,6 +854,7 @@
                 return selectionChanged();
             }
             if (e.target.closest('[data-act="download-selected"]')) return downloadSelected();
+            if (e.target.closest('[data-act="remove-files"]')) return removeFiles();
             // The detail pane's picture opens the viewer (Ctrl/Cmd-click, or the middle button, still opens a tab)
             var picture = e.target.closest('[data-act="view-picture"]');
             if (picture && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button)) {

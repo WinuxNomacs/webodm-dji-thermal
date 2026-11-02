@@ -1062,6 +1062,62 @@ class TestRemovingFrames(AnalyzerTestCase):
         self.assertEqual(self.remove(task, cid, ["a_T.jpg"]).status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(len(conversions.output_files(task, cid)), 3)
 
+    def remove_files(self, task, files, client=None):
+        return (client or self.client).post("{}/{}/remove".format(API, task.id), {"files": files}, format="json")
+
+    def test_files_removed_from_a_dataset_leave_its_images_its_analysis_its_thumbnails_and_its_worksets(self):
+        task, cid = self.converted()
+        datasets.write_json(datasets.data_path(task, datasets.ANALYSIS_FILE),
+                            {"files": [{"path": p, "kind": "thermal"} for p in ("a_T.jpg", "b_T.jpg", "c_T.jpg")]})
+        datasets.update_job(task, status="ready")
+        key = analyzer_api.thumbnail_key(os.path.join(datasets.images_path(task), "a_T.jpg"))
+        cached = [datasets.data_path(task, analyzer_api.THUMBNAILS_DIR, "iron", key + end) for end in (".jpg", "-1280x1280.jpg")]
+        for f in cached:
+            os.makedirs(os.path.dirname(f), exist_ok=True)
+            open(f, "w").close()
+
+        res = self.remove_files(task, ["a_T.jpg", "elsewhere.jpg"])
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual(res.data["files_removed"], 1)
+        self.assertEqual([rel for rel, _ in datasets.image_files(task)], ["b_T.jpg", "c_T.jpg"])
+        self.assertFalse(any(os.path.exists(f) for f in cached))
+        # The analysis kept, without them, and no longer matching the images
+        self.assertEqual([f["path"] for f in res.data["analysis"]["files"]], ["b_T.jpg", "c_T.jpg"])
+        self.assertEqual(res.data["status"], "new")
+        # The workset lost it as Remove from workset does
+        self.assertEqual(conversions.removed_paths(task, cid), {"a_T.jpg"})
+        self.assertEqual(conversions.output_files(task, cid), ["b_T_temp_c.tiff"])
+        self.assertEqual(res.data["conversions"][0]["removed"], 1)
+        # Not the workset's last converted frame: refused, nothing deleted
+        res = self.remove_files(task, ["b_T.jpg", "c_T.jpg"])
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("without a converted frame", res.data["error"])
+        self.assertEqual([rel for rel, _ in datasets.image_files(task)], ["b_T.jpg", "c_T.jpg"])
+        self.assertEqual(conversions.output_files(task, cid), ["b_T_temp_c.tiff"])
+        # A file no workset converted goes from the dataset alone
+        self.upload(task, [jpeg("d_T.jpg")])
+        self.assertEqual(self.remove_files(task, ["d_T.jpg"]).status_code, status.HTTP_200_OK)
+        self.assertEqual(conversions.removed_paths(task, cid), {"a_T.jpg"})
+
+    def test_files_are_removed_from_a_dataset_only_by_who_can_change_it_while_nothing_runs(self):
+        task, cid = self.converted()
+        assign_perm("view_project", User.objects.get(username="testuser2"), self.project)
+        self.assertEqual(self.remove_files(task, ["a_T.jpg"], self.client_for("testuser2")).status_code,
+                         status.HTTP_404_NOT_FOUND)
+        for bad in ([], "a_T.jpg", [1], ["elsewhere.jpg"], ["../a_T.jpg"]):
+            self.assertEqual(self.remove_files(task, bad).status_code, status.HTTP_400_BAD_REQUEST, bad)
+        with mock.patch.object(datasets, "job_gone", return_value=False):
+            datasets.update_job(task, status="analyzing")
+            self.assertIn("analysis", self.remove_files(task, ["a_T.jpg"]).data["error"])
+            datasets.update_job(task, status="ready")
+            datasets.write_json(mosaics.path(task, cid, mosaics.JOB_FILE), {"status": "building"})
+            self.assertIn("mosaics", self.remove_files(task, ["a_T.jpg"]).data["error"])
+            datasets.write_json(mosaics.path(task, cid, mosaics.JOB_FILE), {"status": "ready"})
+            datasets.update_job(task, rel=conversions.rel(cid, "job.json"), status="converting")
+            self.assertIn("converting", self.remove_files(task, ["a_T.jpg"]).data["error"])
+        self.assertEqual(len(datasets.image_files(task)), 3)
+        self.assertEqual(len(conversions.output_files(task, cid)), 3)
+
     def test_the_mosaics_of_a_workset_with_frames_removed_are_built_of_links_to_the_frames_it_keeps(self):
         root = os.path.join(self.create().task_path(), "scratch")
         frames = [os.path.join(root, "images", p) for p in ("a_T.jpg", os.path.join("east", "b_T.jpg"), "c_T.jpg")]
