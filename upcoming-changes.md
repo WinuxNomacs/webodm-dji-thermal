@@ -134,6 +134,30 @@
   Building mosaics, then Create task primary; the counts, wrong for the oblique RGB photos (350 oblique, 42 not
   thermal), fixed and checked on that workset's results (42 · 175 · 217); deleted afterwards. README,
   `docs/quickstart-worksets.md`, `docs/quickstart-analyzer.md`, `create-task.png` retaken.
+- **The SDK note's wording** (the user, 2026-11-02, from `new.md`): "Change this statement in the admin page \"it
+  reduces the performance of the DJI Thermal Analyzer.\" to say \"will reduce performance of the DJI Thermal Analyzer
+  when used in this WebODM environment.\"" Builds on the SDK settings note (`templates/sdk.html`,
+  `#dji-thermal-sdk-note`, Administration › DJI Thermal › "Use DJI's own Thermal SDK"). Their wording as is.
+- **Emissivity and Reflected under the Inspector's scale** (the user, 2026-11-02, from `new.md`): "In Thermal
+  Inspector, move Emissivity and Reflected beneath the scale temperatures. Move the Manual Corrections checkbox
+  beneath them and remove it's description text. Emissivity and Reflected should remain visible at all times though
+  when Manual Corrections is disabled they should be disabled/greyed out and contain their default values. When
+  Manual Corrections is enabled, the user may change the 2 values to any supported value." Builds on the Inspector's
+  Manual Corrections (`inspector.js` `correctionHtml`, `correctionInput`). The default values: what the topmost
+  layer was measured with (else 0.95 and 20 °C), as a tick starts from now. Done (2026-11-02),
+  `inspector-corrections-layout`: the fields right under the scale's range and "This layer" line, the tick box
+  "Manual Corrections" under them, then "Legend on the map"; unticked, the fields are disabled and hold the topmost
+  layer's values (`correctionDefault`, also what a tick starts from). Removed: the "Approximate (a broadband
+  model)…" line and each layer's "measured with …" line (the greyed fields show it); kept: the warning that a layer
+  doesn't record how it was measured. Not in the panel's top that stays in view: there it filled a short map's whole
+  panel and left the rest a sliver; they scroll with the sections under it. Jest `inspector.test.js`. README,
+  `quickstart-inspector.md` section 7; `inspector`, `inspector-line`, `inspector-image`, `inspector-saved`,
+  `inspector-mosaics` retaken.
+- **Documentation up to date** (the user, 2026-11-02, from `new.md`): "ensure the documentation and any accompanying
+  screenshots are up to date. Including the installation, quickstart and walthroughs." Builds on `docs/` and README.
+  Proposed: every page read against the plugin as it is now (each step done on the dev stack where it can be), what
+  is out of date corrected, every screenshot retaken and looked at, the links checked; U2 to U4 then update their own
+  pages as they go.
 - **U2. The Workset Creation Settings form** (UX review, 2026-11-02). Dataset page › Worksets › Workset Creation
   Settings:
   - U2-1: a new dataset starts from dji-thermal-cli's defaults, four chips "≠ plan", though step 2 says to start from

@@ -577,7 +577,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         on.checked = true;
         on.dispatchEvent(new Event("change", {bubbles: true}));
         expect(ins.state.correction).toEqual({on: true, emissivity: 0.91, reflected: 21});
-        expect(panel().textContent).toContain("Roof survey: measured with emissivity 0.91, reflected 21.00 °C");
+        expect(panel().querySelector('[data-act="correction-emissivity"]').disabled).toBe(false);
         change(panel().querySelector('[data-act="correction-emissivity"]'), "0.8");
         await flush(); await flush();
         const bodies = calls(fetchFn, "POST").map(c => JSON.parse(c[1].body));
@@ -605,28 +605,33 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         map.remove();
     });
 
-    it("has Manual Corrections, its tick box in the heading: unticked, the values typed are forgotten and the fields hidden", async () => {
+    it("keeps Emissivity and Reflected under the scale, greyed with the layer's own values until Manual Corrections is ticked", async () => {
         const map = leafletMap();
         const {ins, panel} = start(map, {["GET " + SAVED]: {measurements: [], can_change: true, baseline: BASELINE}}, {L});
         await ins.ready; await flush();
         ins.open();
-        const heading = () => panel().querySelector(".dt-inspector-heading");
+        const field = name => panel().querySelector('[data-act="correction-' + name + '"]');
         const tick = on => {
-            const box = heading().querySelector('[data-act="correction-on"]');
-            box.checked = on;
-            box.dispatchEvent(new Event("change", {bubbles: true}));
+            field("on").checked = on;
+            field("on").dispatchEvent(new Event("change", {bubbles: true}));
         };
-        expect(heading().textContent).toBe("Manual Corrections");
-        expect(heading().querySelector('[data-act="correction-on"]').checked).toBe(false);
-        expect(panel().textContent).not.toContain("Correct for another");
-        expect(panel().querySelector('[data-act="correction-emissivity"]')).toBe(null);
+        // Under the scale's range, just under the top (which stays in view), the tick box under the fields, with no description
+        const order = ['[data-act="range-max"]', '[data-act="correction-emissivity"]', '[data-act="correction-reflected"]', '[data-act="correction-on"]', '[data-act="legend"]']
+            .map(sel => panel().querySelector(sel));
+        order.slice(1).forEach((el, i) => expect(order[i].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy());
+        expect(field("on").parentNode.textContent.trim()).toBe("Manual Corrections");
+        expect(panel().textContent).not.toContain("Approximate");
+        expect(panel().textContent).not.toContain("measured with emissivity");
+        expect(field("on").checked).toBe(false);
+        expect([field("emissivity").disabled, field("emissivity").value, field("reflected").disabled, field("reflected").value]).toEqual([true, "0.91", true, "21"]);
 
         tick(true);
-        change(panel().querySelector('[data-act="correction-emissivity"]'), "0.8");
+        expect(field("emissivity").disabled).toBe(false);
+        change(field("emissivity"), "0.8");
         expect(ins.state.correction).toEqual({on: true, emissivity: 0.8, reflected: 21});
         tick(false);
         expect(ins.state.correction).toEqual({on: false});
-        expect(panel().querySelector('[data-act="correction-emissivity"]')).toBe(null);
+        expect([field("emissivity").disabled, field("emissivity").value]).toEqual([true, "0.91"]);
         expect(window.localStorage.getItem(inspector.correctionKey(["abc-1"]))).toBe(null);
         // Ticked again: from what the layer was measured with
         tick(true);
@@ -1201,10 +1206,11 @@ describe("the Thermal Inspector's colour scale and Image section", () => {
         for (const part of [".dt-inspector-head", ".dt-inspector-modes", ".dt-inspector-readout", '[data-act="palette"]', ".dt-inspector-scale"]) {
             expect(top.querySelector(part)).not.toBeNull();
         }
-        // The legend's tickbox, Image and the sections below scroll under it
+        // The correction, the legend's tickbox, Image and the sections below scroll under it
         expect(top.querySelector('[data-act="legend"]')).toBeNull();
         expect(top.querySelector(".dt-inspector-image, .dt-inspector-section")).toBeNull();
-        expect(top.nextElementSibling.querySelector('[data-act="legend"]')).not.toBeNull();
+        expect(top.nextElementSibling.querySelector('[data-act="correction-emissivity"]')).not.toBeNull();
+        expect(top.querySelector('[data-act="correction-on"]')).toBeNull();
     });
 
     it("shows the topmost layer's scale, range and lowest and highest temperatures under Palette, the range typed or Auto", async () => {

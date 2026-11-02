@@ -455,26 +455,22 @@
         return out;
     }
 
-    // The Manual Corrections section, its tick box in the heading: ticked, the parameters wanted, and what each layer
-    // on the map was measured with
-    function correctionHtml(c, unit, sources, notice) {
-        var head = '<label class="dt-inspector-check dt-inspector-heading"><input type="checkbox" data-act="correction-on"' + (c.on ? " checked" : "") +
-            "><strong>Manual Corrections</strong></label>";
-        if (!c.on) return head;
-        var measured = (sources || []).map(function (src) {
-            if (src.loading) return "";
-            var b = src.baseline;
-            return '<div class="text-muted dt-inspector-hint">' + escapeHtml(src.name) + ": " + (b ?
-                escapeHtml("measured with emissivity " + b.emissivity.toFixed(2) + ", reflected " + formatTemp(b.reflected, unit)) :
-                "doesn't record how it was measured, so isn't corrected") + "</div>";
+    // The correction's fields under the colour scale, always shown, and its tick box under them: unticked, the fields
+    // are greyed and hold what the topmost layer was measured with (fallback: {emissivity, reflected}); ticked, they
+    // take any value correction.py allows, and a layer on the map that can't be corrected says so
+    function correctionHtml(c, unit, sources, notice, fallback) {
+        var v = c.on ? c : fallback || {}, off = c.on ? "" : " disabled";
+        var unrecorded = !c.on ? "" : (sources || []).map(function (src) {
+            return src.loading || src.baseline ? "" : '<div class="text-muted dt-inspector-hint">' + escapeHtml(src.name) +
+                ": doesn't record how it was measured, so isn't corrected</div>";
         }).join("");
-        return head + '<div class="dt-inspector-correction"><label>Emissivity <input type="number" step="0.01" min="' + EMISSIVITY[0] + '" max="' + EMISSIVITY[1] +
-            '" class="form-control input-sm" data-act="correction-emissivity" value="' + (typeof c.emissivity === "number" ? c.emissivity : "") + '"></label>' +
+        return '<div class="dt-inspector-correction"><label>Emissivity <input type="number" step="0.01" min="' + EMISSIVITY[0] + '" max="' + EMISSIVITY[1] +
+            '" class="form-control input-sm" data-act="correction-emissivity" value="' + (typeof v.emissivity === "number" ? v.emissivity : "") + '"' + off + "></label>" +
             '<label>Reflected <input type="number" step="0.1" class="form-control input-sm" data-act="correction-reflected" value="' +
-            (typeof c.reflected === "number" ? roundShown(c.reflected, unit) : "") + '"> <span class="text-muted">°' + unit + "</span></label></div>" +
-            (notice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(notice) + "</div>" : "") + measured +
-            '<div class="text-muted dt-inspector-hint">Approximate (a broadband model): for comparing surfaces, not calibrated values. ' +
-            "The colour scale keeps its temperatures, so the colours change; Auto stretches it over the corrected layer again.</div>";
+            (typeof v.reflected === "number" ? roundShown(v.reflected, unit) : "") + '"' + off + '> <span class="text-muted">°' + unit + "</span></label></div>" +
+            '<label class="dt-inspector-label dt-inspector-check"><input type="checkbox" data-act="correction-on"' + (c.on ? " checked" : "") +
+            "> Manual Corrections</label>" +
+            (notice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(notice) + "</div>" : "") + unrecorded;
     }
 
     // The legend: the palette's colours (encoded, as the palette API gives them) over the range (°C), its ends marked
@@ -893,7 +889,8 @@
         var current = state.palette;
         // One of WebODM's other colour maps, chosen in its layer panel
         if (current && options.length && !options.some(function (o) { return o[0] === current; })) options = options.concat([[current, current]]);
-        // The top (the heading, modes, readout, palette and scale) stays in view while the rest scrolls under it
+        // The top (the heading, modes, readout, palette and scale) stays in view while the rest scrolls under it, from the
+        // correction's fields
         return '<div class="dt-inspector-top"><div class="dt-inspector-head"><strong><i class="fa fa-thermometer-half"></i> Thermal Inspector</strong>' +
             '<a href="javascript:void(0)" class="dt-inspector-close" data-act="close" title="Close"><i class="fa fa-times"></i></a></div>' +
             '<div class="btn-group btn-group-xs dt-inspector-modes">' +
@@ -911,12 +908,13 @@
                 options.map(function (o) {
                     return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === current ? " selected" : "") + ">" + escapeHtml(o[1]) + "</option>";
                 }).join("") + "</select></label>" : "") + scaleHtml(state.scale, state, unit) + "</div>" +
+            correctionHtml(state.correction, unit, (state.onMap || []).map(function (k) { return state.sources[k]; }).filter(Boolean),
+                           state.correctionNotice, state.correctionDefault) +
             '<label class="dt-inspector-label dt-inspector-check"><input type="checkbox" data-act="legend"' + (state.legendVisible ? " checked" : "") +
             "> Legend on the map</label>" + imageHtml(state.scale) +
             mosaicsHtml(state) +
             '<div class="dt-inspector-section"><strong>Isotherm</strong>' + isothermHtml(state.isotherm, unit) +
             (state.isothermNotice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.isothermNotice) + "</div>" : "") + "</div>" +
-            '<div class="dt-inspector-section">' + correctionHtml(state.correction, unit, (state.onMap || []).map(function (k) { return state.sources[k]; }).filter(Boolean), state.correctionNotice) + "</div>" +
             '<div class="dt-inspector-section"><strong>Pinned points</strong>' + pinsHtml(state, unit) + "</div>" +
             '<div class="dt-inspector-section"><strong>Regions and lines</strong>' + regionsHtml(state, unit) + "</div>" +
             ((state.onMap || []).length ? '<div class="dt-inspector-section"><strong>Saved measurements</strong>' + savedHtml(state, unit) + "</div>" : "");
@@ -1025,6 +1023,7 @@
             state.pins.forEach(function (p) { state.savable[p.id] = canSaveAt({lat: p.lat, lng: p.lng}); });
             state.regions.forEach(function (r) { state.savable[r.id] = !!r.statistics && canSaveAt(regionBounds(r).getCenter()); });
             state.scale = scaleState();
+            state.correctionDefault = correctionDefault();
             panel.innerHTML = panelHtml(state);
             // Within the map, above its bottom controls
             var room = map.getContainer().clientHeight - container.offsetTop - 60;
@@ -1101,18 +1100,19 @@
             render();
         }
 
+        // What the topmost thermal layer was measured with, else the camera's usual emissivity and 20 °C
+        function correctionDefault() {
+            var layers = thermalLayers(map), t = layers[layers.length - 1];
+            var src = t && state.sources[layerSource(t).key], b = src && src.baseline;
+            return {emissivity: b ? b.emissivity : 0.95, reflected: b ? b.reflected : 20};
+        }
+
         function correctionInput(what, value) {
             var c = assign({}, state.correction), unit = userUnit();
             state.correctionNotice = "";
             if (what === "on") {
                 // Unticked, the values typed are forgotten; ticked, they start from what the topmost layer was measured with
-                c = {on: value};
-                if (value) {
-                    var layers = thermalLayers(map), t = layers[layers.length - 1];
-                    var src = t && state.sources[layerSource(t).key], b = src && src.baseline;
-                    c.emissivity = b ? b.emissivity : 0.95;
-                    c.reflected = b ? b.reflected : 20;
-                }
+                c = value ? assign({on: true}, correctionDefault()) : {on: false};
             } else {
                 var typed = parseFloat(value);
                 if (!isFinite(typed)) { state.correctionNotice = "Enter a number"; return render(); }

@@ -342,14 +342,15 @@ Inspector:
   Everyone who can view the project sees the saved measurements of the layers on the map, dashed in green, with their
   values as saved, who saved them and when; those who can change it rename them, change their comment and delete
   them. The list downloads as CSV and GeoJSON (a line's profile as its own CSV).
-- **Manual Corrections**: its tick box, beside the heading, opens the fields that correct the temperatures shown for
+- **Manual Corrections**: **Emissivity** and **Reflected**, under the colour scale's temperatures, show what the
+  topmost layer was measured with, greyed out; ticking **Manual Corrections** under them lets you change them, to correct the temperatures shown for
   another emissivity and reflected temperature than the photos were measured with, from what each layer records: an orthophoto's TIFFs (the values dji-thermal-cli wrote
   in them), a workset mosaic's settings or its frames. It is approximate (a broadband model, the air's transmission
   taken as 1), for comparing surfaces, not calibrated values. The readout, pins, regions, lines, the legend's marks
   and the isotherm's limits change, and the colour scale keeps the temperatures it shows, so the map's colours change
   with the correction (Auto stretches the scale over the corrected layer again). A layer that doesn't record its values (an orthophoto
   not made from the plugin's TIFFs) isn't corrected, and the panel says so. Kept in your browser for the same tasks;
-  unticking it forgets the values and closes the fields.
+  unticking it forgets the values and greys the fields out again.
 - **Palette**: the thermal layer's palette, from the same list as the Analyzer's: DJI's palettes (drawn by the
   plugin) and WebODM's colour maps. It is your palette everywhere: the
   Analyzer's preference, saved when you choose one here or in WebODM's own layer panel, and the one the map opens
