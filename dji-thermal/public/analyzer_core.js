@@ -372,7 +372,7 @@
                 '<input type="text" id="ta-ask-field" class="form-control input-sm" maxlength="255"' +
                 (opts.field.readonly ? " readonly" : "") + (opts.field.label ? "" : ' aria-label="' + escapeHtml(opts.title) + '"') + "></div>" : "") +
             (opts.selects || []).map(function (sel, i) {
-                return '<div class="form-group"><label for="ta-ask-select-' + i + '">' + escapeHtml(sel.label) + "</label>" +
+                return (sel.heading ? "<h5>" + escapeHtml(sel.heading) + "</h5>" : "") + '<div class="form-group"><label for="ta-ask-select-' + i + '">' + escapeHtml(sel.label) + "</label>" +
                     '<select id="ta-ask-select-' + i + '" class="form-control input-sm" data-name="' + escapeHtml(sel.name) + '">' +
                     sel.options.map(function (o) {
                         return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === (sel.value || "") ? " selected" : "") + ">" + escapeHtml(o[1]) + "</option>";
@@ -474,12 +474,15 @@
                  help: "The same setting as WebODM's units: changing it here changes it on WebODM's map, and back."},
                 {name: "palette", label: "Palette", value: r.data.palette || "",
                  options: [["", "Each image's own"]].concat(paletteOptions(r.data)),
-                 help: "Temperatures are drawn in it: the viewer's mosaics and WebODM's map; DJI's also new worksets and the Files tab's thumbnails."}
+                 help: "Temperatures are drawn in it: the viewer's mosaics and WebODM's map; DJI's also new worksets and the Files tab's thumbnails."},
+                {heading: "Thermal Inspector", name: "legend", label: "Legend on the map", value: r.data.legend === false ? "hidden" : "shown",
+                 options: [["shown", "Shown"], ["hidden", "Hidden"]],
+                 help: "The palette's scale over the range shown, on WebODM's map beside the Thermal Inspector's panel."}
             ], buttons: [{label: "Cancel", value: false}, {label: "Save", value: true, style: "primary"}]});
         }).then(function (d) {
             if (d.button !== true) return null;
             setUserUnit(d.selects.unit);
-            return saveDisplay(fetchFn, api, csrf, {palette: d.selects.palette || null});
+            return saveDisplay(fetchFn, api, csrf, {palette: d.selects.palette || null, legend: d.selects.legend !== "hidden"});
         });
     }
 

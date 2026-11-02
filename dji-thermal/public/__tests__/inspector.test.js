@@ -616,7 +616,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
             field("on").dispatchEvent(new Event("change", {bubbles: true}));
         };
         // Under the scale's range, just under the top (which stays in view), the tick box under the fields, with no description
-        const order = ['[data-act="range-max"]', '[data-act="correction-emissivity"]', '[data-act="correction-reflected"]', '[data-act="correction-on"]', '[data-act="legend"]']
+        const order = ['[data-act="range-max"]', '[data-act="correction-emissivity"]', '[data-act="correction-reflected"]', '[data-act="correction-on"]', '[data-act="image-brightness"]']
             .map(sel => panel().querySelector(sel));
         order.slice(1).forEach((el, i) => expect(order[i].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy());
         expect(field("on").parentNode.textContent.trim()).toBe("Manual Corrections");
@@ -769,10 +769,12 @@ describe("the Thermal Inspector's isotherms and legend", () => {
         expect(window.localStorage.getItem(inspector.isothermKey(["abc-1"]))).toBeNull();
     });
 
-    it("shows the legend of the thermal layer's palette and range, following WebODM's range, unless the user hides it", async () => {
+    it("shows the legend of the thermal layer's palette and range, following WebODM's range, unless the preferences hide it", async () => {
+        window.localStorage.setItem("dji-thermal-inspector:legend", "1");       // where earlier versions kept it
         const layer = tileLayer(TILES, THERMAL_TASK);
         const map = fakeMap([layer]);
         const {ins, fetchFn, panel} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}});
+        expect(window.localStorage.getItem("dji-thermal-inspector:legend")).toBeNull();
         await ins.ready;
         await flush();
         const legend = ins.legend();
@@ -782,13 +784,14 @@ describe("the Thermal Inspector's isotherms and legend", () => {
         layer.setUrl(TILES.replace("rescale=10,40", "rescale=0,100"));       // WebODM's panel
         expect([...legend.querySelectorAll(".dt-tick")].map(t => t.textContent)).toEqual(["0", "25", "50", "75", "100"]);
         expect(fetchFn.mock.calls.filter(c => c[0].indexOf("/palette?") !== -1).length).toBe(1);   // asked for once
+        // Shown or hidden in the Analyzer's Preferences, not in the panel
         ins.open();
-        change(panel().querySelector('[data-act="legend"]'), false);
-        expect(legend.hidden).toBe(true);
-        expect(window.localStorage.getItem("dji-thermal-inspector:legend")).toBe("0");
+        expect(panel().querySelector('[data-act="legend"]')).toBeNull();
         const map2 = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
-        const again = start(map2, {[PALETTE]: {name: "magma", color_map: INFERNO}});
+        const again = start(map2, {[PALETTE]: {name: "magma", color_map: INFERNO},
+                                   "GET /api/plugins/dji-thermal/display": Object.assign({}, DISPLAY, {legend: false})});
         await again.ins.ready;
+        await flush();
         expect(again.ins.legend().hidden).toBe(true);
     });
 
@@ -896,9 +899,9 @@ describe("the Thermal Inspector's panel and legend dragged over the map", () => 
         expect(frames.classList.contains("dt-inspector-frames-right")).toBe(false);
     });
 
-    it("drags the legend by any part, back in its place when it is hidden and shown again", async () => {
+    it("drags the legend by any part", async () => {
         const map = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
-        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: [0, 1]}});
+        const {ins} = start(map, {[PALETTE]: {name: "magma", color_map: [0, 1]}});
         await ins.ready;
         await flush();
         const legend = ins.legend();
@@ -908,14 +911,6 @@ describe("the Thermal Inspector's panel and legend dragged over the map", () => 
         move(400, 620);
         release();
         expect(legend.style.transform).toBe("translate(300px, 600px)");
-        ins.open();
-        const box = panel().querySelector('[data-act="legend"]');
-        box.checked = false;
-        box.dispatchEvent(new Event("change", {bubbles: true}));
-        box.checked = true;
-        box.dispatchEvent(new Event("change", {bubbles: true}));
-        expect(legend.hidden).toBe(false);
-        expect(legend.style.transform).toBe("");
     });
 });
 
@@ -1290,13 +1285,19 @@ describe("the Thermal Inspector's colour scale and Image section", () => {
         expect([field(panel(), "range-min").value, field(panel(), "range-max").value]).toEqual(["10", "40"]);
         expect(scale.textContent).toContain("This layer: 2.5 to 51.3 °C");
         expect(scale.textContent).not.toContain("Of ");       // one thermal layer: no need to say which
-        // Under the scale, after the legend's tickbox: the Image section
-        expect(panel().querySelector(".dt-inspector-image").previousElementSibling.querySelector('[data-act="legend"]')).not.toBeNull();
         field(panel(), "range-min").value = "15";
         change(field(panel(), "range-max"), "35");
         expect(inspector.rangeOf(layer._url)).toEqual([15, 35]);
         expect(layer._url).toContain("color_map=magma");      // still WebODM's tiles
         expect(ticks(ins.legend())).toEqual(["15", "20", "25", "30", "35"]);
+        // The arrows between the fields widen and narrow the range by a tenth of it, about its middle
+        field(panel(), "range-wider").click();
+        expect(inspector.rangeOf(layer._url)).toEqual([14, 36]);
+        expect([field(panel(), "range-min").value, field(panel(), "range-max").value]).toEqual(["14", "36"]);
+        field(panel(), "range-narrow").querySelector("i").click();
+        expect(inspector.rangeOf(layer._url)).toEqual([15.1, 34.9]);
+        field(panel(), "range-min").value = "15";
+        change(field(panel(), "range-max"), "35");
         change(field(panel(), "range-max"), "12");
         expect(panel().textContent).toContain("The maximum must be above the minimum");
         expect(inspector.rangeOf(layer._url)).toEqual([15, 35]);

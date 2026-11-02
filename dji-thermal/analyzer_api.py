@@ -703,7 +703,8 @@ class Display(DatasetView):
         if errors:
             raise ValidationError(errors)
         conversions.save_display(request.user, value)
-        return Response(dict(value, unit=None, palettes=conversions.palettes(), colormaps=conversions.COLORMAPS))
+        return Response(dict(conversions.display(request.user), palettes=conversions.palettes(),
+                             colormaps=conversions.COLORMAPS))
 
 
 def viewer(task, cid, user):

@@ -50,7 +50,8 @@ the next time you open the same task; to share one, save it (section 6).
 - **Palette**: the thermal layer's colours, from the same list as the DJI Thermal Analyzer's. It's your palette
   everywhere: choosing one here also sets it in the Analyzer.
 - **The colour scale**, under Palette: the palette over the range the layer is drawn with, with that range in two
-  boxes in your unit. Type a new minimum or maximum, or click **Auto** for the layer's 2nd to 98th percentile. "This
+  boxes in your unit. Type a new minimum or maximum; **◀** and **▶**, between them, narrow or widen the range by a
+  tenth of it, about its middle; **Auto** sets the layer's 2nd to 98th percentile. "This
   layer" gives its own coldest and hottest temperatures. The range is the same one WebODM's layer panel sets: a
   range set there shows here, and the map draws the one set here. WebODM's panel only shows its new value when the
   page is next loaded.
@@ -62,7 +63,8 @@ the next time you open the same task; to share one, save it (section 6).
   Auto's range with no adjustments. The temperatures don't change, only the colours. The map follows each slider as it
   moves: your browser colours the layer from its temperatures, so nothing waits on the server. The frames window
   (section 5) is drawn again once you let go.
-- **Legend on the map**: a colour bar with the palette's range, at the map's top left. Its two ends say the range's
+- **The legend on the map**: a colour bar with the palette's range, at the map's top left (hidden or shown in the DJI
+  Thermal Analyzer's Preferences, under Thermal Inspector). Its two ends say the range's
   lowest and highest temperatures, with round values between them. If the image itself goes colder or hotter than
   that range (when it was narrowed in WebODM's layer panel), a line under the bar says how far: "Image: -42.5–56.6
   °C". Those parts take the colours of the bar's ends.
@@ -76,8 +78,8 @@ says which), and each layer keeps its own. Nothing is remembered: each visit sta
 with no adjustments.
 
 The panel and the legend can be moved out of the way: drag the panel by its heading (the frames window comes along,
-beside it), or the legend by any part. Both stay inside the map. Closing the panel, hiding the legend or reloading
-the page puts them back where they started. The frames window (section 5) can be dragged on its own too.
+beside it), or the legend by any part. Both stay inside the map. Closing the panel or reloading the page puts
+them back where they started. The frames window (section 5) can be dragged on its own too.
 
 Temperatures are shown in WebODM's units: °F when its map is set to Imperial, °C otherwise. See
 [Palettes and units](palettes.md).

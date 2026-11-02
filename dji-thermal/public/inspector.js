@@ -22,7 +22,7 @@
     var REGIONS_PREFIX = "dji-thermal-inspector:regions:";
     var ISOTHERM_PREFIX = "dji-thermal-inspector:isotherm:";
     var CORRECTION_PREFIX = "dji-thermal-inspector:correction:";   // where earlier versions kept a correction, removed
-    var LEGEND_KEY = "dji-thermal-inspector:legend";
+    var LEGEND_KEY = "dji-thermal-inspector:legend";      // where earlier versions kept the legend's tick, now a preference
     var KELVIN = 273.15;
     var EMISSIVITY = [0.1, 1], REFLECTED = [-100, 1000];     // correction.py's limits (°C)
     var SAVED_STYLE = {color: "#2e7d32", weight: 2, opacity: 0.9, dashArray: "6 4", fillOpacity: 0.08};
@@ -519,7 +519,7 @@
             '<div class="dt-inspector-scale-bar">' + (s.colors ? barHtml(s.colors, s.range, unit, state.isotherm, s.fix, s.shares) : "") + "</div>" +
             '<div class="dt-inspector-range">' +
             '<input type="number" step="0.1" class="form-control input-sm" data-act="range-min" value="' + shown(s.range[0]) + '" title="Minimum">' +
-            '<span class="text-muted">to</span>' +
+            Scale.spanButtonsHtml(function (name) { return 'data-act="range-' + name + '"'; }, "btn-xs") +
             '<input type="number" step="0.1" class="form-control input-sm" data-act="range-max" value="' + shown(s.range[1]) + '" title="Maximum">' +
             '<span class="text-muted">°' + unit + "</span>" +
             '<button type="button" class="btn btn-default btn-xs" data-act="range-auto"' + (s.auto ? "" : " disabled") +
@@ -908,8 +908,7 @@
                 }).join("") + "</select></label>" : "") + scaleHtml(state.scale, state, unit) + "</div>" +
             correctionHtml(state.correction, unit, (state.onMap || []).map(function (k) { return state.sources[k]; }).filter(Boolean),
                            state.correctionNotice, state.correctionDefault) +
-            '<label class="dt-inspector-label dt-inspector-check"><input type="checkbox" data-act="legend"' + (state.legendVisible ? " checked" : "") +
-            "> Legend on the map</label>" + imageHtml(state.scale) +
+            imageHtml(state.scale) +
             mosaicsHtml(state) +
             '<div class="dt-inspector-section"><strong>Isotherm</strong>' + isothermHtml(state.isotherm, unit) +
             (state.isothermNotice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.isothermNotice) + "</div>" : "") + "</div>" +
@@ -943,11 +942,12 @@
         var tasks = (args.tiles || []).map(function (t) { return t.meta && t.meta.task && t.meta.task.id; }).filter(Boolean);
         var key = pinsKey(tasks), rkey = regionsKey(tasks), ikey = isothermKey(tasks);
         forgetCorrections(storage);
+        try { storage.removeItem(LEGEND_KEY); } catch (e) { /* nothing kept */ }
         var regions = loadPins(storage, rkey).filter(function (r) { return r && r.geometry && SHAPES[r.shape]; });
         var state = {open: false, mode: "hover", readout: null, pins: loadPins(storage, key), pinsVisible: true,
                      regions: regions, regionsVisible: true, shown: regions.length ? regions[regions.length - 1].id : null,
                      notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
-                     legendVisible: legendShown(), mosaics: null, laid: {}, frames: false, pick: null,
+                     legendVisible: false, mosaics: null, laid: {}, frames: false, pick: null,
                      correction: {on: false}, correctionNotice: "", sources: {}, onMap: [], savedVisible: true,
                      savedShown: null, form: null, savable: {}, scale: null, rangeError: ""};
         var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
@@ -976,10 +976,6 @@
             var room = map.getContainer().clientHeight - container.offsetTop - 60;
             if (room > 0) panel.style.maxHeight = Math.max(160, room) + "px";
             panelMove.keep();       // moved, and now taller: still inside the map
-        }
-
-        function legendShown() {
-            try { return storage.getItem(LEGEND_KEY) !== "0"; } catch (e) { return true; }
         }
 
         // -- what each thermal layer was measured with, and its saved measurements -----------------------------------
@@ -1921,6 +1917,11 @@
             var what = act && act.getAttribute("data-act");
             var mrow = e.target.closest("[data-mosaic]");
             if (mrow && (what === "mosaic-swipe" || what === "mosaic-zoom")) return onMosaicInput(mrow, what.slice("mosaic-".length));
+            if (what === "range-narrow" || what === "range-wider") {
+                var shown = topLayer();
+                if (shown) setLook(shown, Scale.spanRange(lookOf(shown).range, what === "range-wider" ? 1 : -1), lookOf(shown).adjust);
+                return;
+            }
             if (what === "range-auto" || what === "image-reset") {
                 var top = topLayer(), auto = top && autoRange(top, userUnit());
                 if (!top) return;
@@ -2025,12 +2026,7 @@
         function onPanelChange(e) {
             var what = e.target.getAttribute("data-act") || "";
             if (what === "palette") choosePalette(e.target.value);
-            else if (what === "legend") {
-                state.legendVisible = e.target.checked;
-                if (!state.legendVisible) legendMove.reset();
-                try { storage.setItem(LEGEND_KEY, state.legendVisible ? "1" : "0"); } catch (err) { /* this page only */ }
-                renderLegend();
-            } else if (what.indexOf("isotherm-") === 0) isothermInput(what.slice("isotherm-".length), e.target.value);
+            else if (what.indexOf("isotherm-") === 0) isothermInput(what.slice("isotherm-".length), e.target.value);
             else if (what.indexOf("range-") === 0 || what.indexOf("image-") === 0) onScaleInput(what, e.target);
             else if (what.indexOf("correction-") === 0) {
                 correctionInput(what.slice("correction-".length), what === "correction-on" ? e.target.checked : e.target.value);
@@ -2138,9 +2134,11 @@
         if (plugins && plugins.Map && plugins.Map.onHandleClick) plugins.Map.onHandleClick(onClick);
         doc.addEventListener("onUnitSystemChanged", onUnits);
 
-        // The user's palette, from the Analyzer's preferences
+        // The user's palette and whether the legend is shown, from the Analyzer's preferences (shown when they can't
+        // be read)
         var ready = fetchFn(API + "display", {credentials: "same-origin"}).then(readJson).then(function (r) {
-            if (!r.ok) return;
+            state.legendVisible = !r.ok || r.data.legend !== false;
+            if (!r.ok) return renderLegend();
             state.display = r.data;
             var preferred = r.data.palette;
             if (preferred && paletteNames(r.data).indexOf(preferred) !== -1) {
@@ -2153,7 +2151,10 @@
             }
             renderLegend();
             render();
-        }, function () {});
+        }, function () {
+            state.legendVisible = true;
+            renderLegend();
+        });
 
         // The project's workset mosaics, then the one a link asks for laid on the map, the panel open
         var mosaicsReady = !project ? Promise.resolve() : ready.then(function () {
