@@ -18,10 +18,8 @@ out the visible (RGB) photos taken with them. You can add a GCP file too.
 
 ## 2. Check the measurement values
 
-The panel shows how many thermal photos it found, then the **Palette**: the DJI palette the task's thermal map
-opens in, starting on the one the photos were shot in. It doesn't change the task's images, which hold temperatures,
-and your own palette, if you've chosen one in the DJI Thermal Analyzer's preferences, comes first; the map can show
-any palette later.
+The panel shows how many thermal photos it found, then its settings in the order of the DJI Thermal Analyzer's
+Workset Creation Settings: the frames, the measurement values, then the colours.
 
 **Only frames looking down**, ticked by default, keeps only the frames with a gimbal pitch at or below the limit
 beside it, -80° as the WebODM plan has it, and says how many that is ("42 of 217 frames"): oblique frames mix viewing
@@ -57,7 +55,11 @@ material you're measuring. [Measurement settings](measurement.md) explains each 
 
 **Temperature unit** is the unit of the values you type. The task's images are always in degrees Celsius.
 
-**Also keep the photos in a DJI Thermal Analyzer dataset**, under the values: tick it to look at the photos in the
+**Palette**, under the values: the DJI palette the task's thermal map opens in, starting on the one the photos were
+shot in. It doesn't change the task's images, which hold temperatures, and your own palette, if you've chosen one in
+the DJI Thermal Analyzer's preferences, comes first; the map can show any palette later.
+
+**Also keep the photos in a DJI Thermal Analyzer dataset**, under it: tick it to look at the photos in the
 [DJI Thermal Analyzer](quickstart-analyzer.md) too. The task is also a dataset, under its own name, with every
 photo you picked (the RGB ones too). The photos are sent once, for both, and the dataset is
 analyzed once the task is made; the message under the project links to it. Without it, the task keeps only the

@@ -20,7 +20,8 @@ function readExif(file){
 }
 
 // The panel of a new thermal task, for the files picked with the DJI Thermal Task button: the pitch limit, Normalize and
-// Harmonize, the Measurement section, whether to keep the photos in a DJI Thermal Analyzer dataset too, then WebODM's
+// Harmonize, the Measurement section, the palette (as the Workset Creation Settings: Frames, Measurement, Colours),
+// whether to keep the photos in a DJI Thermal Analyzer dataset too, then WebODM's
 // own task panel (name, processing node, options starting from the plan's, the photos on the map; no resizing).
 export default class ThermalTaskPanel extends React.Component {
     static propTypes = {
@@ -261,7 +262,7 @@ export default class ThermalTaskPanel extends React.Component {
                     <span className="input-group-addon">°</span>
                 </span>
                 {" "}<strong>{interpolate(_("%(kept)s of %(count)s frames"), {kept, count: photos.length})}</strong>
-                <span className="help-block">{_("As the WebODM plan: oblique frames mix viewing angles and sky into the map's temperatures. Unticked, every frame goes in (for a 3D model).")}</span>
+                <span className="help-block">{_("As the WebODM plan: oblique frames mix viewing angles and sky into a map's temperatures. Unticked, every frame goes in (for a 3D model).")}</span>
             </div>
         );
     }
@@ -276,14 +277,14 @@ export default class ThermalTaskPanel extends React.Component {
                         <input type="checkbox" name="normalize" checked={frames.normalize} onChange={this.handleFramesChange} />
                         {" "}{_("Normalize: one ambient and reflected temperature for every frame")}
                     </label>
-                    <span className="help-block">{_("The flight's medians of the values the camera recorded, unless given below: no jumps between frames where the recorded values change.")}</span>
+                    <span className="help-block">{_("The flight's medians of the values the camera recorded, unless given in Measurement: no jumps between frames where the recorded values change.")}</span>
                 </div>
                 <div className="checkbox">
                     <label>
                         <input type="checkbox" name="harmonize" checked={frames.harmonize} onChange={this.handleFramesChange} />
                         {" "}{_("Harmonize: each frame's drift against its overlapping neighbours removed")}
                     </label>
-                    <span className="help-block">{_("The camera drifts between its recalibrations: removing it leaves no seams in the map. Compares the frames' overlaps, which takes a while. Normalizes too.")}</span>
+                    <span className="help-block">{_("The camera drifts between its recalibrations: removing it leaves no seams in a map. Compares the frames' overlaps, which takes a while; frames that can't be placed keep theirs. Normalizes too. Recommended for processing into a map.")}</span>
                 </div>
                 {frames.normalize ?
                     <div className="checkbox">
@@ -375,10 +376,10 @@ export default class ThermalTaskPanel extends React.Component {
                     <div className={uploading ? "hide" : ""}>
                         <div className="new-task-panel theme-background-highlight form-horizontal dji-thermal-measurement-panel">
                             {this.renderSummary()}
-                            {this.renderPalette()}
                             {this.renderFrames()}
                             <MeasurementSettings combined={combined} values={this.state.values} unit={this.state.unit}
                                 errors={this.state.errors} onChange={this.handleValuesChange} onUnitChange={this.handleUnitChange} />
+                            {this.renderPalette()}
                             <div className="checkbox">
                                 <label>
                                     <input type="checkbox" name="keepPhotos" checked={this.keepsPhotos()} disabled={this.state.frames.normalize}

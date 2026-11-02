@@ -1224,7 +1224,7 @@ describe("a dataset's conversions", () => {
         expect(document.querySelector('[name="unit"]').value).toBe("K");
     });
 
-    it("puts the colours first, above the outputs, the default naming the images' own palette", () => {
+    it("orders the sections as the work goes, Colours only with a colour or grey output, the default naming the images' own palette", () => {
         const files = palettes => palettes.map((p, i) => ({path: i + "_T.JPG", kind: "thermal", palette: p}));
         const own = analysis => {
             document.body.innerHTML = '<div id="f">' + conversions.formHtml(DEFAULTS, PREFERENCES, conversions.recorded(analysis)) + "</div>";
@@ -1234,12 +1234,36 @@ describe("a dataset's conversions", () => {
         expect(own({files: files(["whitehot", "ironred", "ironred", ""])})).toBe("Each image's own (ironred on 2, whitehot on 1)");
         expect(own(ANALYSIS)).toBe("Each image's own");
         const sections = [].map.call(document.querySelectorAll("#f > .ta-section"), el => el.querySelector("h4").textContent);
-        expect(sections).toEqual(["Colours", "Outputs", "Measurement", "Frames", "Adjustments"]);
-        const colours = document.querySelector("#f > .ta-section");
-        expect(colours.tagName).toBe("DIV");
+        expect(sections).toEqual(["Frames", "Outputs", "Measurement", "Colours", "Adjustments"]);
+        const colours = document.querySelector("#f > .ta-section-colours");
+        expect(colours.hidden).toBe(false);
         expect(colours.querySelector('[name="palette"]')).not.toBe(null);
         expect(colours.querySelector('[name="range_min"]')).not.toBe(null);
         expect([].map.call(document.querySelectorAll('[name="palette"] option'), o => o.value)).toEqual(["", "whitehot", "ironred"]);
+        // Temperatures only: nothing to colour; a 16-bit grey output has a range
+        const hidden = outputs => {
+            document.body.innerHTML = '<div id="f">' + conversions.formHtml(Object.assign({}, DEFAULTS, {outputs}), PREFERENCES, {}) + "</div>";
+            return document.querySelector(".ta-section-colours").hidden;
+        };
+        expect(hidden(["temp_c:tiff"])).toBe(true);
+        expect(hidden(["temp_c:tiff", "gray16:png"])).toBe(false);
+        expect(hidden(["rjpeg:jpg"])).toBe(false);
+    });
+
+    it("limits the pitch with a checkbox, the plan's -80° when ticked, every frame when not", () => {
+        document.body.innerHTML = '<div id="ta-convert-form">' + conversions.formHtml(DEFAULTS, PREFERENCES, {}) + "</div>";
+        expect(input("pitch_limit").checked).toBe(false);
+        expect(input("max_pitch").disabled).toBe(true);
+        expect(input("max_pitch").value).toBe("-80");
+        expect(input("pitch_limit").closest("label").textContent).toContain("Only frames looking down: a gimbal pitch at or below");
+        expect(conversions.readForm(form()).max_pitch).toBe(null);
+        input("pitch_limit").checked = true;
+        expect(conversions.readForm(form()).max_pitch).toBe(-80);
+        input("max_pitch").value = "-60";
+        expect(conversions.readForm(form()).max_pitch).toBe(-60);
+        document.body.innerHTML = '<div id="ta-convert-form">' + conversions.formHtml(Object.assign({}, DEFAULTS, {max_pitch: -70}), PREFERENCES, {}) + "</div>";
+        expect(input("pitch_limit").checked).toBe(true);
+        expect(input("max_pitch").value).toBe("-70");
     });
 
     it("shows the temperatures in the user's unit and reads them back in the files'", () => {
@@ -1345,9 +1369,10 @@ describe("a dataset's conversions", () => {
         await ticks();
         const summary = document.getElementById("ta-convert-summary");
         expect(form().hidden).toBe(true);
-        // The form starts from the defaults: what it shows are the plan's settings it leaves
-        expect([...summary.querySelectorAll(".ta-chip-off-plan")].map(c => c.getAttribute("data-key"))).toEqual(["outputs", "normalize"]);
-        expect(summary.querySelector(".ta-chip-changed")).toBe(null);
+        // With no saved defaults, the form starts from the plan: its chips are what the plan changes, none off it
+        expect(document.getElementById("ta-convert-from").value).toBe("plan");
+        expect([...summary.querySelectorAll(".ta-chip-changed")].map(c => c.getAttribute("data-key"))).toEqual(["outputs", "normalize"]);
+        expect(summary.querySelector(".ta-chip-off-plan")).toBe(null);
         // Each card says what its conversion changed
         const card = document.querySelector('.ta-conversion[data-id="9"] .ta-conversion-chips');
         expect([...card.querySelectorAll(".ta-chip")].map(c => c.textContent)).toEqual(["emissivity 0.95", "normalized"]);
@@ -1368,9 +1393,15 @@ describe("a dataset's conversions", () => {
         expect(summary.querySelector('[data-key="reflected_temp"]').textContent).toBe("reflected 68 °F");
         const field = input("reflected_temp").closest(".ta-field");
         expect(field.classList.contains("ta-changed")).toBe(true);
-        // The plan harmonizes, the form does not: both its boxes are marked together
+        // Changed by hand, it no longer says it starts from the plan
+        expect(document.getElementById("ta-convert-from").value).toBe("other");
+        // The plan harmonizes, the form does not: both boxes marked together, the note on Harmonize's own line
+        input("harmonize").checked = false;
+        input("normalize").checked = false;
+        input("normalize").dispatchEvent(new Event("change", {bubbles: true}));
         expect(input("normalize").closest(".ta-normalize").classList.contains("ta-off-plan")).toBe(true);
-        expect(input("harmonize").closest(".ta-normalize")).toBe(input("normalize").closest(".ta-normalize"));
+        expect(input("harmonize").closest("label").querySelector(".ta-mark-note").textContent).toContain("≠ plan: harmonized");
+        expect(input("normalize").closest("label").querySelector(".ta-mark-note")).toBe(null);
 
         click(field.querySelector('[data-reset="reflected_temp"]'));
         expect(input("reflected_temp").value).toBe("");
@@ -1406,6 +1437,24 @@ describe("a dataset's conversions", () => {
         await ticks();
         expect(form().innerHTML).toContain("Recorded: 5.0 m");
         expect(input("humidity").value).toBe("55");
+    });
+
+    it("starts from the WebODM plan once an analysis running when the page opened is done, if the form wasn't changed", async () => {
+        jest.useFakeTimers();
+        const analyzing = Object.assign({}, DATASET, {status: "analyzing", analysis: {}, analyzed: false, analyzed_at: null, conversions: []});
+        const fetchFn = server({[URL5]: [analyzing, Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: []})]});
+        dataset.init(document, fetchFn);
+        await ticks();
+        const from = document.getElementById("ta-convert-from");
+        expect(from.value).toBe("defaults");
+        expect(from.querySelector('[value="plan"]').disabled).toBe(true);
+        expect(from.querySelector('[value="saved"]').disabled).toBe(true);
+        expect(input("harmonize").checked).toBe(false);
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect(from.value).toBe("plan");
+        expect(input("harmonize").checked).toBe(true);
+        expect(form().querySelector('input[name="output"][value="pseudo"]').checked).toBe(false);
     });
 
     it("keeps following a running analysis after a reload of the page's dataset fails", async () => {
@@ -1559,7 +1608,7 @@ describe("a dataset's conversions", () => {
         expect(document.querySelector('[data-act="download-selected"]').textContent).toContain("Download their 2 files");
     });
 
-    it("converts with the form's settings, polls while it runs, and saves or resets the user's defaults", async () => {
+    it("converts with the form's settings, polls while it runs, and starts from, saves or forgets the user's defaults", async () => {
         jest.useFakeTimers();
         const converting = Object.assign({}, CONVERSION, {id: 10, name: "Conversion 2", status: "converting", progress: 0.5});
         const fetchFn = server({
@@ -1576,9 +1625,10 @@ describe("a dataset's conversions", () => {
 
         // The form starts from the user's saved defaults
         expect(document.getElementById("ta-convert-count").textContent).toBe("1");
-        expect(document.getElementById("ta-convert-origin").textContent).toMatch(/your saved defaults/);
+        const from = document.getElementById("ta-convert-from");
+        expect(from.value).toBe("saved");
         expect(input("emissivity").value).toBe("0.9");
-        expect(document.getElementById("ta-convert-plan").hidden).toBe(false);
+        expect(document.getElementById("ta-convert-forget").hidden).toBe(false);
 
         input("normalize").checked = true;
         document.getElementById("ta-convert-name").value = "Normalized";
@@ -1605,13 +1655,28 @@ describe("a dataset's conversions", () => {
         expect(JSON.parse(put[1].body).settings.humidity).toBe(60);
         expect(document.getElementById("ta-convert-message").textContent).toMatch(/Saved/);
 
-        click(document.getElementById("ta-convert-reset"));
-        expect(askDialog().textContent).toContain("Your saved defaults are forgotten.");
-        press("Reset");
-        await ticks();
+        expect(from.value).toBe("saved");
+
+        // Start from fills the form: dji-thermal-cli's defaults, the plan's, the saved defaults again
+        const choose = v => { from.value = v; from.dispatchEvent(new Event("change", {bubbles: true})); };
+        choose("defaults");
         expect(input("emissivity").value).toBe("");
         expect(input("humidity").value).toBe("");
-        expect(document.getElementById("ta-convert-origin").textContent).toMatch(/dji-thermal-cli's defaults/);
+        choose("plan");
+        expect(input("harmonize").checked).toBe(true);
+        choose("saved");
+        expect(input("humidity").value).toBe("60");
+
+        // Forgotten, once asked: the form keeps its settings, My defaults can no longer be chosen
+        click(document.getElementById("ta-convert-forget"));
+        expect(askDialog().textContent).toContain("Forget your saved defaults?");
+        press("Forget");
+        await ticks();
+        expect(fetchFn.mock.calls.some(c => c[1] && c[1].method === "DELETE")).toBe(true);
+        expect(input("humidity").value).toBe("60");
+        expect(from.value).toBe("other");
+        expect(from.querySelector('[value="saved"]').disabled).toBe(true);
+        expect(document.getElementById("ta-convert-forget").hidden).toBe(true);
 
         // A conversion's settings, and the WebODM plan's, fill the form
         expect(dataset.framePage("/plugins/dji-thermal/", {id: 5, conversions: [
@@ -1621,7 +1686,7 @@ describe("a dataset's conversions", () => {
         click(document.querySelector('.ta-conversion[data-id="9"] button[data-act="use"]'));
         expect(input("emissivity").value).toBe("0.95");
         expect(input("normalize").checked).toBe(true);
-        click(document.getElementById("ta-convert-plan"));
+        choose("plan");
         expect(input("emissivity").value).toBe("");
         expect(form().querySelector('input[name="output"][value="pseudo"]').checked).toBe(false);
     });

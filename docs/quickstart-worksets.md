@@ -9,28 +9,33 @@ side by side. Then you look at a workset's mosaics, and make a WebODM task from 
 On the dataset's page, the **Worksets** tab comes first. **Workset Creation Settings:** opens and closes the
 settings. Its chips show what differs from dji-thermal-cli's defaults, even when it's closed.
 
-The quickest start: **Use the WebODM plan's settings**, on the Worksets tab (or **Use these settings** on the WebODM
-plan tab). It fills in what the plan recommends for processing in WebODM.
+**Start from**, above them, fills the form with the **WebODM plan's settings** (what the plan recommends for
+processing in WebODM), **My defaults** or **dji-thermal-cli's defaults**. A new dataset starts from your saved
+defaults, or the plan's once the dataset is analyzed: usually you can create the workset as it is. Once you change
+a setting, it says **Other settings**. **Use these settings**, on the WebODM plan tab, fills in the plan's too.
 
 ![The Workset Creation Settings, open](images/workset-settings.png)
 
-The settings are in sections:
+The settings are in sections, in the order of the work:
 
-- **Colours**: the palette and colour range of the colour pictures.
+- **Frames**: **Only frames looking down** (ticked, only the frames with a gimbal pitch at or below the limit beside
+  it, -80° as the plan; unticked, every frame, for a 3D model), **Normalize** (one ambient and reflected temperature
+  for every frame) and **Harmonize** (also each frame's drift removed, so a map has no seams; see
+  [Measurement settings](measurement.md)).
 - **Outputs**: which files to write (temperature TIFFs in °C, °F or K, colour PNGs, 16-bit grey, DJI R-JPEGs and
   others), their compression, and whether to build mosaics.
 - **Measurement**: the values the temperatures are computed with. Left empty, each photo keeps its recorded value;
   the recorded median shows under each field. See [Measurement settings](measurement.md).
-- **Frames**: **Normalize** (one ambient and reflected temperature for every frame), **Harmonize** (also each
-  frame's drift removed, so a map has no seams; see [Measurement settings](measurement.md)) and a gimbal pitch
-  limit that keeps only the frames looking straight down.
+- **Colours**, once a colour or 16-bit grey output is ticked: the palette and colour range of those pictures.
 - **Adjustments**: gimbal angle overrides, temperatures above or below a threshold replaced, and the location and
   identifiers stripped from the outputs.
 
-A chip or field marked **≠ plan** differs from the WebODM plan's settings; hover over it to see the plan's value.
-That isn't an error: the plan is for processing into a map, and other settings suit other uses.
+A setting marked **≠ plan** differs from the WebODM plan's settings; hover over it to see the plan's value. That
+isn't an error: the plan is for processing into a map, and other settings suit other uses. **default**, beside a
+changed setting, puts it back to dji-thermal-cli's.
 
-**Save as my defaults** keeps your settings for new worksets; **Reset to defaults** goes back to dji-thermal-cli's.
+**Save as my defaults**, beside Start from, keeps your settings for new worksets; **Forget my defaults** forgets
+them, once you confirm.
 
 Give the workset a name if you like, then press **Create Workset**. It's converted in WebODM's background worker,
 with its progress and a **Cancel** button. A harmonized workset first compares the frames' overlaps: its label shows

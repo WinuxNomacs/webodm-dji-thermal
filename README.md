@@ -74,11 +74,7 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
    GCP file if you have one. The plugin finds the thermal R-JPEGs among them by their content; the RGB photos taken
    with them are ignored and not uploaded. (To check the flight first or compare settings, the panel points to the
    DJI Thermal Analyzer.) The Workset Creation Settings ask the same values in the same order and words.
-2. **Palette**, at the top: the DJI palette the task's thermal map (and the Thermal Inspector) opens in, starting on
-   the one the photos were shot in, unless you've chosen a palette in the Analyzer's preferences; the task's images
-   hold temperatures, so the map can show them in any palette later. A task made from a workset opens in the
-   workset's palette, if it has one.
-3. **Only frames looking down**, under it, ticked by default: as the WebODM plan, only the frames with a gimbal pitch
+2. **Only frames looking down**, at the top, ticked by default: as the WebODM plan, only the frames with a gimbal pitch
    at or below the limit beside it (-80° to start with, which you can change; read from each photo) go into the task,
    with the count kept beside it ("42 of 217 frames");
    oblique frames mix viewing angles and sky into the map's temperatures. Untick it to keep every frame (for a 3D
@@ -96,7 +92,7 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
    before it starts. If putting the images in the task fails, the reason shows with the plugin's own
    **Start processing** to try again. **Also build the workset's mosaics**, off by default, builds
    the Analyzer's mosaics too; they can be built later from the workset's menu. The workset stays in the Analyzer.
-4. **Measurement**: the values the temperatures are computed with. Each field shows the value the camera recorded
+3. **Measurement**: the values the temperatures are computed with. Each field shows the value the camera recorded
    and the range the camera accepts; left empty, every photo keeps its own recorded value.
    - **Temperature unit** of the values you enter: Celsius, Fahrenheit or Kelvin, by default WebODM's units (°F
      when imperial, else °C). The task's images are always in degrees Celsius.
@@ -107,13 +103,17 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
      recorded (usually 5 m, whatever the flight height). Or the recorded distance, or one distance for all photos.
      With the rangefinder's distance, the temperatures differ slightly from DJI's own apps, which use the recorded
      one.
-   - **Also keep the photos in a DJI Thermal Analyzer dataset**: the task is also a dataset, under its own name,
-     that gets every photo picked (the RGB ones too) as they are uploaded, so they are sent once, and is analyzed
-     once the task is made. The message under the project then links to it.
-5. Below it, WebODM's own task panel: name, processing node, options and the photos on the map. The options start as
+4. **Palette**, under Measurement (the Workset Creation Settings' order: Frames, Measurement, Colours): the DJI
+   palette the task's thermal map (and the Thermal Inspector) opens in, starting on the one the photos were shot in,
+   unless you've chosen a palette in the Analyzer's preferences; the task's images hold temperatures, so the map can
+   show them in any palette later. A task made from a workset opens in the workset's palette, if it has one.
+5. **Also keep the photos in a DJI Thermal Analyzer dataset**: the task is also a dataset, under its own name, that
+   gets every photo picked (the RGB ones too) as they are uploaded, so they are sent once, and is analyzed once the
+   task is made. The message under the project then links to it.
+6. Below it, WebODM's own task panel: name, processing node, options and the photos on the map. The options start as
    the WebODM plan's, "(Custom)" with `radiometric-calibration` none (the images already hold temperatures). Images
    are not resized: the thermal frames keep their size. **Review**, then **Start Processing**.
-6. Each photo is converted as it is uploaded, a few at a time. A photo that fails is left out with its reason;
+7. Each photo is converted as it is uploaded, a few at a time. A photo that fails is left out with its reason;
    the task then processes the others. A GCP file, `geo.txt` and `image_groups.txt` go in with the photos' names
    changed to the converted images' (`DJI_0001_T.JPG` becomes `DJI_0001_T.tif`).
 
@@ -196,18 +196,26 @@ frames it converted, left out as oblique, found not thermal and skipped. **Works
 Creation Settings:** opens and closes the settings, its chips showing what differs from the defaults either way; the **Outputs** section shows its own when
 closed. A chip marked **≠ plan** differs from the WebODM plan's settings (hover for the plan's value).
 
-- **Colours**: the palette and colour range of the pictures.
+- **Start from**, above the settings: the WebODM plan's settings, your saved defaults or dji-thermal-cli's defaults
+  fill the form. A new dataset's form starts from your saved defaults, else the plan's (once the dataset is
+  analyzed), else dji-thermal-cli's; changed by hand, it says "Other settings". **Save as my defaults** beside it keeps
+  your settings for new worksets, **Forget my defaults** (once asked) forgets them. **Copy settings to form**, in a
+  workset's menu, fills in that workset's.
+
+The sections, in the order of the work:
+
+- **Frames**: **Only frames looking down** (ticked, only the frames with a gimbal pitch at or below the limit beside
+  it, -80° to start with, as the plan), **Normalize** (one ambient and reflected temperature for every frame, the
+  flight's medians) and **Harmonize** (also each frame's drift against its overlapping neighbours removed).
 - **Outputs**: temperature TIFFs in °C, °F or K, pseudo-colour PNGs, gray16, raw counts, DJI R-JPEGs and the others
   dji-thermal-cli writes, their compression, and whether to build the mosaics.
 - **Measurement**: each parameter, with the flight's recorded median beside it (left empty, each image keeps its
   own), and the unit of the files.
-- **Frames**: **Normalize** (one ambient and reflected temperature for every frame, the flight's medians),
-  **Harmonize** (also each frame's drift against its overlapping neighbours removed) and a gimbal pitch limit for
-  nadir frames only.
+- **Colours**, shown once a colour or 16-bit grey output is ticked: the palette and colour range of the pictures.
 - **Adjustments**: gimbal overrides, temperatures above or below a threshold replaced, the location stripped.
-- **Use the WebODM plan's settings** fills in what the plan recommends; **Copy settings to form**, in a workset's
-  menu, fills in that workset's; **Save as my defaults** keeps your settings for new worksets (**Reset to defaults**
-  goes back to dji-thermal-cli's).
+
+A "≠ plan" or "default" note sits at the end of its own setting's label; "default" puts that setting back to
+dji-thermal-cli's.
 
 Each workset is kept beside the others, with what it changed from the defaults, its **Files** (a table, closed at
 first and remembered in your browser, of each image with its thumbnail, result, minimum and maximum temperature,
