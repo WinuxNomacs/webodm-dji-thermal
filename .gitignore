@@ -221,7 +221,7 @@ __marimo__/
 ignored/
 
 # Host-only dev tooling and personal editor settings
-node_modules/
+node_modules
 .vscode/
 
 # New requests (see the user's CLAUDE.md)
