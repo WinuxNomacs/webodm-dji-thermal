@@ -557,18 +557,19 @@
             }).join("") + "</ul></span>";
     }
 
-    // The worksets whose Files are shown on a dataset's page, kept in the browser (none at first)
+    // The worksets whose Files, or Mosaics, are shown on a dataset's page, kept in the browser (none at first)
     var FILES_PREFIX = "dji-thermal-analyzer:files-shown:";
-    function shownFiles(storage, datasetId) {
+    var MOSAICS_PREFIX = "dji-thermal-analyzer:mosaics-shown:";
+    function shownFiles(storage, datasetId, prefix) {
         try {
-            var v = JSON.parse((storage && storage.getItem(FILES_PREFIX + datasetId)) || "[]");
+            var v = JSON.parse((storage && storage.getItem((prefix || FILES_PREFIX) + datasetId)) || "[]");
             return Array.isArray(v) ? v : [];
         } catch (e) { return []; }
     }
-    function keepShownFiles(storage, datasetId, ids) {
+    function keepShownFiles(storage, datasetId, ids, prefix) {
         try {
-            if (ids.length) storage.setItem(FILES_PREFIX + datasetId, JSON.stringify(ids));
-            else storage.removeItem(FILES_PREFIX + datasetId);
+            if (ids.length) storage.setItem((prefix || FILES_PREFIX) + datasetId, JSON.stringify(ids));
+            else storage.removeItem((prefix || FILES_PREFIX) + datasetId);
         } catch (e) { /* this page only */ }
     }
 
@@ -579,10 +580,34 @@
             '"></i> Files</button></div>';
     }
 
+    var MOSAIC_KINDS = {as_converted: "As converted", harmonized: "Harmonized"};
+
+    // A workset's Mosaics, below its Files: a toggle over the mosaics' files to download, by mosaic ("" before any is
+    // built)
+    function mosaicFilesHtml(c, base, shown) {
+        var files = c.mosaic_files || [];
+        if (!files.length) return "";
+        var kinds = [];
+        files.forEach(function (f) {
+            var kind = f.split("/")[0];
+            if (kinds.indexOf(kind) < 0) kinds.push(kind);
+        });
+        return '<div class="ta-conversion-files-head"><button type="button" class="ta-collapse" data-act="mosaic-files" aria-expanded="' + shown +
+            '" title="' + (shown ? "Hide the mosaics' files" : "Show the mosaics' files to download") + '"><i class="fa fa-caret-' + (shown ? "down" : "right") +
+            '"></i> Mosaics</button> <span class="text-muted">' + esc(core.count(files.length, "file", "files")) + "</span></div>" +
+            '<div class="ta-mosaic-files"' + (shown ? "" : " hidden") + ">" + kinds.map(function (kind) {
+                return "<div><strong>" + esc(MOSAIC_KINDS[kind] || kind) + ":</strong> " + files.filter(function (f) { return f.split("/")[0] === kind; }).map(function (f) {
+                    return '<a href="' + esc(base + c.id + "/download?mosaic=" + encodeURIComponent(f)) + '" title="' + esc(f) + '"><i class="fa fa-download"></i> ' +
+                        esc(f.slice(kind.length + 1)) + "</a>";
+                }).join(" ") + "</div>";
+            }).join("") + "</div>";
+    }
+
     // The dataset's conversions, newest first (base: their API's URL; open: the ids of those whose files are shown;
     // defaults: what their settings are compared against; menu: the conversion whose menu is open; viewerBase: their mosaics' pages, followed by their id;
-    // dashboard: WebODM's dashboard, where their tasks are; parent: the dataset's own task)
-    function listHtml(conversions, canChange, base, open, fresh, defaults, menu, viewerBase, dashboard, parent) {
+    // dashboard: WebODM's dashboard, where their tasks are; parent: the dataset's own task; mosaicsOpen: the ids of those
+    // whose mosaics' files are shown)
+    function listHtml(conversions, canChange, base, open, fresh, defaults, menu, viewerBase, dashboard, parent, mosaicsOpen) {
         if (!conversions.length) return '<p class="text-muted ta-none">No worksets yet' + (canChange ? ": choose the settings above (the WebODM plan's " +
             "are a good start), then Create Workset." : ".") + "</p>";
         open = open || [];
@@ -612,7 +637,8 @@
                 '<div class="ta-conversion-figures text-muted">' + esc(figures.join(" · ")) + "</div>" +
                 parentHtml(c, parent, dashboard) + tasksHtml(c, dashboard) + '<div class="ta-conversion-task" data-task="' + c.id + '"></div>' +
                 filesToggleHtml(c, open.indexOf(c.id) >= 0) +
-                '<div class="ta-conversion-files" data-files="' + c.id + '"' + (open.indexOf(c.id) >= 0 ? "" : " hidden") + "></div></div>";
+                '<div class="ta-conversion-files" data-files="' + c.id + '"' + (open.indexOf(c.id) >= 0 ? "" : " hidden") + "></div>" +
+                mosaicFilesHtml(c, base, (mosaicsOpen || []).indexOf(c.id) >= 0) + "</div>";
         }).join("");
     }
 
@@ -694,10 +720,6 @@
             }).join("") + "</tbody></table></div>";
         if (files.length > RESULTS_SHOWN) html += '<p class="text-muted">And ' + (files.length - RESULTS_SHOWN) + " more: download all to see them.</p>";
         html += '</div><aside class="ta-file-detail" hidden></aside></div>';
-        var mosaicFiles = c.mosaic_files || [];
-        if (mosaicFiles.length) html += '<p class="ta-mosaic-files"><strong>Mosaics:</strong> ' + mosaicFiles.map(function (f) {
-            return '<a href="' + esc(base + c.id + "/download?mosaic=" + encodeURIComponent(f)) + '">' + esc(f) + "</a>";
-        }).join(", ") + "</p>";
         return html;
     }
 
@@ -757,6 +779,7 @@
         var meta = null, settings = null, saved = false, dataset = null, built = false, loading = null;
         var storage = ctx.storage !== undefined ? ctx.storage : root.localStorage;
         var open = shownFiles(storage, ctx.datasetId);    // the worksets whose Files are shown, kept in the browser
+        var mosaicsOpen = shownFiles(storage, ctx.datasetId, MOSAICS_PREFIX);   // and whose Mosaics are
         var results = {}, sorts = {};                     // each one's files as loaded, and how its table is sorted
         var picks = {}, polls = {};                       // each one's images selected and under the mouse; its reload while measuring
         // The source frames' thumbnails and pictures, in the user's preferred DJI palette when they have one
@@ -836,7 +859,7 @@
             var el = taskPanel();
             if (el && task.info && el.querySelector('[name="task-name"]')) task.draft = readTaskForm(el, task.info).draft;
             root$("ta-conversions").innerHTML = listHtml(list, dataset && dataset.can_change, base, open, fresh,
-                dataset && dataset.defaults, menu, viewerBase, ctx.dashboard, dataset && dataset.parent);
+                dataset && dataset.defaults, menu, viewerBase, ctx.dashboard, dataset && dataset.parent, mosaicsOpen);
             open.forEach(function (id) { renderFiles(id); loadFiles(id); });
             renderTask();
         }
@@ -1278,6 +1301,10 @@
                 open = open.indexOf(id) >= 0 ? open.filter(function (x) { return x !== id; }) : open.concat([id]);
                 keepShownFiles(storage, ctx.datasetId, open);
                 renderList();
+            } else if (act === "mosaic-files") {
+                mosaicsOpen = mosaicsOpen.indexOf(id) >= 0 ? mosaicsOpen.filter(function (x) { return x !== id; }) : mosaicsOpen.concat([id]);
+                keepShownFiles(storage, ctx.datasetId, mosaicsOpen, MOSAICS_PREFIX);
+                renderList();
             } else if (act === "parent") {
                 useForParent(c);
             } else if (act === "use") {
@@ -1312,6 +1339,8 @@
                     if (!r.ok) return message(esc(core.errorText(r.data, "Could not delete the workset.")), "text-danger");
                     open = open.filter(function (x) { return x !== id; });
                     keepShownFiles(storage, ctx.datasetId, open);
+                    mosaicsOpen = mosaicsOpen.filter(function (x) { return x !== id; });
+                    keepShownFiles(storage, ctx.datasetId, mosaicsOpen, MOSAICS_PREFIX);
                     if (task && task.id === id) task = null;
                     return ctx.onChange();
                 });
@@ -1323,7 +1352,7 @@
 
     var api = {recorded: recorded, settingsIn: settingsIn, formHtml: formHtml, readForm: readForm, formProblem: formProblem, planSettings: planSettings, statusLabel: statusLabel,
                differences: differences, chipsHtml: chipsHtml, markForm: markForm, resetSetting: resetSetting,
-               mosaicHtml: mosaicHtml, mapUrl: mapUrl, actionsHtml: actionsHtml, listHtml: listHtml, parentHtml: parentHtml, taskStatusLabel: taskStatusLabel, tasksHtml: tasksHtml,
+               mosaicHtml: mosaicHtml, mapUrl: mapUrl, actionsHtml: actionsHtml, listHtml: listHtml, mosaicFilesHtml: mosaicFilesHtml, parentHtml: parentHtml, taskStatusLabel: taskStatusLabel, tasksHtml: tasksHtml,
                taskHtml: taskHtml, readTaskForm: readTaskForm, optionsFormHtml: optionsFormHtml, readOptions: readOptions, skipReasons: skipReasons, resultRows: resultRows, resultsHtml: resultsHtml,
                resultDetailRows: resultDetailRows, resultDetailHtml: resultDetailHtml, init: init};
     root.ThermalAnalyzerConversions = api;

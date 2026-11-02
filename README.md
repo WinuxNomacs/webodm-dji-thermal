@@ -168,6 +168,7 @@ closed. A chip marked **≠ plan** differs from the WebODM plan's settings (hove
 Each workset is kept beside the others, with what it changed from the defaults, its **Files** (a table, closed at
 first and remembered in your browser, of each image with its thumbnail, result, minimum and maximum temperature,
 emissivity, reflected temperature and distance as the workset measured it, and why any was skipped, sortable by each either way, its headings in view as it scrolls),
+its **Mosaics** below them once built (their files to download, by mosaic, closed at first and remembered too),
 **Download all** (a zip), and **Rename** and **Delete** in its menu. Beside the table, a detail pane shows the image
 under the mouse, or the one clicked: the frame at its own size, all it was measured with, and its downloads (the
 workset's files, its temperatures as CSV or a float TIFF, and Open frame). Ctrl/Cmd-click or Shift-click selects

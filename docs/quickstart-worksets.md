@@ -50,6 +50,9 @@ Each workset is listed with the settings it changed, how many images it converte
   first time its Files are opened, which takes a few seconds.
 
 ![A workset's Files, the detail pane on the image under the mouse](images/workset-files.png)
+- **Mosaics**, below Files once the workset's mosaics are built, lists their files to download: the mosaic as
+  converted and harmonized, each a temperature TIFF with its JSON report, a preview and, when the frames were projected
+  onto heights, those heights. It opens and closes as Files does, and **Download all**'s zip has them too.
 - The **⋯** menu has **Download all** (a zip), **Copy settings to form**, **Build mosaics**, **Create task** (once
   the workset is in a task), **Use for parent task**, **Rename** and **Delete**.
 
