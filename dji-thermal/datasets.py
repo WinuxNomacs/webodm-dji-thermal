@@ -337,7 +337,13 @@ def start_job(task, module, function, *args, rel=JOB_FILE, running='analyzing', 
     update_job(task, rel=rel, status=running, progress=0, error='', run_id=run_id, started_at=now(),
                celery_task_id='', **fields)
     module = __name__.rsplit('.', 1)[0] + '.' + module
-    celery_task_id = run_function_async(run_job, module, function, str(task.pk), run_id, *args).task_id
+    try:
+        celery_task_id = run_function_async(run_job, module, function, str(task.pk), run_id, *args).task_id
+    except Exception as e:  # noqa: BLE001 - the broker unreachable: the job would show as running forever
+        logger.error("Cannot start the job {}.{}: {}".format(module, function, e))
+        update_job(task, if_run=run_id, rel=rel, status='failed', progress=0, run_id='', finished_at=now(),
+                   error="The job could not be started ({}). Try again in a moment.".format(e))
+        return
     update_job(task, if_run=run_id, rel=rel, celery_task_id=celery_task_id or '')
 
 

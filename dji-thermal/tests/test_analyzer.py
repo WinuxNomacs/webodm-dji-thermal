@@ -235,6 +235,15 @@ class TestAnalysis(AnalyzerTestCase):
         self.assertEqual(d["status"], "failed")
         self.assertIn("stopped", d["error"])
 
+    def test_an_analysis_that_cannot_be_started_fails_at_once_instead_of_running_forever(self):
+        task = self.create()
+        self.upload(task, [jpeg("a.jpg")])
+        with mock.patch("app.plugins.worker.run_function_async", side_effect=ConnectionError("broker unreachable")):
+            d = self.client.post("{}/{}/analyze".format(API, task.id)).data
+        self.assertEqual(d["status"], "failed")
+        self.assertIn("could not be started (broker unreachable)", d["error"])
+        self.assertEqual(datasets.job(task)["run_id"], "")
+
     @skip_without("DJI_THERMAL_FLIGHT_DIR")
     def test_a_flights_frames_are_analyzed_with_the_webodm_plan(self):
         frames = [f for f in jpegs_in("DJI_THERMAL_FLIGHT_DIR") if f.upper().endswith("_T.JPG")][:6]

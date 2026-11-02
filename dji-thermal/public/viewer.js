@@ -573,11 +573,23 @@
             return renderTab();
         }
 
+        // A reload that failed while the mosaics are built is tried again, less often: one dropped request must not
+        // leave the page showing the build as it was
+        function retry() {
+            if (timer) timer = root.setTimeout(load, POLL_MS * 5);
+        }
+
         function load() {
             return fetchFn(base + "/mosaics", {credentials: "same-origin"}).then(core.readJson).then(function (r) {
-                if (!r.ok) return status({text: esc(core.errorText(r.data, "Could not load the mosaics.")), cls: "text-danger"});
+                if (!r.ok) {
+                    retry();
+                    return status({text: esc(core.errorText(r.data, "Could not load the mosaics.")), cls: "text-danger"});
+                }
                 return render(r.data);
-            }, function () { status({text: "Could not load the mosaics.", cls: "text-danger"}); });
+            }, function () {
+                retry();
+                status({text: "Could not load the mosaics.", cls: "text-danger"});
+            });
         }
 
         function post(url, failure) {

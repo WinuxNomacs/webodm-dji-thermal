@@ -1399,6 +1399,24 @@ describe("a dataset's conversions", () => {
         expect(input("humidity").value).toBe("55");
     });
 
+    it("keeps following a running analysis after a reload of the page's dataset fails", async () => {
+        jest.useFakeTimers();
+        const at = progress => Object.assign({}, DATASET, {status: "analyzing", progress, analysis: {}, analyzed: false, analyzed_at: null, conversions: []});
+        const fetchFn = server({[URL5]: [at(0.2), () => Promise.reject(new Error("dropped")), () => jsonResponse({}, false), at(0.7)]});
+        dataset.init(document, fetchFn);
+        await ticks();
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect(document.getElementById("ta-status").textContent).toBe("Could not load the dataset.");
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect(document.getElementById("ta-status").textContent).toBe("Could not load the dataset.");
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect(document.getElementById("ta-status").innerHTML).toContain("width: 70%");
+        expect(calls(fetchFn).filter(c => c === "GET " + URL5)).toHaveLength(4);
+    });
+
     it("fills the form with a workset's settings and the frame page's changed parameters, from its New workset with these", async () => {
         window.history.replaceState(null, "", "/?from=9&emissivity=0.8&humidity=40&palette=x#convert");
         expect(dataset.fromQuery(window.location.search)).toEqual({id: "9", changes: {emissivity: 0.8, humidity: 40}});
