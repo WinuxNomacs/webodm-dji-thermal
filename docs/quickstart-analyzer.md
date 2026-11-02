@@ -9,8 +9,9 @@ Open **DJI Thermal Analyzer** in WebODM's menu. It lists the thermal datasets of
 
 ![The DJI Thermal Analyzer's list of datasets](images/analyzer-list.png)
 
-Press **New Dataset**. Give it a name, choose the project, and choose the flight's photos or their folder (you can
-also drop them on the page).
+Press **New Dataset**. Choose the flight's photos or their folder (you can also drop them on the page) and the
+project. The name is filled in from the camera and the day the photos were taken ("M4T 2026-10-12"); change it if you
+like. The project is the one the list is filtered to, else the one your last dataset went to.
 
 ![The New Dataset dialog](images/new-dataset.png)
 
@@ -43,8 +44,9 @@ you do it:
 
 ## 3. Look at the files
 
-The **Files** tab lists every file with its capture time, height, gimbal pitch, temperatures, distance and
-emissivity. You can filter it, sort it by any column and show thumbnails.
+The **Files** tab lists the files with their capture time, height, gimbal pitch, temperatures, distance and
+emissivity. It opens on the **Thermal frames**; **All files** adds the visible photos, and **With problems** shows
+only the files a problem names. You can filter it by name, sort it by any column and show thumbnails.
 
 ![The Files tab, with a file's detail pane](images/dataset-files.png)
 
@@ -77,6 +79,10 @@ the workset's settings, and names the files concerned.
 
 Some problems are fixed by a single setting, such as **Normalize** or leaving out oblique frames. Those have a button
 that sets it in the workset settings for you.
+
+A warning that names only oblique frames (a few unusually cold frames looking at the sky, say) is shown under the
+oblique frames' note, marked **Only in oblique frames**. Leaving those frames out, as the WebODM plan does, leaves
+it out too, so it isn't counted on the tab or in the steps.
 
 ## 5. Read the WebODM plan
 

@@ -86,6 +86,9 @@ const SHOTS = {
         await p.goto(env.url + "/plugins/dji-thermal/");
         await p.waitForSelector("#ta-body tr");
         await p.click("#ta-new");
+        // A few of the flight's photos chosen (nothing is sent before Create): the name filled in from their camera
+        await p.setInputFiles("#ta-new-files", thermalPhotos(need(env, "DT_FLIGHT_DIR"), 6));
+        await p.waitForFunction(() => /\d{4}-\d\d-\d\d$/.test(document.getElementById("ta-new-name").value));
         return p.locator("#ta-new-dialog .ta-dialog-inner");
     },
     "dataset": async (p, env) => {

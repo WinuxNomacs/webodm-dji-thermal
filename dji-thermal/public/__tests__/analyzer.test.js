@@ -511,6 +511,114 @@ describe("datasets list", () => {
         expect(nested.map(f => core.uploadName(f))).toEqual(["a_T.JPG", "sub/b_T.JPG", "notes.txt"]);
     });
 
+    // A JPEG's start with an EXIF block giving IFD0's Model and DateTime (either byte order)
+    const exifJpeg = (model, time, little) => {
+        const strings = [model + "\0", time + "\0"];
+        const ifd = 8, data = ifd + 2 + 2 * 12 + 4;
+        const tiff = new DataView(new ArrayBuffer(data + strings[0].length + strings[1].length));
+        tiff.setUint16(0, little ? 0x4949 : 0x4D4D);
+        tiff.setUint16(2, 42, little);
+        tiff.setUint32(4, ifd, little);
+        tiff.setUint16(ifd, 2, little);
+        let at = data;
+        [0x0110, 0x0132].forEach((tag, i) => {
+            const e = ifd + 2 + i * 12;
+            tiff.setUint16(e, tag, little);
+            tiff.setUint16(e + 2, 2, little);
+            tiff.setUint32(e + 4, strings[i].length, little);
+            // Four bytes or fewer are written in the entry itself
+            let to = e + 8;
+            if (strings[i].length > 4) {
+                tiff.setUint32(e + 8, at, little);
+                to = at;
+                at += strings[i].length;
+            }
+            [...strings[i]].forEach((c, k) => tiff.setUint8(to + k, c.charCodeAt(0)));
+        });
+        const head = [0xFF, 0xD8, 0xFF, 0xE1, (tiff.byteLength + 8) >> 8, (tiff.byteLength + 8) & 255, 0x45, 0x78, 0x69, 0x66, 0, 0];
+        return new Uint8Array([...head, ...new Uint8Array(tiff.buffer), 0xFF, 0xDA]);
+    };
+
+    it("names a new dataset after the camera and the day, else the folder unless it's generic", async () => {
+        expect(core.exifCamera(exifJpeg("M4T", "2026:10:12 18:29:50", true).buffer)).toEqual({model: "M4T", date: "2026-10-12"});
+        expect(core.exifCamera(exifJpeg("ZH20N", "2023:12:21 14:43:17", false).buffer)).toEqual({model: "ZH20N", date: "2023-12-21"});
+        expect(core.exifCamera(new Uint8Array([1, 2, 3, 4]).buffer)).toEqual({model: null, date: null});
+
+        const inFolder = (folder, name) => Object.defineProperty(new File(["x"], name), "webkitRelativePath", {value: folder + "/" + name});
+        const flight = [inFolder("images", "DJI_20261012182950_0001_T.JPG"), inFolder("images", "DJI_20261012182949_0001_V.JPG")];
+        expect(core.datasetName(flight, {model: "M4T", date: "2026-10-12"})).toBe("M4T 2026-10-12");
+        // The day from a DJI file name when the EXIF has none
+        expect(core.datasetName(flight, {model: "M4T", date: null})).toBe("M4T 2026-10-12");
+        expect(core.datasetName(flight)).toBe("Thermal dataset");
+        expect(core.datasetName([inFolder("Roof east", "DJI_0001_R.JPG")])).toBe("Roof east");
+        expect(core.datasetName([inFolder("100MEDIA", "DJI_0001_R.JPG")], {model: "ZH20N"})).toBe("ZH20N");
+        expect(core.namingImage(flight).name).toBe("DJI_20261012182950_0001_T.JPG");
+
+        // New Dataset: the folder at once, the camera and day once the photo is read, unless typed over meanwhile
+        datasets.init(document, jest.fn(() => jsonResponse({datasets: [], projects: [{id: 2, name: "Warehouse"}]})));
+        await flush();
+        click(document.getElementById("ta-new"));
+        const input = document.getElementById("ta-new-dir"), name = document.getElementById("ta-new-name");
+        const pick = files => {
+            Object.defineProperty(input, "files", {value: files, configurable: true});
+            change(input);
+        };
+        const thermal = Object.defineProperty(new File([exifJpeg("M4T", "2026:10:12 18:29:50", true)], "DJI_20261012182950_0001_T.JPG"),
+                                              "webkitRelativePath", {value: "Roof east/DJI_20261012182950_0001_T.JPG"});
+        pick([thermal]);
+        expect(name.value).toBe("Roof east");
+        for (let i = 0; i < 50 && name.value === "Roof east"; i++) await flush();
+        expect(name.value).toBe("M4T 2026-10-12");
+
+        name.value = "";
+        pick([thermal]);
+        name.value = "My roof";
+        for (let i = 0; i < 10; i++) await flush();
+        expect(name.value).toBe("My roof");
+    });
+
+    it("proposes the project the list is filtered to, else the last one a dataset went to, kept as the list reloads", async () => {
+        jest.useFakeTimers();
+        const projects = [{id: 2, name: "Warehouse"}, {id: 3, name: "Yard"}, {id: 4, name: "Roof"}];
+        const busy = Object.assign({}, DATASET, {busy: true, project: {id: 3, name: "Yard"}});
+        const fetchFn = jest.fn((url, opts) => opts && opts.method === "POST" ?
+            jsonResponse(Object.assign({}, DATASET, {id: 6})) : jsonResponse({datasets: [busy], projects}));
+        datasets.init(document, fetchFn, jest.fn());
+        await ticks();
+        const project = document.getElementById("ta-new-project");
+        click(document.getElementById("ta-new"));
+        expect(project.value).toBe("2");
+        click(document.getElementById("ta-new-cancel"));
+
+        const filter = document.getElementById("ta-project-filter");
+        filter.value = "3";
+        change(filter);
+        click(document.getElementById("ta-new"));
+        expect(project.value).toBe("3");
+        // Picked by hand, kept through the list's polls
+        project.value = "4";
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect(project.value).toBe("4");
+
+        document.getElementById("ta-new-name").value = "Roof";
+        Object.defineProperty(document.getElementById("ta-new-files"), "files", {value: [new File(["x"], "a_T.JPG")]});
+        change(document.getElementById("ta-new-files"));
+        click(document.getElementById("ta-new-create"));
+        await ticks();
+        expect(window.localStorage.getItem("thermalAnalyzer.newDatasetProject")).toBe("4");
+
+        // The next time, with the list not filtered: the project the last dataset went to
+        document.body.innerHTML = page('datasets.html', false);
+        datasets.init(document, fetchFn);
+        await ticks();
+        click(document.getElementById("ta-new"));
+        expect(document.getElementById("ta-new-project").value).toBe("4");
+        window.localStorage.clear();
+        jest.clearAllTimers();
+        jest.useRealTimers();
+    });
+
     it("needs a project to add a dataset to", async () => {
         const fetchFn = jest.fn(() => jsonResponse({datasets: [], projects: []}));
         datasets.init(document, fetchFn);
@@ -795,6 +903,29 @@ describe("a dataset's page", () => {
         expect(dataset.planHtml({})).toMatch(/No plan/);
     });
 
+    it("shows a warning naming only oblique frames under them, not counted as a problem", async () => {
+        const oblique = {severity: "info", code: "oblique", message: "2 oblique frames", files: ["thermal/a_T.JPG", "thermal/b_T.JPG"], suggestion: ""};
+        const hot = {severity: "warning", code: "temperature_max_outlier", message: "1 image with an unusual maximum", files: ["thermal/a_T.JPG"], suggestion: ""};
+        const broken = {severity: "error", code: "unreadable", message: "1 unreadable", files: ["thermal/b_T.JPG"], suggestion: ""};
+        const findings = [hot, broken, oblique];
+        expect(dataset.foldFindings(findings)).toEqual({shown: [broken, oblique], folded: [hot]});
+        const html = dataset.problemsHtml({findings});
+        expect(html.match(/class="ta-finding alert/g).length).toBe(2);
+        const box = document.createElement("div");
+        box.innerHTML = html;
+        expect(box.querySelector(".alert-info .ta-finding-folded").textContent).toContain("Only in oblique frames 1 image with an unusual maximum");
+        expect(box.querySelector(".ta-finding-folded a[data-file]").getAttribute("data-file")).toBe("thermal/a_T.JPG");
+        // A warning naming another frame too stays a problem
+        expect(dataset.foldFindings([Object.assign({}, hot, {files: ["thermal/a_T.JPG", "rgb/a_V.JPG"]}), oblique]).folded).toEqual([]);
+
+        // The tab's badge and the step bar count the error alone
+        dataset.init(document, server({[URL5]: Object.assign({}, DATASET, {analysis: Object.assign({}, ANALYSIS, {findings})})}));
+        await ticks();
+        expect(document.getElementById("ta-problems-count").textContent).toBe("1");
+        expect(document.getElementById("ta-steps").textContent).toContain("Check the problems: 1 error");
+        expect(document.getElementById("ta-steps").textContent).not.toContain("warning");
+    });
+
     it("says who can see the dataset", () => {
         const s = dataset.sharingHtml({owner: "ana", users: ["ana", "ben"], groups: ["Default", "Inspectors"], everyone: true});
         expect(s).toContain("ana (the project's owner), everyone (the Default group), group Inspectors, ben");
@@ -802,6 +933,36 @@ describe("a dataset's page", () => {
     });
 
     afterEach(() => { window.localStorage.clear(); delete navigator.clipboard; });
+
+    // The Files tab opens on the thermal frames: its "All files" choice
+    const showAllFiles = () => {
+        const all = document.querySelector('#ta-tab-files input[name="ta-files-show"][value="all"]');
+        all.checked = true;
+        all.dispatchEvent(new Event("change", {bubbles: true}));
+    };
+
+    it("opens the Files tab on the thermal frames without their Kind, or on every file when there are none", async () => {
+        dataset.init(document, server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS})}));
+        await ticks();
+        const rows = () => [...document.querySelectorAll("#ta-tab-files tbody tr")].map(r => r.getAttribute("data-path"));
+        expect(document.querySelector('#ta-tab-files input[value="thermal"]').checked).toBe(true);
+        expect(rows()).toEqual(["thermal/a_T.JPG", "thermal/b_T.JPG"]);
+        // Kind left out while every row is a thermal frame; a long name may wrap after a folder or before a number
+        const headings = () => [...document.querySelectorAll("#ta-tab-files thead th")].map(th => th.textContent.trim());
+        expect(headings()).not.toContain("Kind");
+        expect(document.querySelector("#ta-tab-files td.ta-path").innerHTML).toContain("thermal/<wbr>a_T.JPG");
+        expect(dataset.filesHtml({files: [{path: "DJI_20260918084442_0001_T.JPG", kind: "thermal"}]}, {})).toContain("DJI_<wbr>20260918084442_<wbr>0001_T.JPG");
+        showAllFiles();
+        expect(rows()).toEqual(["rgb/a_V.JPG", "thermal/a_T.JPG", "thermal/b_T.JPG"]);
+        expect(headings()).toContain("Kind");
+
+        document.body.innerHTML = page("dataset.html");
+        const visible = Object.assign({}, ANALYSIS, {files: ANALYSIS.files.filter(f => f.kind !== "thermal")});
+        dataset.init(document, server({[URL5]: Object.assign({}, DATASET, {analysis: visible})}));
+        await ticks();
+        expect(document.querySelector('#ta-tab-files input[value="all"]').checked).toBe(true);
+        expect(rows()).toEqual(["rgb/a_V.JPG"]);
+    });
 
     it("filters the files by every word of a name, and shows thumbnails", () => {
         expect(dataset.fileRows(ANALYSIS, {filter: "T.jpg THERMAL"}).map(f => f.path)).toEqual(["thermal/a_T.JPG", "thermal/b_T.JPG"]);
@@ -820,6 +981,7 @@ describe("a dataset's page", () => {
         dataset.init(document, fetchFn);
         await ticks();
         const tab = document.getElementById("ta-tab-files");
+        showAllFiles();
 
         const filter = tab.querySelector(".ta-files-filter");
         filter.value = "rgb";
@@ -848,9 +1010,9 @@ describe("a dataset's page", () => {
         dataset.init(document, fetchFn);
         await ticks();
         document.querySelector('#ta-tabs a[data-tab="files"]').click();
-        expect(document.querySelector(".ta-thumb img").getAttribute("src")).toBe(URL5 + "/thumbnail?palette=ironred&file=rgb%2Fa_V.JPG");
+        expect(document.querySelector(".ta-thumb img").getAttribute("src")).toBe(URL5 + "/thumbnail?palette=ironred&file=thermal%2Fa_T.JPG");
         core.setPreferences(null);
-        expect(document.querySelectorAll(".ta-thumb img").length).toBe(3);
+        expect(document.querySelectorAll(".ta-thumb img").length).toBe(2);
         jest.clearAllTimers();    // no more polls into the next test's page
     });
 
@@ -861,6 +1023,7 @@ describe("a dataset's page", () => {
         await ticks();
         click(document.querySelector('#ta-tabs a[data-tab="files"]'));
         const tab = document.getElementById("ta-tab-files");
+        showAllFiles();
         const pane = () => tab.querySelector(".ta-file-detail");
         const row = p => tab.querySelector('tbody tr[data-path="' + p + '"]');
         click(row("thermal/b_T.JPG").querySelector("td:last-child"));
@@ -895,6 +1058,7 @@ describe("a dataset's page", () => {
         await ticks();
         click(document.querySelector('#ta-tabs a[data-tab="files"]'));
         const tab = document.getElementById("ta-tab-files");
+        showAllFiles();
         const pane = () => tab.querySelector(".ta-file-detail");
         const row = p => tab.querySelector('tbody tr[data-path="' + p + '"]');
         const press = (el, keys) => el.dispatchEvent(new MouseEvent("click", Object.assign({bubbles: true}, keys)));
