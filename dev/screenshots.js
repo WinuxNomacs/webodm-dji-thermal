@@ -104,7 +104,8 @@ const SHOTS = {
     },
     "workset-files": async (p, env) => {
         // The first workset's Files, the detail pane following the mouse on its second image (its figures measured
-        // once, in WebODM's worker, the first time they're asked for)
+        // once, in WebODM's worker, the first time they're asked for), wide enough for all its columns
+        await p.setViewportSize({width: 1500, height: 900});
         await openDataset(p, env);
         const first = p.locator(".ta-conversion").first();
         await first.locator('.ta-conversion-files-head [data-act="files"]').click();
@@ -113,6 +114,8 @@ const SHOTS = {
         await p.waitForFunction(() => !document.querySelector(".ta-figures-progress .fa-spin"), null, {timeout: 120000});
         await files.locator(".ta-results tbody tr").nth(1).hover();
         await files.locator(".ta-file-detail-img").waitFor();
+        // The table's first rows only, so the picture stays readable
+        await p.addStyleTag({content: ".ta-results tbody tr:nth-child(n+13){ display: none; } .ta-mosaic-files{ display: none; }"});
         await p.waitForTimeout(1500);
         return files;
     },

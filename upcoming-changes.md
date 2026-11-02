@@ -5,7 +5,7 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
-  - **A workset's Files: more figures, thumbnails and a detail pane** (the user, 2026-11-02, with a screenshot of a
+  - Done: **a workset's Files: more figures, thumbnails and a detail pane** (the user, 2026-11-02, with a screenshot of a
     workset's Files table: "should show more file information such as emissivity, background temp, temperature
     min/max ... a thumbnail view of the image to the left of the filename. When you select an image, a detail pane on
     the right should open with the full size frame and its properties in a table below it, along with controls to
@@ -18,6 +18,16 @@
     Decided (the user): **the Outputs column moves to the detail pane**; **older worksets are filled in once** (the
     worker measures their frames the first time their Files open, with a progress line, and saves it); **several
     images can be selected** (Ctrl/Shift-click, as on the dataset's Files tab), their outputs downloaded as one zip.
+    Built: `frames.py` (`frame_figures`, the `measure_all` job, `figures.json` and `figures-job.json` in the workset's
+    folder: about 35 ms a frame), started by `conversions.convert` once converted (a job of its own: a DJI Thermal
+    Task's start isn't delayed) and by the workset GET for an older one; `analyzer_api.py` (the detail's `figures*`,
+    `POST .../figures` Measure again, `POST .../download` some outputs as a zip, the thumbnail's `?workset=` for a
+    dataset never analyzed, as a DJI Thermal Task's); `conversions.js` (`resultRows`, `resultsHtml`,
+    `resultDetailHtml`, selection, hover, polling while measuring, the picture viewer). Thumbnails and hover always on
+    in a workset's table. README, `quickstart-worksets.md` (new `workset-files.png`), `api.md`, `troubleshooting.md`.
+    Tests: `test_frames.py` (figures as the TIFF, measured once for an older workset, Measure again, the zip,
+    thumbnails through the workset), Jest (figures, pane, hover, selection, zip). Live: Thermal - 9/18/2026 (not
+    analyzed: found the thumbnails' 404) and Roof Sample.
   - Done: **a DJI Thermal Task starts reliably** (the user, 2026-11-02: "hangs at 100% for many seconds before failing
     with 'task failed to start'", with two start buttons), `reliable-thermal-task-start`. Cause: a worker started
     before `commit_parent` existed converts and stops. Now the progress GET (api.py `TaskWorkset.progress`) commits a
