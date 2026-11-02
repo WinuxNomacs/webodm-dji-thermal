@@ -1,36 +1,56 @@
 # Changelog
 
-## 1.0.0 (2026-10-30)
+## 1.0.0 (2026-11-02)
 
-The first release, for WebODM 3.3.2 or later.
+The first release, for WebODM 3.3.2 or later, in Docker (Linux, Windows, macOS) or from its native Windows
+installer.
 
-**Thermal Task**
+**DJI Thermal Task**, a button beside WebODM's "Select Images and GCP"
 
-- A **Thermal Task** button in each project: pick a flight's photos (and a GCP file); the DJI thermal R-JPEGs among
-  them are found by their content, the RGB photos are ignored and not uploaded.
+- Pick a flight's photos (and a GCP file); the DJI thermal R-JPEGs among them are found by their content, the RGB
+  photos are ignored and not uploaded.
 - Each thermal photo is converted on upload into a single-band float32 TIFF of temperatures in degrees Celsius,
   with the photo's GPS, camera and gimbal metadata and marked as a thermal band, so WebODM processes the task into
   a thermal orthophoto.
-- **Measurement settings** at upload: emissivity, reflected and ambient temperature, humidity, in °C or °F (WebODM's
-  unit system by default), within each camera's ranges; left empty, each photo keeps its recorded value. Distance:
-  the laser rangefinder's by default, else the recorded one, or one distance for all photos. The values used are
-  recorded in each TIFF's XMP.
-- A photo that fails is left out with its reason; a GCP file, `geo.txt` and `image_groups.txt` get the converted
-  images' names.
+- **Only frames looking down** (a gimbal pitch limit, -80° by default), **Normalize** and **Harmonize** (through a
+  workset of the task's dataset, the task then starting by itself, with its progress shown), and the task's
+  palette.
+- **Measurement** settings: emissivity, reflected and ambient temperature, humidity, in °C, °F or K, within each
+  camera's ranges; left empty, each photo keeps its recorded value. Distance: the laser rangefinder's by default,
+  else the recorded one, or one distance for all photos. The values used are recorded in each TIFF's XMP.
+- The task's options start as the WebODM plan's; a photo that fails is left out with its reason; a GCP file,
+  `geo.txt` and `image_groups.txt` get the converted images' names.
+- **Also keep the photos in a DJI Thermal Analyzer dataset**, or **Create thermal dataset** on a task's panel
+  later.
 
-**Thermal Analyzer**, in WebODM's menu
+**DJI Thermal Analyzer**, in WebODM's menu
 
 - **Datasets** of a flight's photos (or a folder, its subfolders kept) in any project you can view, shared as the
-  project is, counted in its owner's quota.
-- **Analysis** by dji-thermal-cli's check, in WebODM's worker: the files with their capture data and temperatures,
-  the problems found and what addresses them, and a WebODM plan (coverage, task options, the conversion command).
-- **Conversions** with every dji-thermal-cli setting (outputs, measurement, normalization, pitch limit, gimbal
-  overrides, thresholds), kept side by side, downloaded as a zip or file by file; each user's defaults saved.
-- **Mosaics** of a conversion (as converted and harmonized), placed from the frames' positions with no WebODM task,
-  in a map viewer: palettes and range changed live, the temperature, frame and view angle under the cursor, the
-  reports and files.
-- **Create task** from a conversion: its °C TIFFs in a WebODM task of the project, with the plan's ODM options as
-  ticked, waiting for a processing node set in WebODM's own panel.
+  project is, counted in its owner's quota, kept in a task of the project.
+- **Analysis** by dji-thermal-cli's check, in WebODM's worker: a summary per camera, the files with their capture
+  data and temperatures (a detail pane, a picture viewer, downloads, removing files), the problems found and what
+  addresses them, and a WebODM plan (coverage, task options, saved as a WebODM preset).
+- **Worksets** with every dji-thermal-cli setting (frames, outputs, measurement, colours, adjustments), kept side by
+  side, each with its files measured (thumbnails, figures, a detail pane, removing frames), downloaded as a zip or
+  file by file; each user's defaults saved.
+- **Mosaics** of a workset (as converted and harmonized), placed from the frames' positions with no WebODM task (a
+  harmonized workset's with Harmonize's alignment, not aligned again), in a map viewer: palettes, range and image
+  adjustments changed live, an isotherm, the temperature, frame and view angle under the cursor, the frames that saw
+  a point, the reports and files.
+- **The frame page**: one frame at a time, measured in its pixels (pins, lines, regions), measurements saved on it,
+  and measured again with other parameters by dji-thermal-cli.
+- **Create task** from a workset (its °C TIFFs in a WebODM task of the project, with the plan's ODM options as
+  ticked), or **Use for parent task** to process the dataset's own task again with another workset.
+- **Preferences**: a temperature unit (WebODM's own), a palette, and the Thermal Inspector's legend, for each user.
+
+**Thermal Inspector**, on WebODM's 2D map of a thermal orthophoto
+
+- The temperature under the cursor, pins, and the statistics of regions and lines (their surroundings and ΔT, a
+  line's profile, a histogram), downloaded as CSV; measurements saved for the project, also as GeoJSON.
+- The map's palette (DJI's and WebODM's), colour scale and range, image adjustments, an isotherm and a legend.
+- An approximate correction for another emissivity and reflected temperature (**Manual Corrections**).
+- **Mosaic Overlays**: the Analyzer's workset mosaics laid on the map, with opacity and swipe; and the frames that
+  saw a point clicked.
 
 **DJI's own Thermal SDK**
 
@@ -39,5 +59,5 @@ The first release, for WebODM 3.3.2 or later.
   runs in a process of its own; without it, dji-thermal-cli's built-in port is used.
 
 **Cameras**: H20N, H20T, H30T, M2EA, M30T, M3T, M3TD, M4T and XT S (temperatures by
-[dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/) 1.10.0). The M4T checked on a real flight, the others
+[dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/) 1.12.0). The M4T checked on a real flight, the others
 on DJI's Thermal SDK sample images. The server calls no outside service.
