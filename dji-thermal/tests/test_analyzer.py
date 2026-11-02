@@ -710,6 +710,20 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual(self.client.get(self.url(task, cid, "/harmonized/tiles/20/1/1.png")).status_code,
                          status.HTTP_404_NOT_FOUND)
 
+    def test_building_the_mosaics_again_keeps_the_measurements_saved_on_them_and_on_the_frames(self):
+        frames_api = importlib.import_module("coreplugins.dji-thermal.frames_api")
+        task, cid = self.converted()
+        saved = [measurements.workset_path(task, cid), frames_api.measurements_path(task, cid)]
+        self.assertEqual(sorted(os.path.basename(p) for p in saved), sorted(mosaics.KEPT_FILES))
+        for p in saved:
+            measurements.add(task, p, {"name": "Hot spot"}, self.user)
+        old = mosaics.path(task, cid, mosaics.VIEWER_DIR, "harmonized.tif")
+        with open(old, "w") as f:
+            f.write("an old mosaic")
+        mosaics.remove(task, cid)
+        self.assertFalse(os.path.exists(old))
+        self.assertEqual([[m["name"] for m in measurements.listed(p)] for p in saved], [["Hot spot"], ["Hot spot"]])
+
     def test_a_canceled_build_stops_at_its_next_progress_and_keeps_nothing(self):
         task, cid = self.converted()
         with mock.patch.object(datasets, "start_job"):
