@@ -413,8 +413,8 @@ themselves are not kept.
 
 By default the temperatures come from dji-thermal-cli's built-in port of DJI's Thermal SDK v1.8, which gives the
 same results as DJI's own SDK on DJI's sample images. If you prefer DJI's own library, it can compute every
-photo's temperatures instead. **It is usually only needed for development purposes: it reduces the performance of
-the DJI Thermal Analyzer.** The **DJI Thermal** page, under **Administration** in WebODM's menu (for
+photo's temperatures instead. **It is usually only needed for development purposes: it will reduce performance of
+the DJI Thermal Analyzer when used in this WebODM environment.** The **DJI Thermal** page, under **Administration** in WebODM's menu (for
 superusers only), shows which of the two is in use and changes it:
 
 - **Upload** the [DJI Thermal SDK](https://www.dji.com/downloads/softwares/dji-thermal-sdk) zip as DJI's site gives

@@ -4,8 +4,8 @@ By default, temperatures come from dji-thermal-cli's built-in port of DJI's Ther
 results as DJI's own SDK on DJI's sample images. If you prefer DJI's own library, an administrator can have it
 compute every photo's temperatures instead.
 
-**DJI's own SDK is usually only needed for development purposes: it reduces the performance of the DJI Thermal
-Analyzer.**
+**DJI's own SDK is usually only needed for development purposes: it will reduce performance of the DJI Thermal
+Analyzer when used in this WebODM environment.**
 
 ## The DJI Thermal page
 

@@ -30,7 +30,7 @@
 <div class="panel panel-default">
     <div class="panel-heading"><strong>{% if status.folder %}{% trans "Update DJI's Thermal SDK" %}{% else %}{% trans "Use DJI's own Thermal SDK" %}{% endif %}</strong></div>
     <div class="panel-body">
-        <p id="dji-thermal-sdk-note"><strong>{% trans "Usually only needed for development purposes: it reduces the performance of the DJI Thermal Analyzer." %}</strong></p>
+        <p id="dji-thermal-sdk-note"><strong>{% trans "Usually only needed for development purposes: will reduce performance of the DJI Thermal Analyzer when used in this WebODM environment." %}</strong></p>
         <p>{% blocktrans %}Upload the zip of the <a href="https://www.dji.com/downloads/softwares/dji-thermal-sdk" target="_blank" rel="noopener">DJI Thermal SDK</a> as DJI's site gives it (version 1.8). It then computes every photo's temperatures, in place of the built-in port. The plugin keeps the SDK's libraries for this server, DJI's License.txt and one sample image per camera, which it checks the SDK with before using it. DJI's license terms apply to the SDK.{% endblocktrans %}</p>
         {% if status.deploy_dir %}
         <p>{% blocktrans with folder=status.deploy_dir %}The deployment sets {{ env }}={{ folder }}: the SDK is installed there, replacing the one in it.{% endblocktrans %}</p>
