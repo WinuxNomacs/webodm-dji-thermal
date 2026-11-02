@@ -162,7 +162,9 @@ name to copy a link to it; adding images marks the analysis out of date until it
 ### Worksets
 
 The **Worksets** tab, the first on a dataset's page and the one it opens on, converts the images into a workset
-with dji-thermal-cli's settings (**Create Workset**), in WebODM's worker, with progress and Cancel. **Workset
+with dji-thermal-cli's settings (**Create Workset**), in WebODM's worker, with progress (each harmonizing stage, then
+the frames converted, not counting the RGB photos and oblique frames it skips) and Cancel. Each workset lists how many
+frames it converted, left out as oblique, found not thermal and skipped. **Workset
 Creation Settings:** opens and closes the settings, its chips showing what differs from the defaults either way; the **Outputs** section shows its own when
 closed. A chip marked **≠ plan** differs from the WebODM plan's settings (hover for the plan's value).
 

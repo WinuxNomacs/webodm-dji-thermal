@@ -320,9 +320,37 @@ def compact(report, root, out_dir, version=""):
         norm = {'ambient_c': n.ambient_c, 'reflected_c': n.reflected_c, 'frames': n.frames,
                 'without_offset': n.without_offset,
                 'offset_min': min(values) if values else None, 'offset_max': max(values) if values else None}
-    converted = sum(1 for f in files if f['ok'])
-    return clean({'files': files, 'converted': converted, 'skipped': len(files) - converted,
-                  'normalization': norm, 'version': version})
+    return clean(dict(counts(files), files=files, normalization=norm, version=version))
+
+
+def counts(files):
+    """A conversion's images by result: {converted, oblique (above its pitch limit), not_thermal (the RGB photos
+    beside the thermal ones, and any other JPEG), skipped (those that failed)}, as dji-thermal-cli's reasons say"""
+    out = {'converted': 0, 'oblique': 0, 'not_thermal': 0, 'skipped': 0}
+    for f in files:
+        reason = f.get('reason') or ''
+        out['converted' if f.get('ok') else 'oblique' if reason.startswith('oblique') else
+            'not_thermal' if 'not an R-JPEG' in reason else 'skipped'] += 1
+    return out
+
+
+def frames_to_convert(dtc, jpegs, settings):
+    """The JPEGs a conversion writes files for, judged before it starts so that its progress counts only them: the
+    thermal ones, at or below its pitch limit (the gimbal pitch it sets, else each frame's own; a frame without one
+    is converted, as dji-thermal-cli does)"""
+    limit, fixed = settings.get('max_pitch'), settings.get('gimbal_pitch')
+    out = set()
+    for p in jpegs:
+        try:
+            if dtc.classify(p).kind != 'thermal':
+                continue
+            pitch = fixed if fixed is not None or limit is None else \
+                dtc.djixmp.number(dtc.djixmp.fields(p.read_bytes()), 'GimbalPitchDegree')
+        except Exception:  # noqa: BLE001 - counted: dji-thermal-cli reports it as skipped
+            pitch = None
+        if limit is None or pitch is None or pitch <= limit:
+            out.add(p)
+    return out
 
 
 def mosaic_stage(event, **extra):
@@ -426,8 +454,7 @@ def remove_frames(task, cid, frames, user):
                     pass
         now = datasets.now()
         r['files'] = kept
-        r['converted'] = sum(1 for f in kept if f.get('ok'))
-        r['skipped'] = len(kept) - r['converted']
+        r.update(counts(kept))
         r['removed'] = (r.get('removed') or []) + [{'path': f['path'], 'removed_by': user.username, 'removed_at': now}
                                                    for f in gone]
         datasets.write_json(path(task, cid, RESULTS_FILE), r)
@@ -524,7 +551,7 @@ def create(task, name, settings, user, then=None):
         os.makedirs(output_path(task, cid))
         datasets.write_json(path(task, cid, RECORD_FILE), record_)
         datasets.write_json(path(task, cid, JOB_FILE), {'status': 'converting'})
-    datasets.start_job(task, 'conversions', 'convert', cid, rel=rel(cid, JOB_FILE), running='converting', stage={})
+    datasets.start_job(task, 'conversions', 'convert', cid, rel=rel(cid, JOB_FILE), running='converting', stage={}, frames={})
     return cid
 
 
@@ -606,9 +633,12 @@ def convert(task_id, run_id, cid):
         if settings.get('normalize') and not harmonized(settings):
             medians = flight_medians(root, dtc.scan(root).jpegs)
         args = api_arguments(settings, medians)
-        # Each image is reported once when it is written. Normalizing first compares the frames' overlaps, stage by
-        # stage: the page shows the stage while the progress is 0
-        total = max(1, len(dtc.scan(root).jpegs))
+        # Each image is reported once when it is written; the progress counts only the frames converted, not the
+        # RGB photos or the oblique frames, skipped at once. Harmonizing first compares the frames' overlaps, stage by
+        # stage: the page shows the stage and how far its run of stages is while the progress is 0
+        from .mosaics import stage_fraction
+        frames = frames_to_convert(dtc, dtc.scan(root).jpegs, settings)
+        total = max(1, len(frames))
         state = {'done': 0, 'written': time.time(), 'stage': None}
 
         def write(now, **fields):
@@ -618,17 +648,22 @@ def convert(task_id, run_id, cid):
                 if not datasets.update_job(task, if_run=run_id, rel=job_rel, **fields):
                     raise Canceled()
 
+        write(True, frames={'done': 0, 'total': len(frames)})
+
         def progress(event):
             if event.kind == 'mosaic':
                 key = stage_key(event)
-                write(key != state['stage'], stage=mosaic_stage(event))
+                write(key != state['stage'], stage=mosaic_stage(event, fraction=stage_fraction(event.data)))
                 state['stage'] = key
             elif event.kind == 'file':
                 # A conversion or dataset deleted stops at once, before it writes more files where they were
                 if not os.path.exists(job_file):
                     raise Canceled()
+                if event.path not in frames:
+                    return
                 state['done'] += 1
-                write(state['stage'] is not None, progress=min(0.99, state['done'] / total), stage={})
+                write(state['stage'] is not None or state['done'] == len(frames), progress=min(0.99, state['done'] / total),
+                      stage={}, frames={'done': state['done'], 'total': len(frames)})
                 state['stage'] = None
 
         # jobs=1: a Celery worker's processes cannot start processes of their own

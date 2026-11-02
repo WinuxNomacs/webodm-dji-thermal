@@ -12,6 +12,7 @@ import time
 from . import converter, datasets
 
 PROGRESS_INTERVAL = 1.0     # seconds between progress writes (each also checks the run is still wanted)
+FILES_SHARE = 0.8           # the analysis's progress the files' checks make, before its summary
 
 
 class Canceled(Exception):
@@ -142,14 +143,18 @@ def analyze(task_id, run_id):
         total = max(1, len(dtc.scan(root).jpegs))
         state = {'done': 0, 'written': time.time()}
 
+        # The files checked fill FILES_SHARE of the bar; then the summary (the frames' poses read again, the coverage
+        # and the WebODM plan) reports no progress of its own: its stage is written at once
         def progress(event):
             if event.kind != 'file':
                 return
             state['done'] += 1
             now = time.time()
-            if now - state['written'] >= PROGRESS_INTERVAL:
+            last = state['done'] >= total
+            if last or now - state['written'] >= PROGRESS_INTERVAL:
                 state['written'] = now
-                if not datasets.update_job(task, if_run=run_id, progress=min(0.99, state['done'] / total)):
+                if not datasets.update_job(task, if_run=run_id, progress=FILES_SHARE * min(1.0, state['done'] / total),
+                                           stage='summary' if last else ''):
                     raise Canceled()
 
         # jobs=1: a Celery worker's processes cannot start processes of their own
@@ -159,7 +164,7 @@ def analyze(task_id, run_id):
         return {'canceled': True}
     except Exception as e:  # noqa: BLE001 - shown on the dataset's page
         datasets.update_job(task, if_run=run_id, status='failed', error=str(e) or type(e).__name__, progress=0,
-                            run_id='', finished_at=datasets.now())
+                            stage='', run_id='', finished_at=datasets.now())
         return {'error': str(e)}
 
     if not datasets.finish_job(task, run_id, result):

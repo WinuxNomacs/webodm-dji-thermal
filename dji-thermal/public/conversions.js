@@ -376,10 +376,26 @@
         return out;
     }
 
+    // A conversion's label: while harmonizing, its step among the stages; while its mosaics build, theirs
     function statusLabel(c) {
-        var label = STATUS_LABELS[c.status] || c.status;
+        var label = STATUS_LABELS[c.status] || c.status, stage = c.stage || {};
+        if (c.status === "converting" && stage.stage) return "Harmonizing " + stage.step + "/" + stage.steps;
         if (c.status === "converting") label += " " + Math.round((c.progress || 0) * 100) + "%";
+        if (c.status === "ready" && c.mosaic_status === "building") label = "Building mosaics " + Math.round((c.mosaic_progress || 0) * 100) + "%";
         return label;
+    }
+
+    // A converting conversion's bar, filled by how far its stages are while harmonizing, else by the frames converted,
+    // and what it is doing
+    function convertingHtml(c) {
+        var stage = c.stage || {}, frames = c.frames || {}, settings = c.settings || {};
+        var text = stage.stage ? "Harmonizing: " + core.stageText(stage) + "…" :
+            frames.done ? frames.done + " of " + frames.total + " frames converted" :
+            harmonizes(settings) ? "Harmonizing: comparing the frames' overlaps…" :
+            settings.normalize ? "Normalizing: reading the frames' recorded temperatures…" : "Starting…";
+        var width = stage.stage ? stage.fraction || 0 : c.progress || 0;
+        return '<div class="progress"><div class="progress-bar progress-bar-striped active" style="width: ' + Math.round(width * 100) +
+            '%;"></div></div><div class="text-muted">' + esc(text) + "</div>";
     }
 
     // A conversion's mosaics as its card shows them: being built, failed or canceled, or built with frames removed since
@@ -527,9 +543,11 @@
         var mainCls = "btn btn-default btn-xs";
         var view = viewer && c.mosaic_status === "ready";
         if (busy || building) {
-            if (canChange) main = button("cancel", "stop", "Cancel", busy ? "Stop converting" : "Stop building the mosaics", mainCls);
+            if (canChange) main = busy ? button("cancel", "stop", "Cancel", "Stop converting", mainCls) :
+                button("cancel", "stop", "Cancel mosaics", "Stop building the mosaics", mainCls);
         } else if (ready && view) {
-            main = link(viewer, "map", "View mosaics", "btn btn-primary btn-xs");
+            // Create task, the next step, is the primary one when it is shown beside them
+            main = link(viewer, "map", "View mosaics", canChange && taskless ? mainCls : "btn btn-primary btn-xs");
         } else if (ready && download) {
             main = link(download, "download", "Download all", "btn btn-primary btn-xs");
         } else {
@@ -539,7 +557,7 @@
         var task = function (cls) {
             return button("task", "plus", "Create task", "A new WebODM task of this workset's temperature TIFFs, in the dataset's project", cls);
         };
-        if (createTask && taskless) main += " " + task(mainCls);
+        if (createTask && taskless) main += " " + task(view ? "btn btn-primary btn-xs" : mainCls);
         if (download && !(ready && !view && !building)) items.push(link(download, "download", "Download all"));
         if (viewer && building) items.push(link(viewer, "map", "Mosaics"));
         if (view && !building && c.project_map) items.push(link(mapUrl(c), "globe", "Open on WebODM's map"));
@@ -652,16 +670,15 @@
             var cls = {ready: "success", failed: "danger", canceled: "default", converting: "info"}[c.status] || "default";
             var figures = [];
             if (c.status !== "converting") {
-                if (c.converted || c.skipped) figures.push(c.converted + " converted" + (c.skipped ? ", " + c.skipped + " skipped" : ""));
+                if (c.converted || c.skipped || c.oblique || c.not_thermal) figures.push(c.converted + " converted");
+                if (c.oblique) figures.push(c.oblique + " oblique left out");
+                if (c.not_thermal) figures.push(c.not_thermal + " not thermal");
+                if (c.skipped) figures.push(c.skipped + " skipped");
                 if (c.removed) figures.push(c.removed + " removed");
                 figures.push(c.file_count + " file(s), " + core.formatBytes(c.size));
             }
             figures.push(core.formatDate(c.created_at) + (c.created_by ? " by " + c.created_by : ""));
-            var progress = c.status === "converting" ? '<div class="progress"><div class="progress-bar progress-bar-striped active" style="width: ' +
-                Math.round((c.progress || 0) * 100) + '%;"></div></div>' + (c.progress ? "" : '<div class="text-muted">' +
-                (harmonizes(c.settings || {}) ? "Harmonizing: " + (esc(core.stageText(c.stage)) || "comparing the frames' overlaps") + "…" :
-                    (c.settings || {}).normalize ? "Normalizing: reading the frames' recorded temperatures…" :
-                    "Starting…") + "</div>") : "";
+            var progress = c.status === "converting" ? convertingHtml(c) : "";
             // What the conversion changed from the defaults, in its files' unit
             var settings = defaults && c.settings ? '<div class="ta-conversion-chips" title="' + esc(c.description) + '">' +
                 chipsHtml(differences(c.settings, defaults, null, core.unitOf(c.settings.unit)), "dji-thermal-cli's defaults") + "</div>" :
