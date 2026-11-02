@@ -25,6 +25,16 @@
   removed since, from the workset or the dataset: the mosaics align afresh); the command line gets it as well as
   the API. Then the 1.0.0 release is redone (`release/1.0.0`, its changelog, manifest and README commit kept) and
   the zip rebuilt with its new sha256.
+  Done (2026-11-02): dji-thermal-cli 1.12.0 (its `saved-alignment` branch: `mosaic.Alignment`, `_layout(saved=)`,
+  `_align` returning the boresight; `MosaicOptions.alignment`, `Normalization.alignment`, `MosaicReport.alignment`;
+  `--save-alignment`, `--alignment`; tests in `test_mosaic.py`, the flight test in `test_webodm.py`; 42 M4T frames:
+  the mosaics 10 s instead of 28 s), published on PyPI (the tag's first run lost its macOS runner, re-run). The
+  plugin, `u2-4-shared-alignment`: `conversions.ALIGNMENT_FILE` saved by `convert`, `api_arguments`'
+  `mosaic_options` (Harmonize at the workset's pitch limit), `mosaics.build` passing it unless frames were removed,
+  `analyzer_core.js` `mosaicReportRows`' Alignment row. Tests: Jest (`analyzer.test.js`), `test_analyzer`
+  (`test_a_harmonized_worksets_mosaics_are_placed_with_harmonizings_alignment`, `api_arguments`). Live on
+  "Thermal - 9/18/2026" (200 frames, a "Live check" workset made and deleted): converted in 110 s, the mosaics in
+  39 s (about 3 minutes before), both "Harmonize's, not aligned again". README, `quickstart-worksets.md`.
 - **Two requests lost from `new.md`** (the user, 2026-11-02; found in VSCode's history of `new.md`): each was saved
   there a minute or more after Claude read the file, and Claude's clearing of it wrote over them unread. From now on
   `new.md` is read again just before it is cleared, and only the lines turned into phases are removed.
