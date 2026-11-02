@@ -1213,13 +1213,20 @@
         function loadFiles(id) {
             clearTimeout(polls[id]);
             return fetchFn(base + id, {credentials: "same-origin"}).then(core.readJson).then(function (r) {
-                if (!r.ok) return;
+                if (!r.ok) return retry();
                 results[id] = r.data;
                 renderFiles(id);
                 if (r.data.figures_status === "measuring") {
                     polls[id] = setTimeout(function () { if (open.indexOf(id) >= 0) loadFiles(id); }, FIGURES_POLL_MS);
                 }
-            });
+            }, retry);
+
+            // Tried again, less often, while its frames were being measured: one dropped request must not stop the reloads
+            function retry() {
+                if (results[id] && results[id].figures_status === "measuring") {
+                    polls[id] = setTimeout(function () { if (open.indexOf(id) >= 0) loadFiles(id); }, FIGURES_POLL_MS * 5);
+                }
+            }
         }
 
         // The settings and what can be chosen, loaded once, for those who can convert

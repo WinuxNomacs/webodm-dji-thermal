@@ -54,6 +54,16 @@ processing it. Wait for it to finish, or cancel it on the dashboard.
 
 WebODM's worker stopped while running it, for example when WebODM restarted. Start it again.
 
+**"The job could not be started (…). Try again in a moment."**
+
+The analysis, workset or mosaics could not be handed to WebODM's worker: its message broker (Redis) did not answer,
+for example while WebODM is starting. Start it again once WebODM is up.
+
+**"Could not load the dataset." or "Could not load the mosaics." while a job runs**
+
+The page lost the server for a moment (a dropped connection, or WebODM restarting). It keeps trying every few
+seconds, and shows the job's progress again once the server answers.
+
 **"Could not measure the frames for the table: …"**
 
 A workset's Files table shows each frame's temperatures and measurement values, measured in WebODM's worker. The

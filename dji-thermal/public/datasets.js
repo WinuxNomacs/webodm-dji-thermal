@@ -213,7 +213,11 @@
                         return;
                     }
                     schedule();
-                }, function () { message.textContent = "Could not load the datasets."; });
+                }, function () {
+                    message.textContent = "Could not load the datasets.";
+                    // Tried again, less often, while a dataset is busy: one dropped request must not leave its progress as it was
+                    if (timer && root.setTimeout) timer = root.setTimeout(load, POLL_MS * 5);
+                });
         }
 
         function find(id) { return datasets.filter(function (d) { return String(d.id) === String(id); })[0]; }
