@@ -3,6 +3,38 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **U2-4. Harmonize's alignment reused by the mosaics** (the user, 2026-11-02: in 1.0.0, the last known item before
+  it). A harmonized workset aligns its frames twice: the conversion's `dtc.process(normalize=True)` runs
+  dji-thermal-cli's `normalization()`, which builds a mosaic layout and aligns it (`mosaic._align`: 4 rounds of every
+  overlapping pair's block offsets, solving the boresight, each frame's shift and rotation and the surface heights),
+  keeps only each frame's offset and drops the alignment; then Build mosaics' `make_mosaic` (`mosaics.py`) aligns
+  the same frames again (about 2.5 and 3 minutes of a 6-minute plan workset). The blocks are matched on the
+  temperature's gradient by phase correlation, so a frame's constant offset (and the medians' small change) should
+  leave the alignment as it was: checked on the M4T flight before release.
+  - **dji-thermal-cli 1.12.0** (made and released there first; PyPI is at 1.11.0, the plugin pins 1.10.0): an
+    `Alignment` (the boresight, each frame's shift and rotation by name, the surface, the reports, and what it was
+    made with: frames, max pitch, gsd, heights, height cell, dsm), saved to and read from JSON; `Normalization`
+    carries it (so `ProcessReport.normalization` does); `MosaicOptions(alignment=...)` places the frames with it and
+    skips the "align" stage (its progress too), when it matches the run, else aligns afresh, the mosaic's report
+    saying which. The command line: a harmonized conversion saves its alignment to a file, the mosaic command takes
+    one. Tests there; on the M4T flight, a mosaic from the saved alignment against one aligned afresh, and the time.
+  - **The plugin**: dji-thermal-cli pinned at 1.12.0; a harmonized workset saves its alignment beside its files;
+    Build mosaics (after converting, from the workset's menu, Build again) passes it; DJI Thermal Task's Harmonize
+    goes through a workset, so gets it too. Older worksets, and Normalize alone (no alignment), build as now.
+  Decided (the user, 2026-11-02): the saved alignment is used only for exactly the frames Harmonize aligned (frames
+  removed since, from the workset or the dataset: the mosaics align afresh); the command line gets it as well as
+  the API. Then the 1.0.0 release is redone (`release/1.0.0`, its changelog, manifest and README commit kept) and
+  the zip rebuilt with its new sha256.
+  Done (2026-11-02): dji-thermal-cli 1.12.0 (its `saved-alignment` branch: `mosaic.Alignment`, `_layout(saved=)`,
+  `_align` returning the boresight; `MosaicOptions.alignment`, `Normalization.alignment`, `MosaicReport.alignment`;
+  `--save-alignment`, `--alignment`; tests in `test_mosaic.py`, the flight test in `test_webodm.py`; 42 M4T frames:
+  the mosaics 10 s instead of 28 s), published on PyPI (the tag's first run lost its macOS runner, re-run). The
+  plugin, `u2-4-shared-alignment`: `conversions.ALIGNMENT_FILE` saved by `convert`, `api_arguments`'
+  `mosaic_options` (Harmonize at the workset's pitch limit), `mosaics.build` passing it unless frames were removed,
+  `analyzer_core.js` `mosaicReportRows`' Alignment row. Tests: Jest (`analyzer.test.js`), `test_analyzer`
+  (`test_a_harmonized_worksets_mosaics_are_placed_with_harmonizings_alignment`, `api_arguments`). Live on
+  "Thermal - 9/18/2026" (200 frames, a "Live check" workset made and deleted): converted in 110 s, the mosaics in
+  39 s (about 3 minutes before), both "Harmonize's, not aligned again". README, `quickstart-worksets.md`.
 - **Two requests lost from `new.md`** (the user, 2026-11-02; found in VSCode's history of `new.md`): each was saved
   there a minute or more after Claude read the file, and Claude's clearing of it wrote over them unread. From now on
   `new.md` is read again just before it is cleared, and only the lines turned into phases are removed.
@@ -304,7 +336,7 @@
   - U2-4 (larger, its own phase): harmonize and the mosaics each align the frames (about 2.5 and 3 minutes of a
     6-minute plan workset). Open (D2): reuse harmonize's alignment for the mosaics, later, after a dji-thermal-cli
     release that saves and accepts an alignment (recommended), or keep both. Decided (D2, the user, 2026-11-02):
-    reuse it, later, after that dji-thermal-cli release.
+    reuse it, later, after that dji-thermal-cli release. Planned at the top of "Up next" (U2-4), for 1.0.0.
 - **U3. New Dataset, the Files and Problems tabs** (UX review, 2026-11-02):
   - U3-1: Thermal Analyzer › New Dataset › Name is the folder picked ("images"). Open (D3): the camera and capture
     date from the file names ("M4T 2026-10-12"), the folder's name kept unless generic (images, DCIM, 100MEDIA)

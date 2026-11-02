@@ -79,7 +79,8 @@ thermal (the RGB photos) and skipped (those that failed), and its size.
 ## 3. The mosaics
 
 With mosaics on (the default), dji-thermal-cli places the frames side by side from their positions and angles. That
-gives a quick look at the whole flight without a WebODM task. Press **View mosaics**.
+gives a quick look at the whole flight without a WebODM task. A harmonized workset builds them faster: they are placed
+as Harmonize aligned the frames, without aligning them again. Press **View mosaics**.
 
 ![The mosaic viewer](images/mosaic-viewer.png)
 

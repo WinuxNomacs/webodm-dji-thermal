@@ -253,6 +253,15 @@ def build(task, cid, write_progress):
 
     jpegs = dtc.scan(root).jpegs
     removed = conversions.removed_paths(task, cid)
+    # Placed as harmonizing aligned the frames, without aligning them again (dji-thermal-cli aligns them afresh when
+    # the frames or their poses differ); not once frames are removed from the workset: aligned without them
+    alignment = None
+    saved = path(task, cid, conversions.ALIGNMENT_FILE)
+    if not removed and os.path.exists(saved):
+        try:
+            alignment = dtc.Alignment.load(saved)
+        except ValueError:
+            pass
     if removed:
         # Only the frames the workset keeps (see conversions.remove_frames): removed once built, or by remove
         root = path(task, cid, FRAMES_DIR)
@@ -275,7 +284,8 @@ def build(task, cid, write_progress):
     # reads the frames in this process. On Linux a Celery worker's processes cannot start processes of their own; on
     # Windows they can, but a process started there doesn't have the plugin's site-packages and fails to import it.
     harmonized = dtc.make_mosaic(root, kind_dirs['harmonized'], settings,
-                                 dtc.MosaicOptions(max_pitch=max_pitch, normalize=True, units=(unit,)),
+                                 dtc.MosaicOptions(max_pitch=max_pitch, normalize=True, units=(unit,),
+                                                   alignment=alignment),
                                  compression=args['compression'], jobs=1, progress=progress,
                                  as_converted_dir=kind_dirs['as_converted'])
     reports = {'as_converted': harmonized.as_converted, 'harmonized': harmonized}
