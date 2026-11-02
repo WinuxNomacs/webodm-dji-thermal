@@ -5,6 +5,36 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Next: **removing frames from a workset** (the user, 2026-11-02, from `new.md`): "on the Files view detail pane
+    for a image in a Workset, add the ability to delete a file from the workset; or multiple if more than one
+    selected. This allows the user to manually remove files that are more noise than they desire. Then they can
+    create new mosaics and tasks from the reduced file set if they so please." Builds on the workset's Files detail
+    pane and its selection (`conversions.js` `resultDetailHtml`, `downloadSelected`). What the code does now: a task
+    from the workset takes every ok frame's TIFF in `results.json` (`conversion_tasks.tiffs`), so marking a frame
+    removed there leaves it out of new tasks; but the mosaics are built from all the dataset's photos
+    (`mosaics.build`: `dtc.scan(root).jpegs`), so they need to be limited to the workset's kept frames. Proposed: a
+    **Remove from workset** button in the pane (for one or the selection), with a confirmation naming how many; it
+    deletes those frames' outputs from the workset's folder and records them in `results.json` as removed (by whom,
+    when), needing the right to change the project (as deleting a workset); the figures stay with them; tasks already
+    made keep their images. Open decisions: what the table shows of a removed frame (its row greyed as "Removed",
+    or gone, counted in the summary line); what happens to mosaics built before (kept, marked "built with frames
+    since removed", with Build again; or deleted); saved frame measurements on a removed frame (deleted with it, or
+    kept).
+  - Next: **a workset's Mosaics in a section of their own** (the user, 2026-11-02, from `new.md`): "On the Files view
+    in a workset, move the Mosaics download links out of the Files section into their own collapsible section below
+    Files." Now `resultsHtml` lists `mosaic_files` at the end of the Files section, seen only once Files is open.
+    Proposed: a **Mosaics** heading below Files, collapsed at first and remembered in the browser as Files is
+    (`FILES_PREFIX`), with the file count in the heading and shown only when the workset has mosaics. No open
+    decision.
+  - Done: **a workset's Files table: its header in view, aligned and sortable** (the user, 2026-11-02, with a
+    screenshot: "Make the Files table header row sticky ... Shade the background of the header row ... Align the
+    column contents with the header row ... Each column should be sortable ascending/descending where sensible.
+    Remove the Notes column."), `workset-files-header`. The table scrolls in its own box (`.ta-results-scroll`, as
+    tall as the window) so its header can stick (the page's horizontal scroll box would stop it otherwise); the header
+    shaded; the figures' headings right-aligned like their values, cells centred vertically beside the thumbnails;
+    every column but the thumbnail sorts either way; Notes gone (still in the detail pane). `conversions.js`
+    (`RESULT_COLUMNS`), `analyzer.css`. README, `quickstart-worksets.md`, `workset-files.png` retaken. Jest (the sort
+    and alignment test). Live (read only, thumbnails blocked): Thermal - 9/18/2026, scrolled 1500 px, sorted by Max.
   - Done: **a workset's Files: more figures, thumbnails and a detail pane** (the user, 2026-11-02, with a screenshot of a
     workset's Files table: "should show more file information such as emissivity, background temp, temperature
     min/max ... a thumbnail view of the image to the left of the filename. When you select an image, a detail pane on
