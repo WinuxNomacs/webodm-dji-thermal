@@ -131,16 +131,17 @@ def checks(task, cid):
 
     plan = plan_settings(plan_of(task).get('process_args'))
     if plan['normalize'] and not conversions.harmonized(settings):
-        warnings.append("Not harmonized: the frames' offsets show as seams where ODM blends them")
+        warnings.append("This workset isn't harmonized: the frames' offsets show as seams where ODM blends them")
     if plan['max_pitch'] is not None and settings.get('max_pitch') != plan['max_pitch']:
         if settings.get('max_pitch') is None:
-            warnings.append("Oblique frames kept: the plan leaves out frames above {:g}° pitch".format(plan['max_pitch']))
+            warnings.append("This workset kept its oblique frames; the plan leaves out frames above {:g}° pitch".format(
+                plan['max_pitch']))
         else:
-            warnings.append("Pitch limit {:g}°, the plan's is {:g}°".format(settings['max_pitch'], plan['max_pitch']))
-    for key, label in (('emissivity', "Emissivity"), ('humidity', "Humidity")):
+            warnings.append("This workset's pitch limit is {:g}°; the plan's is {:g}°".format(settings['max_pitch'], plan['max_pitch']))
+    for key in ('emissivity', 'humidity'):
         if plan[key] is not None and settings.get(key) != plan[key]:
-            warnings.append("{} {}, the plan's is {:g}".format(
-                label, "as recorded" if settings.get(key) is None else "{:g}".format(settings[key]), plan[key]))
+            used = "the recorded " + key if settings.get(key) is None else "{} {:g}".format(key, settings[key])
+            warnings.append("This workset used {}; the plan's is {:g}".format(used, plan[key]))
     return problems, warnings
 
 

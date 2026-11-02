@@ -1032,9 +1032,9 @@ class TestConversionTasks(AnalyzerTestCase):
         info = self.client.get(self.url(task, cid)).data
         self.assertEqual(info["problems"], [])
         self.assertEqual(info["warnings"], [
-            "Not harmonized: the frames' offsets show as seams where ODM blends them",
-            "Oblique frames kept: the plan leaves out frames above -80° pitch",
-            "Emissivity as recorded, the plan's is 0.95"])
+            "This workset isn't harmonized: the frames' offsets show as seams where ODM blends them",
+            "This workset kept its oblique frames; the plan leaves out frames above -80° pitch",
+            "This workset used the recorded emissivity; the plan's is 0.95"])
 
         for settings, problem in (({"strip_location": True}, "stripped the frames' location"),
                                   ({}, "at least 2 frames")):
