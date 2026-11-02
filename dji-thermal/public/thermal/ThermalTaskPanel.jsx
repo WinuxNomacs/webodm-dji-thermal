@@ -8,16 +8,20 @@ import MeasurementSettings from './MeasurementSettings';
 import { combineCameras, defaultUnit, requestData, startPalette, validate } from './measurement';
 import ThermalUpload from './upload';
 import serverApi from './serverApi';
+import { MAX_PITCH, PANEL_OPTIONS, byPitch, gimbalPitch, sameOptions } from './plan';
 
-const EXIF_OPTIONS = {ifd0: [0x0110], exif: [0x9003], gps: [0x0001, 0x0002, 0x0003, 0x0004], interop: false, ifd1: false};
+// The camera model, date and position, and DJI's XMP (the gimbal pitch)
+const EXIF_OPTIONS = {ifd0: [0x0110], exif: [0x9003], gps: [0x0001, 0x0002, 0x0003, 0x0004], xmp: true, interop: false, ifd1: false};
+const PRESET_TRIES = 150;   // WebODM's panel loading its presets: 30 s at PRESET_MS
+const PRESET_MS = 200;
 
 function readExif(file){
     return exifr.parse(file, EXIF_OPTIONS).then(exif => exif || {}, () => ({}));
 }
 
-// The panel of a new thermal task, for the files picked with the DJI Thermal Task button: Normalize and Harmonize, the
-// Measurement section, whether to keep the photos in a DJI Thermal Analyzer dataset too, then WebODM's own task panel
-// (name, processing node, options, the photos on the map; no resizing).
+// The panel of a new thermal task, for the files picked with the DJI Thermal Task button: the pitch limit, Normalize and
+// Harmonize, the Measurement section, whether to keep the photos in a DJI Thermal Analyzer dataset too, then WebODM's
+// own task panel (name, processing node, options starting from the plan's, the photos on the map; no resizing).
 export default class ThermalTaskPanel extends React.Component {
     static propTypes = {
         projectId: PropTypes.number.isRequired,
@@ -43,6 +47,8 @@ export default class ThermalTaskPanel extends React.Component {
             errors: {},
             keepPhotos: false,
             frames: {normalize: false, harmonize: false, mosaics: false},
+            pitchLimit: true,
+            maxPitch: String(MAX_PITCH),
             palette: "",
             error: "",
             progress: null
@@ -55,6 +61,7 @@ export default class ThermalTaskPanel extends React.Component {
 
     componentWillUnmount(){
         this.unmounted = true;
+        clearTimeout(this.presetTimer);
         if (this.upload) this.upload.cancel();
     }
 
@@ -71,6 +78,7 @@ export default class ThermalTaskPanel extends React.Component {
         }
         Promise.all(photos.map(readExif)).then(exifs => {
             const byModel = {};
+            this.pitches = new Map(photos.map((p, i) => [p, gimbalPitch(exifs[i])]));
             photos.forEach((p, i) => {
                 const model = exifs[i].Model || "";
                 (byModel[model] = byModel[model] || []).push(p);
@@ -126,10 +134,30 @@ export default class ThermalTaskPanel extends React.Component {
         this.setState({unit, errors: validate(this.state.values, this.state.combined, unit)});
     };
 
+    // The pitch limit in degrees, null for none, or NaN when it isn't one
+    maxPitch(){
+        if (!this.state.pitchLimit) return null;
+        const pitch = parseFloat(this.state.maxPitch);
+        return pitch >= -90 && pitch <= 90 ? pitch : NaN;
+    }
+
+    keptPhotos(){
+        const pitch = this.maxPitch();
+        return byPitch(this.state.photos, this.pitches || new Map(), isNaN(pitch) ? null : pitch).kept;
+    }
+
     handleSave = taskInfo => {
         const errors = validate(this.state.values, this.state.combined, this.state.unit);
         if (Object.keys(errors).length){
             this.setState({errors});
+            this.resetNewTaskPanel();
+            return;
+        }
+        const pitch = this.maxPitch();
+        const pitchError = isNaN(pitch) ? _("The pitch limit is a number of degrees from -90 to 90.") :
+            !this.keptPhotos().length ? interpolate(_("No photo has a gimbal pitch at or below %(pitch)s°."), {pitch}) : "";
+        if (pitchError){
+            this.setState({error: pitchError});
             this.resetNewTaskPanel();
             return;
         }
@@ -144,9 +172,12 @@ export default class ThermalTaskPanel extends React.Component {
             onProgress: progress => this.update({progress}),
             keepPhotos: this.keepsPhotos(),
             otherPhotos: this.otherPhotos(),
-            frames: this.state.frames
+            frames: this.state.frames,
+            maxPitch: pitch,
+            pitches: this.pitches,
+            planOptions: sameOptions(taskInfo.options, PANEL_OPTIONS)
         });
-        this.setState({phase: "uploading", error: "", progress: {done: 0, total: this.state.photos.length, converted: [], ignored: [], failed: []}});
+        this.setState({phase: "uploading", error: "", progress: this.upload.initialProgress()});
         this.upload.start().then(result => {
             this.upload = null;
             result.ignored = result.ignored.concat(this.state.unsupported);
@@ -195,10 +226,51 @@ export default class ThermalTaskPanel extends React.Component {
         );
     }
 
+    // WebODM's panel starts from the plan's options, as its "(Custom)" preset, once it has loaded its presets
+    presetOptions = (tries = 0) => {
+        const form = this.newTaskPanel && this.newTaskPanel.taskForm;
+        if (this.unmounted) return;
+        if (!form || !form.state.loadedPresets){
+            if (tries < PRESET_TRIES) this.presetTimer = setTimeout(() => this.presetOptions(tries + 1), PRESET_MS);
+            return;
+        }
+        const custom = (form.state.presets || []).find(p => p.id === -1);
+        if (!custom) return;
+        custom.options = PANEL_OPTIONS.map(o => Object.assign({}, o));
+        form.setState({selectedPreset: custom});
+    };
+
+    handleNewTaskPanel = panel => {
+        const first = panel && !this.newTaskPanel;
+        this.newTaskPanel = panel;
+        if (first) this.presetOptions();
+    };
+
+    renderPitch(){
+        const { photos, pitchLimit, maxPitch } = this.state;
+        const kept = this.keptPhotos().length;
+        return (
+            <div className="checkbox dji-thermal-pitch">
+                <label>
+                    <input type="checkbox" name="pitchLimit" checked={pitchLimit} onChange={e => this.setState({pitchLimit: e.target.checked})} />
+                    {" "}{_("Only frames looking down: a gimbal pitch at or below")}
+                </label>
+                {" "}<span className="input-group dji-thermal-pitch-input">
+                    <input type="number" step="1" min="-90" max="90" className="form-control input-sm" value={maxPitch}
+                           disabled={!pitchLimit} aria-label={_("Pitch limit")} onChange={e => this.setState({maxPitch: e.target.value})} />
+                    <span className="input-group-addon">°</span>
+                </span>
+                {" "}<strong>{interpolate(_("%(kept)s of %(count)s frames"), {kept, count: photos.length})}</strong>
+                <span className="help-block">{_("As the WebODM plan: oblique frames mix viewing angles and sky into the map's temperatures. Unticked, every frame goes in (for a 3D model).")}</span>
+            </div>
+        );
+    }
+
     renderFrames(){
         const { frames } = this.state;
         return (
             <div className="dji-thermal-frames">
+                {this.renderPitch()}
                 <div className="checkbox">
                     <label>
                         <input type="checkbox" name="normalize" checked={frames.normalize} onChange={this.handleFramesChange} />
@@ -251,8 +323,15 @@ export default class ThermalTaskPanel extends React.Component {
         if (unsupported.length) text += " " + interpolate(_("%(count)s photos of a camera this plugin cannot convert are left out."), {count: unsupported.length});
         if (others) text += " " + interpolate(this.keepsPhotos() ? _("%(count)s other files (RGB photos, ...) go only in the dataset.") :
                                               _("%(count)s other files (RGB photos, ...) are ignored."), {count: others});
-        return <p>{text} <span className="text-muted">{_("To check the flight first or compare settings, use the")}{" "}
-            <a href="/plugins/dji-thermal/">{_("DJI Thermal Analyzer")}</a>.</span></p>;
+        return (
+            <React.Fragment>
+                <p>{text} <span className="text-muted">{_("To check the flight first or compare settings, use the")}{" "}
+                    <a href="/plugins/dji-thermal/">{_("DJI Thermal Analyzer")}</a>.</span></p>
+                <p className="help-block">{this.state.frames.normalize ?
+                    _("WebODM's options below start as the plan's (radiometric-calibration none). Left so, the task also gets the plan's orthophoto resolution and GPS accuracy, from the photos' analysis, before it starts.") :
+                    _("WebODM's options below start as the plan's (radiometric-calibration none). Normalized or harmonized, the task also gets its orthophoto resolution and GPS accuracy, from the photos' analysis.")}</p>
+            </React.Fragment>
+        );
     }
 
     renderProgress(){
@@ -260,7 +339,7 @@ export default class ThermalTaskPanel extends React.Component {
         const percent = p.total ? Math.round(p.done / p.total * 100) : 100;
         return (
             <div className="dji-thermal-progress">
-                <p>{interpolate(p.uploading ? _("Uploading the photos: %(done)s of %(total)s") : _("Converting the thermal photos: %(done)s of %(total)s"), {done: p.done, total: p.total})}
+                <p>{interpolate(p.uploading ? _("Uploading %(done)s of %(total)s photos") : _("Converting %(done)s of %(total)s thermal photos"), {done: p.done, total: p.total})}
                     {p.failed.length ? " " + interpolate(_("(%(count)s failed)"), {count: p.failed.length}) : ""}</p>
                 <div className="progress">
                     <div className="progress-bar progress-bar-striped active" role="progressbar" style={{width: percent + "%"}}>{percent}%</div>
@@ -310,7 +389,7 @@ export default class ThermalTaskPanel extends React.Component {
                             </div>
                         </div>
                         <NewTaskPanel
-                            ref={p => { this.newTaskPanel = p; }}
+                            ref={this.handleNewTaskPanel}
                             onSave={this.handleSave}
                             onCancel={this.props.onCancel}
                             suggestedTaskName={this.suggestedTaskName}

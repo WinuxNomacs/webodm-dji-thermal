@@ -61,8 +61,8 @@ export default class WorksetProgress extends React.Component {
 
     text(state, photos){
         switch (state.kind){
-        case "waiting": return interpolate(_("Waiting for WebODM's worker to convert the %(count)s photos…"), {count: photos});
-        case "converting": return interpolate(_("Converting the %(count)s photos: %(progress)s…"),
+        case "waiting": return interpolate(_("Waiting for WebODM's worker to convert %(count)s thermal photos…"), {count: photos});
+        case "converting": return interpolate(_("Converting %(count)s thermal photos: %(progress)s…"),
                                               {count: photos, progress: state.stage || state.percent + "%"});
         case "committing": return _("Converted: putting the images in the task…");
         case "started": return <React.Fragment><i className="fa fa-check"></i> <strong>{_("Complete!")}</strong> {_("The task is processing in WebODM.")}</React.Fragment>;

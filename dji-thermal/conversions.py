@@ -658,6 +658,7 @@ def convert(task_id, run_id, cid):
     then = record(task, cid).get('then')
     if ok and then:
         from . import conversion_tasks
+        conversion_tasks.wait_for_plan(task, then)
         conversion_tasks.commit_parent(task, cid, then)
     if ok and (record(task, cid).get('settings') or {}).get('mosaics'):
         from . import mosaics

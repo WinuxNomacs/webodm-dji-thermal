@@ -9,8 +9,13 @@
 //
 // Normalized or harmonized (frames), every photo is needed before any is converted: the task is made a dataset, the
 // photos are uploaded to it, and the server converts them in a workset of the dataset (the panel's measurement values
-// and frames settings), whose TIFFs then go into the task, which the server commits (api.py TaskWorkset).
+// and frames settings), whose TIFFs then go into the task, which the server commits (api.py TaskWorkset), with the
+// plan's options (planOptions) once it has analyzed the dataset.
+//
+// With maxPitch, only the photos at or below it go into the task: as is, the others are not converted (but kept in the
+// dataset with the other photos); normalized, the workset leaves them out.
 import { tiffName, withImagesRenamed, worksetTiffName } from './textFiles';
+import { byPitch } from './plan';
 
 export const CONCURRENCY = 3;
 export const RETRIES = 2;           // times a request the server never answered is sent again
@@ -43,27 +48,39 @@ export function taskData(taskInfo){
 }
 
 // api: the server calls (see serverApi.js), each returning a promise. onProgress({done, total, converted,
-// ignored, failed}) after each photo.
+// ignored, failed, uploading}) after each photo. pitches: a Map of each photo's gimbal pitch (plan.gimbalPitch).
 export default class ThermalUpload {
     constructor({projectId, taskInfo, photos, textFiles, measurement, api, onProgress, concurrency, keepPhotos, otherPhotos,
-                 frames}){
+                 frames, maxPitch, pitches, planOptions}){
         this.projectId = projectId;
         this.taskInfo = taskInfo;
-        this.photos = photos;
         this.textFiles = textFiles || [];
         this.measurement = measurement;
         this.api = api;
         this.onProgress = onProgress || (() => {});
         this.concurrency = concurrency || CONCURRENCY;
         this.keepPhotos = !!keepPhotos;
-        this.otherPhotos = otherPhotos || [];
         const normalize = !!(frames && (frames.normalize || frames.harmonize));
         // mosaics: the workset's mosaics built once it is converted (api.py TaskWorkset)
         this.frames = {normalize, harmonize: !!(frames && frames.harmonize), mosaics: normalize && !!frames.mosaics};
+        this.maxPitch = maxPitch === undefined ? null : maxPitch;
+        this.planOptions = !!planOptions;
+        const { kept, oblique } = byPitch(photos, pitches || new Map(), this.maxPitch);
+        this.thermal = kept.length;     // the photos that go into the task
+        // Normalized, the workset leaves the oblique photos out; as is, they are not converted
+        this.photos = normalize ? photos : kept;
+        this.otherPhotos = (normalize ? [] : oblique).concat(otherPhotos || []);
+        this.uploads = normalize ? this.photos.concat(this.otherPhotos.filter(f => /\.jpe?g$/i.test(f.name || ""))) : null;
         this.canceled = false;
         this.task = null;
         this.dataset = null;
-        this.result = {done: 0, total: photos.length, converted: [], ignored: [], failed: []};
+        this.result = {done: 0, total: this.photos.length, converted: [], ignored: [], failed: [], oblique: oblique.length};
+    }
+
+    // What onProgress is first given: normalized, the photos are uploaded before anything is converted
+    initialProgress(){
+        if (this.uploads) return {done: 0, total: this.uploads.length, converted: [], ignored: [], failed: [], uploading: true};
+        return Object.assign({}, this.result);
     }
 
     // Resolves to the result ({task, converted: image names, ignored and failed: [{name, reason}], dataset: its id
@@ -98,8 +115,8 @@ export default class ThermalUpload {
     // Normalized or harmonized: resolves to {task, dataset, workset: its id, done, total} once the photos are on the
     // server and the workset started; the task processes once the workset is converted
     startWorkset(){
-        const photos = this.photos.concat(this.otherPhotos.filter(f => /\.jpe?g$/i.test(f.name || "")));
-        const progress = {done: 0, total: photos.length, converted: [], ignored: [], failed: [], uploading: true};
+        const photos = this.uploads;
+        const progress = this.initialProgress();
         return this.api.createTask(this.projectId, taskData(this.taskInfo))
             .then(task => {
                 this.task = task;
@@ -127,9 +144,12 @@ export default class ThermalUpload {
                     .then(files => retried(() => this.api.uploadFiles(this.projectId, this.task.id, files)));
             })
             .then(() => this.checkCanceled())
-            .then(() => this.api.startWorkset(this.projectId, this.task.id, Object.assign({}, this.measurement, this.frames)))
+            .then(() => this.api.startWorkset(this.projectId, this.task.id,
+                Object.assign({}, this.measurement, this.frames, {max_pitch: this.maxPitch}),
+                {plan_options: this.planOptions, frames: this.thermal}))
             .then(w => ({task: this.task, dataset: this.dataset, workset: w.id, frames: this.frames, done: progress.done,
-                         total: progress.total, converted: [], ignored: [], failed: []}))
+                         total: progress.total, thermal: this.thermal, oblique: this.result.oblique, converted: [],
+                         ignored: [], failed: []}))
             .catch(e => this.removeTask().then(() => { throw e; }));
     }
 

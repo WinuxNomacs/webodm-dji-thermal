@@ -170,9 +170,12 @@ class TaskDataset(APIView):
 class TaskWorkset(APIView):
     """
     A partial task of DJI Thermal Task, normalized or harmonized: its photos, uploaded to the dataset it is (TaskDataset),
-    converted in a workset of it ('settings': the panel's measurement values, normalize, harmonize and the task's
-    palette, also the workset's), whose TIFFs
-    then go into the task, which is committed (conversion_tasks.commit_parent). The answer is the workset's {id}.
+    converted in a workset of it ('settings': the panel's measurement values, normalize, harmonize, the pitch limit and
+    the task's palette, also the workset's), whose TIFFs
+    then go into the task, which is committed (conversion_tasks.commit_parent). The dataset is analyzed meanwhile: with
+    'plan_options', the options the panel started from left as they were, the task gets the WebODM plan's recommended
+    options before it starts. 'frames': how many thermal photos the panel counted to convert, for its progress. The
+    answer is the workset's {id}.
     """
     permission_classes = (permissions.IsAuthenticated,)
     MEASUREMENT = ('distance', 'unit', 'emissivity', 'reflected_temp', 'ambient_temp', 'humidity')
@@ -196,18 +199,20 @@ class TaskWorkset(APIView):
 
     @staticmethod
     def progress(task, cid):
-        """{id, status, progress, stage, error, photos, committed: the task has its images, task_error}. A converted
-        workset whose TIFFs aren't in the task yet goes in now: the worker that converted it may run an older copy of
-        the plugin, without that step (conversion_tasks.commit_parent)"""
+        """{id, status, progress, stage, error, photos: the thermal photos to convert, committed: the task has its
+        images, task_error}. A converted workset whose TIFFs aren't in the task yet goes in now, once the analysis its
+        options wait for is done: the worker that converted it may run an older copy of the plugin, without that step
+        (conversion_tasks.commit_parent)"""
         from . import conversions
         conversions.check_stale(task, cid)
         job = conversions.job(task, cid)
-        if job['status'] == 'ready' and task.partial and not task.last_error:
-            conversion_tasks.commit_parent(task, cid, conversions.record(task, cid)['then'])
+        then = conversions.record(task, cid)['then']
+        if job['status'] == 'ready' and task.partial and not task.last_error and not conversion_tasks.awaits_plan(task, then):
+            conversion_tasks.commit_parent(task, cid, then)
             task.refresh_from_db()
         return {'id': cid, 'status': job['status'], 'progress': job.get('progress') or 0, 'stage': job.get('stage') or {},
-                'error': job.get('error') or '', 'photos': len(datasets.image_files(task)), 'committed': not task.partial,
-                'task_error': task.last_error or ''}
+                'error': job.get('error') or '', 'photos': then.get('frames') or len(datasets.image_files(task)),
+                'committed': not task.partial, 'task_error': task.last_error or ''}
 
     def get(self, request, project_pk=None, pk=None):
         """The task's workset converting its photos, as the project page shows its progress (WorksetProgress.jsx)"""
@@ -230,14 +235,24 @@ class TaskWorkset(APIView):
                    normalize=bool(sent.get('normalize')) or bool(sent.get('harmonize')), harmonize=bool(sent.get('harmonize')))
         raw.update({k: sent[k] for k in self.MEASUREMENT if k in sent})
         raw['palette'] = sent.get('palette') or None
+        if sent.get('max_pitch') not in (None, ''):
+            raw['max_pitch'] = sent['max_pitch']
         settings, errors = conversions.parse_settings(raw)
         if errors:
             raise exceptions.ValidationError(detail=errors)
         conversion_tasks.set_task_palette(task, settings.get('palette'))
         if not settings['normalize']:
             raise exceptions.ValidationError(detail="Normalize or harmonize: a task converted as is takes its photos one by one")
-        cid = conversions.create(task, "DJI Thermal Task", settings, request.user, then={
-            'processing_node': task.processing_node_id, 'auto_processing_node': task.auto_processing_node})
+        then = {'processing_node': task.processing_node_id, 'auto_processing_node': task.auto_processing_node}
+        if request.data.get('plan_options'):
+            then['plan_options'] = True
+        try:
+            then['frames'] = max(0, int(request.data.get('frames')))
+        except (TypeError, ValueError):
+            pass
+        datasets.update_size(task)
+        datasets.start_analysis(task)
+        cid = conversions.create(task, "DJI Thermal Task", settings, request.user, then=then)
         return Response({'id': cid}, status=status.HTTP_201_CREATED)
 
 

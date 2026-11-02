@@ -316,6 +316,61 @@ class TestTaskWorkset(ApiTestCase):
             cid = self.client.post(self.url, {"settings": {"normalize": True, "mosaics": True}}, format="json").data["id"]
         self.assertTrue(conversions.record(self.task, cid)["settings"]["mosaics"])
 
+    def test_the_workset_has_the_panel_s_pitch_limit_and_frame_count_and_the_dataset_is_analyzed_meanwhile(self):
+        self.made_dataset()
+        with mock.patch.object(datasets, "start_job") as start:
+            res = self.client.post(self.url, {"settings": {"normalize": True, "max_pitch": "-80"}, "plan_options": True,
+                                              "frames": 42}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        record = conversions.record(self.task, res.data["id"])
+        self.assertEqual(record["settings"]["max_pitch"], -80.0)
+        self.assertEqual(record["then"], {"processing_node": None, "auto_processing_node": True, "plan_options": True,
+                                          "frames": 42})
+        self.assertEqual(start.call_args_list[0][0][1:], ("analysis", "analyze"))
+        datasets.update_job(self.task, rel=conversions.rel(res.data["id"], conversions.JOB_FILE), status="converting")
+        self.assertEqual(self.client.get(self.url).data["photos"], 42)
+        # No pitch limit sent: the workset keeps every frame
+        with mock.patch.object(datasets, "start_job"):
+            cid = self.client.post(self.url, {"settings": {"normalize": True}}, format="json").data["id"]
+        self.assertIsNone(conversions.record(self.task, cid)["settings"]["max_pitch"])
+        self.assertNotIn("plan_options", conversions.record(self.task, cid)["then"])
+        with mock.patch.object(datasets, "start_job"):
+            res = self.client.post(self.url, {"settings": {"normalize": True, "max_pitch": "-95"}}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_a_task_left_with_the_panel_s_options_gets_the_plan_s_once_the_analysis_is_done(self):
+        self.made_dataset()
+        Task.objects.filter(pk=self.task.pk).update(options=[{"name": "radiometric-calibration", "value": "none"},
+                                                              {"name": "dsm", "value": True}])
+        with mock.patch.object(datasets, "start_job"):
+            cid = self.client.post(self.url, {"settings": {"normalize": True}, "plan_options": True}, format="json").data["id"]
+        out = conversions.output_path(self.task, cid)
+        for name in ("DJI_0001_T_temp_c.tiff", "DJI_0002_T_temp_c.tiff"):
+            with open(os.path.join(out, name), "wb") as f:
+                f.write(b"II*\0")
+        datasets.write_json(conversions.path(self.task, cid, conversions.RESULTS_FILE), {"files": [
+            {"path": n.replace("_temp_c.tiff", ".JPG"), "ok": True, "outputs": [n]} for n in os.listdir(out)]})
+        datasets.update_job(self.task, rel=conversions.rel(cid, conversions.JOB_FILE), status="ready", progress=1,
+                            finished_at=datasets.now())
+        # The analysis still running: the progress leaves the task waiting for it
+        datasets.update_job(self.task, status="analyzing", started_at=datasets.now(), heartbeat_at=datasets.now())
+        with mock.patch.object(datasets, "job_gone", return_value=False), mock.patch("worker.tasks.process_task") as process:
+            self.assertFalse(self.client.get(self.url).data["committed"])
+            self.assertFalse(conversion_tasks.wait_for_plan(self.task, {"plan_options": True}, timeout=0))
+        process.delay.assert_not_called()
+        datasets.update_job(self.task, status="ready", finished_at=datasets.now())
+        datasets.write_json(datasets.data_path(self.task, datasets.ANALYSIS_FILE), {"webodm": {
+            "recommended": {"radiometric-calibration": {"value": "none", "reason": "already temperatures"},
+                            "orthophoto-resolution": {"value": 2.2, "reason": "the frames' GSD"}},
+            "consider": {"fast-orthophoto": {"value": True, "reason": "flat"}}}})
+        with mock.patch("worker.tasks.process_task") as process:
+            self.assertTrue(self.client.get(self.url).data["committed"])
+        process.delay.assert_called_once_with(self.task.id)
+        self.task.refresh_from_db()
+        # The plan's recommended options over the panel's, the others kept; not those it only suggests considering
+        self.assertEqual(self.task.options, [{"name": "dsm", "value": True}, {"name": "radiometric-calibration", "value": "none"},
+                                             {"name": "orthophoto-resolution", "value": 2.2}])
+
     def test_the_workset_s_progress_says_how_far_it_is_and_starts_a_converted_worksets_task(self):
         self.assertEqual(self.client.get(self.url).status_code, status.HTTP_404_NOT_FOUND)
         self.made_dataset()
