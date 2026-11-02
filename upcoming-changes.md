@@ -7,9 +7,9 @@
   Thermal SDK\"; add a note in bold that it's usually only needed for development purposes reduces the performance
   of the DJI Thermal Analyzer." Builds on the DJI Thermal page under Administration (`templates/sdk.html`, the
   "Use DJI's own Thermal SDK" panel, shown before an SDK is installed; titled "Update DJI's Thermal SDK" after).
-  Proposed: one bold sentence at the top of that panel; the speed claim measured first (the same frames through
-  the built-in port and through DJI's SDK, in the dev stack), and worded by what the measurement shows. README and
-  `docs/dji-sdk.md` say the same; its screenshot retaken.
+  Decided (the user, 2026-11-02): their wording as is, not measured first. Done, `sdk-settings-note`: in bold at the
+  top of that panel (shown with an SDK installed too), "Usually only needed for development purposes: it reduces
+  the performance of the DJI Thermal Analyzer." README, `docs/dji-sdk.md`, `dji-sdk.png` retaken.
 - **Workflow walk-through for bugs and hangs** (the user, 2026-11-02, from `new.md`): "walk through the workflows for
   creating datasets, worksets and tasks. Look for bugs and places where it could hang unexpectedly for the user
   etc... Fix anything minor as you go but note anything larger to be a planned effort." Builds on the Thermal
@@ -20,13 +20,17 @@
   task, delete; each step's waits, polls, progress and error paths read in the code too (what happens when the
   worker is down or restarted, a job dies, a request fails). Minor fixes each on its own branch with a test; larger
   ones written here as phases. What it created is deleted afterwards.
+  Decided (the user, 2026-11-02): **the whole M4T flight** (thermal and RGB); **everything it creates deleted**
+  afterwards; **all three flows**: the Thermal Analyzer, DJI Thermal Task (the dashboard's button, its dialog and
+  converted task), and the mosaic viewer and frame page.
 - **UX review of the same workflows** (the user, 2026-11-02, from `new.md`): "As a UX design expert, walk through
   the workflows for creating datasets, worksets and tasks. Look for cumbersome and unintuitive design experiences
   that should be improved upon. Create a Claude Artifact with your findings for us to review after." Builds on the
   earlier UX review (2026-10-31, "Done: UX review" below) and everything since. Proposed: the same walk-through as a
   first-time user; findings ranked, each with where (page and panel), what is cumbersome, the proposal and a
   screenshot (no location or serial shown), sorted into quick fixes and larger changes; published as a private
-  Artifact for the user to review; nothing changed until they choose.
+  Artifact for the user to review; nothing changed until they choose. Decided (the user, 2026-11-02): as the walk-through's (the whole
+  flight, deleted afterwards, the same three flows).
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
   - Done: **removing files from a dataset** (the user, 2026-11-02: "For the Files view under dataset we should add the
