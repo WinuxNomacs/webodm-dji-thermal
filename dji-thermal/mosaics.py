@@ -8,6 +8,8 @@ Files, in the conversion's folder (see conversions):
     viewer/<kind>.tif (+ .json)    a georeferenced copy for the map, only when the conversion strips the location (the
                                    downloads are then stripped); never downloaded
     viewer/palettes.json           DJI's palettes, read from one of the frames
+    viewer/measurements.json, frame-measurements.json    the measurements saved on the mosaics and on the frames,
+                                   kept when the mosaics are built again (see measurements)
 
 The viewer's source frame window reads the mosaic's JSON sidecar: its frame table (each frame's measurement and
 offset) and frame models (dji-thermal-cli's FrameModels: where each frame saw a point).
@@ -52,6 +54,8 @@ TILE_SIZE = 256
 EARTH_CIRCUMFERENCE_M = 40075016.686
 HISTOGRAM_FILE = 'histogram-{}.json'    # a temperature mosaic's histogram, in VIEWER_DIR, for the equalization
 NO_ADJUST = {'gamma': 1.0, 'equalize': False, 'sharpen': 0.0}
+# What VIEWER_DIR holds that isn't the mosaics': the measurements saved on them and on the frames (see measurements)
+KEPT_FILES = ('measurements.json', 'frame-measurements.json')
 
 
 def conversions_module():
@@ -138,9 +142,17 @@ def stage_fraction(d):
 
 
 def remove(task, cid):
-    """A conversion's mosaics and the viewer's files"""
-    for d in (MOSAICS_DIR, VIEWER_DIR):
-        shutil.rmtree(path(task, cid, d), ignore_errors=True)
+    """A conversion's mosaics and the viewer's files, but the measurements saved on the mosaics and the frames (kept
+    there too, deleted only with the workset)"""
+    shutil.rmtree(path(task, cid, MOSAICS_DIR), ignore_errors=True)
+    viewer = path(task, cid, VIEWER_DIR)
+    for name in os.listdir(viewer) if os.path.isdir(viewer) else []:
+        if name not in KEPT_FILES:
+            p = os.path.join(viewer, name)
+            if os.path.isdir(p) and not os.path.islink(p):
+                shutil.rmtree(p, ignore_errors=True)
+            else:
+                os.remove(p)
     try:
         os.remove(path(task, cid, RESULT_FILE))
     except FileNotFoundError:

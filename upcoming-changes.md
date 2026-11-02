@@ -5,6 +5,11 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **building the mosaics again kept no saved measurements** (found 2026-11-02 while planning removing frames),
+    `keep-measurements-on-rebuild`. `mosaics.remove`, run before each build and after a failed or canceled one,
+    deleted the whole `viewer/` folder, with the measurements saved on the mosaics (`measurements.json`) and on the
+    frames (`frame-measurements.json`) in it; it now keeps those (`mosaics.KEPT_FILES`), deleted only with the
+    workset. Django (`test_building_the_mosaics_again_keeps_the_measurements_saved_on_them_and_on_the_frames`).
   - Next: **removing frames from a workset** (the user, 2026-11-02, from `new.md`): "on the Files view detail pane
     for a image in a Workset, add the ability to delete a file from the workset; or multiple if more than one
     selected. This allows the user to manually remove files that are more noise than they desire. Then they can
