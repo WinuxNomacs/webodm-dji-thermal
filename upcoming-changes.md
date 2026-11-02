@@ -86,7 +86,26 @@
     is done.
   - U5-5 (larger): one order, labels and help text for the panel and the Workset Creation Settings (after U2-2):
     labels left here and above there, Normalize/Harmonize before Measurement here and after it there, "Temperature
-    unit" here and "Unit of the files" there.
+    unit" here and "Unit of the files" there. Moved into U2, built with U2-2.
+  Decided (D4 follow-up, the user, 2026-11-02): the plan's orthophoto-resolution and gps-accuracy need the dataset's
+  analysis, which can't run before the upload, so **the server sets them**: the panel pre-selects "(Custom)" with
+  radiometric-calibration none, and a normalized or harmonized task left so gets the plan's recommended options once
+  its dataset is analyzed; an as-is task keeps radiometric-calibration none.
+  Done (2026-11-02), `thermal-task-panel`: U5-1 **Only frames looking down: a gimbal pitch at or below** -80°, ticked,
+  with "42 of 217 frames" (each photo's XMP `GimbalPitchDegree`, read by exifr; `public/thermal/plan.js`); as is, the
+  oblique photos aren't converted (kept in the dataset, if any), normalized, the workset gets `max_pitch`
+  (`upload.js`, `api.py` TaskWorkset). U5-2 WebODM's options start as "(Custom)" `PANEL_OPTIONS`
+  (`ThermalTaskPanel.presetOptions`, through WebODM's EditTaskForm once its presets load); left so, `plan_options`
+  goes with the workset, and `conversion_tasks.use_for_parent(with_plan)` puts the plan's recommended options over
+  the task's at commit; the worker waits up to 10 minutes for the analysis (`wait_for_plan`), the progress doesn't
+  commit while it runs (`awaits_plan`). U5-3 "Uploading N of 434 photos" from the start
+  (`ThermalUpload.initialProgress`), "Converting 42 thermal photos" (TaskWorkset's `frames`, answered as `photos`),
+  the result message counting the thermal photos and the oblique ones left out. U5-4 TaskWorkset starts the
+  dataset's analysis. Tests: `test_api.py` TestTaskWorkset (the pitch limit, frames and analysis; the plan's options
+  once analyzed), Jest `plan.test.js`, `upload.test.js`. Live (dt-worker restarted): the flight's 217 thermal photos
+  normalized, 42 frames in the task, analyzed during the conversion, committed with orthophoto-resolution 2.1 and
+  gps-accuracy 0.02 in 19 s; deleted afterwards. README, `docs/quickstart-thermal-task.md`, `docs/api.md`,
+  `thermal-task-panel.png` retaken.
 - **U1. Progress and results on the workset card** (UX review, 2026-11-02). Dataset page › Worksets › a workset's
   card; quick fixes, no decision:
   - U1-1: a harmonized workset shows "Converting 0%" and an empty bar for about four minutes (the stage only in the
@@ -111,6 +130,7 @@
   - U2-3: Create Workset, Use the WebODM plan's settings, Save as my defaults and Reset to defaults side by side, and
     Reset also forgets the saved defaults; a "Start from" choice above the form (WebODM plan · My defaults ·
     dji-thermal-cli defaults), Save as my defaults beside it, "Forget my defaults" in its menu.
+  - U5-5, from U5: DJI Thermal Task's panel in the form's new order, labels and help text.
   - U2-4 (larger, its own phase): harmonize and the mosaics each align the frames (about 2.5 and 3 minutes of a
     6-minute plan workset). Open (D2): reuse harmonize's alignment for the mosaics, later, after a dji-thermal-cli
     release that saves and accepts an alignment (recommended), or keep both. Decided (D2, the user, 2026-11-02):
