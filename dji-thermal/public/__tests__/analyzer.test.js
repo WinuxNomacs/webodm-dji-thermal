@@ -2102,6 +2102,22 @@ describe("a task made from a conversion", () => {
         expect(card().querySelector(".ta-task-message").textContent).toContain("no longer on the server");
     });
 
+    it("says the server could not be reached when Create task's request never arrives, and the button can be pressed again", async () => {
+        const fetchFn = server({
+            [URL5]: d({}),
+            [C9 + "/task"]: INFO,
+            ["POST " + C9 + "/task"]: () => Promise.reject(new TypeError("Failed to fetch"))
+        });
+        dataset.init(document, fetchFn);
+        await ticks();
+        click(card().querySelector('[data-act="task"]'));
+        await ticks();
+        click(card().querySelector('[data-act="task-create"]'));
+        await ticks();
+        expect(card().querySelector(".ta-task-message").textContent).toBe("Could not reach the server: check the connection, then try again.");
+        expect(card().querySelector('[data-act="task-create"]').disabled).toBe(false);
+    });
+
     it("says deleting a conversion keeps the tasks made from it", async () => {
         const fetchFn = server({[URL5]: d({tasks: [TASK]})});
         dataset.init(document, fetchFn);

@@ -577,7 +577,7 @@
             return fetchFn(url, {method: method, credentials: "same-origin", headers: {"Content-Type": "application/json", "X-CSRFToken": csrf},
                                  body: body === undefined ? undefined : JSON.stringify(body)}).then(function (r) {
                 return r.status === 204 ? {ok: true, data: {}} : core.readJson(r);
-            });
+            }, core.unreachable);
         }
 
         // The form's Save: a drawn shape saved (then out of the drawn ones), or a saved one renamed

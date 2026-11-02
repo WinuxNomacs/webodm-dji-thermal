@@ -50,6 +50,11 @@ The step needs images, or a converted workset, that the dataset doesn't have yet
 **Use for parent task** replaces the images of the dataset's own task, which can't happen while WebODM is
 processing it. Wait for it to finish, or cancel it on the dashboard.
 
+**"Could not reach the server: check the connection, then try again."**
+
+A button's request never reached WebODM (a dropped connection, or WebODM restarting): nothing was changed. Press it
+again once WebODM answers.
+
 **"The … job stopped before it finished"**
 
 WebODM's worker stopped while running it, for example when WebODM restarted. Start it again.

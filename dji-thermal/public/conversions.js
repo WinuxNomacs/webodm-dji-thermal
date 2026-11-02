@@ -852,7 +852,7 @@
                 opts.headers["Content-Type"] = "application/json";
                 opts.body = JSON.stringify(data);
             }
-            return fetchFn(u, opts).then(core.readJson);
+            return fetchFn(u, opts).then(core.readJson, core.unreachable);
         }
 
         function message(text, cls) {
@@ -937,7 +937,7 @@
         function openTask(id) {
             task = {id: id, info: null, draft: null};
             renderTask();
-            return fetchFn(base + id + "/task", {credentials: "same-origin"}).then(core.readJson).then(function (r) {
+            return fetchFn(base + id + "/task", {credentials: "same-origin"}).then(core.readJson, core.unreachable).then(function (r) {
                 if (!task || task.id !== id) return;
                 if (!r.ok) {
                     task = null;
@@ -971,7 +971,7 @@
         function useForParent(c) {
             var parent = (dataset && dataset.parent) || {};
             if (parent.busy) return message("The dataset's task is processing in WebODM: cancel it there first, or wait for it to finish.", "text-danger");
-            return fetchFn(base + c.id + "/task", {credentials: "same-origin"}).then(core.readJson).then(function (r) {
+            return fetchFn(base + c.id + "/task", {credentials: "same-origin"}).then(core.readJson, core.unreachable).then(function (r) {
                 if (!r.ok) return message(esc(core.errorText(r.data, "Could not check " + c.name + ".")), "text-danger");
                 if (r.data.problems.length) return message(esc(r.data.problems.join(" ")), "text-danger");
                 var text = ["Send " + c.name + "'s " + r.data.frames + " temperature TIFFs to the dataset's task, " + parent.name + "?"];
@@ -1231,7 +1231,7 @@
 
         // The settings and what can be chosen, loaded once, for those who can convert
         function loadPreferences() {
-            loading = fetchFn(ctx.api + "preferences", {credentials: "same-origin"}).then(core.readJson).then(function (r) {
+            loading = fetchFn(ctx.api + "preferences", {credentials: "same-origin"}).then(core.readJson, core.unreachable).then(function (r) {
                 if (!r.ok) return message("Could not load the settings.", "text-danger");
                 meta = r.data;
                 settings = r.data.settings;

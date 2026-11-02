@@ -587,7 +587,7 @@
                 opts.headers["Content-Type"] = "application/json";
                 opts.body = JSON.stringify(data);
             }
-            return fetchFn(u, opts).then(core.readJson);
+            return fetchFn(u, opts).then(core.readJson, core.unreachable);
         }
 
         function status(text, cls) {
@@ -1017,7 +1017,7 @@
             var plan = (dataset.analysis || {}).webodm;
             preset = {info: null, draft: null};
             renderPreset();
-            return fetchFn(PRESETS, {credentials: "same-origin"}).then(core.readJson).then(function (r) {
+            return fetchFn(PRESETS, {credentials: "same-origin"}).then(core.readJson, core.unreachable).then(function (r) {
                 if (!preset) return;
                 if (!r.ok || !Array.isArray(r.data)) {
                     preset = null;
@@ -1038,7 +1038,7 @@
             if (form.problem) return presetMessage(esc(form.problem), "text-danger");
             var btn = el.querySelector('[data-act="preset-save"]');
             btn.disabled = true;
-            return fetchFn(PRESETS, {credentials: "same-origin"}).then(core.readJson).then(function (r) {
+            return fetchFn(PRESETS, {credentials: "same-origin"}).then(core.readJson, core.unreachable).then(function (r) {
                 if (!r.ok || !Array.isArray(r.data)) return r;
                 var same = r.data.filter(function (x) { return !x.system && x.name === form.data.name; })[0];
                 if (!same) return send(PRESETS, "POST", form.data);
