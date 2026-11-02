@@ -51,14 +51,21 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
    the one the photos were shot in, unless you've chosen a palette in the Analyzer's preferences; the task's images
    hold temperatures, so the map can show them in any palette later. A task made from a workset opens in the
    workset's palette, if it has one.
-3. **Normalize** and **Harmonize**, under it, off by default: as the workset settings of the same names (see
+3. **Only frames looking down**, under it, ticked by default: as the WebODM plan, only the frames with a gimbal pitch
+   at or below -80° (read from each photo) go into the task, with the count kept beside it ("42 of 217 frames");
+   oblique frames mix viewing angles and sky into the map's temperatures. Untick it to keep every frame (for a 3D
+   model). As is, the others are not converted (but kept in the dataset, if any); normalized, the workset leaves
+   them out.
+   **Normalize** and **Harmonize**, under it, off by default: as the workset settings of the same names (see
    below), one ambient and reflected temperature for every frame, and also each frame's drift removed. Ticked, every
    photo is uploaded first to the task's DJI Thermal Analyzer dataset (**Also keep the photos** is then ticked), a
    workset of it converts them in WebODM's worker, and its TIFFs go into the task, which then starts processing by
    itself. The message under the project, and the task's panel after the page is refreshed (above the panel's
    buttons), show how far the conversion is, then a green **Complete!** once the task has started; the page can be
    closed or refreshed once the upload is done; don't use WebODM's own **Start Processing** meanwhile, which would
-   process the photos unconverted. If putting the images in the task fails, the reason shows with the plugin's own
+   process the photos unconverted. The dataset is analyzed meanwhile, and a task whose options were left as the
+   panel started them gets the WebODM plan's recommended options (its orthophoto resolution and GPS accuracy)
+   before it starts. If putting the images in the task fails, the reason shows with the plugin's own
    **Start processing** to try again. **Also build the workset's mosaics**, off by default, builds
    the Analyzer's mosaics too; they can be built later from the workset's menu. The workset stays in the Analyzer.
 4. **Measurement**: the values the temperatures are computed with. Each field shows the value the camera recorded
@@ -75,8 +82,9 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
    - **Also keep the photos in a DJI Thermal Analyzer dataset**: the task is also a dataset, under its own name,
      that gets every photo picked (the RGB ones too) as they are uploaded, so they are sent once, and is analyzed
      once the task is made. The message under the project then links to it.
-5. Below it, WebODM's own task panel: name, processing node, options and the photos on the map. Images are not
-   resized: the thermal frames keep their size. **Review**, then **Start Processing**.
+5. Below it, WebODM's own task panel: name, processing node, options and the photos on the map. The options start as
+   the WebODM plan's, "(Custom)" with `radiometric-calibration` none (the images already hold temperatures). Images
+   are not resized: the thermal frames keep their size. **Review**, then **Start Processing**.
 6. Each photo is converted as it is uploaded, a few at a time. A photo that fails is left out with its reason;
    the task then processes the others. A GCP file, `geo.txt` and `image_groups.txt` go in with the photos' names
    changed to the converted images' (`DJI_0001_T.JPG` becomes `DJI_0001_T.tif`).
