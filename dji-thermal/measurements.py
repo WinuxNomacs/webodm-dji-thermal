@@ -5,8 +5,10 @@ list replaced whole under the folder's lock:
 
     <task>/thermal/measurements.json                            a task's thermal orthophoto's
     <dataset>/thermal/conversions/<id>/viewer/measurements.json   a workset's mosaics' (each records its tab)
+    <dataset>/thermal/conversions/<id>/viewer/frame-measurements.json   a workset's frames' (each records its frame,
+                                                                     in its pixels; see frames_api)
 
-so they are shared and deleted with the task or the workset. Each is {id, name, comment, shape (pin, rectangle,
+so they are shared and deleted with the task or the workset (a frame's with the frame, removed from the workset). Each is {id, name, comment, shape (pin, rectangle,
 circle, polygon or line), geometry (GeoJSON, lon/lat: a point for a pin), circle ({lat, lng, radius}) for a circle,
 tab (a mosaic's), values (a pin's {valid, temperature, measured, reason}; a region's as inspector.raster_region finds
 them), isotherm ({low, high} °C, or null), correction (correction.described, or null), created_at, created_by}.
@@ -17,6 +19,7 @@ import uuid
 from . import conversions, datasets
 
 FILE = 'measurements.json'
+FRAMES_FILE = 'frame-measurements.json'
 SHAPES = ('pin', 'rectangle', 'circle', 'polygon', 'line')
 MAX_NAME = 255
 MAX_COMMENT = 2000
@@ -28,6 +31,11 @@ def task_path(task):
 
 def workset_path(task, cid):
     return conversions.path(task, cid, 'viewer', FILE)
+
+
+def frames_path(task, cid):
+    """The measurements saved on a workset's frames: beside its mosaics' (the Inspector lists those on the map)"""
+    return conversions.path(task, cid, 'viewer', FRAMES_FILE)
 
 
 def listed(path):
@@ -87,6 +95,19 @@ def remove(task, path, mid):
     def change(items):
         kept = [m for m in items if m.get('id') != mid]
         gone = len(kept) != len(items)
+        items[:] = kept
+        return gone
+    return _changed(task, path, change)
+
+
+def remove_frames(task, path, frames):
+    """The measurements saved on some frames removed; how many were"""
+    if not os.path.exists(path):
+        return 0
+
+    def change(items):
+        kept = [m for m in items if m.get('frame') not in frames]
+        gone = len(items) - len(kept)
         items[:] = kept
         return gone
     return _changed(task, path, change)

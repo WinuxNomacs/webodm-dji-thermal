@@ -133,12 +133,15 @@ def conversion_summary(task, cid):
         'error': job.get('error') or '',
         'converted': r.get('converted', 0),
         'skipped': r.get('skipped', 0),
+        'removed': len(r.get('removed') or []),
         # '' before any build
         'mosaic_status': mosaic_job['status'] if mosaic_job['status'] != 'new' else '',
         'mosaic_progress': mosaic_job.get('progress') or 0,
         'mosaic_stage': mosaic_job.get('stage') or {},
         'mosaic_error': mosaic_job.get('error') or '',
         'mosaic_files': mosaics.files(task, cid),
+        # Built with frames removed from the workset since: to build again
+        'mosaic_outdated': bool(conversions.removed_paths(task, cid) & set(mosaics.result(task, cid).get('frames') or [])),
         'tasks': [task_summary(t) for t in conversion_tasks.made(task, cid)],
         'file_count': count,
         'size': size,
@@ -472,6 +475,20 @@ class ConversionFigures(DatasetView):
         if frames.figures_job(task, cid)['status'] != 'measuring':
             frames.start_figures(task, cid)
         return Response(conversion_detail(task, cid))
+
+
+class ConversionRemoveFrames(DatasetView):
+    def post(self, request, pk, cid):
+        """Frames removed from a converted workset ({frames: [paths]}, see conversions.remove_frames)"""
+        task = conversions.check_stale(get_conversion(request, pk, cid, 'change_project'), cid)
+        asked = request.data.get('frames') if isinstance(request.data, dict) else None
+        if not isinstance(asked, list) or not asked or not all(isinstance(f, str) for f in asked):
+            raise ValidationError({'error': "Which frames? (frames: a list of their paths)"})
+        try:
+            removed = conversions.remove_frames(task, cid, asked, request.user)
+        except conversions.NotRemoved as e:
+            raise ValidationError({'error': str(e)}) from None
+        return Response(dict(conversion_detail(task, cid), frames_removed=removed))
 
 
 class ConversionCancel(DatasetView):

@@ -1686,6 +1686,62 @@ describe("a dataset's conversions", () => {
         expect(window.localStorage.getItem("dji-thermal-analyzer:mosaics-shown:5")).toBeNull();
     });
 
+    it("removes the images selected, or the one under the mouse, from a workset once confirmed, and counts them", async () => {
+        const C9 = "/api/plugins/dji-thermal/datasets/5/conversions/9";
+        const files = [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []}, {path: "b_T.JPG", ok: true, outputs: ["b.tiff"], notes: []},
+            {path: "c_T.JPG", ok: true, outputs: ["c.tiff"], notes: []}];
+        const before = Object.assign({}, CONVERSION, {mosaic_status: "ready", mosaic_files: ["harmonized/mosaic.tif"]});
+        const after = Object.assign({}, before, {converted: 1, removed: 2, mosaic_outdated: true});
+        const fetchFn = server({
+            [URL5]: [Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [before]}), Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [after]})],
+            [C9]: [Object.assign({}, before, {results: {files: files}}), Object.assign({}, after, {results: {files: files.slice(2)}})],
+            ["POST " + C9 + "/remove"]: Object.assign({}, after, {results: {files: files.slice(2)}, frames_removed: 2})
+        });
+        window.localStorage.setItem("dji-thermal-analyzer:files-shown:5", "[9]");
+        dataset.init(document, fetchFn);
+        await ticks();
+        const list = document.getElementById("ta-conversions");
+        const pane = () => list.querySelector(".ta-file-detail");
+        const row = path => list.querySelector('.ta-results tbody tr[data-path="' + path + '"]');
+        row("a_T.JPG").dispatchEvent(new MouseEvent("mouseover", {bubbles: true}));
+        expect(pane().querySelector('[data-act="remove-frames"]').textContent).toBe(" Remove from workset");
+        click(row("a_T.JPG").children[1]);
+        row("b_T.JPG").children[1].dispatchEvent(new MouseEvent("click", {bubbles: true, ctrlKey: true}));
+        click(pane().querySelector('[data-act="remove-frames"]'));
+        expect(askDialog().textContent).toContain("Remove 2 images from Nadir?");
+        expect(askDialog().textContent).toContain("The mosaics stay as they were built until you build them again.");
+        press("Cancel");
+        await ticks();
+        expect(calls(fetchFn)).not.toContain("POST " + C9 + "/remove");
+        click(pane().querySelector('[data-act="remove-frames"]'));
+        press("Remove");
+        await ticks();
+        const sent = fetchFn.mock.calls.find(c => c[0] === C9 + "/remove");
+        expect(JSON.parse(sent[1].body)).toEqual({frames: ["a_T.JPG", "b_T.JPG"]});
+        expect([...list.querySelectorAll(".ta-results tbody tr")].map(tr => tr.getAttribute("data-path"))).toEqual(["c_T.JPG"]);
+        expect(pane().hidden).toBe(true);
+        expect(list.querySelector(".ta-conversion-figures").textContent).toMatch(/^1 converted, 1 skipped · 2 removed · /);
+        expect(list.querySelector(".ta-mosaic-status").textContent).toContain("built with frames since removed");
+        expect(list.querySelector('.ta-mosaic-status button[data-act="mosaics"]')).not.toBeNull();
+        window.localStorage.removeItem("dji-thermal-analyzer:files-shown:5");
+    });
+
+    it("offers removing images only to who can change the workset, once converted, and not while its mosaics are built", () => {
+        const c = Object.assign({}, CONVERSION, {results: {files: [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []},
+            {path: "b_T.JPG", ok: true, outputs: ["b.tiff"], notes: []}]}});
+        const urls = {picture: "/t", palette: "", download: "/d", frameDownload: "/f", frame: null, canRemove: true};
+        const button = (conv, paths, u) => {
+            document.body.innerHTML = conversions.resultDetailHtml(conv, paths, true, Object.assign({}, urls, u));
+            return document.querySelector('[data-act="remove-frames"]');
+        };
+        expect(button(c, ["a_T.JPG", "b_T.JPG"]).textContent).toBe(" Remove 2 from workset");
+        expect(button(c, ["a_T.JPG"], {canRemove: false})).toBeNull();
+        expect(button(Object.assign({}, c, {status: "converting"}), ["a_T.JPG"])).toBeNull();
+        expect(button(Object.assign({}, c, {mosaic_status: "building"}), ["a_T.JPG"]).disabled).toBe(true);
+        expect(conversions.mosaicHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready", mosaic_outdated: true}), false))
+            .not.toContain("data-act");
+    });
+
     it("sorts a workset's files by any column but the thumbnail, ascending or descending, the figures' headers aligned with them", () => {
         const c = Object.assign({}, CONVERSION, {figures: {"a_T.JPG": {max: 30}, "b_T.JPG": {max: 50}}, results: {files: [
             {path: "b_T.JPG", ok: true, outputs: ["b.tiff"], notes: []},

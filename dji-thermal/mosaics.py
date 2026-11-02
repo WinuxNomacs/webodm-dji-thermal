@@ -15,6 +15,7 @@ The viewer's source frame window reads the mosaic's JSON sidecar: its frame tabl
 offset) and frame models (dji-thermal-cli's FrameModels: where each frame saw a point).
     mosaic-job.json                the build's status, progress, stage, error and run id
     mosaics.json                   what was built (see build)
+    mosaic-frames/                 while building, for a workset with frames removed: the frames it keeps (links)
 """
 
 import dataclasses
@@ -26,7 +27,7 @@ import shutil
 import time
 from pathlib import Path
 
-from . import conversions, converter, datasets
+from . import conversions, converter, datasets, measurements
 from .analysis import PROGRESS_INTERVAL, Canceled, clean
 
 # The mosaics built: (kind, normalized)
@@ -55,7 +56,9 @@ EARTH_CIRCUMFERENCE_M = 40075016.686
 HISTOGRAM_FILE = 'histogram-{}.json'    # a temperature mosaic's histogram, in VIEWER_DIR, for the equalization
 NO_ADJUST = {'gamma': 1.0, 'equalize': False, 'sharpen': 0.0}
 # What VIEWER_DIR holds that isn't the mosaics': the measurements saved on them and on the frames (see measurements)
-KEPT_FILES = ('measurements.json', 'frame-measurements.json')
+KEPT_FILES = (measurements.FILE, measurements.FRAMES_FILE)
+# While a workset with frames removed builds its mosaics: links to the frames it keeps, as the dataset holds them
+FRAMES_DIR = "mosaic-frames"
 
 
 def conversions_module():
@@ -144,7 +147,8 @@ def stage_fraction(d):
 def remove(task, cid):
     """A conversion's mosaics and the viewer's files, but the measurements saved on the mosaics and the frames (kept
     there too, deleted only with the workset)"""
-    shutil.rmtree(path(task, cid, MOSAICS_DIR), ignore_errors=True)
+    for d in (MOSAICS_DIR, FRAMES_DIR):
+        shutil.rmtree(path(task, cid, d), ignore_errors=True)
     viewer = path(task, cid, VIEWER_DIR)
     for name in os.listdir(viewer) if os.path.isdir(viewer) else []:
         if name not in KEPT_FILES:
@@ -169,6 +173,25 @@ def files(task, cid):
     return out
 
 
+def kept_frames(root, jpegs, removed, frames_dir):
+    """The dataset's JPEGs but those removed from the workset, linked (copied where the storage can't link) into
+    frames_dir at their paths in the dataset, so the mosaics name them as they would in the dataset itself"""
+    from .analysis import relative
+    kept = []
+    for jpeg in jpegs:
+        rel = relative(jpeg, root)
+        if rel in removed:
+            continue
+        dst = os.path.join(frames_dir, rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        try:
+            os.link(str(jpeg), dst)
+        except OSError:
+            shutil.copy2(str(jpeg), dst)
+        kept.append(Path(dst))
+    return kept
+
+
 def build(task, cid, write_progress):
     """
     Builds a conversion's mosaics into its folder (see result).
@@ -191,6 +214,11 @@ def build(task, cid, write_progress):
     max_pitch = DEFAULT_MAX_PITCH if max_pitch is None else max_pitch
 
     jpegs = dtc.scan(root).jpegs
+    removed = conversions.removed_paths(task, cid)
+    if removed:
+        # Only the frames the workset keeps (see conversions.remove_frames): removed once built, or by remove
+        root = path(task, cid, FRAMES_DIR)
+        jpegs = kept_frames(datasets.images_path(task), jpegs, removed, root)
     datasets.write_json(os.path.join(out_dir, VIEWER_DIR, PALETTES_FILE), dji_palettes(jpegs))
 
     state = {'stage': None}
@@ -232,6 +260,7 @@ def build(task, cid, write_progress):
                            palette=report.palette, preview_range_c=list(report.preview_range_c),
                            normalization=list(report.normalize_ambient_c) if report.normalize_ambient_c else None,
                            report=trimmed(m.report))
+    shutil.rmtree(path(task, cid, FRAMES_DIR), ignore_errors=True)
     return clean({'kinds': kinds, 'frames': frames, 'unit': unit, 'stripped': stripped,
                   'built_at': datasets.now()})
 

@@ -32,6 +32,7 @@ workset's id (12 hexadecimal characters).
 | GET, POST | `datasets/<dataset>/conversions` | The worksets; a new workset from settings. |
 | GET, PATCH, DELETE | `datasets/<dataset>/conversions/<workset>` | A workset, with each frame's `figures` (`min`, `max`, `mean`, `reflected`, `ambient` in °C, `emissivity`, `humidity`, `distance`, `distance_source`, as it measured them) and how far measuring them is (`figures_status`, `figures_progress`, `figures_error`; a workset converted before they were measured starts measuring them); rename it; delete it. |
 | POST | `.../conversions/<workset>/figures` | Measures its frames' figures again. |
+| POST | `.../conversions/<workset>/remove` | Removes frames from a converted workset (`frames`: their paths): their files and the measurements saved on them are deleted, and they move from `results.files` to `results.removed` (`path`, `removed_by`, `removed_at`), so new tasks and mosaics leave them out. Answers the workset, with `frames_removed`; its `removed` counts them, and `mosaic_outdated` says its mosaics were built with frames since removed. Refused while its mosaics are being built, and for the last converted frame. |
 | POST | `.../conversions/<workset>/cancel` | Cancels its conversion or mosaics. |
 | GET, POST | `.../conversions/<workset>/download` | The workset's files as a zip, or one of them; some of them as a zip (`file`, repeated: a form posted). |
 | GET, POST | `.../conversions/<workset>/task` | What a task from the workset would be (the plan's options, what stops it); makes the task. |

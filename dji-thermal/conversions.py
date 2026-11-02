@@ -7,7 +7,8 @@ Each conversion is a folder of the dataset's (see datasets), with records change
 
     thermal/conversions/<id>/conversion.json   its name, settings, who made it and when
     thermal/conversions/<id>/job.json          the conversion's status, progress, stage, error and run id
-    thermal/conversions/<id>/results.json      what was written for each image (see compact)
+    thermal/conversions/<id>/results.json      what was written for each image (see compact), and the frames
+                                               removed from it since (see remove_frames)
     thermal/conversions/<id>/output/           the files written, mirroring the images' folders
     thermal/conversions/<id>/mosaics/ ...      its mosaics, when built (see mosaics)
 
@@ -380,6 +381,59 @@ def job(task, cid):
 
 def results(task, cid):
     return datasets.read_json(path(task, cid, RESULTS_FILE))
+
+
+def removed_paths(task, cid):
+    """The frames removed from a conversion (see remove_frames), as paths in the dataset"""
+    return {f.get('path') for f in results(task, cid).get('removed') or []}
+
+
+class NotRemoved(ValueError):
+    """Frames that can't be removed from a conversion (the message is for the user)"""
+
+
+def remove_frames(task, cid, frames, user):
+    """
+    Frames taken out of a converted conversion: their files deleted and they moved from its results' files to its
+    'removed' ({path, removed_by, removed_at}), so its Files, the tasks and mosaics made from it after leave them out;
+    the measurements saved on them are deleted too. The tasks made before keep their images (links or copies), and
+    the mosaics built before stay as they are until built again (see mosaics.result's frames).
+    :return: how many were removed
+    :raises NotRemoved: the conversion isn't converted, its mosaics are being built, none of frames is one of its own,
+        or they are all it has
+    """
+    from . import measurements, mosaics
+    frames = set(frames)
+    with datasets.locked(task):
+        if job(task, cid)['status'] != 'ready':
+            raise NotRemoved("Only a converted workset's frames can be removed")
+        if mosaics.job(task, cid)['status'] == 'building':
+            raise NotRemoved("Wait for the mosaics to be built, or cancel them, before removing frames")
+        r = results(task, cid)
+        files = r.get('files') or []
+        gone = [f for f in files if f.get('path') in frames]
+        if not gone:
+            raise NotRemoved("None of these frames is in the workset")
+        kept = [f for f in files if f.get('path') not in frames]
+        if not any(f.get('ok') for f in kept):
+            raise NotRemoved("A workset keeps at least one converted frame: delete the workset instead")
+        out_dir = output_path(task, cid)
+        for f in gone:
+            for o in f.get('outputs') or []:
+                try:
+                    os.remove(os.path.join(out_dir, o))
+                except FileNotFoundError:
+                    pass
+        now = datasets.now()
+        r['files'] = kept
+        r['converted'] = sum(1 for f in kept if f.get('ok'))
+        r['skipped'] = len(kept) - r['converted']
+        r['removed'] = (r.get('removed') or []) + [{'path': f['path'], 'removed_by': user.username, 'removed_at': now}
+                                                   for f in gone]
+        datasets.write_json(path(task, cid, RESULTS_FILE), r)
+    measurements.remove_frames(task, measurements.frames_path(task, cid), {f['path'] for f in gone})
+    datasets.update_size(task)
+    return len(gone)
 
 
 def files_size(task, cid):

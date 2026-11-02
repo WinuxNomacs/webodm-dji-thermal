@@ -46,7 +46,10 @@ Each workset is listed with the settings it changed, how many images it converte
   in view as it scrolls; click one to sort by it, and again to reverse the order. The detail pane beside it shows the image under the mouse, or the one you click: the frame at its own
   size (click it for the picture viewer), all it was measured with, the workset's files for it, its temperatures as
   CSV or a float TIFF, and **Open frame**. Ctrl/Cmd-click or Shift-click selects several images, to download their
-  files as one zip. The figures are measured once, after the workset converts; an older workset's are measured the
+  files as one zip. **Remove from workset**, at the bottom of the pane, takes out an image that is more noise than
+  use (or those selected), once you confirm: its files are deleted, with the measurements saved on it, and the
+  workset's line counts it as removed. New tasks and mosaics are made without it; the tasks made before keep their
+  images, and mosaics built with it say so, with **Build again**. It needs the right to change the project. The figures are measured once, after the workset converts; an older workset's are measured the
   first time its Files are opened, which takes a few seconds.
 
 ![A workset's Files, the detail pane on the image under the mouse](images/workset-files.png)
