@@ -970,6 +970,110 @@ PLAN = {'process_args': ['--normalize', '--max-pitch', '-80', '--emissivity', '0
         'consider': {'fast-orthophoto': {'value': True, 'reason': "flat ground"}}}
 
 
+class TestRemovingFrames(AnalyzerTestCase):
+    def converted(self):
+        """A dataset with a conversion its job and results say converted three frames (a and b with files, c skipped)"""
+        task = self.create()
+        self.upload(task, [jpeg("a_T.jpg"), jpeg("b_T.jpg"), jpeg("c_T.jpg")])
+        with mock.patch.object(datasets, "start_job"):
+            cid = conversions.create(task, "Nadir", dict(conversions.DEFAULTS, mosaics=False), self.user)
+        out = conversions.output_path(task, cid)
+        for name in ("a_T_temp_c.tiff", "a_T_pseudo.png", "b_T_temp_c.tiff"):
+            with open(os.path.join(out, name), "w") as f:
+                f.write(name)
+        datasets.write_json(conversions.path(task, cid, conversions.RESULTS_FILE), {"files": [
+            {"path": "a_T.jpg", "ok": True, "outputs": ["a_T_temp_c.tiff", "a_T_pseudo.png"]},
+            {"path": "b_T.jpg", "ok": True, "outputs": ["b_T_temp_c.tiff"]},
+            {"path": "c_T.jpg", "ok": False, "reason": "not thermal", "outputs": []}], "converted": 2, "skipped": 1})
+        datasets.update_job(task, rel=conversions.rel(cid, "job.json"), status="ready", run_id="")
+        return task, cid
+
+    def remove(self, task, cid, frames, client=None):
+        return (client or self.client).post("{}/{}/conversions/{}/remove".format(API, task.id, cid), {"frames": frames},
+                                            format="json")
+
+    def test_removed_frames_lose_their_files_and_measurements_and_leave_the_workset_for_new_tasks(self):
+        task, cid = self.converted()
+        saved = measurements.frames_path(task, cid)
+        for frame in ("a_T.jpg", "b_T.jpg"):
+            measurements.add(task, saved, {"name": "On " + frame, "frame": frame}, self.user)
+        datasets.write_json(mosaics.path(task, cid, mosaics.RESULT_FILE), {"frames": ["a_T.jpg", "b_T.jpg"]})
+        self.assertFalse(self.client.get("{}/{}/conversions/{}".format(API, task.id, cid)).data["mosaic_outdated"])
+
+        res = self.remove(task, cid, ["a_T.jpg", "c_T.jpg", "elsewhere.jpg"])
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual(res.data["frames_removed"], 2)
+        self.assertEqual([f["path"] for f in res.data["results"]["files"]], ["b_T.jpg"])
+        self.assertEqual((res.data["converted"], res.data["skipped"], res.data["removed"]), (1, 0, 2))
+        self.assertEqual([(r["path"], r["removed_by"]) for r in res.data["results"]["removed"]],
+                         [("a_T.jpg", "testuser"), ("c_T.jpg", "testuser")])
+        # The mosaics built with a frame removed since are kept, to build again
+        self.assertTrue(res.data["mosaic_outdated"])
+        self.assertEqual(conversions.output_files(task, cid), ["b_T_temp_c.tiff"])
+        self.assertEqual([m["name"] for m in measurements.listed(saved)], ["On b_T.jpg"])
+        self.assertEqual(conversion_tasks.tiffs(task, cid), ["b_T_temp_c.tiff"])
+        self.assertEqual(conversions.removed_paths(task, cid), {"a_T.jpg", "c_T.jpg"})
+        # Its last converted frame stays: the workset is deleted instead
+        res = self.remove(task, cid, ["b_T.jpg"])
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("delete the workset", res.data["error"])
+        self.assertEqual(self.remove(task, cid, ["a_T.jpg"]).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_frames_are_removed_only_from_a_converted_workset_not_building_its_mosaics_by_who_can_change_it(self):
+        task, cid = self.converted()
+        assign_perm("view_project", User.objects.get(username="testuser2"), self.project)
+        self.assertEqual(self.remove(task, cid, ["a_T.jpg"], self.client_for("testuser2")).status_code,
+                         status.HTTP_404_NOT_FOUND)
+        for bad in ([], "a_T.jpg", [1]):
+            self.assertEqual(self.remove(task, cid, bad).status_code, status.HTTP_400_BAD_REQUEST, bad)
+        with mock.patch.object(datasets, "start_job"):
+            mosaics.start(task, cid)
+        res = self.remove(task, cid, ["a_T.jpg"])
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("mosaics", res.data["error"])
+        datasets.update_job(task, rel=mosaics.rel(cid, mosaics.JOB_FILE), status="ready")
+        datasets.update_job(task, rel=conversions.rel(cid, "job.json"), status="converting")
+        self.assertEqual(self.remove(task, cid, ["a_T.jpg"]).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(len(conversions.output_files(task, cid)), 3)
+
+    def test_the_mosaics_of_a_workset_with_frames_removed_are_built_of_links_to_the_frames_it_keeps(self):
+        root = os.path.join(self.create().task_path(), "scratch")
+        frames = [os.path.join(root, "images", p) for p in ("a_T.jpg", os.path.join("east", "b_T.jpg"), "c_T.jpg")]
+        for f in frames:
+            os.makedirs(os.path.dirname(f), exist_ok=True)
+            with open(f, "w") as out:
+                out.write(f)
+        kept = mosaics.kept_frames(os.path.join(root, "images"), frames, {"c_T.jpg"}, os.path.join(root, "kept"))
+        self.assertEqual([os.path.relpath(str(p), os.path.join(root, "kept")) for p in kept],
+                         ["a_T.jpg", os.path.join("east", "b_T.jpg")])
+        self.assertTrue(os.path.samefile(str(kept[1]), frames[1]))
+
+    @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def test_a_flights_mosaics_built_again_after_a_frame_is_removed_leave_it_out(self):
+        frames = flight_frames(6)
+        task = self.create()
+        with contextlib.ExitStack() as stack:
+            self.upload(task, [stack.enter_context(open(f, "rb")) for f in frames])
+        res = self.client.post("{}/{}/conversions".format(API, task.id),
+                               {"name": "Nadir", "settings": {"outputs": ["temp_c:tiff"]}}, format="json")
+        cid = res.data["id"]
+        built = mosaics.result(task, cid)["frames"]
+        self.assertGreater(len(built), 2)
+        res = self.remove(task, cid, [built[1]])
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertTrue(res.data["mosaic_outdated"])
+        self.assertEqual(self.client.post("{}/{}/conversions/{}/mosaics".format(API, task.id, cid)).status_code,
+                         status.HTTP_200_OK)
+        d = self.client.get("{}/{}/conversions/{}".format(API, task.id, cid)).data
+        self.assertEqual(d["mosaic_status"], "ready", d["mosaic_error"])
+        self.assertFalse(d["mosaic_outdated"])
+        self.assertEqual(mosaics.result(task, cid)["frames"], [f for f in built if f != built[1]])
+        self.assertFalse(os.path.exists(mosaics.path(task, cid, mosaics.FRAMES_DIR)))
+        # The viewer still finds the kept frames in the dataset
+        self.assertEqual(self.client.get("{}/{}/conversions/{}/mosaics/as_converted/frames/0.png".format(
+            API, task.id, cid)).status_code, status.HTTP_200_OK)
+
+
 class TestConversionTasks(AnalyzerTestCase):
     def converted(self, frames=("a/DJI_0001_T.JPG", "b/DJI_0001_T.JPG", "b/DJI_0002_T.JPG"), task=None, **settings):
         """A dataset (or another conversion of `task`) with a WebODM plan and a converted conversion whose results name

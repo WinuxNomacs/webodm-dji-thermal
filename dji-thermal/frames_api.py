@@ -17,12 +17,7 @@ from .analyzer_api import DatasetView, download_name, get_conversion
 
 # What a frame's values tile is made of, in its ETag
 VALUES_VERSION = 1
-FILE = 'frame-measurements.json'
-
-
-def measurements_path(task, cid):
-    """The measurements saved on a workset's frames: beside its mosaics' (the Inspector lists those on the map)"""
-    return conversions.path(task, cid, mosaics.VIEWER_DIR, FILE)
+measurements_path = measurements.frames_path
 
 
 def frame_palettes():
