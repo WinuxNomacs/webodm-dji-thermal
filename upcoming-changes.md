@@ -17,21 +17,27 @@
     deleted the whole `viewer/` folder, with the measurements saved on the mosaics (`measurements.json`) and on the
     frames (`frame-measurements.json`) in it; it now keeps those (`mosaics.KEPT_FILES`), deleted only with the
     workset. Django (`test_building_the_mosaics_again_keeps_the_measurements_saved_on_them_and_on_the_frames`).
-  - Next: **removing frames from a workset** (the user, 2026-11-02, from `new.md`): "on the Files view detail pane
+  - Done: **removing frames from a workset** (the user, 2026-11-02, from `new.md`: "on the Files view detail pane
     for a image in a Workset, add the ability to delete a file from the workset; or multiple if more than one
     selected. This allows the user to manually remove files that are more noise than they desire. Then they can
-    create new mosaics and tasks from the reduced file set if they so please." Builds on the workset's Files detail
-    pane and its selection (`conversions.js` `resultDetailHtml`, `downloadSelected`). What the code does now: a task
-    from the workset takes every ok frame's TIFF in `results.json` (`conversion_tasks.tiffs`), so marking a frame
-    removed there leaves it out of new tasks; but the mosaics are built from all the dataset's photos
-    (`mosaics.build`: `dtc.scan(root).jpegs`), so they need to be limited to the workset's kept frames. Proposed: a
-    **Remove from workset** button in the pane (for one or the selection), with a confirmation naming how many; it
-    deletes those frames' outputs from the workset's folder and records them in `results.json` as removed (by whom,
-    when), needing the right to change the project (as deleting a workset); the figures stay with them; tasks already
-    made keep their images. Decided (the user, 2026-11-02): **a removed frame is gone from the table**, the
-    workset's summary line counting the removed frames ("217 converted · 3 removed"); **mosaics built before are
-    kept, marked out of date** ("built with frames since removed", with Build again); **measurements saved on a
-    removed frame are deleted with it**.
+    create new mosaics and tasks from the reduced file set if they so please."), `remove-workset-frames`. Decided (the
+    user, 2026-11-02): a removed frame is gone from the table, the workset's line counting them ("325 converted · 2
+    removed"); mosaics built before are kept, marked out of date ("The mosaics were built with frames since removed",
+    with Build again); measurements saved on a removed frame are deleted with it. **Remove from workset** at the
+    bottom of the detail pane (one image, or "Remove N from workset" for the selection), for those who can change the
+    project, once converted (disabled while the mosaics are built), with a confirmation. `conversions.remove_frames`
+    deletes their outputs and moves them from `results.json`'s files to its `removed` (path, by whom, when), so new
+    tasks (`conversion_tasks.tiffs`) and the frame page leave them out; it refuses removing the last converted frame
+    (delete the workset instead). Mosaics built again are built from hard links (copies where the storage can't link)
+    to the frames the workset keeps, at their paths in the dataset (`mosaics.kept_frames`, `mosaic-frames/`, removed
+    once built), so the viewer finds them as before. The summary's `removed` and `mosaic_outdated` (a removed frame
+    among the mosaics' frames). `POST .../conversions/<workset>/remove` (`ConversionRemoveFrames`);
+    `measurements.frames_path`, `remove_frames`; `conversions.js` (`removeButtonHtml`, `removeFrames`, `mosaicHtml`).
+    README, `quickstart-worksets.md`, `api.md`, `troubleshooting.md`, `workset-files.png` retaken. Django
+    (`TestRemovingFrames`: files, measurements and tasks; who and when; links; a flight's mosaics built again
+    without the frame), Jest (the pane's button, the confirmation, the count, the out-of-date note). Live: a "Live
+    check" copy of a Roof Sample workset (outputs hard-linked, records copied), 2 frames removed in the page (327 → 325
+    rows, 662 → 658 files, mosaics marked out of date), then deleted through the page; the original untouched.
   - Done: **a workset's Files table: its header in view, aligned and sortable** (the user, 2026-11-02, with a
     screenshot: "Make the Files table header row sticky ... Shade the background of the header row ... Align the
     column contents with the header row ... Each column should be sortable ascending/descending where sensible.
