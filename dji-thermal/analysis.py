@@ -123,6 +123,23 @@ def compact(result, root, version=""):
                   'webodm': plan, 'version': version})
 
 
+def severities(analysis):
+    """The findings counted by severity, {'error', 'warning', 'info'}, those naming only oblique frames (which the pitch
+    limit leaves out of a map) as info: the dataset page shows them under the oblique frames' finding
+    (dataset.js foldFindings)"""
+    findings = analysis.get('findings') or []
+    oblique = set(next((f.get('files') or [] for f in findings if f.get('code') == 'oblique'), []))
+    out = {'error': 0, 'warning': 0, 'info': 0}
+    for f in findings:
+        severity = f.get('severity')
+        names = f.get('files') or []
+        if severity != 'error' and f.get('code') != 'oblique' and names and all(n in oblique for n in names):
+            severity = 'info'
+        if severity in out:
+            out[severity] += 1
+    return out
+
+
 def analyze(task_id, run_id):
     """
     Analyzes a dataset (its task's id) and keeps the result with it, while its run is still run_id.

@@ -133,13 +133,14 @@
 .ta-page .ta-table-scroll{ overflow-x: auto; }
 .ta-page .ta-files th[data-sort]{ cursor: pointer; white-space: nowrap; }
 .ta-page .ta-files td{ white-space: nowrap; font-size: 12px; }
-.ta-page .ta-files td:last-child{ white-space: normal; }
+.ta-page .ta-files td:last-child, .ta-page .ta-files td.ta-path{ white-space: normal; }
 .ta-page .ta-files .label{ margin-right: 3px; }
 .ta-page .ta-files tr.ta-kind-not_thermal td, .ta-page .ta-files tr.ta-kind-not_jpeg td{ opacity: .6; }
 .ta-page .ta-finding{ padding: 10px 14px; margin-bottom: 10px; }
 .ta-page .ta-suggestion{ margin-top: 4px; }
 .ta-page .ta-finding-files{ margin-top: 6px; font-size: 12px; }
 .ta-page .ta-finding-files code{ margin-right: 4px; display: inline-block; }
+.ta-page .ta-finding-folded{ margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(128, 128, 128, .3); }
 .ta-page .ta-plan-command{ margin-bottom: 10px; }
 .ta-page .ta-steps{ display: flex; flex-wrap: wrap; gap: 4px 0; list-style: none; padding: 0; margin: 10px 0 4px; font-size: 13px; counter-reset: ta-step; }
 .ta-page .ta-steps li{ counter-increment: ta-step; opacity: .7; }

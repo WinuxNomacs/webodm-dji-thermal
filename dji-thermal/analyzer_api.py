@@ -31,7 +31,7 @@ from app.models import Project, Task
 from app.security import path_traversal_check
 from nodeodm import status_codes
 
-from . import (conversion_tasks, conversions, converter, correction, datasets, frames, inspector, inspector_api,
+from . import (analysis, conversion_tasks, conversions, converter, correction, datasets, frames, inspector, inspector_api,
                measurements, mosaics, portable)
 
 THUMBNAIL_SIZE = (96, 96)
@@ -52,6 +52,7 @@ def summary(task, user):
     a = datasets.analysis(task)
     s = a.get('summary') or {}
     files = s.get('files') or {}
+    counts = analysis.severities(a)
     job = datasets.job(task)
     created = datasets.info(task)
     images = datasets.image_files(task)
@@ -71,9 +72,9 @@ def summary(task, user):
         'size': int((task.size or 0) * 1024 * 1024),
         'thermal': files.get('thermal', 0),
         'not_thermal': sum(n for k, n in files.items() if k != 'thermal'),
-        'errors': s.get('error', 0),
-        'warnings': s.get('warning', 0),
-        'infos': s.get('info', 0),
+        'errors': counts['error'],
+        'warnings': counts['warning'],
+        'infos': counts['info'],
         'cameras': sorted({c.get('model') or "" for c in a.get('cameras') or []}),
         'analyzed': bool(a),
         'analyzed_at': a.get('analyzed_at'),

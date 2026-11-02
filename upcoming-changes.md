@@ -280,6 +280,19 @@
     table scrolls sideways in its own box when the detail pane is open (Distance's header is cut).
   - U3-4: Dataset page › Problems: two of the four warnings (7 hottest, 39 coldest) are oblique frames only, which
     the pitch limit removes; fold such a warning into the pitch note, so the step bar's count shows what affects a map.
+  Done (2026-11-02), `u3-dataset-files`: U3-1 the name is filled from the first thermal photo's EXIF (IFD0 Model and
+  DateTime, read in the browser: `analyzer_core.js` `exifCamera`, `readCamera`, `datasetName`), "M4T 2026-10-12",
+  the day from a DJI file name when the EXIF has none; without a camera, the folder unless generic (images, DCIM,
+  100MEDIA…), else "Thermal dataset"; a name typed meanwhile is kept. U3-2 the project the list is filtered to, else
+  the last one a dataset went to (`thermalAnalyzer.newDatasetProject`, this browser), kept through the list's polls
+  (which used to reset it to the first). U3-3 the Files tab opens on Thermal frames (All files when there are none),
+  without the Kind column there; names may wrap after their timestamp (`<wbr>`), so every column fits beside the
+  detail pane. U3-4 a non-error finding naming only the oblique finding's frames is shown under it, "Only in oblique
+  frames" (`dataset.js` `foldFindings`), and not counted on the tab, in the steps or in the datasets list
+  (`analysis.severities`). Tests: Jest `analyzer.test.js`, `test_analyzer.py`
+  (`test_the_list_counts_a_warning_naming_only_oblique_frames_as_info`). Checked live (read only) on the "Thermal -
+  9/18/2026" dataset and New Dataset with the M4T flight's folder (nothing created). README,
+  `quickstart-analyzer.md`; `new-dataset.png` (photos chosen, the name filled) and `dataset-files.png` retaken.
 - **U4. The frame page** (UX review, 2026-11-02). Mosaic viewer › Open this frame › frame page:
   - U4-1: the list doesn't show the frame opened (0022 opened, 0001 to 0017 shown); scroll it into view, centred,
     and highlight it.

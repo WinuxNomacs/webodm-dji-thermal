@@ -145,8 +145,9 @@ analysis and worksets at a glance (how many worksets, or how many of them are re
 
 ### A dataset and its analysis
 
-**New Dataset**: a name, the project and the flight's photos (or their folder, whose subfolders are kept; you can
-also drop them on the page). Only JPEGs are uploaded; the RGB photos taken with the thermal ones are listed, not
+**New Dataset**: the flight's photos (or their folder, whose subfolders are kept; you can also drop them on the
+page), the project (the one the list is filtered to, else the last one used) and a name (filled in from the camera
+and the day the photos were taken, "M4T 2026-10-12"). Only JPEGs are uploaded; the RGB photos taken with the thermal ones are listed, not
 analyzed. The photos are then analyzed with dji-thermal-cli's check, in WebODM's worker, with its progress and a
 Cancel button.
 
@@ -159,9 +160,8 @@ photos to temperatures on a map, each done (✓) or a link to where it is done: 
 (starting from the WebODM plan's settings), create a task from it, measure on the map once the task is processed.
 Then:
 
-- **Files**: every file with its capture time, height, gimbal pitch, temperatures, distance (recorded and the
-  rangefinder's) and emissivity (the problems that name it in its detail pane); filtered by name, by kind or to those with
-  problems, sorted by any column, with thumbnails if you like (in your preferred DJI palette, if you chose one).
+- **Files**: the thermal frames (or every file, or those with problems) with their capture time, height, gimbal pitch, temperatures, distance (recorded and the
+  rangefinder's) and emissivity (the problems that name it in its detail pane); filtered by name, sorted by any column, with thumbnails if you like (in your preferred DJI palette, if you chose one).
   Click a file to open a detail pane beside the table: its picture (a thermal frame drawn from its temperatures in
   your preferred DJI palette, else in the one it was shot in) and everything the analysis read from it (camera, position, gimbal, temperatures, measurement
   parameters, warnings), with **Download** (the file as uploaded) and, for a thermal frame once a workset has converted,
@@ -178,7 +178,9 @@ Then:
   **Analyze again**.
 - **Problems**: what dji-thermal-cli found (errors, warnings, notes), each with what addresses it in the Workset
   Creation Settings' terms and the files it names (a file's value in its tooltip). Where one setting addresses it
-  (Normalize, frames at or below −80°), a button sets it in the form on the Worksets tab.
+  (Normalize, frames at or below −80°), a button sets it in the form on the Worksets tab. A warning naming only
+  oblique frames is shown under the oblique frames' note and not counted (on the tab, in the steps and in the list of
+  datasets): the pitch limit leaves those frames out.
 - **WebODM plan**: how well the frames cover the ground, the task options to use (each with its section in
   WebODM's task options; to copy, or **Save as a WebODM preset** to pick in a new task), **Use these settings**
   for the workset that prepares the images (also as a dji-thermal-cli command, folded), and notes.

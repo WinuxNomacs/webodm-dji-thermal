@@ -154,6 +154,9 @@
 
     function cell(row, col) {
         var v = row[col.key];
+        // Long names may wrap after a folder or before a number ("DJI_20260918084442_ 0001_T.JPG"), so the table
+        // fits beside the detail pane
+        if (col.key === "path") return esc(v).replace(/\/|_(?=\d)/g, "$&<wbr>");
         if (col.key === "kind") return esc(core.kindLabel(v));
         if (col.key === "time") return esc(captureTime(v));
         if (col.key === "distance") {
@@ -187,7 +190,9 @@
     function filesTableHtml(a, view) {
         var rows = fileRows(a, view);
         var selected = view.selected || [];
-        var html = '<div class="ta-table-scroll"><table class="table table-condensed ta-files"><thead><tr>' + (view.thumbs ? "<th></th>" : "") + FILE_COLUMNS.map(function (c) {
+        // Kind says nothing when only thermal frames are shown
+        var columns = FILE_COLUMNS.filter(function (c) { return c.key !== "kind" || view.show !== "thermal"; });
+        var html = '<div class="ta-table-scroll"><table class="table table-condensed ta-files"><thead><tr>' + (view.thumbs ? "<th></th>" : "") + columns.map(function (c) {
             var arrow = (view.sort || "path") === c.key ? ' <i class="fa fa-caret-' + (view.desc ? "down" : "up") + '"></i>' : "";
             return '<th data-sort="' + c.key + '"' + (c.title ? ' title="' + esc(c.title) + '"' : "") + ">" + esc(c.label) + arrow + "</th>";
         }).join("") + "</tr></thead><tbody>";
@@ -196,8 +201,8 @@
             var thumb = view.thumbs ? '<td class="ta-thumb">' + (core.isImage({name: r.path}) ?
                 '<img loading="lazy" alt="" src="' + esc(view.thumbs + encodeURIComponent(r.path)) + '">' : "") + "</td>" : "";
             return '<tr class="ta-kind-' + esc(r.kind) + (selected.indexOf(r.path) >= 0 ? " ta-selected" : "") + '" data-path="' + esc(r.path) + '">' + thumb +
-                FILE_COLUMNS.map(function (c) {
-                    return "<td>" + (href && c.key === "path" ? '<a href="' + esc(href) + '" title="Open the frame">' + cell(r, c) + "</a>" : cell(r, c)) + "</td>";
+                columns.map(function (c) {
+                    return "<td" + (c.key === "path" ? ' class="ta-path"' : "") + ">" + (href && c.key === "path" ? '<a href="' + esc(href) + '" title="Open the frame">' + cell(r, c) + "</a>" : cell(r, c)) + "</td>";
                 }).join("") + "</tr>";
         }).join("");
         return {html: html + "</tbody></table></div>", count: rows.length};
@@ -395,7 +400,7 @@
     function stepsHtml(d) {
         var a = d.analysis || {};
         if (!a.files) return "";
-        var serious = (a.findings || []).filter(function (f) { return f.severity !== "info"; });
+        var serious = seriousFindings(a);
         var errors = serious.filter(function (f) { return f.severity === "error"; }).length;
         var ready = (d.conversions || []).filter(function (c) { return c.status === "ready"; });
         var tasks = [];
@@ -426,28 +431,61 @@
         }).join("") + "</ol>";
     }
 
+    // The findings that name only oblique frames (every file in the "oblique" finding's), which the pitch limit leaves
+    // out of a map: shown under that finding and not counted as problems; errors stay where they are.
+    // {shown: [finding], folded: [finding]}
+    function foldFindings(findings) {
+        var oblique = findings.filter(function (f) { return f.code === "oblique"; })[0];
+        var inOblique = {};
+        ((oblique || {}).files || []).forEach(function (p) { inOblique[p] = true; });
+        var out = {shown: [], folded: []};
+        findings.forEach(function (f) {
+            var files = f.files || [];
+            var only = f !== oblique && f.severity !== "error" && files.length && files.every(function (p) { return inOblique[p]; });
+            out[only ? "folded" : "shown"].push(f);
+        });
+        return out;
+    }
+
+    // The warnings and errors that count: the tab's badge and the step bar's
+    function seriousFindings(a) {
+        return foldFindings(a.findings || []).shown.filter(function (f) { return f.severity !== "info"; });
+    }
+
+    // A finding's files, each a link to the Files tab filtered to it
+    function findingFilesHtml(f, message) {
+        var files = f.files || [];
+        if (!files.length) return "";
+        var listed = files.slice(0, FILES_SHOWN).map(function (p) {
+            var name = p.split("/").pop(), value = message.values[name] || message.values[p];
+            return '<a href="#files" data-file="' + esc(p) + '" title="' + (value ? esc(value) + ": " : "") + 'Show it on the Files tab"><code>' + esc(p) + "</code></a>";
+        }).join(" ");
+        if (files.length > FILES_SHOWN) listed += ' <span class="text-muted">and ' + (files.length - FILES_SHOWN) + " more</span>";
+        return '<div class="ta-finding-files">' + listed + "</div>";
+    }
+
     // The Problems tab: the findings, most severe first, each with what addresses it (and a button setting it in the
-    // form, canConvert) and the files it names (each a link to the Files tab filtered to it)
+    // form, canConvert) and the files it names; those only in oblique frames under the oblique frames' finding
     function problemsHtml(a, canConvert) {
         var findings = a.findings || [];
         if (!findings.length) return '<p class="text-success ta-none"><i class="fa fa-check"></i> dji-thermal-cli found no problems in this dataset.</p>';
-        return findings.map(function (f) {
+        var split = foldFindings(findings);
+        return split.shown.map(function (f) {
             var cls = {error: "danger", warning: "warning", info: "info"}[f.severity] || "default";
-            var files = f.files || [];
             var message = findingMessage(f), fix = findingFix(f);
-            var listed = files.slice(0, FILES_SHOWN).map(function (p) {
-                var name = p.split("/").pop(), value = message.values[name] || message.values[p];
-                return '<a href="#files" data-file="' + esc(p) + '" title="' + (value ? esc(value) + ": " : "") + 'Show it on the Files tab"><code>' + esc(p) + "</code></a>";
-            }).join(" ");
-            if (files.length > FILES_SHOWN) listed += ' <span class="text-muted">and ' + (files.length - FILES_SHOWN) + " more</span>";
             var suggestion = fix ? fix.text : settingsWords(f.suggestion);
             var button = fix && fix.set && canConvert ? ' <button type="button" class="btn btn-default btn-xs" data-set="' + esc(JSON.stringify(fix.set)) +
                 '" data-label="' + esc(fix.label) + '" title="Set it in the Workset Creation Settings, on the Worksets tab"><i class="fa fa-magic"></i> ' +
                 esc(fix.label) + "</button>" : "";
+            var folded = f.code === "oblique" ? split.folded.map(function (g) {
+                var m = findingMessage(g);
+                return '<div class="ta-finding-folded" title="' + esc(g.code) + '"><div><span class="label label-default">Only in oblique frames</span> ' +
+                    esc(m.text) + "</div>" + findingFilesHtml(g, m) + "</div>";
+            }).join("") : "";
             return '<div class="ta-finding alert alert-' + cls + '" title="' + esc(f.code) + '">' +
                 '<div><span class="label label-' + cls + '">' + esc(core.severityLabel(f.severity)) + "</span> " + esc(message.text) + "</div>" +
                 (suggestion ? '<div class="ta-suggestion"><i class="fa fa-lightbulb"></i> ' + esc(suggestion) + button + "</div>" : "") +
-                (files.length ? '<div class="ta-finding-files">' + listed + "</div>" : "") +
+                findingFilesHtml(f, message) + folded +
                 "</div>";
         }).join("");
     }
@@ -567,7 +605,7 @@
         var palette = core.preferences().palette;
         var thumbsUrl = url + "/thumbnail?" + (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file=";
         var $ = function (i) { return doc.getElementById(i); };
-        var dataset = null, view = {show: "all", sort: "path", desc: false, filter: ""}, tab = "convert", tabChosen = false, timer = null, uploading = false;
+        var dataset = null, view = {show: null, sort: "path", desc: false, filter: ""}, tab = "convert", tabChosen = false, timer = null, uploading = false;
         var filesKey = null;
         var planShown = null, preset = null;    // the WebODM plan tab as drawn; its preset panel, when open: {info, draft}
         try { view.thumbs = root.localStorage && root.localStorage.getItem(THUMBS_KEY) === "1" ? thumbsUrl : null; } catch (e) { view.thumbs = null; }
@@ -661,7 +699,9 @@
             view.frames = framePage(publicUrl, d);
             if (a.files) {
                 $("ta-files-count").textContent = a.files.length;
-                var serious = (a.findings || []).filter(function (f) { return f.severity !== "info"; }).length;
+                // The Files tab opens on the thermal frames, the visible photos listed first otherwise
+                if (!view.show) view.show = a.files.some(function (f) { return f.kind === "thermal"; }) ? "thermal" : "all";
+                var serious = seriousFindings(a).length;
                 $("ta-problems-count").textContent = serious || "";
                 // Polling redraws the rest: the Files tab only when it would change, not to lose the filter's focus
                 var key = [d.analyzed_at, a.files.length, view.frames].join("|");
@@ -1169,7 +1209,7 @@
 
     var api = {planOptions: planOptions, presetOptions: presetOptions, presetHtml: presetHtml, readPresetForm: readPresetForm,
                captureTime: captureTime, median: core.median, overview: overview, summaryRows: summaryRows, duration: duration, overviewHtml: overviewHtml, flagsByFile: flagsByFile,
-               framePage: framePage, fromQuery: fromQuery, sortRows: core.sortRows, fileRows: fileRows, detailRows: detailRows, viewerSrc: viewerSrc, viewerItems: viewerItems, detailHtml: detailHtml, filesHtml: filesHtml, stepsHtml: stepsHtml, settingsWords: settingsWords, findingMessage: findingMessage, problemsHtml: problemsHtml, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
+               framePage: framePage, fromQuery: fromQuery, sortRows: core.sortRows, fileRows: fileRows, detailRows: detailRows, viewerSrc: viewerSrc, viewerItems: viewerItems, detailHtml: detailHtml, filesHtml: filesHtml, stepsHtml: stepsHtml, settingsWords: settingsWords, findingMessage: findingMessage, problemsHtml: problemsHtml, foldFindings: foldFindings, planHtml: planHtml, sharingHtml: sharingHtml, init: init};
     root.ThermalAnalyzerDataset = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

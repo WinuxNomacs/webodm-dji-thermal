@@ -212,6 +212,19 @@ class TestAnalysis(AnalyzerTestCase):
         self.assertTrue(d["analysis"]["version"])
         self.assertGreater(Task.objects.get(pk=task.id).size, size)
 
+    def test_the_list_counts_a_warning_naming_only_oblique_frames_as_info(self):
+        findings = [
+            {"severity": "info", "code": "oblique", "files": ["a_T.JPG", "b_T.JPG"]},
+            {"severity": "warning", "code": "temperature_max_outlier", "files": ["a_T.JPG"]},
+            {"severity": "warning", "code": "temperature_min_outlier", "files": ["a_T.JPG", "c_T.JPG"]},
+            {"severity": "error", "code": "unreadable", "files": ["b_T.JPG"]},
+            {"severity": "warning", "code": "rangefinder_distance", "files": []},
+        ]
+        self.assertEqual(analysis.severities({"findings": findings}), {"error": 1, "warning": 2, "info": 2})
+        # Without oblique frames every warning counts
+        self.assertEqual(analysis.severities({"findings": findings[1:]}), {"error": 1, "warning": 3, "info": 0})
+        self.assertEqual(analysis.severities({}), {"error": 0, "warning": 0, "info": 0})
+
     def test_a_canceled_or_restarted_run_writes_nothing(self):
         task = self.create()
         self.upload(task, [jpeg("a.jpg")])

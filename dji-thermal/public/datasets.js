@@ -3,6 +3,7 @@
 (function (root) {
     var core = root.ThermalAnalyzerCore || (typeof require !== "undefined" ? require("./analyzer_core") : null);
     var POLL_MS = 3000;
+    var PROJECT_KEY = "thermalAnalyzer.newDatasetProject";  // the project the last new dataset went to
 
     function problemsCell(d) {
         if (!d.analyzed) return "";
@@ -170,6 +171,8 @@
             }
         }
 
+        function canAddTo(id) { return projects.some(function (p) { return String(p.id) === String(id); }); }
+
         function fillProjects(all) {
             // The filter offers the projects that have datasets; New Dataset those the user can add to
             var seen = {}, current = filter.value;
@@ -181,9 +184,12 @@
             });
             filter.innerHTML = options.join("");
             filter.value = seen[current] ? current : "";
+            // Redrawn as the list reloads, keeping the project picked
+            var picked = $("ta-new-project").value;
             $("ta-new-project").innerHTML = all.map(function (p) {
                 return '<option value="' + p.id + '">' + core.escapeHtml(p.name) + "</option>";
             }).join("");
+            if (picked && canAddTo(picked)) $("ta-new-project").value = picked;
             $("ta-new").disabled = !all.length;
             $("ta-new").title = all.length ? "" : "Create a project on the Dashboard first: a dataset belongs to a project";
         }
@@ -278,8 +284,12 @@
             $("ta-new-chosen").textContent = images.length + " image(s), " + core.formatBytes(images.reduce(function (s, f) { return s + f.size; }, 0)) +
                 (chosen.length > images.length ? " (" + (chosen.length - images.length) + " other file(s) left out)" : "");
             if (!$("ta-new-name").value && images.length) {
-                var first = images[0].webkitRelativePath ? images[0].webkitRelativePath.split("/")[0] : "";
-                $("ta-new-name").value = first || "Thermal dataset";
+                // Named at once from the folder, then from the camera and day once its EXIF is read, unless typed over
+                var name = $("ta-new-name"), picked = chosen, proposed = core.datasetName(picked);
+                name.value = proposed;
+                core.readCamera(core.namingImage(picked)).then(function (camera) {
+                    if (chosen === picked && name.value === proposed) name.value = core.datasetName(picked, camera);
+                });
             }
         }
 
@@ -303,7 +313,11 @@
             $("ta-new-dir").value = "";
             $("ta-new-chosen").textContent = "The DJI thermal photos of a flight (the _T.JPG files). Visible photos can be included: they are listed, not analyzed.";
             $("ta-new-progress").hidden = true;
-            if (filter.value && projects.some(function (p) { return String(p.id) === filter.value; })) $("ta-new-project").value = filter.value;
+            // The project the list is filtered to, else the one the last dataset went to
+            var last = null;
+            try { last = root.localStorage.getItem(PROJECT_KEY); } catch (e) { /* none kept */ }
+            var start = [filter.value, last].filter(function (id) { return id && canAddTo(id); })[0];
+            if (start) $("ta-new-project").value = start;
             setError("");
             setStage("idle");
             dialog.hidden = false;
@@ -384,6 +398,7 @@
             send(API + "datasets", "POST", {name: name, project: $("ta-new-project").value})
                 .then(function (r) {
                     if (!r.ok) throw new Error(core.errorText(r.data, "Could not create the dataset."));
+                    try { root.localStorage.setItem(PROJECT_KEY, $("ta-new-project").value); } catch (e) { /* not remembered */ }
                     upload = {dataset: r.data, saved: 0, failed: []};
                     return sendImages(chosen);
                 })

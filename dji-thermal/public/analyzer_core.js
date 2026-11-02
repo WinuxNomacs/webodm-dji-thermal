@@ -135,6 +135,75 @@
 
     function isImage(file) { return /\.jpe?g$/i.test(file.name || ""); }
 
+    // The camera and the day a JPEG was taken, from its EXIF (IFD0's Model and DateTime): {model, date: "YYYY-MM-DD"},
+    // each null when not found. bytes: an ArrayBuffer of the file's start
+    function exifCamera(bytes) {
+        var out = {model: null, date: null};
+        var v = new DataView(bytes), n = v.byteLength, pos = 2;
+        if (n < 4 || v.getUint16(0) !== 0xFFD8) return out;
+        while (pos + 10 <= n && v.getUint8(pos) === 0xFF) {
+            var marker = v.getUint8(pos + 1);
+            if (marker === 0xDA) break;
+            if (marker === 0xE1 && v.getUint32(pos + 4) === 0x45786966) {  // "Exif", then the TIFF header
+                var t = pos + 10;
+                if (t + 8 > n) break;
+                var le = v.getUint16(t) === 0x4949;
+                var ifd = t + v.getUint32(t + 4, le);
+                var entries = ifd + 2 <= n ? v.getUint16(ifd, le) : 0;
+                for (var i = 0; i < entries && ifd + 14 + i * 12 <= n; i++) {
+                    var e = ifd + 2 + i * 12, tag = v.getUint16(e, le), len = v.getUint32(e + 4, le);
+                    if (v.getUint16(e + 2, le) !== 2 || (tag !== 0x0110 && tag !== 0x0132)) continue;
+                    var at = len <= 4 ? e + 8 : t + v.getUint32(e + 8, le), text = "";
+                    for (var k = 0; k < len && at + k < n && v.getUint8(at + k); k++) text += String.fromCharCode(v.getUint8(at + k));
+                    text = text.trim();
+                    if (tag === 0x0110) out.model = text || null;
+                    var day = /^(\d{4}):(\d\d):(\d\d)/.exec(text);
+                    if (tag === 0x0132 && day) out.date = day[1] + "-" + day[2] + "-" + day[3];
+                }
+                break;
+            }
+            pos += 2 + v.getUint16(pos + 2);
+        }
+        return out;
+    }
+
+    // exifCamera of a file's first 64 KB, {model: null, date: null} when it can't be read
+    function readCamera(file) {
+        var none = {model: null, date: null};
+        if (!file || !file.slice || typeof FileReader === "undefined") return Promise.resolve(none);
+        return new Promise(function (resolve) {
+            var reader = new FileReader();
+            reader.onload = function () {
+                try { resolve(exifCamera(reader.result)); } catch (e) { resolve(none); }
+            };
+            reader.onerror = function () { resolve(none); };
+            reader.readAsArrayBuffer(file.slice(0, 65536));
+        });
+    }
+
+    // Folders named for what any flight has, not for this one
+    var GENERIC_FOLDER = /^(images?|photos?|pictures?|dcim|\d{3}media|dji_\d+|thermal|rgb|new folder)$/i;
+
+    // A new dataset's name: the camera and the day ("M4T 2026-10-12", the day from a DJI file name when the EXIF has
+    // none); without them the folder chosen, unless its name is generic; else "Thermal dataset". camera: readCamera's
+    function datasetName(files, camera) {
+        camera = camera || {};
+        var images = files.filter(isImage).map(function (f) { return f.name; }).sort();
+        var named = images.map(function (name) { return /^DJI_(\d{4})(\d\d)(\d\d)\d{6}_/i.exec(name); }).filter(Boolean)[0];
+        var date = camera.date || (named ? named[1] + "-" + named[2] + "-" + named[3] : null);
+        if (camera.model && date) return camera.model + " " + date;
+        var first = files.filter(isImage)[0];
+        var folder = first && first.webkitRelativePath ? first.webkitRelativePath.split("/")[0] : "";
+        if (folder && !GENERIC_FOLDER.test(folder)) return folder;
+        return camera.model ? camera.model + (date ? " " + date : "") : "Thermal dataset";
+    }
+
+    // The image whose camera names a new dataset: the first thermal photo by name, else the first image
+    function namingImage(files) {
+        var images = files.filter(isImage).sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+        return images.filter(function (f) { return /_[TR]\.jpe?g$/i.test(f.name); })[0] || images[0] || null;
+    }
+
     // The upload requests: at most BATCH_FILES images and BATCH_BYTES each (a larger image goes alone)
     function batches(files, maxFiles, maxBytes) {
         maxFiles = maxFiles || BATCH_FILES;
@@ -529,7 +598,7 @@
     var api = {
         escapeHtml: escapeHtml, formatBytes: formatBytes, formatDate: formatDate, formatNumber: formatNumber,
         statusLabel: statusLabel, severityLabel: severityLabel, kindLabel: kindLabel, uploadName: uploadName,
-        isImage: isImage, batches: batches, uploadFiles: uploadFiles, readJson: readJson, unreachable: unreachable, errorText: errorText,
+        isImage: isImage, exifCamera: exifCamera, readCamera: readCamera, datasetName: datasetName, namingImage: namingImage, batches: batches, uploadFiles: uploadFiles, readJson: readJson, unreachable: unreachable, errorText: errorText,
         unitOf: unitOf, userUnit: userUnit, unitSymbol: unitSymbol, convertTemp: convertTemp, convertDelta: convertDelta,
         formatTemp: formatTemp, formatDelta: formatDelta, stageText: stageText, mosaicLabel: mosaicLabel,
         batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName,
