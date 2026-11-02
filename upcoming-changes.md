@@ -3,6 +3,27 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **Two requests lost from `new.md`** (the user, 2026-11-02; found in VSCode's history of `new.md`): each was saved
+  there a minute or more after Claude read the file, and Claude's clearing of it wrote over them unread. From now on
+  `new.md` is read again just before it is cleared, and only the lines turned into phases are removed.
+  - **The scale's span from two arrow buttons** (saved 12:10): "Add a left arrow button and right arrow button
+    between min/max temperature of the scale. When the user clicks the right arrow button min and max temperature
+    values should get further apart; increasing the span of the range. Inversely when the user clicks the left arrow
+    button, min and max should get nearer each other; reducing the span of the range. The increments by which the
+    change occurs will be based upon 10% the numeric distance between the 2 values." Builds on the Thermal
+    Inspector's colour scale (WebODM's map › the thermometer button › the panel, its range fields "min to max °C" and
+    Auto, `inspector.js` `scaleHtml`, `typedRange`). Proposed: ◀ and ▶ in place of "to" between the two fields
+    ("Narrow the range", "Widen the range"); each click moves both ends about the range's middle, the range drawn at
+    once as a typed one is (Auto then puts it back). Open: how far a click moves the ends; whether the mosaic viewer's
+    and the frame page's panels (the same "min to max" fields, `viewer.js` `controlsHtml`) get them too.
+  - **"Legend on the map" in the Preferences** (saved 11:30): "Move \"Show legend on the map\" out of the thermal
+    inspector and into the DJI Thermal Analyzer settings under Thermal Inspector settings." Builds on the Inspector
+    panel's "Legend on the map" tickbox (kept per browser, `dji-thermal-inspector:legend`) and the Preferences dialog
+    (DJI Thermal Analyzer › the gear: Temperature unit, Palette; saved per user, `conversions.display`). Proposed: the
+    tickbox leaves the Inspector's panel; the Preferences dialog gets a "Thermal Inspector" section with "Show the
+    legend on the map" (shown by default), saved with the user's other preferences on the server, so it follows them
+    to any browser; the browser's old setting is removed. Open: that it's the Preferences dialog (per user) meant,
+    not Administration › DJI Thermal (for every user).
 - **Manual Corrections off by default, and the frames window movable** (the user, 2026-11-02, from `new.md`):
   "Manual Corrections should be disabled by default." and "The Frame popout pane should be movable via drag and drop
   as well." Builds on the Thermal Inspector (WebODM's map › the thermometer button › the panel, `inspector.js`).
