@@ -18,6 +18,33 @@ The DJI Thermal plugin turns the radiometric thermal photos of a DJI drone (R-JP
 Temperatures are computed on your WebODM server by [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/),
 a pure-Python version of DJI's Thermal SDK. The plugin calls no outside service.
 
+## What you can do
+
+- **Get a temperature map straight from the drone's photos.** DJI Thermal Task converts the R-JPEGs as they upload,
+  so there's nothing to preprocess before a WebODM task: [A thermal map with DJI Thermal Task](quickstart-thermal-task.md).
+- **Check a flight before processing it.** What each photo is, the problems found, how well the frames cover the
+  ground, and the WebODM options to use, saved as a preset: [Checking a flight](quickstart-analyzer.md).
+- **Preview mosaics and try settings, then make WebODM models from the result.** Normalize, harmonize, change the
+  palette and the measurement values, leave out oblique frames, and compare worksets side by side; then make a WebODM
+  task from the one you pick, or try several in one task: [Worksets, mosaics and a task](quickstart-worksets.md).
+- **Compare mosaics and orthophotos, adjusting them in real time.** Lay a workset's mosaic on WebODM's map, swipe it
+  against a task's orthophoto, and change the palette, range, brightness, contrast, gamma and isotherm as you watch:
+  [Mosaic Overlays](quickstart-inspector.md#4-mosaic-overlays-on-the-map) and
+  [Colours, legend and isotherms](quickstart-inspector.md#3-colours-legend-and-isotherms).
+- **Analyze your results.** The temperature under the cursor, pins, lines with their profile, regions with their
+  statistics, histogram, surroundings and ΔT, isotherms, measurements saved for the project, and a correction for
+  another emissivity: [Measuring on the map](quickstart-inspector.md).
+- **Trace a temperature back to its photos.** The frames that saw a point on the map, each one measured in its own
+  pixels or measured again with other values: [The frames that saw a point](quickstart-inspector.md#5-the-frames-that-saw-a-point)
+  and [One frame at a time](quickstart-worksets.md#one-frame-at-a-time).
+- **Clean a dataset.** The hottest frames first, the frames without GPS, noisy frames or files removed, oblique
+  frames left out: [Read the summary](quickstart-analyzer.md#2-read-the-summary) and
+  [The workset](quickstart-worksets.md#2-the-workset).
+- **Export the temperatures.** TIFFs in °C, °F or K, CSV, colour PNGs, R-JPEGs and zips, with the location stripped
+  for sharing: [The converted images](converted-images.md).
+- **Keep everything on your own server.** No outside service is called; an administrator can have DJI's own SDK
+  compute the temperatures instead: [DJI's own Thermal SDK](dji-sdk.md).
+
 ## Quickstarts
 
 Each one walks through a task from start to finish.
