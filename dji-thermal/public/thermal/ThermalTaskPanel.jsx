@@ -42,7 +42,7 @@ export default class ThermalTaskPanel extends React.Component {
             unit: defaultUnit(unitSystem()),
             errors: {},
             keepPhotos: false,
-            frames: {normalize: false, harmonize: false},
+            frames: {normalize: false, harmonize: false, mosaics: false},
             palette: "",
             error: "",
             progress: null
@@ -171,7 +171,7 @@ export default class ThermalTaskPanel extends React.Component {
     handleFramesChange = e => {
         const frames = Object.assign({}, this.state.frames, {[e.target.name]: e.target.checked});
         if (e.target.name === "harmonize" && e.target.checked) frames.normalize = true;
-        if (e.target.name === "normalize" && !e.target.checked) frames.harmonize = false;
+        if (e.target.name === "normalize" && !e.target.checked) frames.harmonize = frames.mosaics = false;
         this.setState({frames});
     };
 
@@ -213,6 +213,15 @@ export default class ThermalTaskPanel extends React.Component {
                     </label>
                     <span className="help-block">{_("The camera drifts between its recalibrations: removing it leaves no seams in the map. Compares the frames' overlaps, which takes a while. Normalizes too.")}</span>
                 </div>
+                {frames.normalize ?
+                    <div className="checkbox">
+                        <label>
+                            <input type="checkbox" name="mosaics" checked={frames.mosaics} onChange={this.handleFramesChange} />
+                            {" "}{_("Also build the workset's mosaics")}
+                        </label>
+                        <span className="help-block">{_("The DJI Thermal Analyzer's mosaics of the converted photos, built after the task starts. They can be built later from the workset's menu (Build mosaics).")}</span>
+                    </div>
+                : ""}
                 {frames.normalize ?
                     <p className="help-block">{_("All the photos are uploaded first, to the task's DJI Thermal Analyzer dataset; WebODM's worker then converts them in a workset of it, and the task starts processing once they are converted. You can close the page once the upload is done.")}</p>
                 : ""}

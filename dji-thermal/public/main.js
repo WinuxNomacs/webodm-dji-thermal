@@ -16,6 +16,39 @@ PluginsAPI.Map.willAddControls(["leaflet", "dji-thermal/inspector.css", "dji-the
     if (window.ThermalInspector) window.ThermalInspector.create(args, L);
 });
 
+// A component of the plugin's built bundles (public/build), loaded once it is shown. A task panel's button can't wait
+// for its dependencies: WebODM's trigger stops listening after the first answer (ApiFactory.js), which the buttons
+// below give at once
+window.DjiThermalLazy = function(bundle){
+    function Lazy(props){
+        React.Component.call(this, props);
+        this.state = {component: null};
+    }
+    Lazy.prototype = Object.create(React.Component.prototype);
+    Lazy.prototype.constructor = Lazy;
+    Lazy.prototype.componentDidMount = function(){
+        var self = this;
+        return PluginsAPI.SystemJS.import(bundle).then(function(m){
+            if (!self.unmounted) self.setState({component: m["default"] || m});
+        });
+    };
+    Lazy.prototype.componentWillUnmount = function(){ this.unmounted = true; };
+    Lazy.prototype.render = function(){
+        return this.state.component ? React.createElement(this.state.component, this.props) : null;
+    };
+    return Lazy;
+};
+
+// A DJI Thermal Task's photos being normalized or harmonized in a workset: its progress in the task's panel until the
+// task starts, so a refreshed page still shows it (thermal/WorksetProgress.jsx). Added before the Thermal dataset
+// button, so it comes first in the panel
+var DjiThermalWorksetProgress = window.DjiThermalLazy("dji-thermal/build/WorksetProgress.js");
+PluginsAPI.Dashboard.addTaskActionButton(function(args){
+    var task = args.task || {};
+    if (!task.partial || !task.id || task.project == null || (task.tags || []).indexOf(".dji-thermal-task") === -1) return null;
+    return React.createElement(DjiThermalWorksetProgress, {projectId: task.project, taskId: task.id});
+});
+
 // A Thermal dataset button on a task's expanded panel: on the dataset's own task (its hidden tag) and on a task linked
 // to one (the tag naming the dataset, see conversion_tasks.py). A task made by the Thermal Task button (its tag), or
 // one with a thermal orthophoto, that has none gets Create thermal dataset instead: the task becomes a dataset itself
@@ -46,38 +79,6 @@ PluginsAPI.Dashboard.addTaskActionButton(function(args){
         title: "Make a dataset for this task in the DJI Thermal Analyzer, to hold the flight's photos, and open it",
         onClick: function(e){ window.DjiThermalTaskDataset.create(task, e.currentTarget); }
     }, React.createElement("i", {className: "fa fa-thermometer-half fa-fw"}), " Create thermal dataset");
-});
-
-// A component of the plugin's built bundles (public/build), loaded once it is shown. A task panel's button can't wait
-// for its dependencies: WebODM's trigger stops listening after the first answer (ApiFactory.js), which the buttons
-// above give at once
-window.DjiThermalLazy = function(bundle){
-    function Lazy(props){
-        React.Component.call(this, props);
-        this.state = {component: null};
-    }
-    Lazy.prototype = Object.create(React.Component.prototype);
-    Lazy.prototype.constructor = Lazy;
-    Lazy.prototype.componentDidMount = function(){
-        var self = this;
-        return PluginsAPI.SystemJS.import(bundle).then(function(m){
-            if (!self.unmounted) self.setState({component: m["default"] || m});
-        });
-    };
-    Lazy.prototype.componentWillUnmount = function(){ this.unmounted = true; };
-    Lazy.prototype.render = function(){
-        return this.state.component ? React.createElement(this.state.component, this.props) : null;
-    };
-    return Lazy;
-};
-
-// A DJI Thermal Task's photos being normalized or harmonized in a workset: its progress in the task's panel until the
-// task starts, so a refreshed page still shows it (thermal/WorksetProgress.jsx)
-var DjiThermalWorksetProgress = window.DjiThermalLazy("dji-thermal/build/WorksetProgress.js");
-PluginsAPI.Dashboard.addTaskActionButton(function(args){
-    var task = args.task || {};
-    if (!task.partial || !task.id || task.project == null || (task.tags || []).indexOf(".dji-thermal-task") === -1) return null;
-    return React.createElement(DjiThermalWorksetProgress, {projectId: task.project, taskId: task.id});
 });
 
 window.DjiThermalTaskDataset = {

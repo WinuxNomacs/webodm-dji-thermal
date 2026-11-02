@@ -18,6 +18,13 @@ They're R-JPEGs from a camera dji-thermal-cli doesn't decode. See [Cameras](inde
 
 Those photos are left out and the task goes on with the others. The reason says what went wrong with the photo.
 
+**"Converted, but the task didn't start."**, with a **Start processing** button
+
+The photos were converted, but their images didn't go into the task, which still waits for them (the reason follows,
+when there is one). **Start processing** puts them in and starts the task on the processing node chosen. Don't use
+WebODM's own **Start Processing** for it: the task has no images until the plugin puts them there. WebODM deletes a
+task left waiting for its images after 72 hours.
+
 **No DJI Thermal Task button on the dashboard**
 
 The plugin's scripts didn't load. Install the plugin from a release zip or WebODM's plugin list, which include the

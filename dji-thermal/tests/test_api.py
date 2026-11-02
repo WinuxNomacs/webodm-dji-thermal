@@ -306,10 +306,15 @@ class TestTaskWorkset(ApiTestCase):
         self.assertEqual({k: record["settings"][k] for k in ("normalize", "harmonize", "emissivity", "unit", "reflected_temp",
                                                              "distance", "outputs", "mosaics")},
                          {"normalize": True, "harmonize": True, "emissivity": 0.9, "unit": "F", "reflected_temp": 70.0,
-                          "distance": "embedded", "outputs": ["temp_c:tiff"], "mosaics": True})
+                          "distance": "embedded", "outputs": ["temp_c:tiff"], "mosaics": False})
         # The panel's palette is the task's and the workset's
         self.assertEqual((record["settings"]["palette"], conversion_tasks.task_palette(self.task)), ("hotiron", "hotiron"))
         self.assertEqual(record["then"], {"processing_node": None, "auto_processing_node": True})
+        # No mosaics unless asked: the Analyzer builds them from the workset later
+        self.assertFalse(record["settings"]["mosaics"])
+        with mock.patch.object(datasets, "start_job"):
+            cid = self.client.post(self.url, {"settings": {"normalize": True, "mosaics": True}}, format="json").data["id"]
+        self.assertTrue(conversions.record(self.task, cid)["settings"]["mosaics"])
 
     def test_the_workset_s_progress_says_how_far_it_is_and_whether_the_task_started(self):
         self.assertEqual(self.client.get(self.url).status_code, status.HTTP_404_NOT_FOUND)
@@ -322,7 +327,11 @@ class TestTaskWorkset(ApiTestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
         self.assertEqual(res.data, {"id": cid, "status": "converting", "progress": 0.25,
                                     "stage": {"stage": "align", "step": 2, "steps": 5}, "error": "", "photos": 1,
-                                    "committed": False, "task_error": ""})
+                                    "committed": False, "task_error": "", "since_converted": None})
+        # Converted: how long ago, so a task that didn't start can be told apart
+        datasets.update_job(self.task, rel=conversions.rel(cid, conversions.JOB_FILE), status="ready", progress=1,
+                            finished_at="2026-11-01T23:19:31+00:00")
+        self.assertGreater(self.client.get(self.url).data["since_converted"], 60)
         Task.objects.filter(pk=self.task.pk).update(partial=False, last_error="No node")
         self.assertEqual({k: self.client.get(self.url).data[k] for k in ("committed", "task_error")},
                          {"committed": True, "task_error": "No node"})
@@ -355,6 +364,27 @@ class TestTaskWorkset(ApiTestCase):
                          (False, node.id, 3, None))
         self.assertEqual(sorted(self.task.scan_images()), ["DJI_0001_T_temp_c.tiff", "DJI_0002_T_temp_c.tiff", "gcp_list.txt"])
         process.delay.assert_called_once_with(self.task.id)
+
+    def test_start_processing_puts_a_converted_worksets_tiffs_in_a_task_that_did_not_start(self):
+        self.made_dataset()
+        with mock.patch.object(datasets, "start_job"):
+            cid = self.client.post(self.url, {"settings": {"normalize": True}}, format="json").data["id"]
+        start = self.url + "/start"
+        self.assertIn("isn't converted", str(self.client.post(start).data))
+        out = conversions.output_path(self.task, cid)
+        for name in ("DJI_0001_T_temp_c.tiff", "DJI_0002_T_temp_c.tiff"):
+            with open(os.path.join(out, name), "wb") as f:
+                f.write(b"II*\0")
+        datasets.write_json(conversions.path(self.task, cid, conversions.RESULTS_FILE), {"files": [
+            {"path": n.replace("_temp_c.tiff", ".JPG"), "ok": True, "outputs": [n]} for n in os.listdir(out)]})
+        datasets.update_job(self.task, rel=conversions.rel(cid, conversions.JOB_FILE), status="ready", progress=1,
+                            finished_at=datasets.now())
+        with mock.patch("worker.tasks.process_task") as process:
+            res = self.client.post(start)
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual((res.data["committed"], res.data["task_error"]), (True, ""))
+        process.delay.assert_called_once_with(self.task.id)
+        self.assertIn("has its images already", str(self.client.post(start).data))
 
     @skip_without("DJI_THERMAL_FLIGHT_DIR")
     def test_a_flight_normalized_through_a_workset_is_committed_with_its_tiffs(self):

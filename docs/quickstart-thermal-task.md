@@ -32,9 +32,11 @@ any palette later. Then two settings, off by default:
 Both need every photo before any is converted. With either ticked, the photos are uploaded to the task's
 [DJI Thermal Analyzer](quickstart-analyzer.md) dataset first (**Also keep the photos**, below, is ticked for you),
 WebODM's worker converts them in a workset of that dataset, and the task starts processing once they're converted.
-The message under the project shows how far the conversion is, with a progress bar, until the task starts, and links
-to the dataset. You can close or refresh the page once the upload is done: the task's panel (click its name in the
-project's task list) shows the same progress.
+The message under the project shows how far the conversion is, with a progress bar, then a green **Complete!** once
+the task has started, and links to the dataset. You can close or refresh the page once the upload is done: the task's
+panel (click its name in the project's task list) shows the same progress. **Also build the workset's mosaics**, off
+by default, builds the dataset's mosaics of the converted photos as well; you can build them later from the
+workset's menu in the DJI Thermal Analyzer (**Build mosaics**).
 
 Then come the values the temperatures are computed with.
 
