@@ -316,7 +316,7 @@ class TestTaskWorkset(ApiTestCase):
             cid = self.client.post(self.url, {"settings": {"normalize": True, "mosaics": True}}, format="json").data["id"]
         self.assertTrue(conversions.record(self.task, cid)["settings"]["mosaics"])
 
-    def test_the_workset_s_progress_says_how_far_it_is_and_whether_the_task_started(self):
+    def test_the_workset_s_progress_says_how_far_it_is_and_starts_a_converted_worksets_task(self):
         self.assertEqual(self.client.get(self.url).status_code, status.HTTP_404_NOT_FOUND)
         self.made_dataset()
         with mock.patch.object(datasets, "start_job"):
@@ -327,11 +327,19 @@ class TestTaskWorkset(ApiTestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
         self.assertEqual(res.data, {"id": cid, "status": "converting", "progress": 0.25,
                                     "stage": {"stage": "align", "step": 2, "steps": 5}, "error": "", "photos": 1,
-                                    "committed": False, "task_error": "", "since_converted": None})
-        # Converted: how long ago, so a task that didn't start can be told apart
+                                    "committed": False, "task_error": ""})
+        # Converted, but the worker didn't put the TIFFs in the task (an older copy of the plugin): the progress does
         datasets.update_job(self.task, rel=conversions.rel(cid, conversions.JOB_FILE), status="ready", progress=1,
-                            finished_at="2026-11-01T23:19:31+00:00")
-        self.assertGreater(self.client.get(self.url).data["since_converted"], 60)
+                            finished_at=datasets.now())
+        with mock.patch.object(conversion_tasks, "commit_parent") as commit:
+            self.client.get(self.url)
+        commit.assert_called_once()
+        self.assertEqual(commit.call_args[0][1:], (cid, {"processing_node": None, "auto_processing_node": True}))
+        # Not again after it failed: the task's error shows, with the page's Start processing to try again
+        Task.objects.filter(pk=self.task.pk).update(last_error="No node")
+        with mock.patch.object(conversion_tasks, "commit_parent") as commit:
+            self.assertEqual(self.client.get(self.url).data["task_error"], "No node")
+        commit.assert_not_called()
         Task.objects.filter(pk=self.task.pk).update(partial=False, last_error="No node")
         self.assertEqual({k: self.client.get(self.url).data[k] for k in ("committed", "task_error")},
                          {"committed": True, "task_error": "No node"})
@@ -364,6 +372,12 @@ class TestTaskWorkset(ApiTestCase):
                          (False, node.id, 3, None))
         self.assertEqual(sorted(self.task.scan_images()), ["DJI_0001_T_temp_c.tiff", "DJI_0002_T_temp_c.tiff", "gcp_list.txt"])
         process.delay.assert_called_once_with(self.task.id)
+        # The worker and the page's progress both commit it: the second finds it committed, and leaves it as it is
+        with mock.patch("worker.tasks.process_task") as process:
+            self.assertEqual(conversion_tasks.commit_parent(self.task, cid, {"processing_node": node.id}).pk, self.task.pk)
+        process.delay.assert_not_called()
+        self.task.refresh_from_db()
+        self.assertEqual((self.task.partial, self.task.auto_processing_node, self.task.last_error), (False, False, None))
 
     def test_start_processing_puts_a_converted_worksets_tiffs_in_a_task_that_did_not_start(self):
         self.made_dataset()

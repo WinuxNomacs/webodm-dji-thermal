@@ -5,6 +5,13 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Done: **a DJI Thermal Task starts reliably** (the user, 2026-11-02: "hangs at 100% for many seconds before failing
+    with 'task failed to start'", with two start buttons), `reliable-thermal-task-start`. Cause: a worker started
+    before `commit_parent` existed converts and stops. Now the progress GET (api.py `TaskWorkset.progress`) commits a
+    converted workset too, and `commit_parent` commits once under the task's row lock (the second caller finds it
+    committed); no 60 s wait (`START_S`, `since_converted` gone): the plugin's Start processing shows only after a
+    real error, with it. Decided (the user): **WebODM's own Start Processing is left**; the help line warns against it.
+    Tests: `test_api.py` (progress commits, not after an error; a second commit leaves it), `worksetProgress.test.js`.
   - Done: **polish, the progress's place and finish, and no mosaics by default** (the user, 2026-11-01, with a
     screenshot of the panel: "move the buttons below progress bar and message, or vice versa", a green bar with
     "Complete!" and a checkmark, "creating a task shouldn't create mosaics by default"), `workset-progress-polish`.

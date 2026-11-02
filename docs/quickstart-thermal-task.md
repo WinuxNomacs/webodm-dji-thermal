@@ -34,7 +34,8 @@ Both need every photo before any is converted. With either ticked, the photos ar
 WebODM's worker converts them in a workset of that dataset, and the task starts processing once they're converted.
 The message under the project shows how far the conversion is, with a progress bar, then a green **Complete!** once
 the task has started, and links to the dataset. You can close or refresh the page once the upload is done: the task's
-panel (click its name in the project's task list) shows the same progress. **Also build the workset's mosaics**, off
+panel (click its name in the project's task list) shows the same progress. Don't press WebODM's own **Start Processing**
+meanwhile: it would process the photos unconverted. **Also build the workset's mosaics**, off
 by default, builds the dataset's mosaics of the converted photos as well; you can build them later from the
 workset's menu in the DJI Thermal Analyzer (**Build mosaics**).
 

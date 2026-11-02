@@ -66,8 +66,7 @@ export default class WorksetProgress extends React.Component {
                                               {count: photos, progress: state.stage || state.percent + "%"});
         case "committing": return _("Converted: putting the images in the task…");
         case "started": return <React.Fragment><i className="fa fa-check"></i> <strong>{_("Complete!")}</strong> {_("The task is processing in WebODM.")}</React.Fragment>;
-        case "not_started": return state.error ? interpolate(_("Converted, but the task didn't start: %(error)s"), {error: state.error})
-                                               : _("Converted, but the task didn't start.");
+        case "not_started": return interpolate(_("Converted, but the task didn't start: %(error)s"), {error: state.error});
         case "failed": return interpolate(_("The conversion failed: %(error)s"), {error: state.error});
         default: return _("The conversion was canceled: the task will not start.");
         }
@@ -94,11 +93,11 @@ export default class WorksetProgress extends React.Component {
                 <div className={started ? "text-success" : ""}>{this.text(state, workset.photos)}</div>
                 {state.kind === "not_started" ?
                     <button type="button" className="btn btn-sm btn-primary dji-thermal-workset-start" disabled={starting} onClick={this.handleStart}
-                            title={_("Put the converted images in the task and start it: WebODM's own Start Processing would start it without them")}>
+                            title={_("Put the converted images in the task and start it again")}>
                         <i className={starting ? "fa fa-circle-notch fa-spin" : "fa fa-play"}></i> {_("Start processing")}
                     </button> : ""}
                 {error ? <div className="text-warning">{interpolate(_("Cannot tell how far the conversion is: %(error)s"), {error})}</div> : ""}
-                {!state.done ? <div className="help-block">{_("You can refresh or close this page: WebODM's worker converts the photos, then starts the task.")}</div> : ""}
+                {!state.done ? <div className="help-block">{_("You can refresh or close this page: WebODM's worker converts the photos, then starts the task. Don't use WebODM's Start Processing meanwhile: it would process the photos unconverted.")}</div> : ""}
             </div>
         );
     }
