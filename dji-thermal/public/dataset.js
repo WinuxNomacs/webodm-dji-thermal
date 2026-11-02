@@ -185,27 +185,20 @@
     // ready conversion's frame page) makes thermal frames' names links to their frame; view.thumbs (the thumbnail URL
     // without the file) adds a small picture of each image.
     function filesTableHtml(a, view) {
-        var flags = flagsByFile(a.findings);
         var rows = fileRows(a, view);
         var selected = view.selected || [];
         var html = '<div class="ta-table-scroll"><table class="table table-condensed ta-files"><thead><tr>' + (view.thumbs ? "<th></th>" : "") + FILE_COLUMNS.map(function (c) {
             var arrow = (view.sort || "path") === c.key ? ' <i class="fa fa-caret-' + (view.desc ? "down" : "up") + '"></i>' : "";
             return '<th data-sort="' + c.key + '"' + (c.title ? ' title="' + esc(c.title) + '"' : "") + ">" + esc(c.label) + arrow + "</th>";
-        }).join("") + "<th>Notes</th></tr></thead><tbody>";
+        }).join("") + "</tr></thead><tbody>";
         html += rows.map(function (r) {
-            var notes = (flags[r.path] || []).map(function (f) {
-                return '<span class="label label-' + ({error: "danger", warning: "warning"}[f.severity] || "default") +
-                    '" title="' + esc(f.message) + '">' + esc(f.code) + "</span>";
-            });
-            if (r.kind !== "thermal" && r.reason) notes.push('<span class="text-muted">' + esc(r.reason) + "</span>");
-            (r.warnings || []).forEach(function (w) { notes.push('<span class="text-warning">' + esc(w) + "</span>"); });
             var href = view.frames && r.kind === "thermal" ? view.frames + "?frame=" + encodeURIComponent(r.path) : null;
             var thumb = view.thumbs ? '<td class="ta-thumb">' + (core.isImage({name: r.path}) ?
                 '<img loading="lazy" alt="" src="' + esc(view.thumbs + encodeURIComponent(r.path)) + '">' : "") + "</td>" : "";
             return '<tr class="ta-kind-' + esc(r.kind) + (selected.indexOf(r.path) >= 0 ? " ta-selected" : "") + '" data-path="' + esc(r.path) + '">' + thumb +
                 FILE_COLUMNS.map(function (c) {
                     return "<td>" + (href && c.key === "path" ? '<a href="' + esc(href) + '" title="Open the frame">' + cell(r, c) + "</a>" : cell(r, c)) + "</td>";
-                }).join("") + "<td>" + notes.join(" ") + "</td></tr>";
+                }).join("") + "</tr>";
         }).join("");
         return {html: html + "</tbody></table></div>", count: rows.length};
     }

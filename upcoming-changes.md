@@ -5,6 +5,22 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
+  - Next: **removing files from a dataset** (the user, 2026-11-02: "For the Files view under dataset we should add the
+    ability to remove files as well, just like is done for the worksets view."). Decided (the user, 2026-11-02):
+    **Remove from dataset** in the dataset page's Files tab detail pane (one file, or those selected), for those who
+    can change the project, with a confirmation; the files deleted from the dataset's images (and their cached
+    thumbnails), their rows gone from the table at once; each workset that converted a removed frame has it removed
+    as Remove from workset does (outputs and saved measurements deleted, counted as removed, mosaics marked out of
+    date; tasks made before keep their images), refused if it would leave a workset without a converted frame, and
+    while the dataset is analyzing or a workset converting or building mosaics; the analysis kept but marked out of
+    date (Analyze again prompted), as after Add images.
+  - Done: **the dataset Files tab's detail pane hid its last columns** (the user, 2026-11-02: "the detail pane on the
+    right blocks the far right column. Either remove the column or move the viewer over to the right more"),
+    `dataset-files-layout`. Decided (the user, 2026-11-02): both. The Notes column is gone (the pane already shows a
+    file's problems, warnings and reason), and the dataset page is up to 1600px wide (`#ta-dataset.ta-page`), so from
+    a window of about 1500px the whole table fits beside the pane; narrower, it still scrolls sideways. `dataset.js`,
+    `analyzer.css`. README, `quickstart-analyzer.md`, `dataset-files.png` (now shot at 1600px) and `workset-files.png`
+    retaken. Jest.
   - Done: **a workset's Mosaics as a table with previews** (the user, 2026-11-02: "Instead of a set of links for
     Mosaics, can we give them a similar preview and interactive table format like we do for images under the Files
     table?"), `workset-mosaics-table`. Decided (the user, 2026-11-02): one row per mosaic (As converted, Harmonized),

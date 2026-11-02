@@ -757,12 +757,15 @@ describe("a dataset's page", () => {
         expect(dataset.duration("2026-10-22 16:32:53", "2026-10-22 16:32:53")).toBe("");
     });
 
-    it("lists the files sorted, with the problems that name them, and filters them", () => {
+    it("lists the files sorted, the problems that name them in the detail pane, not a column, and filters them", () => {
         let html = dataset.filesHtml(ANALYSIS, {sort: "tmax", desc: true});
         expect(html.indexOf("thermal/b_T.JPG")).toBeLessThan(html.indexOf("thermal/a_T.JPG"));
         expect(html).toContain("5.0 m / 21.4 m");
-        expect(html).toContain('title="1 image with an unusual &lt;maximum&gt;">temperature_max_outlier');
-        expect(html).toContain("not an R-JPEG");
+        expect(html).not.toContain("<th>Notes</th>");
+        expect(html).not.toContain("temperature_max_outlier");
+        const urls = {files: "/f?file=", picture: "/t"};
+        expect(dataset.detailHtml(ANALYSIS, ["thermal/b_T.JPG"], false, urls)).toContain("<th>temperature_max_outlier</th><td>1 image with an unusual &lt;maximum&gt;</td>");
+        expect(dataset.detailHtml(ANALYSIS, ["rgb/a_V.JPG"], false, urls)).toContain("not an R-JPEG");
 
         html = dataset.filesHtml(ANALYSIS, {show: "thermal"});
         expect(html).not.toContain("rgb/a_V.JPG");

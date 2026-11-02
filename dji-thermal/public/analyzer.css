@@ -1,4 +1,6 @@
 .ta-page{ max-width: 1200px; }
+/* A dataset's page uses more of a wide window, for its tables beside their detail panes */
+#ta-dataset.ta-page{ max-width: 1600px; }
 .ta-page [hidden]{ display: none !important; }
 .ta-page .ta-header{ display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .ta-page .ta-header h3{ margin: 0; }

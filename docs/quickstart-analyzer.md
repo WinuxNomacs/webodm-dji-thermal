@@ -48,7 +48,7 @@ emissivity. You can filter it, sort it by any column and show thumbnails.
 ![The Files tab, with a file's detail pane](images/dataset-files.png)
 
 Click a file to open its detail pane beside the table. It shows the picture (a thermal frame drawn from its
-temperatures) and everything the analysis read from the file. Click the picture to see it full size:
+temperatures), everything the analysis read from the file, and the problems that name it. Click the picture to see it full size:
 
 ![The picture viewer](images/picture-viewer.png)
 
