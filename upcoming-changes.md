@@ -47,7 +47,16 @@
   - `untrack-node-modules`: `.gitignore` ignored only a `node_modules/` folder, so a worktree's link of that name
     could be committed.
   Larger, planned below: **Jobs left running by a stopped worker** and **Use for parent task with an unreachable
-  node**. Wording and layout found on the way go to the UX review.
+  node**. Not a bug: an upload's files stay in WebODM's `media/tmp` for a day (its upload handler keeps them, and its
+  own task upload copies them too, as the plugin does; WebODM's hourly cleanup removes them after 24 h).
+  For the UX review: a harmonized workset shows "Converting 0%" and an empty bar for minutes (the stage only in the
+  line below); a workset's progress counts the RGB photos, skipped at once, so it jumps to 50% then crawls, and its
+  card says "42 converted, 392 skipped" (RGB and oblique together); **Reset to defaults** also forgets the user's
+  saved defaults; New Dataset names the dataset after the folder picked ("images"); the frame page's list doesn't
+  scroll to the open frame; DJI Thermal Task's panel says the RGB photos "are ignored" but, normalized, uploads them
+  to the dataset, flashes "Converting the thermal photos: 0 of 217" before "Uploading", says "Converting the 434
+  photos" when 217 are thermal, has no pitch limit (the plan's nadir-only), and its normalized datasets are never
+  analyzed ("Not analyzed" in the Analyzer).
 - **UX review of the same workflows** (the user, 2026-11-02, from `new.md`): "As a UX design expert, walk through
   the workflows for creating datasets, worksets and tasks. Look for cumbersome and unintuitive design experiences
   that should be improved upon. Create a Claude Artifact with your findings for us to review after." Builds on the
