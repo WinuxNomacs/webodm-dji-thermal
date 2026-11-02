@@ -415,8 +415,8 @@ Inspector:
 - **Legend**: a colour bar of the thermal layer's palette over its range (shared out as the Image section draws it),
   in your unit, at the map's top left: its ends say the range's lowest and highest temperatures, with round values
   between. When the image's own coldest or hottest temperature lies outside that range (narrowed in the colour scale
-  or WebODM's layer panel), a line under the bar gives them. It follows the palette and range, and "Legend on the
-  map" hides it. With several thermal tasks on the map, it is the topmost one's.
+  or WebODM's layer panel), a line under the bar gives them. It follows the palette and range; the Analyzer's
+  Preferences › Thermal Inspector › Legend on the map hides it. With several thermal tasks on the map, it is the topmost one's.
 - **The panel's top stays in view**: its heading, the mode buttons, the temperature under the cursor, Palette and
   the colour scale stay at the top while the sections below scroll under them.
 - **Moving them**: drag the panel by its heading, or the legend by any part, to move it out of the way; both stay
