@@ -34,10 +34,11 @@ workset's id (12 hexadecimal characters).
 | POST | `.../conversions/<workset>/figures` | Measures its frames' figures again. |
 | POST | `.../conversions/<workset>/remove` | Removes frames from a converted workset (`frames`: their paths): their files and the measurements saved on them are deleted, and they move from `results.files` to `results.removed` (`path`, `removed_by`, `removed_at`), so new tasks and mosaics leave them out. Answers the workset, with `frames_removed`; its `removed` counts them, and `mosaic_outdated` says its mosaics were built with frames since removed. Refused while its mosaics are being built, and for the last converted frame. |
 | POST | `.../conversions/<workset>/cancel` | Cancels its conversion or mosaics. |
-| GET, POST | `.../conversions/<workset>/download` | The workset's files as a zip, or one of them; some of them as a zip (`file`, repeated: a form posted). |
+| GET, POST | `.../conversions/<workset>/download` | The workset's files as a zip, or one of them (`?file=`, `?mosaic=<kind>/<file>`); some of them as a zip (`file` and `mosaic`, repeated: a form posted; the mosaics' in `mosaics/`). |
 | GET, POST | `.../conversions/<workset>/task` | What a task from the workset would be (the plan's options, what stops it); makes the task. |
 | POST | `.../conversions/<workset>/parent` | Sends the workset's TIFFs to the dataset's own task. |
-| GET, POST | `.../conversions/<workset>/mosaics` | The mosaics as the viewer shows them; builds them. |
+| GET, POST | `.../conversions/<workset>/mosaics` | The mosaics as the viewer shows them; builds them. A workset lists the mosaics built in its `mosaics` (`kind`, `frames`, `oblique`, `unusable`, `width`, `height`, `gsd_m`, `min` and `max` in `unit`, `normalization`, dji-thermal-cli's `report`, `preview`, and `files` with each one's `name` and `size`). |
+| GET | `.../mosaics/<kind>/preview` | A mosaic's preview as a small PNG (`as_converted` or `harmonized`; `?size=large` for the detail pane). |
 | GET | `.../mosaics/<tab>/tiles/<z>/<x>/<y>.png` | A map tile of a mosaic tab, over `rescale=min,max` in `color_map`, drawn with `gamma` (0.2 to 5), `sharpen` (0 to 5), and on temperatures `equalize=1` and `isotherm` (`above,T`, `below,T` or `between,A,B`, in the mosaic's unit: those pixels in the palette, the rest grey); the same for a frame's picture. |
 | POST | `.../mosaics/<tab>/region` | A temperature tab's statistics inside a GeoJSON polygon or along a line, in °C, as the Thermal Inspector's `region`; a line's profile also names each sample's source frame. |
 | GET | `.../mosaics/<tab>/isotherm/<z>/<x>/<y>.png?low=&high=&color=` | A temperature tab's isotherm tile, as the Thermal Inspector's `isotherm` (limits in °C). |

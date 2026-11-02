@@ -219,30 +219,7 @@
     // What dji-thermal-cli reports about a mosaic, then its files to download (base: the conversion's API URL)
     function reportHtml(kind, kindName, base) {
         if (!kind) return "";
-        var r = kind.report || {}, rows = [];
-        rows.push(["Frames", kind.frames + " placed" + (kind.oblique ? ", " + kind.oblique + " oblique left out" : "") +
-            (kind.unusable ? ", " + kind.unusable + " unusable" : "")]);
-        rows.push(["Size", kind.width + " × " + kind.height + " px at " + core.formatNumber(kind.gsd_m * 100, 1, " cm")]);
-        var seams = r.radiometric_seams;
-        if (seams && seams.pixels) rows.push(["Seams", "median " + core.formatDelta(seams.median_abs_c, "C") + ", 95% under " +
-            core.formatDelta(seams.p95_abs_c, "C")]);
-        var mis = r.misalignment;
-        if (mis && mis.pairs) rows.push(["Misalignment", "median " + core.formatNumber(mis.median_m * 100, 1, " cm") + ", 90% under " +
-            core.formatNumber(mis.p90_m * 100, 1, " cm") + " (" + mis.pairs + " overlapping pairs)"]);
-        var off = r.frame_offsets;
-        if (off && off.offset_c && off.offset_c.min !== undefined) {
-            rows.push(["Frame offsets", core.formatNumber(core.convertDelta(off.offset_c.min, "C"), 2) + " to " + core.formatDelta(off.offset_c.max, "C") +
-                (off.normalized ? ", removed" : "")]);
-        }
-        var h = r.heights;
-        if (h && h.range_m) {
-            rows.push(["Heights", core.formatNumber(h.range_m[0], 1) + " to " + core.formatNumber(h.range_m[1], 1, " m") +
-                " above the ground plane" + (h.cells ? ", measured in " + h.observed_cells + " of " + h.cells + " cells" : "")]);
-        } else if (h && h.method === "plane") {
-            rows.push(["Heights", "a ground plane" + (h.reason ? " (" + h.reason + ")" : "")]);
-        }
-        if (kind.normalization) rows.push(["Normalized to", "ambient " + core.formatTemp(kind.normalization[0], "C", 1) +
-            ", reflected " + core.formatTemp(kind.normalization[1], "C", 1)]);
+        var rows = core.mosaicReportRows(kind);
         var files = (kind.files || []).map(function (f) {
             return '<li><a href="' + esc(base + "/download?mosaic=" + encodeURIComponent(kindName + "/" + f)) + '">' +
                 '<i class="fa fa-download"></i> ' + esc(f) + "</a></li>";

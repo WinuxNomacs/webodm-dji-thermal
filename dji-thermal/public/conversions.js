@@ -588,32 +588,63 @@
 
     var MOSAIC_KINDS = {as_converted: "As converted", harmonized: "Harmonized"};
 
-    // A workset's Mosaics, below its Files: a toggle over the mosaics' files to download, by mosaic ("" before any is
-    // built)
-    function mosaicFilesHtml(c, base, shown) {
-        var files = c.mosaic_files || [];
-        if (!files.length) return "";
-        var kinds = [];
-        files.forEach(function (f) {
-            var kind = f.split("/")[0];
-            if (kinds.indexOf(kind) < 0) kinds.push(kind);
-        });
-        return '<div class="ta-conversion-files-head"><button type="button" class="ta-collapse" data-act="mosaic-files" aria-expanded="' + shown +
-            '" title="' + (shown ? "Hide the mosaics' files" : "Show the mosaics' files to download") + '"><i class="fa fa-caret-' + (shown ? "down" : "right") +
-            '"></i> Mosaics</button> <span class="text-muted">' + esc(core.count(files.length, "file", "files")) + "</span></div>" +
-            '<div class="ta-mosaic-files"' + (shown ? "" : " hidden") + ">" + kinds.map(function (kind) {
-                return "<div><strong>" + esc(MOSAIC_KINDS[kind] || kind) + ":</strong> " + files.filter(function (f) { return f.split("/")[0] === kind; }).map(function (f) {
-                    return '<a href="' + esc(base + c.id + "/download?mosaic=" + encodeURIComponent(f)) + '" title="' + esc(f) + '"><i class="fa fa-download"></i> ' +
-                        esc(f.slice(kind.length + 1)) + "</a>";
-                }).join(" ") + "</div>";
-            }).join("") + "</div>";
+    // A workset's Mosaics, below its Files: a toggle over a table of the mosaics built, each with its preview and
+    // figures, and its detail pane beside it ("" before any is built; view: {selected: the mosaics selected, by kind})
+    function mosaicsHtml(c, base, shown, view) {
+        var built = c.mosaics || [];
+        if (!built.length) return "";
+        var selected = (view || {}).selected || [];
+        var files = built.reduce(function (n, m) { return n + (m.files || []).length; }, 0);
+        var temp = function (m, v) { return esc(core.formatTemp(v, m.unit, 1)); };
+        return '<div class="ta-mosaics-section"><div class="ta-conversion-files-head"><button type="button" class="ta-collapse" data-act="mosaic-files" aria-expanded="' + shown +
+            '" title="' + (shown ? "Hide the mosaics" : "Show the mosaics and their files") + '"><i class="fa fa-caret-' + (shown ? "down" : "right") +
+            '"></i> Mosaics</button> <span class="text-muted">' + esc(core.count(files, "file", "files")) + "</span></div>" +
+            '<div class="ta-conversion-mosaics" data-mosaics="' + c.id + '"' + (shown ? "" : " hidden") + '><div class="ta-files-layout"><div class="ta-files-table">' +
+            '<table class="table table-condensed ta-results ta-mosaics-table"><thead><tr><th></th><th>Mosaic</th><th class="ta-num">Frames</th>' +
+            '<th class="ta-num">Size</th><th class="ta-num">GSD</th><th class="ta-num">Min</th><th class="ta-num">Max</th></tr></thead><tbody>' +
+            built.map(function (m) {
+                return '<tr data-kind="' + esc(m.kind) + '"' + (selected.indexOf(m.kind) >= 0 ? ' class="ta-selected"' : "") + ">" +
+                    '<td class="ta-thumb">' + (m.preview ? '<img loading="lazy" alt="" src="' + esc(base + c.id + "/mosaics/" + m.kind + "/preview") + '">' : "") +
+                    "</td><td>" + esc(MOSAIC_KINDS[m.kind] || m.kind) + '</td><td class="ta-num">' + esc(m.frames) + '</td><td class="ta-num">' +
+                    esc(m.width + " × " + m.height) + '</td><td class="ta-num">' + esc(core.formatNumber(m.gsd_m * 100, 1, " cm")) + '</td><td class="ta-num">' +
+                    temp(m, m.min) + '</td><td class="ta-num">' + temp(m, m.max) + "</td></tr>";
+            }).join("") + '</tbody></table></div><aside class="ta-file-detail" hidden></aside></div></div></div>';
+    }
+
+    // The Mosaics detail pane of the mosaics selected, or of the one under the mouse; "" for none (urls: {base: the
+    // conversion's API URL, followed by its id, viewer: its mosaics' page or null})
+    function mosaicDetailHtml(c, kinds, selected, urls) {
+        var shown = (c.mosaics || []).filter(function (m) { return kinds.indexOf(m.kind) >= 0; });
+        if (!shown.length) return "";
+        var close = selected ? '<button type="button" class="close" data-act="detail-close" title="Unselect" aria-label="Unselect">&times;</button>' : "";
+        if (shown.length > 1) {
+            var files = shown.reduce(function (n, m) { return n + (m.files || []).length; }, 0);
+            return '<div class="ta-file-detail-head"><strong>' + shown.length + " mosaics selected</strong>" + close + "</div>" +
+                '<button type="button" class="btn btn-primary btn-sm" data-act="download-mosaics"><i class="fa fa-download"></i> Download their ' +
+                files + " files</button>" + '<p class="text-muted ta-files-hint">As a zip of their files. Ctrl/Cmd-click adds or removes a mosaic, ' +
+                "Shift-click a range.</p>";
+        }
+        var m = shown[0];
+        var picture = urls.base + "/mosaics/" + m.kind + "/preview?size=large";
+        var rows = [["Temperatures", core.formatTemp(m.min, m.unit, 1) + " to " + core.formatTemp(m.max, m.unit, 1)]].concat(core.mosaicReportRows(m));
+        return '<div class="ta-file-detail-head"><strong>' + esc(MOSAIC_KINDS[m.kind] || m.kind) + "</strong>" + close + "</div>" +
+            (m.preview ? '<a href="' + esc(picture) + '" target="_blank" rel="noopener" data-act="view-mosaic-picture" data-kind="' + esc(m.kind) +
+                '" title="View the preview"><img class="ta-file-detail-img" alt="" src="' + esc(picture) + '"></a>' : "") +
+            '<div class="ta-file-detail-actions">' + (m.files || []).map(function (f) {
+                return '<a class="btn btn-primary btn-xs" href="' + esc(urls.base + "/download?mosaic=" + encodeURIComponent(m.kind + "/" + f.name)) +
+                    '" title="' + esc(core.formatBytes(f.size)) + '"><i class="fa fa-download"></i> ' + esc(f.name) + "</a>";
+            }).join(" ") + (urls.viewer ? ' <a class="btn btn-default btn-xs" href="' + esc(urls.viewer + "#" + m.kind) +
+                '"><i class="fa fa-map"></i> View mosaic</a>' : "") + "</div>" +
+            '<table class="table table-condensed ta-file-detail-table"><tbody>' + rows.map(function (row) {
+                return "<tr><th>" + esc(row[0]) + "</th><td>" + esc(row[1]) + "</td></tr>";
+            }).join("") + "</tbody></table>";
     }
 
     // The dataset's conversions, newest first (base: their API's URL; open: the ids of those whose files are shown;
     // defaults: what their settings are compared against; menu: the conversion whose menu is open; viewerBase: their mosaics' pages, followed by their id;
     // dashboard: WebODM's dashboard, where their tasks are; parent: the dataset's own task; mosaicsOpen: the ids of those
-    // whose mosaics' files are shown)
-    function listHtml(conversions, canChange, base, open, fresh, defaults, menu, viewerBase, dashboard, parent, mosaicsOpen) {
+    // whose Mosaics are shown; mosaicViews: their mosaics selected, as mosaicsHtml's view, by id)
+    function listHtml(conversions, canChange, base, open, fresh, defaults, menu, viewerBase, dashboard, parent, mosaicsOpen, mosaicViews) {
         if (!conversions.length) return '<p class="text-muted ta-none">No worksets yet' + (canChange ? ": choose the settings above (the WebODM plan's " +
             "are a good start), then Create Workset." : ".") + "</p>";
         open = open || [];
@@ -645,7 +676,7 @@
                 parentHtml(c, parent, dashboard) + tasksHtml(c, dashboard) + '<div class="ta-conversion-task" data-task="' + c.id + '"></div>' +
                 filesToggleHtml(c, open.indexOf(c.id) >= 0) +
                 '<div class="ta-conversion-files" data-files="' + c.id + '"' + (open.indexOf(c.id) >= 0 ? "" : " hidden") + "></div>" +
-                mosaicFilesHtml(c, base, (mosaicsOpen || []).indexOf(c.id) >= 0) + "</div>";
+                mosaicsHtml(c, base, (mosaicsOpen || []).indexOf(c.id) >= 0, (mosaicViews || {})[c.id]) + "</div>";
         }).join("");
     }
 
@@ -801,6 +832,7 @@
         var mosaicsOpen = shownFiles(storage, ctx.datasetId, MOSAICS_PREFIX);   // and whose Mosaics are
         var results = {}, sorts = {};                     // each one's files as loaded, and how its table is sorted
         var picks = {}, polls = {};                       // each one's images selected and under the mouse; its reload while measuring
+        var mosaicPicks = {};                             // and its mosaics selected and under the mouse
         // The source frames' thumbnails and pictures, in the user's preferred DJI palette when they have one
         var palette = core.preferences().palette || "";
         // (a workset's own frames, even in a dataset never analyzed)
@@ -878,8 +910,9 @@
             var el = taskPanel();
             if (el && task.info && el.querySelector('[name="task-name"]')) task.draft = readTaskForm(el, task.info).draft;
             root$("ta-conversions").innerHTML = listHtml(list, dataset && dataset.can_change, base, open, fresh,
-                dataset && dataset.defaults, menu, viewerBase, ctx.dashboard, dataset && dataset.parent, mosaicsOpen);
+                dataset && dataset.defaults, menu, viewerBase, ctx.dashboard, dataset && dataset.parent, mosaicsOpen, mosaicViews());
             open.forEach(function (id) { renderFiles(id); loadFiles(id); });
+            mosaicsOpen.forEach(renderMosaicDetail);
             renderTask();
         }
 
@@ -1002,26 +1035,92 @@
             renderDetail(id);
         }
 
-        // A click on a row: it alone selected (unselected when it was), Ctrl/Cmd adds or removes it, Shift the range
-        // from the last one clicked, in the table's order
-        function selectRow(id, path, e) {
-            var p = pick(id);
+        // A click on a row (key: its image or mosaic, order: the table's): it alone selected (unselected when it was),
+        // Ctrl/Cmd adds or removes it, Shift the range from the last one clicked
+        function choose(p, key, order, e) {
             if (e.shiftKey && p.anchor !== null) {
-                var order = resultRows(results[id], sorts[id]).map(function (f) { return f.path; });
-                var i = order.indexOf(p.anchor), j = order.indexOf(path);
+                var i = order.indexOf(p.anchor), j = order.indexOf(key);
                 if (i >= 0 && j >= 0) {
                     p.selected = order.slice(Math.min(i, j), Math.max(i, j) + 1);
                     if (root.getSelection) root.getSelection().removeAllRanges();
-                    return selectionChanged(id);
+                    return;
                 }
             }
             if (e.ctrlKey || e.metaKey) {
-                p.selected = p.selected.indexOf(path) >= 0 ? p.selected.filter(function (x) { return x !== path; }) : p.selected.concat([path]);
+                p.selected = p.selected.indexOf(key) >= 0 ? p.selected.filter(function (x) { return x !== key; }) : p.selected.concat([key]);
             } else {
-                p.selected = p.selected.length === 1 && p.selected[0] === path ? [] : [path];
+                p.selected = p.selected.length === 1 && p.selected[0] === key ? [] : [key];
             }
-            p.anchor = path;
+            p.anchor = key;
+        }
+
+        function selectRow(id, path, e) {
+            choose(pick(id), path, resultRows(results[id], sorts[id]).map(function (f) { return f.path; }), e);
             selectionChanged(id);
+        }
+
+        function conversionOf(id) {
+            return ((dataset && dataset.conversions) || []).filter(function (x) { return x.id === id; })[0];
+        }
+
+        // A workset's mosaics selected and under the mouse, those no longer built left out
+        function mosaicPick(id) {
+            var p = mosaicPicks[id] || (mosaicPicks[id] = {selected: [], anchor: null, hovered: null});
+            var kinds = ((conversionOf(id) || {}).mosaics || []).map(function (m) { return m.kind; });
+            p.selected = p.selected.filter(function (k) { return kinds.indexOf(k) >= 0; });
+            return p;
+        }
+
+        function mosaicViews() {
+            var views = {};
+            Object.keys(mosaicPicks).forEach(function (id) { views[id] = {selected: mosaicPicks[id].selected}; });
+            return views;
+        }
+
+        function mosaicsPanel(id) { return panel.querySelector('[data-mosaics="' + id + '"]'); }
+
+        // A workset's Mosaics detail pane: the mosaics selected, else the one under the mouse
+        function renderMosaicDetail(id) {
+            var el = mosaicsPanel(id), pane = el && el.querySelector(".ta-file-detail"), c = conversionOf(id);
+            if (!pane || !c) return;
+            var p = mosaicPick(id);
+            var kinds = p.selected.length ? p.selected : p.hovered ? [p.hovered] : [];
+            var html = mosaicDetailHtml(c, kinds, p.selected.length > 0, {base: base + id, viewer: viewerBase ? viewerBase + id : null});
+            pane.hidden = !html;
+            if (pane.innerHTML !== html) pane.innerHTML = html;
+        }
+
+        function mosaicSelectionChanged(id) {
+            var el = mosaicsPanel(id);
+            if (!el) return;
+            [].forEach.call(el.querySelectorAll(".ta-mosaics-table tbody tr[data-kind]"), function (tr) {
+                tr.classList.toggle("ta-selected", mosaicPick(id).selected.indexOf(tr.getAttribute("data-kind")) >= 0);
+            });
+            renderMosaicDetail(id);
+        }
+
+        function selectMosaic(id, kind, e) {
+            choose(mosaicPick(id), kind, (conversionOf(id).mosaics || []).map(function (m) { return m.kind; }), e);
+            mosaicSelectionChanged(id);
+        }
+
+        // The picture viewer over a workset's mosaics' previews, opened at one: the mosaic shown is the one selected
+        function viewMosaicPicture(id, kind) {
+            var viewer = root.ThermalPictureViewer;
+            var items = (conversionOf(id).mosaics || []).filter(function (m) { return m.preview; }).map(function (m) {
+                return {name: MOSAIC_KINDS[m.kind] || m.kind, path: m.kind, src: base + id + "/mosaics/" + m.kind + "/preview?size=large",
+                        download: base + id + "/download?mosaic=" + encodeURIComponent(m.kind + "/mosaic_preview.png")};
+            });
+            var index = items.map(function (it) { return it.path; }).indexOf(kind);
+            if (!viewer || index < 0) return false;
+            viewer.open(doc, {items: items, index: index, onShow: function (i) {
+                var p = mosaicPick(id), shown = items[i].path;
+                p.anchor = shown;
+                if (p.selected.length === 1 && p.selected[0] === shown) return;
+                p.selected = [shown];
+                mosaicSelectionChanged(id);
+            }});
+            return true;
         }
 
         // The picture viewer, opened at an image's frame: the image shown is the one selected, its row scrolled to
@@ -1047,16 +1146,31 @@
             return true;
         }
 
-        // The selected images' files as a zip: a form posted, so the browser downloads it however many there are
+        // The selected images' files as a zip
         function downloadSelected(id) {
             var chosen = pick(id).selected;
             var files = [];
             resultRows(results[id], {}).forEach(function (f) { if (chosen.indexOf(f.path) >= 0) files = files.concat(f.outputs || []); });
+            postDownload(id, files.map(function (f) { return ["file", f]; }));
+        }
+
+        // The selected mosaics' files as a zip
+        function downloadMosaics(id) {
+            var chosen = mosaicPick(id).selected, fields = [];
+            (conversionOf(id).mosaics || []).forEach(function (m) {
+                if (chosen.indexOf(m.kind) >= 0) (m.files || []).forEach(function (f) { fields.push(["mosaic", m.kind + "/" + f.name]); });
+            });
+            postDownload(id, fields);
+        }
+
+        // A zip of some of a workset's files (fields: [[file or mosaic, its path]]): a form posted, so the browser
+        // downloads it however many there are
+        function postDownload(id, fields) {
             var form = doc.createElement("form");
             form.method = "POST";
             form.action = base + id + "/download";
             form.hidden = true;
-            [["csrfmiddlewaretoken", ctx.csrf]].concat(files.map(function (f) { return ["file", f]; })).forEach(function (f) {
+            [["csrfmiddlewaretoken", ctx.csrf]].concat(fields).forEach(function (f) {
                 var input = doc.createElement("input");
                 input.type = "hidden";
                 input.name = f[0];
@@ -1186,11 +1300,25 @@
                 picks[id].selected = [];
                 selectionChanged(id);
             });
+            Object.keys(mosaicPicks).forEach(function (id) {
+                if (!mosaicPicks[id].selected.length) return;
+                mosaicPicks[id].selected = [];
+                mosaicSelectionChanged(id);
+            });
         });
 
-        // While none of its images is selected, a workset's detail pane follows the image under the mouse
+        // While none of its images is selected, a workset's detail pane follows the image under the mouse; so does its
+        // Mosaics' the mosaic
         root$("ta-conversions").addEventListener("mouseover", function (e) {
             if (!e.target.closest) return;
+            var row = e.target.closest(".ta-mosaics-table tbody tr[data-kind]");
+            var mid = row ? mosaicsOf(row) : undefined;
+            if (mid !== undefined) {
+                var mp = mosaicPick(mid);
+                if (mp.selected.length || row.getAttribute("data-kind") === mp.hovered) return;
+                mp.hovered = row.getAttribute("data-kind");
+                return renderMosaicDetail(mid);
+            }
             var tr = e.target.closest(".ta-results tbody tr[data-path]");
             var fid = tr ? filesOf(tr) : undefined;
             if (fid === undefined) return;
@@ -1282,7 +1410,31 @@
             return ((dataset && dataset.conversions) || []).map(function (x) { return x.id; }).filter(function (x) { return String(x) === attr; })[0];
         }
 
+        // The workset whose Mosaics hold an element, or undefined
+        function mosaicsOf(el) {
+            var section = el && el.closest("[data-mosaics]");
+            if (!section) return undefined;
+            var attr = section.getAttribute("data-mosaics");
+            return ((dataset && dataset.conversions) || []).map(function (x) { return x.id; }).filter(function (x) { return String(x) === attr; })[0];
+        }
+
         root$("ta-conversions").addEventListener("click", function (e) {
+            var mid = e.target.closest ? mosaicsOf(e.target) : undefined;
+            if (mid !== undefined) {
+                if (e.target.closest('[data-act="detail-close"]')) {
+                    mosaicPick(mid).selected = [];
+                    return mosaicSelectionChanged(mid);
+                }
+                if (e.target.closest('[data-act="download-mosaics"]')) return downloadMosaics(mid);
+                var preview = e.target.closest('[data-act="view-mosaic-picture"]');
+                if (preview && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button)) {
+                    if (viewMosaicPicture(mid, preview.getAttribute("data-kind"))) e.preventDefault();
+                    return;
+                }
+                var row = e.target.closest(".ta-mosaics-table tbody tr[data-kind]");
+                if (row && !e.target.closest("a")) return selectMosaic(mid, row.getAttribute("data-kind"), e);
+                return;
+            }
             var fid = e.target.closest ? filesOf(e.target) : undefined;
             if (fid !== undefined && results[fid]) {
                 var th = e.target.closest(".ta-results th[data-sort]");
@@ -1399,7 +1551,7 @@
 
     var api = {recorded: recorded, settingsIn: settingsIn, formHtml: formHtml, readForm: readForm, formProblem: formProblem, planSettings: planSettings, statusLabel: statusLabel,
                differences: differences, chipsHtml: chipsHtml, markForm: markForm, resetSetting: resetSetting,
-               mosaicHtml: mosaicHtml, mapUrl: mapUrl, actionsHtml: actionsHtml, listHtml: listHtml, mosaicFilesHtml: mosaicFilesHtml, parentHtml: parentHtml, taskStatusLabel: taskStatusLabel, tasksHtml: tasksHtml,
+               mosaicHtml: mosaicHtml, mapUrl: mapUrl, actionsHtml: actionsHtml, listHtml: listHtml, mosaicsHtml: mosaicsHtml, mosaicDetailHtml: mosaicDetailHtml, parentHtml: parentHtml, taskStatusLabel: taskStatusLabel, tasksHtml: tasksHtml,
                taskHtml: taskHtml, readTaskForm: readTaskForm, optionsFormHtml: optionsFormHtml, readOptions: readOptions, skipReasons: skipReasons, resultRows: resultRows, resultsHtml: resultsHtml,
                resultDetailRows: resultDetailRows, resultDetailHtml: resultDetailHtml, removeButtonHtml: removeButtonHtml, init: init};
     root.ThermalAnalyzerConversions = api;

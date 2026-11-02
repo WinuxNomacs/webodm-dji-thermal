@@ -119,6 +119,18 @@ const SHOTS = {
         await p.waitForTimeout(1500);
         return files;
     },
+    "workset-mosaics": async (p, env) => {
+        // The first workset with mosaics: its Mosaics, the harmonized one clicked, so the pane keeps it
+        await openDataset(p, env);
+        const card = p.locator(".ta-conversion").filter({has: p.locator('[data-act="mosaic-files"]')}).first();
+        await card.locator('[data-act="mosaic-files"]').click();
+        const section = card.locator(".ta-mosaics-section");
+        await section.locator('tbody tr[data-kind="harmonized"] td').nth(1).click();
+        await section.locator(".ta-file-detail-img").waitFor();
+        await p.mouse.move(0, 0);
+        await p.waitForTimeout(1500);
+        return section;
+    },
     "create-task": async (p, env) => {
         await openDataset(p, env);
         const first = p.locator(".ta-conversion").first();

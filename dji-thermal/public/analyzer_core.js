@@ -471,6 +471,36 @@
         return "Building the mosaics" + (stage ? ": " + stage : "") + "…";
     }
 
+    // What dji-thermal-cli reports about a mosaic (kind: as its build kept it), as [label, value]: the viewer's report and
+    // the workset's Mosaics detail pane
+    function mosaicReportRows(kind) {
+        var r = kind.report || {}, rows = [];
+        rows.push(["Frames", kind.frames + " placed" + (kind.oblique ? ", " + kind.oblique + " oblique left out" : "") +
+            (kind.unusable ? ", " + kind.unusable + " unusable" : "")]);
+        rows.push(["Size", kind.width + " × " + kind.height + " px at " + formatNumber(kind.gsd_m * 100, 1, " cm")]);
+        var seams = r.radiometric_seams;
+        if (seams && seams.pixels) rows.push(["Seams", "median " + formatDelta(seams.median_abs_c, "C") + ", 95% under " +
+            formatDelta(seams.p95_abs_c, "C")]);
+        var mis = r.misalignment;
+        if (mis && mis.pairs) rows.push(["Misalignment", "median " + formatNumber(mis.median_m * 100, 1, " cm") + ", 90% under " +
+            formatNumber(mis.p90_m * 100, 1, " cm") + " (" + mis.pairs + " overlapping pairs)"]);
+        var off = r.frame_offsets;
+        if (off && off.offset_c && off.offset_c.min !== undefined) {
+            rows.push(["Frame offsets", formatNumber(convertDelta(off.offset_c.min, "C"), 2) + " to " + formatDelta(off.offset_c.max, "C") +
+                (off.normalized ? ", removed" : "")]);
+        }
+        var h = r.heights;
+        if (h && h.range_m) {
+            rows.push(["Heights", formatNumber(h.range_m[0], 1) + " to " + formatNumber(h.range_m[1], 1, " m") +
+                " above the ground plane" + (h.cells ? ", measured in " + h.observed_cells + " of " + h.cells + " cells" : "")]);
+        } else if (h && h.method === "plane") {
+            rows.push(["Heights", "a ground plane" + (h.reason ? " (" + h.reason + ")" : "")]);
+        }
+        if (kind.normalization) rows.push(["Normalized to", "ambient " + formatTemp(kind.normalization[0], "C", 1) +
+            ", reflected " + formatTemp(kind.normalization[1], "C", 1)]);
+        return rows;
+    }
+
     // Where WebODM's task options dialog (a task's Options > Edit) lists the ODM options the plugin suggests: the
     // section, and the subsection when the section shows them (WebODM 3.3.2's EditPresetDialog.jsx, OPTION_GROUP_MAP)
     var WEBODM_SECTIONS = {
@@ -500,7 +530,7 @@
         batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName,
         preferences: preferences, setPreferences: setPreferences, editPreferences: editPreferences, bindPreferences: bindPreferences,
         setUserUnit: setUserUnit, savePalette: savePalette, migrateUnit: migrateUnit, paletteOptions: paletteOptions, sortRows: sortRows,
-        optionHtml: optionHtml
+        optionHtml: optionHtml, mosaicReportRows: mosaicReportRows
     };
     root.ThermalAnalyzerCore = api;
     if (root.document && root.fetch) {

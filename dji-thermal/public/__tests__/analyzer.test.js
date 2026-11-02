@@ -98,6 +98,10 @@ const PREFERENCES = {
         {product: "gray16", description: "uint16 grayscale view", formats: ["png", "tiff"]}
     ]
 };
+// A mosaic built, as a workset's summary lists it
+const MOSAIC = kind => ({kind, unit: "C", frames: 151, oblique: 176, unusable: 0, width: 1464, height: 1656, gsd_m: 0.016, normalization: null,
+    min: -5.2, max: 56.46, preview: true, report: {radiometric_seams: {pixels: 10, median_abs_c: 0.275, p95_abs_c: 2.036}},
+    files: [{name: "mosaic_preview.png", size: 1585021}, {name: "mosaic_temp_c.tif", size: 18108978}]});
 const CONVERSION = {
     id: 9, dataset: 5, name: "Nadir", settings: Object.assign({}, DEFAULTS, {emissivity: 0.95, normalize: true}),
     description: "temp_c tiff · normalized", status: "ready", progress: 1, error: "", converted: 2, skipped: 1,
@@ -1625,7 +1629,8 @@ describe("a dataset's conversions", () => {
     it("lets a viewer download the conversions but not convert or delete them", async () => {
         const fetchFn = server({
             [URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS, can_change: false, can_delete: false,
-                                                conversions: [Object.assign({}, CONVERSION, {mosaic_files: ["harmonized/mosaic.tif"]})]}),
+                                                conversions: [Object.assign({}, CONVERSION, {mosaic_files: ["harmonized/mosaic_temp_c.tif"],
+                                                    mosaics: [MOSAIC("as_converted"), MOSAIC("harmonized")]})]}),
             "/api/plugins/dji-thermal/datasets/5/conversions/9": Object.assign({}, CONVERSION, {results: {files: [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []},
                 {path: "b_T.JPG", ok: true, outputs: ["b.tiff"], notes: []}]}})
         });
@@ -1676,12 +1681,48 @@ describe("a dataset's conversions", () => {
         click(toggle());
         expect(list.querySelector('[data-files="9"]').hidden).toBe(true);
         expect(window.localStorage.getItem("dji-thermal-analyzer:files-shown:5")).toBeNull();
-        // The mosaics' files: their own toggle, remembered apart from the Files'
+        // The mosaics: their own toggle, remembered apart from the Files'
         const mosaics = () => list.querySelector('button[data-act="mosaic-files"]');
         click(mosaics());
-        expect(list.querySelector(".ta-mosaic-files").hidden).toBe(false);
+        const section = () => list.querySelector('[data-mosaics="9"]');
+        expect(section().hidden).toBe(false);
         expect(JSON.parse(window.localStorage.getItem("dji-thermal-analyzer:mosaics-shown:5"))).toEqual([9]);
         expect(window.localStorage.getItem("dji-thermal-analyzer:files-shown:5")).toBeNull();
+        // Their detail pane, as the Files': the mosaic under the mouse, then the one clicked, Ctrl-click adding one
+        const mpane = () => section().querySelector(".ta-file-detail");
+        const mrow = kind => section().querySelector('tbody tr[data-kind="' + kind + '"]');
+        expect(mpane().hidden).toBe(true);
+        mrow("harmonized").dispatchEvent(new MouseEvent("mouseover", {bubbles: true}));
+        expect(mpane().hidden).toBe(false);
+        expect(mpane().querySelector("strong").textContent).toBe("Harmonized");
+        click(mrow("as_converted").children[1]);
+        expect(mrow("as_converted").classList.contains("ta-selected")).toBe(true);
+        mrow("harmonized").dispatchEvent(new MouseEvent("mouseover", {bubbles: true}));
+        expect(mpane().querySelector("strong").textContent).toBe("As converted");
+        mrow("harmonized").children[1].dispatchEvent(new MouseEvent("click", {bubbles: true, ctrlKey: true}));
+        expect(mpane().textContent).toContain("2 mosaics selected");
+        const zip = jest.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(function () {
+            expect(this.getAttribute("action")).toBe("/api/plugins/dji-thermal/datasets/5/conversions/9/download");
+            expect([...this.querySelectorAll('input[name="mosaic"]')].map(i => i.value)).toEqual(["as_converted/mosaic_preview.png",
+                "as_converted/mosaic_temp_c.tif", "harmonized/mosaic_preview.png", "harmonized/mosaic_temp_c.tif"]);
+        });
+        click(mpane().querySelector('[data-act="download-mosaics"]'));
+        expect(zip).toHaveBeenCalledTimes(1);
+        zip.mockRestore();
+        document.dispatchEvent(new KeyboardEvent("keydown", {key: "Escape"}));
+        expect(mrow("as_converted").classList.contains("ta-selected")).toBe(false);
+        // The preview opens the picture viewer over the mosaics, the one shown selected
+        window.ThermalPictureViewer = {open: jest.fn()};
+        click(mrow("harmonized").children[1]);
+        click(mpane().querySelector('[data-act="view-mosaic-picture"]'));
+        const opened = window.ThermalPictureViewer.open.mock.calls[0][1];
+        expect(opened.index).toBe(1);
+        expect(opened.items.map(it => [it.name, it.src])).toEqual([["As converted", "/api/plugins/dji-thermal/datasets/5/conversions/9/mosaics/as_converted/preview?size=large"],
+            ["Harmonized", "/api/plugins/dji-thermal/datasets/5/conversions/9/mosaics/harmonized/preview?size=large"]]);
+        opened.onShow(0);
+        expect(mrow("as_converted").classList.contains("ta-selected")).toBe(true);
+        expect(mrow("harmonized").classList.contains("ta-selected")).toBe(false);
+        delete window.ThermalPictureViewer;
         click(mosaics());
         expect(window.localStorage.getItem("dji-thermal-analyzer:mosaics-shown:5")).toBeNull();
     });
@@ -1855,23 +1896,49 @@ describe("a conversion's mosaics on the dataset page", () => {
         expect(conversions.differences(read, DEFAULTS, null, "C").map(d => [d.key, d.text])).toEqual([["mosaics", "no mosaics"]]);
     });
 
-    it("lists the mosaics' files in a section of their own below the Files, by mosaic, collapsed at first", () => {
+    it("lists the mosaics in a table of their own below the Files, with their previews and figures, collapsed at first", () => {
         const c = Object.assign({}, CONVERSION, {results: {files: [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []}]},
-            mosaic_files: ["as_converted/mosaic.tif", "harmonized/mosaic.tif", "harmonized/report.json"]});
-        expect(conversions.resultsHtml(c, C9.replace(/9$/, ""))).not.toContain("mosaic.tif");
+            mosaic_files: ["as_converted/mosaic_temp_c.tif", "harmonized/mosaic_temp_c.tif"], mosaics: [MOSAIC("as_converted"), MOSAIC("harmonized")]});
+        expect(conversions.resultsHtml(c, C9.replace(/9$/, ""))).not.toContain("mosaic_temp_c.tif");
         document.body.innerHTML = conversions.listHtml([c], true, C9.replace(/9$/, ""), [9], null, null, null, null, null, null, []);
         const head = document.querySelector('button[data-act="mosaic-files"]');
         expect(head.getAttribute("aria-expanded")).toBe("false");
-        expect(head.parentNode.textContent).toBe(" Mosaics 3 files");
+        expect(head.parentNode.textContent).toBe(" Mosaics 4 files");
         expect(document.querySelector('[data-files="9"]').compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        const files = document.querySelector(".ta-mosaic-files");
-        expect(files.hidden).toBe(true);
-        expect([...files.children].map(d => d.querySelector("strong").textContent)).toEqual(["As converted:", "Harmonized:"]);
-        expect(files.querySelector('a[title="harmonized/mosaic.tif"]').getAttribute("href")).toBe(C9 + "/download?mosaic=harmonized%2Fmosaic.tif");
-        expect(files.lastChild.textContent).toBe("Harmonized:  mosaic.tif  report.json");
-        document.body.innerHTML = conversions.listHtml([c], true, "/x/", [], null, null, null, null, null, null, [9]);
-        expect(document.querySelector(".ta-mosaic-files").hidden).toBe(false);
-        expect(conversions.listHtml([Object.assign({}, c, {mosaic_files: []})], true, "/x/", [])).not.toContain("mosaic-files");
+        const section = document.querySelector('[data-mosaics="9"]');
+        expect(section.hidden).toBe(true);
+        expect([...section.querySelectorAll("thead th")].map(th => th.textContent)).toEqual(["", "Mosaic", "Frames", "Size", "GSD", "Min", "Max"]);
+        const rows = [...section.querySelectorAll("tbody tr")];
+        expect(rows.map(tr => tr.getAttribute("data-kind"))).toEqual(["as_converted", "harmonized"]);
+        expect([...rows[1].children].map(td => td.textContent)).toEqual(["", "Harmonized", "151", "1464 × 1656", "1.6 cm", "-5.2 °C", "56.5 °C"]);
+        expect(rows[1].querySelector("img").getAttribute("src")).toBe(C9 + "/mosaics/harmonized/preview");
+        document.body.innerHTML = conversions.listHtml([c], true, "/x/", [], null, null, null, null, null, null, [9], {9: {selected: ["harmonized"]}});
+        expect(document.querySelector('[data-mosaics="9"]').hidden).toBe(false);
+        expect(document.querySelector('tr[data-kind="harmonized"]').classList.contains("ta-selected")).toBe(true);
+        expect(conversions.listHtml([Object.assign({}, c, {mosaics: []})], true, "/x/", [])).not.toContain("mosaic-files");
+    });
+
+    it("shows a mosaic's preview, files, report and viewer in its detail pane, or how many are selected", () => {
+        const c = Object.assign({}, CONVERSION, {mosaics: [MOSAIC("as_converted"), Object.assign(MOSAIC("harmonized"), {preview: false})]});
+        const urls = {base: C9, viewer: "/plugins/dji-thermal/dataset/5/conversion/9"};
+        expect(conversions.mosaicDetailHtml(c, [], false, urls)).toBe("");
+        document.body.innerHTML = conversions.mosaicDetailHtml(c, ["as_converted"], false, urls);
+        expect(document.querySelector("strong").textContent).toBe("As converted");
+        expect(document.querySelector('[data-act="detail-close"]')).toBeNull();
+        expect(document.querySelector("img").getAttribute("src")).toBe(C9 + "/mosaics/as_converted/preview?size=large");
+        expect([...document.querySelectorAll(".ta-file-detail-actions a")].map(a => [a.textContent.trim(), a.getAttribute("href")])).toEqual([
+            ["mosaic_preview.png", C9 + "/download?mosaic=as_converted%2Fmosaic_preview.png"],
+            ["mosaic_temp_c.tif", C9 + "/download?mosaic=as_converted%2Fmosaic_temp_c.tif"],
+            ["View mosaic", urls.viewer + "#as_converted"]]);
+        expect([...document.querySelectorAll("tr")].map(tr => tr.firstChild.textContent)).toEqual(["Temperatures", "Frames", "Size", "Seams"]);
+        expect(document.querySelector("td").textContent).toBe("-5.2 °C to 56.5 °C");
+        document.body.innerHTML = conversions.mosaicDetailHtml(c, ["harmonized"], true, {base: C9, viewer: null});
+        expect(document.querySelector("img")).toBeNull();
+        expect(document.querySelector('[data-act="detail-close"]')).not.toBeNull();
+        expect(document.body.textContent).not.toContain("View mosaic");
+        document.body.innerHTML = conversions.mosaicDetailHtml(c, ["as_converted", "harmonized"], true, urls);
+        expect(document.querySelector("strong").textContent).toBe("2 mosaics selected");
+        expect(document.querySelector('[data-act="download-mosaics"]').textContent).toContain("Download their 4 files");
     });
 });
 

@@ -53,9 +53,16 @@ Each workset is listed with the settings it changed, how many images it converte
   first time its Files are opened, which takes a few seconds.
 
 ![A workset's Files, the detail pane on the image under the mouse](images/workset-files.png)
-- **Mosaics**, below Files once the workset's mosaics are built, lists their files to download: the mosaic as
-  converted and harmonized, each a temperature TIFF with its JSON report, a preview and, when the frames were projected
-  onto heights, those heights. It opens and closes as Files does, and **Download all**'s zip has them too.
+- **Mosaics**, below Files once the workset's mosaics are built, is a table like the Files': a row for the mosaic
+  as converted and one for the harmonized, with its preview, the frames it was built from, its size, its ground sample
+  distance and its lowest and highest temperature. The detail pane beside it shows the mosaic under the mouse, or the
+  one you click: its preview (click it for the picture viewer), its files to download (a temperature TIFF with its
+  JSON report, the preview and, when the frames were projected onto heights, those heights), what dji-thermal-cli
+  reports about it (seams, misalignment, frame offsets, heights) and **View mosaic**, which opens the mosaic viewer on
+  it. Ctrl/Cmd-click selects both, to download their files as one zip. It opens and closes as Files does, and
+  **Download all**'s zip has the mosaics too.
+
+![A workset's Mosaics, the harmonized mosaic selected](images/workset-mosaics.png)
 - The **⋯** menu has **Download all** (a zip), **Copy settings to form**, **Build mosaics**, **Create task** (once
   the workset is in a task), **Use for parent task**, **Rename** and **Delete**.
 
