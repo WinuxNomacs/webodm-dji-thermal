@@ -16,10 +16,10 @@
     **Remove from workset** button in the pane (for one or the selection), with a confirmation naming how many; it
     deletes those frames' outputs from the workset's folder and records them in `results.json` as removed (by whom,
     when), needing the right to change the project (as deleting a workset); the figures stay with them; tasks already
-    made keep their images. Open decisions: what the table shows of a removed frame (its row greyed as "Removed",
-    or gone, counted in the summary line); what happens to mosaics built before (kept, marked "built with frames
-    since removed", with Build again; or deleted); saved frame measurements on a removed frame (deleted with it, or
-    kept).
+    made keep their images. Decided (the user, 2026-11-02): **a removed frame is gone from the table**, the
+    workset's summary line counting the removed frames ("217 converted · 3 removed"); **mosaics built before are
+    kept, marked out of date** ("built with frames since removed", with Build again); **measurements saved on a
+    removed frame are deleted with it**.
   - Next: **a workset's Mosaics in a section of their own** (the user, 2026-11-02, from `new.md`): "On the Files view
     in a workset, move the Mosaics download links out of the Files section into their own collapsible section below
     Files." Now `resultsHtml` lists `mosaic_files` at the end of the Files section, seen only once Files is open.
