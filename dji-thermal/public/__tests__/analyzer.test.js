@@ -854,6 +854,40 @@ describe("a dataset's page", () => {
         jest.clearAllTimers();    // no more polls into the next test's page
     });
 
+    it("removes the files selected from the dataset once confirmed, for those who can change it, while nothing runs", async () => {
+        const after = Object.assign({}, DATASET, {status: "new", analysis: Object.assign({}, ANALYSIS, {files: ANALYSIS.files.slice(2)}), files_removed: 2});
+        const fetchFn = server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS}), ["POST " + URL5 + "/remove"]: after});
+        dataset.init(document, fetchFn);
+        await ticks();
+        click(document.querySelector('#ta-tabs a[data-tab="files"]'));
+        const tab = document.getElementById("ta-tab-files");
+        const pane = () => tab.querySelector(".ta-file-detail");
+        const row = p => tab.querySelector('tbody tr[data-path="' + p + '"]');
+        click(row("thermal/b_T.JPG").querySelector("td:last-child"));
+        expect(pane().querySelector('[data-act="remove-files"]').textContent).toBe(" Remove from dataset");
+        row("thermal/a_T.JPG").querySelector("td:last-child").dispatchEvent(new MouseEvent("click", {bubbles: true, ctrlKey: true}));
+        click(pane().querySelector('[data-act="remove-files"]'));
+        expect(askDialog().textContent).toContain("Remove 2 files from Roof?");
+        expect(askDialog().textContent).toContain("The worksets that converted them lose them too");
+        press("Cancel");
+        await ticks();
+        expect(calls(fetchFn)).not.toContain("POST " + URL5 + "/remove");
+        click(pane().querySelector('[data-act="remove-files"]'));
+        press("Remove");
+        await ticks();
+        expect(JSON.parse(fetchFn.mock.calls.filter(c => c[1] && c[1].method === "POST")[0][1].body)).toEqual({files: ["thermal/b_T.JPG", "thermal/a_T.JPG"]});
+        expect([...tab.querySelectorAll("tbody tr")].map(r => r.getAttribute("data-path"))).toEqual(["rgb/a_V.JPG"]);
+        expect(pane().hidden).toBe(true);
+        expect(document.getElementById("ta-status").textContent).toContain("2 files removed. Analyze again");
+
+        // Disabled with why while a workset converts; not there for who can't change the dataset
+        const urls = {files: "/f?file=", picture: "/t"};
+        const busy = dataset.detailHtml(ANALYSIS, ["rgb/a_V.JPG"], true, Object.assign({remove: "Wait for Nadir to finish converting, or cancel it"}, urls));
+        expect(busy).toContain('disabled title="Wait for Nadir to finish converting, or cancel it"');
+        expect(dataset.detailHtml(ANALYSIS, ["rgb/a_V.JPG"], true, Object.assign({remove: null}, urls))).not.toContain("remove-files");
+        jest.clearAllTimers();
+    });
+
     it("selects files on the Files tab and shows the one selected, or the one under the mouse, in a detail pane", async () => {
         window.localStorage.removeItem("thermalAnalyzer.hoverDetail");
         const fetchFn = server({[URL5]: Object.assign({}, DATASET, {analysis: ANALYSIS})});

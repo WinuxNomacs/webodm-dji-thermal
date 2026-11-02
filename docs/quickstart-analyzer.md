@@ -57,6 +57,13 @@ reset the zoom. The arrows (or ← and →) go to the previous and next files; �
 
 To select several files, Ctrl/Cmd-click or Shift-click them; the pane can then download them as a zip.
 
+**Remove from dataset**, at the bottom of the pane, deletes a file you don't want (or those selected), once you
+confirm. Each workset that converted it loses it too, as **Remove from workset** does: its files there and the
+measurements saved on it are deleted, and mosaics built with it say so, with **Build again**. The tasks made before
+keep their images. The file leaves the table at once; press **Analyze again** to bring the summary, the problems and
+the WebODM plan up to date. It needs the right to change the project, and waits while the dataset is analyzed or a
+workset converts or builds its mosaics.
+
 Once a workset has converted the photos, a thermal frame's name, and **Open frame** in its detail pane, open it on
 the frame page of the newest one: see [One frame at a time](quickstart-worksets.md#one-frame-at-a-time).
 

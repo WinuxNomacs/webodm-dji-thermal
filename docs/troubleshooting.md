@@ -69,6 +69,16 @@ remove the frames and build the mosaics again.
 
 Removing frames would leave the workset with none converted. Delete the workset from its **⋯** menu.
 
+**"That would leave … without a converted frame: delete it first, or keep one of its frames"**
+
+Removing these files from the dataset would take every converted frame from that workset. Delete the workset from
+its **⋯** menu first, or leave one of its frames out of the selection.
+
+**"Wait for … to finish converting, or cancel it, before removing files"** (or **"Wait for …'s mosaics to be built"**, **"Wait for the analysis to finish"**)
+
+Files can't be removed from a dataset while it is analyzed or one of its worksets converts or builds its mosaics.
+Wait for it, or cancel it, then remove them.
+
 **"The mosaics were built with frames since removed"**
 
 Frames have been removed from the workset since its mosaics were built, and the mosaics still include them.

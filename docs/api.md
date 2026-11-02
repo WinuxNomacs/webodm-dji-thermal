@@ -27,6 +27,7 @@ workset's id (12 hexadecimal characters).
 | GET, PATCH, DELETE | `datasets/<dataset>` | A dataset and its analysis; rename it; delete it. |
 | POST | `datasets/<dataset>/upload` | Adds photos. |
 | POST | `datasets/<dataset>/analyze`, `.../cancel` | Starts the analysis; cancels the running job. |
+| POST | `datasets/<dataset>/remove` | Deletes images from the dataset (`files`: their paths), and from each converted workset that has them (as its `remove`), and drops them from the analysis' `files`, which is kept but no longer matches the images (`status` back to `new`). Answers the dataset, with `files_removed`. Refused while it is analyzed or a workset converts or builds its mosaics, and when a workset would be left without a converted frame. |
 | GET, POST | `datasets/<dataset>/files` | One file as uploaded (`?file=`, `&download=1` to download); several files as a zip. |
 | GET | `datasets/<dataset>/thumbnail` | A file's thumbnail (`?file=`, `?palette=`, `?size=large` for the detail pane; `?workset=` also for a frame that workset converted, in a dataset not analyzed). |
 | GET, POST | `datasets/<dataset>/conversions` | The worksets; a new workset from settings. |

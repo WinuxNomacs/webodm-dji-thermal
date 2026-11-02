@@ -5,7 +5,7 @@
 **Up next**
 - **The user's testing and polishing** (2026-10-30): bugs and polish they report go here, each fixed on its own
   branch. Publishing 1.0.0 waits for it.
-  - Next: **removing files from a dataset** (the user, 2026-11-02: "For the Files view under dataset we should add the
+  - Done: **removing files from a dataset** (the user, 2026-11-02: "For the Files view under dataset we should add the
     ability to remove files as well, just like is done for the worksets view."). Decided (the user, 2026-11-02):
     **Remove from dataset** in the dataset page's Files tab detail pane (one file, or those selected), for those who
     can change the project, with a confirmation; the files deleted from the dataset's images (and their cached
@@ -13,7 +13,13 @@
     as Remove from workset does (outputs and saved measurements deleted, counted as removed, mosaics marked out of
     date; tasks made before keep their images), refused if it would leave a workset without a converted frame, and
     while the dataset is analyzing or a workset converting or building mosaics; the analysis kept but marked out of
-    date (Analyze again prompted), as after Add images.
+    date (Analyze again prompted), as after Add images. `remove-dataset-files`: `conversions.remove_images` (checks
+    everything first, then `remove_frames` per workset, the images, the analysis' files, `images_changed`),
+    `POST datasets/<id>/remove` (`analyzer_api.DatasetRemoveFiles`, the cached thumbnails found by `thumbnail_key`
+    before the images go), `dataset.js` (`removeFilesHtml`, `removeBusy`, `removeFiles`). README,
+    `quickstart-analyzer.md`, `api.md`, `troubleshooting.md`. Django (`TestRemovingFrames`: the effects, and who and
+    when), Jest (the flow, the button disabled or absent). Live: a "Live check remove files" dataset of 3 flight
+    frames, analyzed, 2 removed in the page, then deleted.
   - Done: **the dataset Files tab's detail pane hid its last columns** (the user, 2026-11-02: "the detail pane on the
     right blocks the far right column. Either remove the column or move the viewer over to the right more"),
     `dataset-files-layout`. Decided (the user, 2026-11-02): both. The Notes column is gone (the pane already shows a
