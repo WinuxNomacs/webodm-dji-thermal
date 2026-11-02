@@ -149,8 +149,9 @@ Saved measurements go with their task or workset: deleting either deletes them.
 
 The temperatures were measured with the emissivity and reflected temperature the camera recorded, or those set in
 DJI Thermal Task or the workset (see [Measurement settings](measurement.md)). To see what a surface would measure with
-others, tick the box beside **Manual Corrections**. The values start from what the topmost
-layer was measured with, and the panel lists what each layer on the map was measured with. Change them, and:
+others, use **Emissivity** and **Reflected**, under the colour scale's temperatures. They always show, greyed out
+with what the topmost layer was measured with until you tick **Manual Corrections** under them; then they take any
+emissivity from 0.1 to 1 and any reflected temperature from −100 to 1000 °C. Change them, and:
 
 - the readout, pins, regions and lines show corrected temperatures (the regions are measured again);
 - the legend's marks are corrected temperatures, and the isotherm's limits are too;
@@ -162,4 +163,4 @@ The correction is approximate: a broadband model, with the air's transmission ta
 It's for comparing surfaces, not for calibrated values; for exact values, make a workset with the measurement
 settings you want. A layer that doesn't record how it was measured (an orthophoto that wasn't made from the plugin's
 TIFFs) isn't corrected, and the panel says so. Your browser keeps the correction for the same tasks. Untick the box
-to go back: the values you typed are forgotten and the fields close, so ticking it again starts from the layer's own.
+to go back: the values you typed are forgotten and the fields grey out with the layer's own again.
