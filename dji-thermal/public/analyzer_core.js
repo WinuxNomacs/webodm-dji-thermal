@@ -561,6 +561,9 @@
         var mis = r.misalignment;
         if (mis && mis.pairs) rows.push(["Misalignment", "median " + formatNumber(mis.median_m * 100, 1, " cm") + ", 90% under " +
             formatNumber(mis.p90_m * 100, 1, " cm") + " (" + mis.pairs + " overlapping pairs)"]);
+        var ali = r.alignment;
+        if (ali && ali.saved_alignment_used) rows.push(["Alignment", "Harmonize's, not aligned again"]);
+        else if (ali && ali.saved_alignment_not_used) rows.push(["Alignment", "aligned again: " + ali.saved_alignment_not_used]);
         var off = r.frame_offsets;
         if (off && off.offset_c && off.offset_c.min !== undefined) {
             rows.push(["Frame offsets", formatNumber(convertDelta(off.offset_c.min, "C"), 2) + " to " + formatDelta(off.offset_c.max, "C") +

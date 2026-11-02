@@ -32,6 +32,7 @@ CONVERSIONS_DIR = 'conversions'
 RECORD_FILE = 'conversion.json'
 JOB_FILE = 'job.json'
 RESULTS_FILE = 'results.json'
+ALIGNMENT_FILE = 'alignment.json'   # harmonizing's alignment of the frames, which the mosaics are placed with
 OUTPUT_DIR = 'output'
 PREFERENCES_KEY = 'conversion_settings'
 DISPLAY_KEY = 'display'
@@ -254,11 +255,13 @@ def api_arguments(s, medians=None):
     The keyword arguments of dji-thermal-cli's process for these settings (checked by parse_settings), measured
     with the SDK in use. Harmonizing is dji-thermal-cli's own normalization (the flight's medians and each frame's
     offset); normalizing alone measures every frame with medians, the flight's (ambient_c, reflected_c) (see
-    flight_medians), where the settings give no value.
+    flight_medians), where the settings give no value. Harmonizing compares the frames the mosaics are built from (the
+    pitch limit's, -80° without one), so that the mosaics can be placed with its alignment.
     :raises sdk.SdkError: the SDK set at deployment is missing
     """
     from . import sdk
     dtc = converter.library()
+    max_pitch = s['max_pitch'] if s['max_pitch'] is not None else dtc.MosaicOptions().max_pitch
     fields = {f: s[f] for f in SETTINGS_FIELDS}
     if s.get('normalize') and not harmonized(s) and medians:
         unit = s.get('unit') or 'C'
@@ -271,6 +274,7 @@ def api_arguments(s, medians=None):
         'compression': s['compression'],
         'normalize': harmonized(s),
         'max_pitch': s['max_pitch'],
+        'mosaic_options': dtc.MosaicOptions(max_pitch=max_pitch),
     }
 
 
@@ -681,7 +685,12 @@ def convert(task_id, run_id, cid):
                 state['stage'] = None
 
         # jobs=1: a Celery worker's processes cannot start processes of their own
+        alignment = path(task, cid, ALIGNMENT_FILE)
+        if os.path.exists(alignment):
+            os.remove(alignment)
         report = dtc.process(root, out_dir, jobs=1, progress=progress, **args)
+        if report.normalization is not None and report.normalization.alignment is not None:
+            report.normalization.alignment.save(alignment)
         result = compact(report, root, out_dir, dtc.__version__, thermal)
         if medians is not None:
             result['normalization'] = {'ambient_c': medians[0], 'reflected_c': medians[1], 'offsets': False}

@@ -409,6 +409,10 @@ class TestConversionSettings(AnalyzerTestCase):
         self.assertEqual((args["settings"].ambient_temp, args["settings"].reflected_temp), (68.0, 70.0))
         args = conversions.api_arguments(dict(s, harmonize=True), (20.0, 25.0))
         self.assertTrue(args["normalize"])
+        # harmonizing compares the frames the mosaics are built from, so that they can be placed with its alignment
+        self.assertEqual(args["mosaic_options"].max_pitch, -80.0)
+        self.assertEqual(conversions.api_arguments(dict(s, harmonize=True, max_pitch=-70.0))["mosaic_options"].max_pitch,
+                         -70.0)
         self.assertIsNone(args["settings"].ambient_temp)
         self.assertIsNone(conversions.api_arguments(dict(conversions.DEFAULTS), (20.0, 25.0))["settings"].ambient_temp)
 
@@ -850,6 +854,29 @@ class TestMosaics(AnalyzerTestCase):
         with mock.patch.object(datasets, "job_gone", return_value=True):
             d = self.client.get(self.url(task, cid)).data
         self.assertEqual(d["mosaic_status"], "failed")
+
+    @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def test_a_harmonized_worksets_mosaics_are_placed_with_harmonizings_alignment(self):
+        frames = flight_frames(6)
+        task = self.create()
+        with contextlib.ExitStack() as stack:
+            self.upload(task, [stack.enter_context(open(f, "rb")) for f in frames])
+        res = self.client.post("{}/{}/conversions".format(API, task.id),
+                               {"name": "Harmonized", "settings": {"outputs": ["temp_c:tiff"], "harmonize": True}},
+                               format="json")
+        cid = res.data["id"]
+        v = self.client.get(self.url(task, cid)).data
+        self.assertEqual((v["status"], v["mosaic_status"]), ("ready", "ready"), v["mosaic_error"] or v["error"])
+        self.assertTrue(os.path.isfile(conversions.path(task, cid, conversions.ALIGNMENT_FILE)))
+        for kind in ("as_converted", "harmonized"):
+            self.assertTrue(mosaics.result(task, cid)["kinds"][kind]["report"]["alignment"]["saved_alignment_used"])
+
+        # Not harmonized: no alignment kept, the mosaics aligned as they are built
+        res = self.client.post("{}/{}/conversions".format(API, task.id),
+                               {"name": "Plain", "settings": {"outputs": ["temp_c:tiff"]}}, format="json")
+        plain = res.data["id"]
+        self.assertFalse(os.path.exists(conversions.path(task, plain, conversions.ALIGNMENT_FILE)))
+        self.assertNotIn("saved_alignment_used", mosaics.result(task, plain)["kinds"]["harmonized"]["report"]["alignment"])
 
     @skip_without("DJI_THERMAL_FLIGHT_DIR")
     def test_a_flights_frames_make_mosaics_shown_on_a_map_and_downloaded(self):
