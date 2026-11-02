@@ -211,10 +211,17 @@ describe("a thermal task's upload", () => {
         expect(api.uploadToDataset.mock.calls.map(c => c[1].length)).toEqual([10, 2]);
         expect(progress).toEqual([10, 12]);
         expect(await readText(api.uploadFiles.mock.calls[0][2][0])).toContain("DJI_0001_T_temp_c.tiff gcp1");
-        expect(api.startWorkset).toHaveBeenCalledWith(7, "t1", {unit: "C", distance: "lrf", normalize: true, harmonize: false});
+        expect(api.startWorkset).toHaveBeenCalledWith(7, "t1", {unit: "C", distance: "lrf", normalize: true, harmonize: false, mosaics: false});
         expect(api.convert).not.toHaveBeenCalled();
         expect(api.commit).not.toHaveBeenCalled();
         expect(result).toMatchObject({dataset: "d1", workset: "w1", frames: {normalize: true, harmonize: false}, total: 12});
+    });
+
+    test("the workset's mosaics are asked for when ticked, and only for a normalized task", async () => {
+        const api = fakeApi();
+        await upload(api, [photo("DJI_0001_T.JPG")], {frames: {harmonize: true, mosaics: true}}).start();
+        expect(api.startWorkset.mock.calls[0][2]).toMatchObject({normalize: true, harmonize: true, mosaics: true});
+        expect(upload(api, [photo("DJI_0001_T.JPG")], {frames: {mosaics: true}}).frames.mosaics).toBe(false);
     });
 
     test("harmonize normalizes too, and a workset that cannot start removes the task and its dataset", async () => {

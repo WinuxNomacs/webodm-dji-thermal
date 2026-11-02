@@ -57,7 +57,9 @@ export default class ThermalUpload {
         this.concurrency = concurrency || CONCURRENCY;
         this.keepPhotos = !!keepPhotos;
         this.otherPhotos = otherPhotos || [];
-        this.frames = {normalize: !!(frames && (frames.normalize || frames.harmonize)), harmonize: !!(frames && frames.harmonize)};
+        const normalize = !!(frames && (frames.normalize || frames.harmonize));
+        // mosaics: the workset's mosaics built once it is converted (api.py TaskWorkset)
+        this.frames = {normalize, harmonize: !!(frames && frames.harmonize), mosaics: normalize && !!frames.mosaics};
         this.canceled = false;
         this.task = null;
         this.dataset = null;
