@@ -829,6 +829,14 @@
   (CHANGELOG, README, the zip rebuilt by `dev/package.sh` on the merge, its new sha256, the `release-check` skill);
   then the user tags `v1.0.0`, attaches the zip to the GitHub release and adds `{url, sha256}` to WebODM-Plugins'
   `directory.json` (details under "Done: Release 1.0.0" below).
+  Redone (2026-11-02, the user: the zip and its sha256 ready before the repo goes public and the WebODM-Plugins PR):
+  `release/1.0.0` again, the changelog covering all that ships (dji-thermal-cli 1.12.0), the manifest naming the
+  Thermal Inspector; Jest 281, Django 205 with `app.tests.test_plugins`. Release check (Docker; native Windows not
+  run this time): the zip installed through Administration > Plugins (pip: dji-thermal-cli 1.12.0, numpy 1.26.2,
+  Pillow 11.3.0; no webpack), a DJI Thermal Task of 40 M4T frames (3 RGB ignored) processed in 173 s (9.5 to
+  34.1 °C), a harmonized workset's mosaics (Harmonize's alignment reused) and its task processed in 246 s (5.7 to
+  32.2 °C); the project deleted, the mounted copy back. The zip and its sha256 come from `dev/package.sh` on the
+  merge; the user tags `v1.0.0`, attaches the zip and opens the WebODM-Plugins PR.
 
 **Later**
 - **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
