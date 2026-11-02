@@ -41,6 +41,9 @@
     waiting forever, and normalized, one failed batch removed the whole task; requests sending files now time out
     (`serverApi.filesTimeout`, as the Analyzer's upload) and a request with no answer is sent again twice
     (`upload.retried`); a refusal is not.
+  - `thermal-task-mosaics`: DJI Thermal Task's **Also build the workset's mosaics** did nothing: the upload kept only
+    normalize and harmonize from the panel (`ThermalUpload.frames`). Live: 12 photos harmonized, the mosaics built
+    once the task committed.
   - `untrack-node-modules`: `.gitignore` ignored only a `node_modules/` folder, so a worktree's link of that name
     could be committed.
   Larger, planned below: **Jobs left running by a stopped worker** and **Use for parent task with an unreachable
