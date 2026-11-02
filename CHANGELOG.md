@@ -34,8 +34,9 @@ installer.
   side, each with its files measured (thumbnails, figures, a detail pane, removing frames), downloaded as a zip or
   file by file; each user's defaults saved.
 - **Mosaics** of a workset (as converted and harmonized), placed from the frames' positions with no WebODM task (a
-  harmonized workset's with Harmonize's alignment, not aligned again), in a map viewer: palettes, range and image adjustments changed live, an isotherm, the temperature, frame and view
-  angle under the cursor, the frames that saw a point, the reports and files.
+  harmonized workset's with Harmonize's alignment, not aligned again), in a map viewer: palettes, range and image
+  adjustments changed live, an isotherm, the temperature, frame and view angle under the cursor, the frames that saw
+  a point, the reports and files.
 - **The frame page**: one frame at a time, measured in its pixels (pins, lines, regions), measurements saved on it,
   and measured again with other parameters by dji-thermal-cli.
 - **Create task** from a workset (its °C TIFFs in a WebODM task of the project, with the plan's ODM options as
