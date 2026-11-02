@@ -65,6 +65,68 @@
   screenshot (no location or serial shown), sorted into quick fixes and larger changes; published as a private
   Artifact for the user to review; nothing changed until they choose. Decided (the user, 2026-11-02): as the walk-through's (the whole
   flight, deleted afterwards, the same three flows).
+  Done (2026-11-02): walked through on a "Live check UX review" project (New Dataset of the whole flight, a plan
+  workset with mosaics, the Files, Problems and WebODM plan tabs, Create task, the viewer and frame page, DJI Thermal
+  Task's panel with the flight picked, not started), deleted afterwards. 20 findings, published as a private
+  Artifact (https://claude.ai/artifact/DWqaNce3fs86aW82BHv8zt), planned as phases U1 to U5 below. Open decisions:
+  D1 to D5 (in each phase).
+- **U5. DJI Thermal Task's panel** (UX review, 2026-11-02), proposed first since it changes what the maps contain.
+  Dashboard › a project › DJI Thermal Task, after picking photos:
+  - U5-1 (larger): no pitch limit, so a normalized or harmonized task sends oblique frames to ODM (217 of 217 where
+    the plan keeps 42); add "Only frames with a gimbal pitch at or below", the plan's -80° by default, with the count
+    kept ("42 of 217 frames"); `api.py` TaskWorkset passes it to the workset.
+  - U5-2: WebODM's Options stay at Default (5 cm/px from 2.1 cm/px frames, no RTK accuracy). Open (D4): pre-select the
+    plan's recommended options (radiometric-calibration none, orthophoto-resolution at the GSD, gps-accuracy), shown
+    as "Custom" (recommended), or a "Thermal plan" preset to pick, or leave Default.
+  - U5-3: progress wording: "Converting the thermal photos: 0 of 217" flashes before "Uploading", then "Converting the
+    434 photos" with 217 thermal; "Uploading 434 photos", then "Converting 217 thermal photos" (or those the pitch
+    limit keeps).
+  - U5-4 (larger): datasets kept by the task are never analyzed ("Not analyzed"); start the analysis once the upload
+    is done.
+  - U5-5 (larger): one order, labels and help text for the panel and the Workset Creation Settings (after U2-2):
+    labels left here and above there, Normalize/Harmonize before Measurement here and after it there, "Temperature
+    unit" here and "Unit of the files" there.
+- **U1. Progress and results on the workset card** (UX review, 2026-11-02). Dataset page › Worksets › a workset's
+  card; quick fixes, no decision:
+  - U1-1: a harmonized workset shows "Converting 0%" and an empty bar for about four minutes (the stage only in the
+    grey line); the label shows the stage ("Harmonizing 3/4") and the bar fills from the stage's own progress (rounds,
+    pairs, solve steps); the same while the mosaics build.
+  - U1-2: progress counts the RGB photos (skipped at once: 50%, then a crawl); count only the frames to convert ("12
+    of 42 frames").
+  - U1-3: "42 converted, 392 skipped" becomes "42 converted · 175 oblique left out · 217 not thermal"; "skipped" kept
+    for frames that failed.
+  - U1-4: the analysis bar holds at 91% for about 30 s while the summary is computed (Dataset page › header); report
+    it as a stage with its own share.
+  - U1-5: on a converted card **Create task** (the next step) is grey beside a dark **View mosaics**; make it primary.
+    While mosaics build the label says "Converted" beside a bare **Cancel**: "Building mosaics" and "Cancel mosaics".
+- **U2. The Workset Creation Settings form** (UX review, 2026-11-02). Dataset page › Worksets › Workset Creation
+  Settings:
+  - U2-1: a new dataset starts from dji-thermal-cli's defaults, four chips "≠ plan", though step 2 says to start from
+    the plan. Open (D1): start from the user's saved defaults, else the plan (recommended), or keep the defaults.
+  - U2-2: order Frames, Outputs, Measurement, Colours (shown only with a colour output), Adjustments (now Palette and
+    Colour range first, the map's settings last); each "≠ plan" note on its own control's line ("≠ plan: harmonized"
+    floats above the pitch field).
+  - U2-3: Create Workset, Use the WebODM plan's settings, Save as my defaults and Reset to defaults side by side, and
+    Reset also forgets the saved defaults; a "Start from" choice above the form (WebODM plan · My defaults ·
+    dji-thermal-cli defaults), Save as my defaults beside it, "Forget my defaults" in its menu.
+  - U2-4 (larger, its own phase): harmonize and the mosaics each align the frames (about 2.5 and 3 minutes of a
+    6-minute plan workset). Open (D2): reuse harmonize's alignment for the mosaics, later, after a dji-thermal-cli
+    release that saves and accepts an alignment (recommended), or keep both.
+- **U3. New Dataset, the Files and Problems tabs** (UX review, 2026-11-02):
+  - U3-1: Thermal Analyzer › New Dataset › Name is the folder picked ("images"). Open (D3): the camera and capture
+    date from the file names ("M4T 2026-10-12"), the folder's name kept unless generic (images, DCIM, 100MEDIA)
+    (recommended), or the folder's parent.
+  - U3-2: New Dataset › Project proposes "First Project" with the list filtered to another; pre-select the filter's
+    project, else the last used.
+  - U3-3: Dataset page › Files opens on "All files", 217 rows of "Not thermal" first; open on "Thermal frames"; the
+    table scrolls sideways in its own box when the detail pane is open (Distance's header is cut).
+  - U3-4: Dataset page › Problems: two of the four warnings (7 hottest, 39 coldest) are oblique frames only, which
+    the pitch limit removes; fold such a warning into the pitch note, so the step bar's count shows what affects a map.
+- **U4. The frame page** (UX review, 2026-11-02). Mosaic viewer › Open this frame › frame page:
+  - U4-1: the list doesn't show the frame opened (0022 opened, 0001 to 0017 shown); scroll it into view, centred,
+    and highlight it.
+  - U4-2: from a mosaic, open on "In the mosaic" (42) rather than "All" (217).
+  Open (D5): the order U5, U1, U2, U3, U4.
 - **Jobs left running by a stopped worker** (found in the walk-through, 2026-11-02): when WebODM's worker stops in
   the middle of a job (`docker restart`, a crash, the machine restarting), Celery never marks the job failed (the
   message was taken; no result is ever written), so `datasets.check_stale` never finds it gone: the analysis, workset,
