@@ -42,8 +42,8 @@ Each workset is listed with the settings it changed, how many images it converte
 ![A converted workset](images/workset.png)
 
 - **Files** opens a table of each image: its thumbnail, result, minimum and maximum temperature, emissivity,
-  reflected temperature and distance as the workset measured them, and why any image was skipped. Click a heading to
-  sort by it. The detail pane beside it shows the image under the mouse, or the one you click: the frame at its own
+  reflected temperature and distance as the workset measured them, and why any image was skipped. Its headings stay
+  in view as it scrolls; click one to sort by it, and again to reverse the order. The detail pane beside it shows the image under the mouse, or the one you click: the frame at its own
   size (click it for the picture viewer), all it was measured with, the workset's files for it, its temperatures as
   CSV or a float TIFF, and **Open frame**. Ctrl/Cmd-click or Shift-click selects several images, to download their
   files as one zip. The figures are measured once, after the workset converts; an older workset's are measured the

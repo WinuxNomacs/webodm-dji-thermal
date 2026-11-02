@@ -627,8 +627,8 @@
         return Object.keys(counts).map(function (r) { return [r, counts[r]]; }).sort(function (a, b) { return b[1] - a[1]; });
     }
 
-    var RESULT_COLUMNS = [{key: "path", label: "Image"}, {key: "result", label: "Result"}, {key: "min", label: "Min"}, {key: "max", label: "Max"},
-        {key: "emissivity", label: "Emissivity"}, {key: "reflected", label: "Reflected"}, {key: "distance", label: "Distance"}, {label: "Notes"}];
+    var RESULT_COLUMNS = [{key: "path", label: "Image"}, {key: "result", label: "Result"}, {key: "min", label: "Min", num: true},
+        {key: "max", label: "Max", num: true}, {key: "emissivity", label: "Emissivity", num: true}, {key: "reflected", label: "Reflected", num: true}, {key: "distance", label: "Distance", num: true}];
 
     // A conversion's images with their figures (c: the conversion as its detail has it, with its figures), sorted as
     // the view has them (view: {sort: a sortable RESULT_COLUMNS key, desc}; by image, ascending, at first)
@@ -677,11 +677,11 @@
         var sort = view.sort || "path", selected = view.selected || [];
         var rows = resultRows(c, view);
         var temp = function (v) { return esc(core.formatTemp(v, "C", 1)); };
-        html += '<div class="ta-files-layout"><div class="ta-files-table"><div class="ta-table-scroll"><table class="table table-condensed ta-results"><thead><tr>' +
+        html += '<div class="ta-files-layout"><div class="ta-files-table"><div class="ta-table-scroll ta-results-scroll"><table class="table table-condensed ta-results"><thead><tr>' +
             (view.thumbs ? "<th></th>" : "") + RESULT_COLUMNS.map(function (col) {
-                if (!col.key) return "<th>" + esc(col.label) + "</th>";
                 var arrow = sort === col.key ? ' <i class="fa fa-caret-' + (view.desc ? "down" : "up") + '"></i>' : "";
-                return '<th data-sort="' + col.key + '" title="Sort by ' + esc(col.label.toLowerCase()) + '">' + esc(col.label) + arrow + "</th>";
+                return '<th data-sort="' + col.key + '"' + (col.num ? ' class="ta-num"' : "") + ' title="Sort by ' + esc(col.label.toLowerCase()) + '">' +
+                    esc(col.label) + arrow + "</th>";
             }).join("") + "</tr></thead><tbody>" +
             rows.slice(0, RESULTS_SHOWN).map(function (f) {
                 return '<tr class="' + (f.ok ? "" : "ta-skipped") + (selected.indexOf(f.path) >= 0 ? " ta-selected" : "") + '" data-path="' + esc(f.path) + '">' +
@@ -690,8 +690,7 @@
                     (f.ok ? '<span class="text-success">Converted</span>' : '<span class="text-warning">Skipped</span>: ' + esc(f.reason)) +
                     '</td><td class="ta-num">' + temp(f.min) + '</td><td class="ta-num">' + temp(f.max) + '</td><td class="ta-num">' +
                     esc(core.formatNumber(f.emissivity, 2)) + '</td><td class="ta-num">' + temp(f.reflected) + '</td><td class="ta-num"' +
-                    (f.distance_source ? ' title="' + esc(f.distance_source) + '"' : "") + ">" + esc(core.formatNumber(f.distance, 1, " m")) + "</td><td>" +
-                    esc((f.notes || []).join("; ")) + "</td></tr>";
+                    (f.distance_source ? ' title="' + esc(f.distance_source) + '"' : "") + ">" + esc(core.formatNumber(f.distance, 1, " m")) + "</td></tr>";
             }).join("") + "</tbody></table></div>";
         if (files.length > RESULTS_SHOWN) html += '<p class="text-muted">And ' + (files.length - RESULTS_SHOWN) + " more: download all to see them.</p>";
         html += '</div><aside class="ta-file-detail" hidden></aside></div>';

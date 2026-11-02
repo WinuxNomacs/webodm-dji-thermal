@@ -1443,7 +1443,7 @@ describe("a dataset's conversions", () => {
             figures_status: "ready"});
         document.body.innerHTML = conversions.resultsHtml(c, "/x/", {thumbs: "/thumb?file="});
         const cells = [...document.querySelectorAll(".ta-results tbody td")].map(td => td.textContent);
-        expect(cells).toEqual(["", "a_T.JPG", "Converted", "10.0 °C", "41.3 °C", "0.95", "19.4 °C", "16.4 m", ""]);
+        expect(cells).toEqual(["", "a_T.JPG", "Converted", "10.0 °C", "41.3 °C", "0.95", "19.4 °C", "16.4 m"]);
         expect(document.querySelector(".ta-thumb img").getAttribute("src")).toBe("/thumb?file=a_T.JPG");
         expect(document.querySelector(".ta-figures-progress")).toBeNull();
         expect(conversions.resultsHtml(Object.assign({}, c, {figures: {}, figures_status: "measuring", figures_progress: 0.4}), "/x/"))
@@ -1677,8 +1677,8 @@ describe("a dataset's conversions", () => {
         expect(window.localStorage.getItem("dji-thermal-analyzer:files-shown:5")).toBeNull();
     });
 
-    it("sorts a workset's files by image or result, ascending or descending", () => {
-        const c = Object.assign({}, CONVERSION, {results: {files: [
+    it("sorts a workset's files by any column but the thumbnail, ascending or descending, the figures' headers aligned with them", () => {
+        const c = Object.assign({}, CONVERSION, {figures: {"a_T.JPG": {max: 30}, "b_T.JPG": {max: 50}}, results: {files: [
             {path: "b_T.JPG", ok: true, outputs: ["b.tiff"], notes: []},
             {path: "c_T.JPG", ok: false, reason: "not thermal", outputs: [], notes: []},
             {path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []}]}});
@@ -1689,9 +1689,12 @@ describe("a dataset's conversions", () => {
         expect(order()).toEqual(["a_T.JPG", "b_T.JPG", "c_T.JPG"]);
         expect(order({sort: "path", desc: true})).toEqual(["c_T.JPG", "b_T.JPG", "a_T.JPG"]);
         expect(order({sort: "result", desc: true})).toEqual(["c_T.JPG", "b_T.JPG", "a_T.JPG"]);
-        expect([...document.querySelectorAll(".ta-results th")].map(th => th.getAttribute("data-sort")))
-            .toEqual(["path", "result", "min", "max", "emissivity", "reflected", "distance", null]);
         expect(document.querySelector('.ta-results th[data-sort="result"] .fa-caret-down')).not.toBeNull();
+        expect(order({sort: "max", desc: true})).toEqual(["b_T.JPG", "a_T.JPG", "c_T.JPG"]);
+        expect([...document.querySelectorAll(".ta-results th")].map(th => th.getAttribute("data-sort")))
+            .toEqual(["path", "result", "min", "max", "emissivity", "reflected", "distance"]);
+        expect([...document.querySelectorAll(".ta-results th.ta-num")].map(th => th.getAttribute("data-sort")))
+            .toEqual(["min", "max", "emissivity", "reflected", "distance"]);
     });
 });
 
