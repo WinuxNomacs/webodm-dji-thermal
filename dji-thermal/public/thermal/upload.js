@@ -13,12 +13,21 @@
 import { tiffName, withImagesRenamed, worksetTiffName } from './textFiles';
 
 export const CONCURRENCY = 3;
+export const RETRIES = 2;           // times a request the server never answered is sent again
 export const DATASET_BATCH = 10;    // other photos per request to the dataset, as the Analyzer's own upload
 
 export const NO_IMAGES = "None of the photos could be converted: the task was not created.";
 
 // The task's hidden tag (conversion_tasks.THERMAL_TASK_TAG): its panel then offers a dataset for its photos (main.js)
 export const THERMAL_TASK_TAG = ".dji-thermal-task";
+
+// send() again when the server never answered it (dropped on the way, or timed out: no status), up to RETRIES times
+export function retried(send, attempt = 0){
+    return send().catch(e => {
+        if (e.status || attempt >= RETRIES) throw e;
+        return retried(send, attempt + 1);
+    });
+}
 
 // The fields of WebODM's task creation (as its own upload, without resizing)
 export function taskData(taskInfo){
@@ -100,7 +109,7 @@ export default class ThermalUpload {
                 for (let i = 0; i < photos.length; i += DATASET_BATCH){
                     const batch = photos.slice(i, i + DATASET_BATCH);
                     chain = chain.then(() => this.checkCanceled())
-                        .then(() => this.api.uploadToDataset(this.dataset, batch))
+                        .then(() => retried(() => this.api.uploadToDataset(this.dataset, batch)))
                         .then(() => {
                             progress.done += batch.length;
                             this.onProgress(Object.assign({}, progress));
@@ -113,7 +122,7 @@ export default class ThermalUpload {
                 if (!this.textFiles.length) return null;
                 const names = this.photos.map(p => p.name);
                 return Promise.all(this.textFiles.map(f => withImagesRenamed(f, names, worksetTiffName)))
-                    .then(files => this.api.uploadFiles(this.projectId, this.task.id, files));
+                    .then(files => retried(() => this.api.uploadFiles(this.projectId, this.task.id, files)));
             })
             .then(() => this.checkCanceled())
             .then(() => this.api.startWorkset(this.projectId, this.task.id, Object.assign({}, this.measurement, this.frames)))
@@ -146,7 +155,7 @@ export default class ThermalUpload {
             if (this.canceled || next >= this.photos.length) return Promise.resolve();
             const photo = this.photos[next++];
             const fields = this.dataset ? Object.assign({}, this.measurement, {dataset: this.dataset}) : this.measurement;
-            return this.api.convert(this.projectId, this.task.id, photo, fields)
+            return retried(() => this.api.convert(this.projectId, this.task.id, photo, fields))
                 .then(res => this.record(photo, res.status, res.reason, res.image),
                       e => this.record(photo, "failed", e.message))
                 .then(worker);
@@ -171,7 +180,7 @@ export default class ThermalUpload {
         this.result.converted.forEach(n => { converted[n] = true; });
         const names = this.photos.map(p => p.name).filter(n => converted[tiffName(n)]);
         return Promise.all(this.textFiles.map(f => withImagesRenamed(f, names)))
-            .then(files => this.api.uploadFiles(this.projectId, this.task.id, files));
+            .then(files => retried(() => this.api.uploadFiles(this.projectId, this.task.id, files)));
     }
 
     // The photos that are not converted, into the dataset, a few per request, one request at a time
@@ -181,7 +190,7 @@ export default class ThermalUpload {
         let chain = Promise.resolve();
         for (let i = 0; i < photos.length; i += DATASET_BATCH){
             const batch = photos.slice(i, i + DATASET_BATCH);
-            chain = chain.then(() => this.checkCanceled()).then(() => this.api.uploadToDataset(this.dataset, batch));
+            chain = chain.then(() => this.checkCanceled()).then(() => retried(() => this.api.uploadToDataset(this.dataset, batch)));
         }
         return chain;
     }
