@@ -667,7 +667,8 @@
             "are a good start), then Create Workset." : ".") + "</p>";
         open = open || [];
         return conversions.map(function (c) {
-            var cls = {ready: "success", failed: "danger", canceled: "default", converting: "info"}[c.status] || "default";
+            var cls = c.mosaic_status === "building" ? "info" :
+                {ready: "success", failed: "danger", canceled: "default", converting: "info"}[c.status] || "default";
             var figures = [];
             if (c.status !== "converting") {
                 if (c.converted || c.skipped || c.oblique || c.not_thermal) figures.push(c.converted + " converted");

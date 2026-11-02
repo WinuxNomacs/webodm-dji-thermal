@@ -1913,7 +1913,9 @@ describe("a conversion's mosaics on the dataset page", () => {
         expect(el.firstChild.getAttribute("data-act")).toBe("cancel");
         expect(el.firstChild.getAttribute("title")).toBe("Stop building the mosaics");
         expect(el.firstChild.textContent.trim()).toBe("Cancel mosaics");
-        expect(conversions.statusLabel(Object.assign({}, CONVERSION, {mosaic_status: "building", mosaic_progress: 0.45}))).toBe("Building mosaics 45%");
+        const buildingCard = Object.assign({}, CONVERSION, {mosaic_status: "building", mosaic_progress: 0.45});
+        expect(conversions.statusLabel(buildingCard)).toBe("Building mosaics 45%");
+        expect(conversions.listHtml([buildingCard], true, C9.replace(/9$/, ""), null)).toContain('label-info">Building mosaics 45%');
         expect(el.querySelector('[data-act="mosaics"]')).toBe(null);
         expect(el.querySelector('a[href="' + viewerUrl + '"]').textContent).toContain("Mosaics");
 

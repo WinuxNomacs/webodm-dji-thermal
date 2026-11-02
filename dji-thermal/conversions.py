@@ -295,9 +295,10 @@ def flight_medians(root, jpegs):
     return tuple(float(statistics.median(v)) if v else None for v in values.values())
 
 
-def compact(report, root, out_dir, version=""):
-    """What a conversion keeps of dji-thermal-cli's process report: {files, converted, skipped, normalization,
-    version}"""
+def compact(report, root, out_dir, version="", thermal=None):
+    """What a conversion keeps of dji-thermal-cli's process report: {files, converted, oblique, not_thermal, skipped,
+    normalization, version}; thermal: the thermal JPEGs, when known (the others marked not_thermal: dji-thermal-cli
+    reports one above the pitch limit as oblique, before it looks for thermal data)"""
     files = []
     offsets = report.normalization.offsets_c if report.normalization is not None else {}
     for r in report.results:
@@ -311,6 +312,7 @@ def compact(report, root, out_dir, version=""):
             'distance_source': r.distance_source or "",
             # What normalizing subtracted from the frame (°C)
             'offset_c': offsets.get(r.src),
+            'not_thermal': thermal is not None and r.src not in thermal,
         })
     files.sort(key=lambda f: f['path'])
     norm = None
@@ -325,25 +327,36 @@ def compact(report, root, out_dir, version=""):
 
 def counts(files):
     """A conversion's images by result: {converted, oblique (above its pitch limit), not_thermal (the RGB photos
-    beside the thermal ones, and any other JPEG), skipped (those that failed)}, as dji-thermal-cli's reasons say"""
+    beside the thermal ones, and any other JPEG), skipped (those that failed)}, as compact marks them, else as
+    dji-thermal-cli's reasons say"""
     out = {'converted': 0, 'oblique': 0, 'not_thermal': 0, 'skipped': 0}
     for f in files:
         reason = f.get('reason') or ''
-        out['converted' if f.get('ok') else 'oblique' if reason.startswith('oblique') else
-            'not_thermal' if 'not an R-JPEG' in reason else 'skipped'] += 1
+        out['converted' if f.get('ok') else 'not_thermal' if f.get('not_thermal') or 'not an R-JPEG' in reason else
+            'oblique' if reason.startswith('oblique') else 'skipped'] += 1
     return out
 
 
-def frames_to_convert(dtc, jpegs, settings):
-    """The JPEGs a conversion writes files for, judged before it starts so that its progress counts only them: the
-    thermal ones, at or below its pitch limit (the gimbal pitch it sets, else each frame's own; a frame without one
-    is converted, as dji-thermal-cli does)"""
-    limit, fixed = settings.get('max_pitch'), settings.get('gimbal_pitch')
+def thermal_jpegs(dtc, jpegs):
+    """The thermal JPEGs among jpegs, as dji-thermal-cli tells them by their content"""
     out = set()
     for p in jpegs:
         try:
-            if dtc.classify(p).kind != 'thermal':
-                continue
+            if dtc.classify(p).kind == 'thermal':
+                out.add(p)
+        except Exception:  # noqa: BLE001, S110 - not one it can read
+            pass
+    return out
+
+
+def frames_to_convert(dtc, thermal, settings):
+    """The thermal JPEGs a conversion writes files for, judged before it starts so that its progress counts only
+    them: those at or below its pitch limit (the gimbal pitch it sets, else each frame's own; a frame without one is
+    converted, as dji-thermal-cli does)"""
+    limit, fixed = settings.get('max_pitch'), settings.get('gimbal_pitch')
+    out = set()
+    for p in thermal:
+        try:
             pitch = fixed if fixed is not None or limit is None else \
                 dtc.djixmp.number(dtc.djixmp.fields(p.read_bytes()), 'GimbalPitchDegree')
         except Exception:  # noqa: BLE001 - counted: dji-thermal-cli reports it as skipped
@@ -637,7 +650,8 @@ def convert(task_id, run_id, cid):
         # RGB photos or the oblique frames, skipped at once. Harmonizing first compares the frames' overlaps, stage by
         # stage: the page shows the stage and how far its run of stages is while the progress is 0
         from .mosaics import stage_fraction
-        frames = frames_to_convert(dtc, dtc.scan(root).jpegs, settings)
+        thermal = thermal_jpegs(dtc, dtc.scan(root).jpegs)
+        frames = frames_to_convert(dtc, thermal, settings)
         total = max(1, len(frames))
         state = {'done': 0, 'written': time.time(), 'stage': None}
 
@@ -668,7 +682,7 @@ def convert(task_id, run_id, cid):
 
         # jobs=1: a Celery worker's processes cannot start processes of their own
         report = dtc.process(root, out_dir, jobs=1, progress=progress, **args)
-        result = compact(report, root, out_dir, dtc.__version__)
+        result = compact(report, root, out_dir, dtc.__version__, thermal)
         if medians is not None:
             result['normalization'] = {'ambient_c': medians[0], 'reflected_c': medians[1], 'offsets': False}
     except Canceled:
