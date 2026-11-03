@@ -1,4 +1,4 @@
-# DJI Thermal plugin for WebODM
+# DJI Thermal Analyzer plugin for WebODM
 
 [![The Thermal Inspector on a thermal orthophoto in WebODM: a pinned point, a measured region and an isotherm](docs/images/splash.png)](docs/images/splash-source.png)
 
