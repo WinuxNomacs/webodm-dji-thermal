@@ -60,6 +60,12 @@
   dropped the plugin's row but left its folder half deleted, to come back at the next start.
   Decided (the user, 2026-11-05): **GDAL's OGR in place of Shapely** (WebODM's own GDAL, with GEOS, on 3.3.2 and
   4.0.0, Docker and native Windows, checked on all three): the plugin then ships no compiled package of its own.
+  Built (2026-11-05): `shapes.py` (OGR geometries with what the plugin reads of them; buffers with GEOS's default
+  8 segments a quadrant; OGR's exceptions left as WebODM has them), used by `inspector.py`, `frames.py` and
+  `webodm_versions.task_crop`; Shapely out of `requirements.txt`, the docs and the dev venv. All 208 tests pass on
+  both versions, Jest and ESLint too. Left: the Windows re-check (the new zip installed, a region measured, the
+  plugin removed), once the user has restarted the Windows WebODM to free the half-deleted folder's DLL; then the
+  merge.
 - **U2-4. Harmonize's alignment reused by the mosaics** (the user, 2026-11-02: in 1.0.0, the last known item before
   it). A harmonized workset aligns its frames twice: the conversion's `dtc.process(normalize=True)` runs
   dji-thermal-cli's `normalization()`, which builds a mosaic layout and aligns it (`mosaic._align`: 4 rounds of every
