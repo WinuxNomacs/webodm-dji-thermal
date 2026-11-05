@@ -824,20 +824,6 @@
     section's caret drawn by the plugin (WebODM hid the browser's). Jest 122; live check on the test flight (read
     only): the tabs Worksets, Files, Problems, WebODM plan, opened on Worksets; no console error.
 
-**Last**
-- **Publish 1.0.0**, the final step, when the user says so: after any change to `dji-thermal/`, the release is redone
-  (CHANGELOG, README, the zip rebuilt by `dev/package.sh` on the merge, its new sha256, the `release-check` skill);
-  then the user tags `v1.0.0`, attaches the zip to the GitHub release and adds `{url, sha256}` to WebODM-Plugins'
-  `directory.json` (details under "Done: Release 1.0.0" below).
-  Redone (2026-11-02, the user: the zip and its sha256 ready before the repo goes public and the WebODM-Plugins PR):
-  `release/1.0.0` again, the changelog covering all that ships (dji-thermal-cli 1.12.0), the manifest naming the
-  Thermal Inspector; Jest 281, Django 205 with `app.tests.test_plugins`. Release check (Docker; native Windows not
-  run this time): the zip installed through Administration > Plugins (pip: dji-thermal-cli 1.12.0, numpy 1.26.2,
-  Pillow 11.3.0; no webpack), a DJI Thermal Task of 40 M4T frames (3 RGB ignored) processed in 173 s (9.5 to
-  34.1 °C), a harmonized workset's mosaics (Harmonize's alignment reused) and its task processed in 246 s (5.7 to
-  32.2 °C); the project deleted, the mounted copy back. The zip and its sha256 come from `dev/package.sh` on the
-  merge; the user tags `v1.0.0`, attaches the zip and opens the WebODM-Plugins PR.
-
 **Later**
 - **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
   the earlier "Folder conversion" item (below).
@@ -1353,7 +1339,18 @@
   "Up next: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0. Steps 2–5
   and 3b done (the last, isotherms and the legend, 2026-10-31), and dji-thermal-cli 1.10.0 pinned with the fallback
   to its internal tables dropped (2026-10-31, `pin-cli-1.10.0`). Done.
-- **Release 1.0.0** — 2026-10-30, `release/1.0.0` (details below).
+- **Release 1.1.0** — 2026-11-05, `release/1.1.0` (the user: "prepare the plugin for release"): WebODM 4.0.0
+  support beside 3.3.2; manifest 1.1.0, `CHANGELOG.md`. Tests: Ruff, ESLint, Jest 281, Django 208 with
+  `app.tests.test_plugins` on 4.0.0 and 3.3.2. Release check: `dist/dji-thermal-1.1.0.zip` (`public/build` built
+  against 4.0.0) installed through Administration > Plugins on three WebODMs, pip installing each one's numpy and
+  Pillow (4.0.0: 2.5.4 and 13.0.0; 3.3.2: 1.26.2 and 11.3.0), no webpack; on each, the M4T flight's 40 thermal
+  frames (3 RGB ignored): a dataset analyzed, a workset with mosaics, the viewer, a frame's region, a task from the
+  workset processed and measured in the Inspector, and a DJI Thermal Task processed. Docker 4.0.0: 812 s and 200 s
+  (10.2 to 31.4 °C); Docker 3.3.2 (the 4.0.0-built scripts work there): 632 s and 201 s; native Windows 4.0.0: 604 s
+  and 196 s, the plugin then removed without a restart. No console errors; each check's project deleted, the
+  installed copies removed, the mounted copy back. The user tags `v1.1.0`, attaches the zip and updates
+  WebODM-Plugins' `directory.json`.
+- **Release 1.0.0** — 2026-10-30, `release/1.0.0` (details below); redone 2026-11-02 and published (tag `v1.0.0`).
 - **Thermal Analyzer, part 1** — 2026-10-29, in four steps (`analyzer-datasets`, `analyzer-conversions`,
   `analyzer-mosaics`, `analyzer-task`; details under "1. Thermal Analyzer, part 1" below).
 - **The DJI Thermal page under Administration** — 2026-10-29, `admin-page` (details below).

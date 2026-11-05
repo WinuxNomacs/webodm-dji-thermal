@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.1.0 (2026-11-05)
+
+**WebODM 4.0.0**, as well as 3.3.2, in Docker (Linux, Windows, macOS) or from its native Windows installer.
+
+- The plugin runs on WebODM 4.0.0 (Python 3.14, Django 5.2, no PostGIS): WebODM installs numpy and Pillow at the
+  versions of its own Python (3.9 for 3.3.2, 3.14 for 4.0.0).
+- **Upgrading WebODM** from 3.x to 4.0.0 with the plugin installed: WebODM installs the plugin's packages again for
+  its new Python by itself.
+- The palettes WebODM 4.0.0 no longer has (hot, rainbow, gray_r) stay available: the plugin carries its own copies.
+- Shapes (the Thermal Inspector's regions and lines, the frame page's figures, a task's crop) are measured with
+  WebODM's own GDAL, so the plugin installs no compiled package of its own, and on native Windows it can be removed
+  in Administration > Plugins without restarting WebODM.
+- A line of one point is answered "A line needs two points".
+- **Installing**: after loading a new version of the plugin, restart WebODM so it runs the new one (it keeps the
+  version it started with).
+
 ## 1.0.0 (2026-11-02)
 
 The first release, for WebODM 3.3.2 or later, in Docker (Linux, Windows, macOS) or from its native Windows
