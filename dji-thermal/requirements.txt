@@ -1,3 +1,7 @@
 dji-thermal-cli==1.12.0
-numpy==1.26.2
-pillow==11.3.0
+numpy==1.26.2 ; python_version < "3.14"
+numpy==2.5.4 ; python_version >= "3.14"
+pillow==11.3.0 ; python_version < "3.14"
+pillow==13.0.0 ; python_version >= "3.14"
+shapely==2.0.7 ; python_version < "3.14"
+shapely==2.1.2 ; python_version >= "3.14"

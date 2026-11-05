@@ -5,15 +5,14 @@ known temperatures (no image of anyone's).
 import importlib
 import io
 import json
+import math
 import os
 import shutil
 
-import morecantile
 import numpy as np
 import rasterio
 from PIL import Image
 from django.contrib.auth.models import User
-from django.contrib.gis.geos import GEOSGeometry
 from rasterio.transform import from_origin
 from rasterio.warp import transform
 from rest_framework import status
@@ -45,6 +44,27 @@ def lonlat(col, row):
     x, y = ORIGIN[0] + (col + 0.5) * PIXEL, ORIGIN[1] - (row + 0.5) * PIXEL
     lons, lats = transform('EPSG:32616', 'EPSG:4326', [x], [y])
     return lons[0], lats[0]
+
+
+def stored(polygon):
+    """A polygon (GeoJSON, lon/lat) as a task keeps its crop and extents: GeoJSON in WebODM 4.0.0, GEOS in 3.3.2"""
+    if Task._meta.get_field('crop').get_internal_type() == 'JSONField':
+        return polygon
+    from django.contrib.gis.geos import GEOSGeometry
+    return GEOSGeometry(json.dumps(polygon), srid=4326)
+
+
+def web_mercator_tile(lon, lat, zoom):
+    """The map tile (z, x, y) holding a point, the tile's bounds (left, bottom, right, top) and the point (x, y), in
+    Web Mercator metres"""
+    half = math.pi * 6378137.0
+    n = 2 ** zoom
+    x = math.floor((lon + 180.0) / 360.0 * n)
+    y = math.floor((1.0 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2.0 * n)
+    side = 2 * half / n
+    left, top = -half + x * side, half - y * side
+    point = (math.radians(lon) * 6378137.0, math.asinh(math.tan(math.radians(lat))) * 6378137.0)
+    return (zoom, x, y), (left, top - side, left + side, top), point
 
 
 def xmp_tiff(path, emissivity, reflected):
@@ -83,7 +103,7 @@ class TestInspector(BootTestCase):
                                                      {'name': 'alpha', 'description': bands[1]}])
         self.addCleanup(shutil.rmtree, task.task_path(), True)
         # WebODM keeps a crop within the orthophoto's extent
-        task.orthophoto_extent = GEOSGeometry(json.dumps(square(-1, -1, WIDTH, HEIGHT)), srid=4326)
+        task.orthophoto_extent = stored(square(-1, -1, WIDTH, HEIGHT))
         task.save()
         path = task.get_asset_download_path('orthophoto.tif')
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -96,7 +116,7 @@ class TestInspector(BootTestCase):
         return task
 
     def crop(self, *corners):
-        self.task.crop = GEOSGeometry(json.dumps(square(*corners)), srid=4326)
+        self.task.crop = stored(square(*corners))
         self.task.save()
 
     def url(self, task, what):
@@ -313,13 +333,10 @@ class TestInspector(BootTestCase):
     def tile(self, col, row, zoom=18, task=None, what="tiles", headers=None, **params):
         """The map tile holding a pixel's centre (of the thermal layer, or what), and where that centre is in it (x, y)"""
         lon, lat = lonlat(col, row)
-        tms = morecantile.tms.get('WebMercatorQuad')
-        t = tms.tile(lon, lat, zoom)
-        bounds, (mx, my) = tms.xy_bounds(t), tms.xy(lon, lat)
+        (z, x, y), (left, bottom, right, top), (mx, my) = web_mercator_tile(lon, lat, zoom)
         size = int(params.get('size', 256))
-        url = self.url(task or self.task, "{}/{}/{}/{}".format(what, t.z + (size == 512), t.x, t.y))
-        at = (int((mx - bounds.left) / (bounds.right - bounds.left) * size),
-              int((bounds.top - my) / (bounds.top - bounds.bottom) * size))
+        url = self.url(task or self.task, "{}/{}/{}/{}".format(what, z + (size == 512), x, y))
+        at = (int((mx - left) / (right - left) * size), int((top - my) / (top - bottom) * size))
         return self.client.get(url, params, **(headers or {})), at
 
     def test_a_mosaics_regions_and_isotherms_are_in_celsius_without_its_no_data_marker(self):
@@ -339,12 +356,10 @@ class TestInspector(BootTestCase):
 
         def painted(col, row, low=None, high=None):
             lon, lat = lonlat(col, row)
-            tms = morecantile.tms.get('WebMercatorQuad')
-            t = tms.tile(lon, lat, 18)
-            bounds, (mx, my) = tms.xy_bounds(t), tms.xy(lon, lat)
-            png = inspector.raster_isotherm(path, t.z, t.x, t.y, low, high, (255, 0, 0), unit='F')
-            x = int((mx - bounds.left) / (bounds.right - bounds.left) * 256)
-            y = int((bounds.top - my) / (bounds.top - bounds.bottom) * 256)
+            (z, tx, ty), (left, bottom, right, top), (mx, my) = web_mercator_tile(lon, lat, 18)
+            png = inspector.raster_isotherm(path, z, tx, ty, low, high, (255, 0, 0), unit='F')
+            x = int((mx - left) / (right - left) * 256)
+            y = int((top - my) / (top - bottom) * 256)
             return np.array(Image.open(io.BytesIO(png)).convert('RGBA'))[y, x, 3] == 255
 
         # (50, 40) is at 60 °C (140 °F): its limits are °C
@@ -453,6 +468,10 @@ class TestInspector(BootTestCase):
         etag = res['ETag']
         again, _at = self.tile(50, 40, what="values", headers={'HTTP_IF_NONE_MATCH': etag})
         self.assertEqual((again.status_code, again['ETag']), (status.HTTP_304_NOT_MODIFIED, etag))
+        # Asked within the crop: the crop's part of it (the task had none: the same tile)
+        self.assertEqual(self.tile(50, 40, what="values", crop='1')[0]['ETag'], etag)
+        self.crop(40, 30, 60, 50)
+        self.assertEqual(self.tile(50, 40, what="values")[0]['ETag'], etag)
         cropped, _at = self.tile(50, 40, what="values", crop='1')
         self.assertNotEqual(cropped['ETag'], etag)
         os.utime(inspector.thermal_orthophoto(self.task), ns=(1, 1))

@@ -14,6 +14,7 @@ from app.api.tasks import TaskNestedView
 from app.models import Project
 
 from . import colouring, conversion_tasks, conversions, converter, correction, datasets, inspector, measurements, mosaics
+from . import webodm_versions
 
 # The mosaics' tabs laid on the map: those of temperatures (View angle stays in the Analyzer's viewer)
 MAP_TABS = ('as_converted', 'harmonized', 'source_frame')
@@ -126,7 +127,8 @@ class InspectorValues(InspectorView):
         task = self.thermal_task(request, pk)
         size, crop = tile_params(request)
         st = os.stat(inspector.thermal_orthophoto(task))
-        version = [VALUES_VERSION, st.st_ino, st.st_size, st.st_mtime_ns, crop and task.crop and task.crop.wkt]
+        cropped = webodm_versions.task_crop(task) if crop else None
+        version = [VALUES_VERSION, st.st_ino, st.st_size, st.st_mtime_ns, cropped.wkt if cropped is not None else None]
         etag = '"{}"'.format(hashlib.sha1(repr(version).encode()).hexdigest()[:20])
         if etag in [t.strip() for t in request.META.get('HTTP_IF_NONE_MATCH', '').split(',')]:
             response = HttpResponseNotModified()
@@ -192,11 +194,10 @@ def palette_colors(name):
     lut = converter.palette_luts().get(name)
     if lut is not None:
         return mosaics.encoded(lut)
-    from app.api.tiler import get_colormap_encoded_values
     if not re.fullmatch(r'[a-z0-9_]+', name):
         return None
     try:
-        return get_colormap_encoded_values(name)
+        return webodm_versions.colormap_encoded(name)
     except Exception:  # noqa: BLE001 - rio-tiler refuses a name it doesn't have
         return None
 
@@ -283,7 +284,7 @@ def region_response(read):
         return Response(read())
     except ValueError as e:
         raise ValidationError({'error': str(e)}) from None
-    except Exception:  # noqa: BLE001 - GEOS refuses what isn't a geometry
+    except Exception:  # noqa: BLE001 - Shapely refuses what isn't a geometry
         raise ValidationError({'error': "Invalid geometry"}) from None
 
 
@@ -405,7 +406,7 @@ def saved_record(data, point, region, baseline):
             values = region(geometry, percentiles, bins, isotherm, fix)
         except ValueError as e:
             raise ValidationError({'error': str(e)}) from None
-        except Exception:  # noqa: BLE001 - GEOS refuses what isn't a geometry
+        except Exception:  # noqa: BLE001 - Shapely refuses what isn't a geometry
             raise ValidationError({'error': "Invalid geometry"}) from None
         record = {'geometry': geometry,
                   'isotherm': {'low': isotherm[0], 'high': isotherm[1]} if isotherm else None}

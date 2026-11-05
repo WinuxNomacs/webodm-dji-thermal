@@ -317,6 +317,15 @@ class TestStaleMetadata(unittest.TestCase):
                          ["PIL", "dji_thermal_cli", "dji_thermal_cli-1.10.0.dist-info", "numpy-1.26.2.dist-info",
                           "pillow-11.3.0.dist-info", "rasterio-1.0.dist-info"])
 
+    def test_the_version_pinned_for_another_python_is_removed_after_webodm_moves_to_this_one(self):
+        with open(self.requirements, "w") as f:
+            f.write('numpy==1.26.2 ; python_version < "3"\nnumpy==2.5.4 ; python_version >= "3"  # WebODM 4\n')
+        self.installed("numpy-1.26.2.dist-info")
+        self.assertEqual(converter.remove_stale_metadata(self.packages, self.requirements), [])
+        self.installed("numpy-2.5.4.dist-info")
+        self.assertEqual(converter.remove_stale_metadata(self.packages, self.requirements), ["numpy-1.26.2.dist-info"])
+        self.assertEqual(os.listdir(self.packages), ["numpy-2.5.4.dist-info"])
+
     def test_nothing_is_removed_until_the_pinned_version_is_installed(self):
         self.installed("dji_thermal_cli-1.9.0.dist-info")
         self.assertEqual(converter.remove_stale_metadata(self.packages, self.requirements), [])

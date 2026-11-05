@@ -181,26 +181,25 @@ def values_png(task, cid, rel, changes=None):
 
 
 def _shape(geometry):
-    """A GeoJSON Point, LineString or Polygon in a frame's pixels (x right, y down) as GEOS
+    """A GeoJSON Point, LineString or Polygon in a frame's pixels (x right, y down) as a Shapely shape
     :raises FrameError: none of those"""
-    import json
-
-    from django.contrib.gis.geos import GEOSGeometry
+    from .converter import shapely
+    shapely_shape = shapely().geometry.shape
     if not isinstance(geometry, dict) or geometry.get('type') not in ('Point', 'LineString', 'Polygon'):
         raise FrameError("Not a pin, a region or a line")
     try:
-        shape = GEOSGeometry(json.dumps({'type': geometry['type'], 'coordinates': geometry.get('coordinates')}))
-    except Exception:  # noqa: BLE001 - GEOS refuses what isn't a geometry
+        shape = shapely_shape({'type': geometry['type'], 'coordinates': geometry.get('coordinates')})
+    except Exception:  # noqa: BLE001 - Shapely refuses what isn't a geometry
         raise FrameError("Invalid geometry") from None
     if shape.geom_type == 'LineString' and (len(shape.coords) < 2 or shape.length == 0):
         raise FrameError("A line needs two points")
-    if shape.geom_type == 'Polygon' and not shape.valid:
+    if shape.geom_type == 'Polygon' and not shape.is_valid:
         shape = shape.buffer(0)
     return shape
 
 
 def _mask(shape, out_shape):
-    """The pixels a GEOS polygon (in pixels) touches, outline pixels included as on the map"""
+    """The pixels a Shapely polygon (in pixels) touches, outline pixels included as on the map"""
     import numpy as np
     from rasterio import Affine
     from rasterio.features import geometry_mask

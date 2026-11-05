@@ -52,7 +52,9 @@ def remove_stale_metadata(path, requirements):
     at path, where the pinned version is installed. WebODM installs a plugin's requirements with pip's --target,
     which replaces a package's code on an upgrade but leaves the old version's metadata beside the new one; packages
     read their version from it (dji-thermal-cli's __version__, written in the converted images), and would name the
-    old one. Returns the folders removed.
+    old one. A line whose environment marker doesn't hold here (a pin for another WebODM's Python) is skipped, so the
+    version pinned for this Python is kept and the other one's metadata (left by an upgrade of WebODM) is removed.
+    Returns the folders removed.
     """
     def canonical(name):
         return re.sub(r'[-_.]+', '-', name).lower()
@@ -60,8 +62,8 @@ def remove_stale_metadata(path, requirements):
     pinned = {}
     with open(requirements) as f:
         for line in f:
-            m = re.match(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;#]+)', line)
-            if m:
+            m = re.match(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;#]+)\s*(?:;([^#]*))?', line)
+            if m and (not m.group(3) or _marker_holds(m.group(3))):
                 pinned[canonical(m.group(1))] = m.group(2)
     found = {}
     for entry in os.listdir(path) if os.path.isdir(path) else []:
@@ -79,6 +81,15 @@ def remove_stale_metadata(path, requirements):
     return removed
 
 
+def _marker_holds(marker):
+    """Whether a requirement's environment marker (python_version < "3.14", ...) holds for this Python"""
+    try:
+        from packaging.markers import Marker
+    except ImportError:     # pip's own copy: WebODM installs the requirements with pip
+        from pip._vendor.packaging.markers import Marker
+    return Marker(marker.strip()).evaluate()
+
+
 @contextmanager
 def _plugin_packages():
     # As PluginBase.python_imports(), which needs the plugin's instance: this module also runs in the worker
@@ -88,6 +99,16 @@ def _plugin_packages():
         yield
     finally:
         sys.path.remove(path)
+
+
+def shapely():
+    """Shapely, from the plugin's own packages (WebODM has none): its geometry and wkt modules imported at once, so
+    nothing is imported later without them on the path"""
+    with _plugin_packages():
+        import shapely
+        import shapely.geometry
+        import shapely.wkt
+    return shapely
 
 
 def library():

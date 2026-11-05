@@ -4,10 +4,10 @@ point and the statistics of a region or a line (with its profile), in degrees Ce
 reads it). Pixels outside the task's crop are left out, as WebODM's map draws them. The regions and isotherms of a
 workset's mosaics laid on the map read them alike (raster_region, raster_isotherm), in °C from the mosaic's unit.
 """
-import json
 import math
 
 from . import correction as correcting
+from . import webodm_versions
 
 THERMAL_BAND = 'lwir'
 REGION_MAX_SIZE = 4096        # pixels along the longer side; a larger region is read downsampled
@@ -36,7 +36,7 @@ def thermal_orthophoto(task):
 
 
 def _crop(task):
-    return task.crop if task.crop is not None and not task.crop.empty else None
+    return webodm_versions.task_crop(task)
 
 
 def to_celsius(values, unit):
@@ -58,13 +58,15 @@ def point(task, lon, lat):
     """The temperature at a point (lon/lat): {coordinates, valid, temperature, reason}, reason 'excluded' (outside the
     crop), 'outside_raster' or 'nodata' when there is none"""
     import rasterio
-    from django.contrib.gis.geos import Point
     from rasterio.warp import transform
+
+    from .converter import shapely
+    Point = shapely().geometry.Point
     from rasterio.windows import Window
 
     out = {'coordinates': [lon, lat], 'valid': False, 'temperature': None, 'reason': None}
     crop = _crop(task)
-    if crop is not None and not crop.contains(Point(lon, lat, srid=4326)):
+    if crop is not None and not crop.contains(Point(lon, lat)):
         out['reason'] = 'excluded'
         return out
     with rasterio.open(thermal_orthophoto(task)) as src:
@@ -104,7 +106,7 @@ def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS, isother
 def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILES, bins=HISTOGRAM_BINS, isotherm=None,
                   frames=None, correction=None):
     """
-    region of a raster's first band, within crop (a GEOS geometry) when given; with unit (a mosaic's), its no-data
+    region of a raster's first band, within crop (a Shapely shape, lon/lat) when given; with unit (a mosaic's), its no-data
     marker left out and the statistics in °C. A line measures a strip LINE_HALF_WIDTH either side of it, and adds its
     length (m) and profile: {distance (m), values (°C, None where there is none), points ([lon, lat])}, with frames
     ((raster, band, names): a mosaic's source frame band) the name of the frame each sample came from. The surroundings
@@ -116,19 +118,21 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
     """
     import numpy as np
     import rasterio
-    from django.contrib.gis.geos import GEOSGeometry
     from rasterio.features import geometry_mask
     from rasterio.warp import transform, transform_geom
     from rasterio.errors import WindowError
     from rasterio.windows import Window, from_bounds, intersection
 
-    shape = GEOSGeometry(json.dumps(geometry), srid=4326)
+    from .converter import shapely
+    shapely_shape = shapely().geometry.shape
+
+    shape = shapely_shape(geometry)
     if shape.geom_type not in ('Polygon', 'MultiPolygon', 'LineString'):
         raise ValueError("Not a polygon or a line")
     line = shape.geom_type == 'LineString'
     if line and (len(shape.coords) < 2 or shape.length == 0):
         raise ValueError("A line needs two points")
-    if not line and not shape.valid:
+    if not line and not shape.is_valid:
         shape = shape.buffer(0)
     out = {'valid': False, 'reason': None, 'statistics': None, 'pixel_size': None, 'resampled': False,
            'correction': correcting.described(*correction) if correction else None}
@@ -151,12 +155,12 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
             return out
         crs = src.crs
         metre = crs.linear_units_factor[1] if crs.is_projected else DEGREE_M      # metres per unit of the raster's CRS
-        local = GEOSGeometry(json.dumps(transform_geom('EPSG:4326', crs, measured)))
+        local = shapely_shape(transform_geom('EPSG:4326', crs, measured))
         inside = local.buffer(LINE_HALF_WIDTH / metre) if line else local
         width = RING_MIN if line else min(RING_MAX, max(RING_MIN, math.sqrt(inside.area) * metre))
         ring = inside.buffer(width / metre).difference(inside)
         # Every pixel the region and its surroundings reach into
-        xmin, ymin, xmax, ymax = (ring if not ring.empty else inside).extent
+        xmin, ymin, xmax, ymax = (ring if not ring.is_empty else inside).bounds
         bounds = from_bounds(xmin, ymin, xmax, ymax, src.transform)
         col0, row0 = math.floor(bounds.col_off), math.floor(bounds.row_off)
         window = Window(col0, row0, math.ceil(bounds.col_off + bounds.width) - col0 + 1,
@@ -182,7 +186,7 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
             return geometry_mask([polygons], out_shape=shape_out, transform=wt, invert=True, all_touched=True)
 
         if crop is not None:
-            usable &= mask(GEOSGeometry(json.dumps(transform_geom('EPSG:4326', crs, _polygons(crop)))))
+            usable &= mask(shapely_shape(transform_geom('EPSG:4326', crs, _polygons(crop))))
         within = mask(inside)
         around = mask(ring) & ~within
         out['pixel_size'] = abs(wt.a) * metre
@@ -248,7 +252,7 @@ def statistics(data, keep, around, location, percentiles=PERCENTILES, bins=HISTO
 
 
 def _profile(line, data, usable, wt, crs, metre, frames=None):
-    """A line's (GEOS, in the raster's CRS) temperatures every pixel along it, at most MAX_SAMPLES of them, from the
+    """A line's (Shapely, in the raster's CRS) temperatures every pixel along it, at most MAX_SAMPLES of them, from the
     grid read (data where usable, its transform wt); frames as raster_region's"""
     import numpy as np
     import rasterio
@@ -368,7 +372,7 @@ def isotherm(task, z, x, y, low, high, rgb, size=256, crop=False):
 
 
 def raster_isotherm(raster, z, x, y, low, high, rgb, size=256, crop=None, unit=None):
-    """isotherm of a raster's first band, within crop (a GEOS geometry) when given; with unit (a mosaic's), low and
+    """isotherm of a raster's first band, within crop (a Shapely shape, lon/lat) when given; with unit (a mosaic's), low and
     high are still °C, its no-data marker is left out and it is read as its own tiles are (nearest pixel)"""
     import io
 
@@ -396,18 +400,16 @@ def raster_isotherm(raster, z, x, y, low, high, rgb, size=256, crop=None, unit=N
 
 def _raster_tile(raster, z, x, y, size, crop=None, resampling='bilinear', buffer=0, pixel=False):
     """A tile of a raster's first band as WebODM's map reads the thermal orthophoto (rio-tiler's ImageData), within crop
-    (a GEOS geometry) when given, with buffer more pixels on each side; with pixel, (it, the raster's pixel width in
+    (a Shapely shape, lon/lat) when given, with buffer more pixels on each side; with pixel, (it, the raster's pixel width in
     metres); None outside it"""
-    from rio_tiler.errors import TileOutsideBounds
-    from rio_tiler.io import COGReader
-
     from app.api.tiler import get_zoom_safe
-    from app.geoutils import geom_transform_wkt_bbox
     from app.raster_utils import ZOOM_EXTRA_LEVELS
+
+    rio = webodm_versions.tiler()
 
     if size == 512:     # as WebODM's map asks for them: a tile of the zoom level above
         z -= 1
-    with COGReader(raster) as src:
+    with rio.COGReader(raster) as src:
         if not src.tile_exists(z, x, y):
             return None
         minzoom, maxzoom = get_zoom_safe(src)
@@ -415,12 +417,11 @@ def _raster_tile(raster, z, x, y, size, crop=None, resampling='bilinear', buffer
             return None
         vrt_options = None
         if crop is not None:
-            cutline, _bounds = geom_transform_wkt_bbox(crop, src.dataset)
-            vrt_options = {'cutline': cutline}
+            vrt_options = {'cutline': webodm_versions.cutline(crop, src.dataset)}
         try:
             data = src.tile(x, y, z, indexes=(1,), tilesize=size, resampling_method=resampling, vrt_options=vrt_options,
                             tile_buffer=buffer or None)
-        except TileOutsideBounds:
+        except rio.TileOutsideBounds:
             return None
         if not pixel:
             return data
@@ -452,18 +453,17 @@ def _coordinates(geometry):
 
 def _polygons(geometry):
     """
-    The polygonal parts of a GEOS geometry as a GeoJSON MultiPolygon (lon/lat), or None when it has none (an
-    intersection along an edge). Built from the coordinates: GEOS's own GeoJSON goes through GDAL, which swaps the axes
-    of EPSG:4326 with GDAL 3.
+    The polygonal parts of a Shapely shape as a GeoJSON MultiPolygon (lon/lat), or None when it has none (an
+    intersection along an edge)
     """
     found = []
 
     def collect(g):
         if g.geom_type == 'Polygon':
-            if not g.empty and g.area > 0:
-                found.append([[list(c) for c in ring] for ring in g.coords])
+            if not g.is_empty and g.area > 0:
+                found.append([[list(c) for c in ring.coords] for ring in (g.exterior, *g.interiors)])
         elif g.geom_type in ('MultiPolygon', 'GeometryCollection'):
-            for part in g:
+            for part in g.geoms:
                 collect(part)
 
     collect(geometry)
