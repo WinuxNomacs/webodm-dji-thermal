@@ -23,8 +23,8 @@ and committed.
    Plugins > Load Plugin (.zip), upload the zip (only the plugin list sends a sha256). Restart the webapp if WebODM
    asks to. Check
    that pip installed its requirements in the plugin's site-packages
-   (`docker exec dt-webapp ls /webodm/app/media/plugins/dji-thermal/site-packages`: dji-thermal-cli, with numpy
-   and Pillow at WebODM's own versions), that WebODM ran npm in the installed copy if it has npm packages, and
+   (`docker exec dt-webapp ls /webodm/app/media/plugins/dji-thermal/site-packages`: dji-thermal-cli,
+   with numpy and Pillow at WebODM's own versions), that WebODM ran npm in the installed copy if it has npm packages, and
    that the plugin is back.
 5. **Live check on the installed copy** (the `live-check` skill): a thermal task from DJI R-JPEGs, uploaded,
    converted and processed, with temperatures in the result; and in the Thermal Analyzer a dataset analyzed,

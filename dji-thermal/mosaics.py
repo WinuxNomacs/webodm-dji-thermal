@@ -28,7 +28,7 @@ import shutil
 import time
 from pathlib import Path
 
-from . import conversions, converter, datasets, measurements
+from . import conversions, converter, datasets, measurements, webodm_versions
 from .analysis import PROGRESS_INTERVAL, Canceled, clean
 
 # The mosaics built: (kind, normalized)
@@ -105,10 +105,9 @@ def band_stats(values):
 def raster_info(raster, unit):
     """Where a mosaic is (lon/lat bounds, zooms) and the range of its temperature and view angle bands"""
     import numpy as np
-    from rio_tiler.io import COGReader
 
     from app.api.tiler import get_zoom_safe
-    with COGReader(raster) as src:
+    with webodm_versions.tiler().COGReader(raster) as src:
         minzoom, maxzoom = get_zoom_safe(src)
         info = {'bounds': list(src.bounds), 'minzoom': minzoom, 'maxzoom': maxzoom}
         temperature = src.dataset.read(1)
@@ -414,10 +413,9 @@ def palettes_of(task, cid):
 
 def viewer_palettes(task, cid):
     """[{key, label, color_map (encoded)}]: DJI's, then WebODM's"""
-    from app.api.tiler import get_colormap_encoded_values
     dji = [{'key': DJI_PREFIX + name, 'label': "DJI " + name, 'color_map': encoded(lut)}
            for name, lut in palettes_of(task, cid).items()]
-    return dji + [{'key': name, 'label': name, 'color_map': get_colormap_encoded_values(name)}
+    return dji + [{'key': name, 'label': name, 'color_map': webodm_versions.colormap_encoded(name)}
                   for name in VIEWER_COLORMAPS]
 
 
@@ -433,8 +431,7 @@ def colormap(task, cid, name):
         return {i: (c[0], c[1], c[2], 255) for i, c in enumerate(lut)}
     if name not in VIEWER_COLORMAPS:
         raise ValueError("Not a valid color_map value")
-    from app.api.tiler import colormap as webodm_colormaps
-    return webodm_colormaps.get(name)
+    return webodm_versions.colormap(name)
 
 
 def default_palette(task, cid, settings, preferred=None):
@@ -519,8 +516,7 @@ def tile_pixel_m(z, y):
 def png(rgba):
     """An RGBA image ((h, w, 4) uint8) as PNG bytes"""
     import numpy as np
-    from rio_tiler.utils import render
-    return render(np.moveaxis(rgba[..., :3], 2, 0), rgba[..., 3], img_format='PNG')
+    return webodm_versions.tiler().render(np.moveaxis(rgba[..., :3], 2, 0), rgba[..., 3], img_format='PNG')
 
 
 def tile(task, cid, tab, z, x, y, cmap, low, high, adjust=None, isotherm=None):
@@ -578,16 +574,15 @@ def _tile_values(task, cid, tab, z, x, y, buffer):
     mask's sigma: (values, seams, sigma); None when the tile is outside the mosaic
     """
     import numpy as np
-    from rio_tiler.errors import TileOutsideBounds
-    from rio_tiler.io import COGReader
 
     from app.api.tiler import get_zoom_safe
     from app.raster_utils import ZOOM_EXTRA_LEVELS
 
     from . import colouring
+    rio = webodm_versions.tiler()
     raster, band = tab_raster(task, cid, tab)
     framed = tab == 'source_frame'
-    with COGReader(raster) as src:
+    with rio.COGReader(raster) as src:
         if not src.tile_exists(z, x, y):
             return None
         minzoom, maxzoom = get_zoom_safe(src)
@@ -599,7 +594,7 @@ def _tile_values(task, cid, tab, z, x, y, buffer):
                          tile_buffer=buffer or None)
             # The tile itself as it is read without a margin: with one, its pixels land on a slightly shifted grid
             inner = src.tile(x, y, z, indexes=indexes, tilesize=TILE_SIZE, resampling_method='nearest') if buffer else t
-        except TileOutsideBounds:
+        except rio.TileOutsideBounds:
             return None
     bands, mask = np.asarray(t.data, dtype=np.float64), t.mask.copy()
     if buffer:
@@ -629,24 +624,28 @@ def point(task, cid, tab, lon, lat):
     A viewer tab's values at a point: {valid, temperature, frame, frame_index, view_angle, frame_pixel, unit, reason};
     frame_pixel: the frame's pixel it was read from (column, row; none in a mosaic built before dji-thermal-cli 1.4.0)
     """
-    from rio_tiler.errors import PointOutsideBounds
-    from rio_tiler.io import COGReader
+    import rasterio
+    from rasterio.warp import transform
 
+    from . import inspector
     raster, _band = tab_raster(task, cid, tab)
     built = result(task, cid)
     unit = built.get('unit') or 'C'
     out = {'coordinates': [lon, lat], 'valid': False, 'unit': unit, 'temperature': None, 'frame': None,
            'frame_index': None, 'view_angle': None, 'frame_pixel': None}
-    try:
-        with COGReader(raster) as src:
-            # Checked first: far from the mosaic, a point may be outside its projection's domain too
-            west, south, east, north = src.bounds
-            if not (west <= lon <= east and south <= lat <= north):
-                raise PointOutsideBounds()
-            values = src.point(lon, lat, indexes=(1, 2, 3, 4, 5) if src.dataset.count >= 5 else (1, 2, 3))
-    except PointOutsideBounds:
-        out['reason'] = 'outside_raster'
-        return out
+    # The nearest pixel, as rio-tiler 2's COGReader.point read it (WebODM 4.0.0's copy of rio-tiler has none)
+    with rasterio.open(raster) as src:
+        # Checked first: far from the mosaic, a point may be outside its projection's domain too
+        west, south, east, north = inspector._lonlat_bounds(src)
+        inside = west <= lon <= east and south <= lat <= north
+        if inside:
+            xs, ys = transform('EPSG:4326', src.crs, [lon], [lat])
+            b = src.bounds
+            inside = b.left < xs[0] < b.right and b.bottom < ys[0] < b.top
+        if not inside:
+            out['reason'] = 'outside_raster'
+            return out
+        values = next(src.sample([(xs[0], ys[0])], indexes=(1, 2, 3, 4, 5) if src.count >= 5 else (1, 2, 3)))
     finite = [v if math.isfinite(v) else None for v in (float(x) for x in values)]
     temperature, frame, angle = finite[:3]
     if temperature is not None and temperature > low_value(unit):

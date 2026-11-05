@@ -697,11 +697,26 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual(second.astype(int).tolist(), [[0, 0, 1], [0, 0, 1], [1, 1, 0]])
 
     def test_the_browsers_colouring_fixtures_are_what_colouring_draws(self):
+        # The colours exactly; the floats to within rounding, which numpy's versions (WebODM 3.3.2's and 4.0.0's) do
+        # differently in the last digit
+        import json
+        import math
+
         from . import colouring_fixtures
         with open(colouring_fixtures.PATH) as f:
-            kept = f.read()
-        self.assertEqual(kept, colouring_fixtures.text(colouring_fixtures.build(colouring)),
-                         "Write them again: .venv/bin/python dji-thermal/tests/colouring_fixtures.py")
+            kept = json.load(f)
+        drawn = json.loads(colouring_fixtures.text(colouring_fixtures.build(colouring)))
+
+        def same(a, b):
+            if isinstance(a, float) or isinstance(b, float):
+                return isinstance(a, (int, float)) and isinstance(b, (int, float)) and math.isclose(a, b, rel_tol=1e-12)
+            if isinstance(a, dict):
+                return isinstance(b, dict) and a.keys() == b.keys() and all(same(a[k], b[k]) for k in a)
+            if isinstance(a, list):
+                return isinstance(b, list) and len(a) == len(b) and all(same(x, y) for x, y in zip(a, b))
+            return a == b
+
+        self.assertTrue(same(kept, drawn), "Write them again: .venv/bin/python dji-thermal/tests/colouring_fixtures.py")
 
     def test_a_value_tile_holds_its_values_in_16_bits_with_flags_and_clear_where_there_are_none(self):
         import numpy as np

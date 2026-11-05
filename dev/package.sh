@@ -2,13 +2,13 @@
 # Builds the release zip, dist/dji-thermal-<version>.zip (the version from dji-thermal/manifest.json), from the committed
 # files of dji-thermal/ with LICENSE added, without the tests and with the React parts built (public/build), and
 # prints its sha256 for WebODM-Plugins' directory.json. Commit first: uncommitted changes are not in the zip. Needs the
-# dev stack up (dev/webodm.sh up).
+# dev stack up (dev/webodm.sh up). DT_ZIP=<path> writes it there instead (a zip for a check, leaving dist/ as it is).
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo"
 
 version="$(python3 -c 'import json; print(json.load(open("dji-thermal/manifest.json"))["version"])')"
-zip="dist/dji-thermal-$version.zip"
+zip="${DT_ZIP:-$repo/dist/dji-thermal-$version.zip}"
 if [ -n "$(git status --porcelain -- dji-thermal LICENSE)" ]; then
     echo "dji-thermal/ or LICENSE has uncommitted changes: commit them first" >&2
     exit 1
@@ -36,10 +36,10 @@ docker exec -w /webodm/coreplugins/dji-thermal/public dt-webapp webpack-cli --ou
 docker cp -q "dt-webapp:$build_tmp" "$work/dji-thermal/public/build"
 docker exec dt-webapp rm -rf "$build_tmp"
 
-mkdir -p dist
+mkdir -p "$(dirname "$zip")"
 rm -f "$zip"
 # Python's zipfile, so that no zip tool is needed; folders first, sorted, as unzip lists them
-python3 - "$work" "$repo/$zip" <<'PY'
+python3 - "$work" "$zip" <<'PY'
 import os, sys, zipfile
 root, out = sys.argv[1], sys.argv[2]
 with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:

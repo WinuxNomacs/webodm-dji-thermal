@@ -52,7 +52,9 @@ def remove_stale_metadata(path, requirements):
     at path, where the pinned version is installed. WebODM installs a plugin's requirements with pip's --target,
     which replaces a package's code on an upgrade but leaves the old version's metadata beside the new one; packages
     read their version from it (dji-thermal-cli's __version__, written in the converted images), and would name the
-    old one. Returns the folders removed.
+    old one. A line whose environment marker doesn't hold here (a pin for another WebODM's Python) is skipped, so the
+    version pinned for this Python is kept and the other one's metadata (left by an upgrade of WebODM) is removed.
+    Returns the folders removed.
     """
     def canonical(name):
         return re.sub(r'[-_.]+', '-', name).lower()
@@ -60,8 +62,8 @@ def remove_stale_metadata(path, requirements):
     pinned = {}
     with open(requirements) as f:
         for line in f:
-            m = re.match(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;#]+)', line)
-            if m:
+            m = re.match(r'\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;#]+)\s*(?:;([^#]*))?', line)
+            if m and (not m.group(3) or _marker_holds(m.group(3))):
                 pinned[canonical(m.group(1))] = m.group(2)
     found = {}
     for entry in os.listdir(path) if os.path.isdir(path) else []:
@@ -77,6 +79,33 @@ def remove_stale_metadata(path, requirements):
                 shutil.rmtree(os.path.join(path, entry), ignore_errors=True)
                 removed.append(entry)
     return removed
+
+
+def built_for_another_python(path):
+    """
+    Whether the packages installed at path hold compiled modules (numpy's, Pillow's) built for another
+    Python than this one. WebODM installs a plugin's requirements again only when requirements.txt changed or a package
+    is missing, by name: upgraded from 3.x (Python 3.9) to 4.0.0 (Python 3.14), it would keep the old ones, whose
+    compiled modules this Python can't load.
+    """
+    this = "{}{}".format(*sys.version_info[:2])
+    for package in ('numpy', 'PIL'):
+        for _root, _dirs, files in os.walk(os.path.join(path, package)):
+            for name in files:
+                # name.cpython-39-x86_64-linux-gnu.so, name.cpython-39-darwin.so, name.cp39-win_amd64.pyd
+                m = re.search(r'\.(?:cpython-|cp)(\d+)[^.]*\.(?:so|pyd)$', name)
+                if m and m.group(1) != this:
+                    return True
+    return False
+
+
+def _marker_holds(marker):
+    """Whether a requirement's environment marker (python_version < "3.14", ...) holds for this Python"""
+    try:
+        from packaging.markers import Marker
+    except ImportError:     # pip's own copy: WebODM installs the requirements with pip
+        from pip._vendor.packaging.markers import Marker
+    return Marker(marker.strip()).evaluate()
 
 
 @contextmanager

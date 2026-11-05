@@ -13,6 +13,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -317,12 +318,50 @@ class TestStaleMetadata(unittest.TestCase):
                          ["PIL", "dji_thermal_cli", "dji_thermal_cli-1.10.0.dist-info", "numpy-1.26.2.dist-info",
                           "pillow-11.3.0.dist-info", "rasterio-1.0.dist-info"])
 
+    def test_the_version_pinned_for_another_python_is_removed_after_webodm_moves_to_this_one(self):
+        with open(self.requirements, "w") as f:
+            f.write('numpy==1.26.2 ; python_version < "3"\nnumpy==2.5.4 ; python_version >= "3"  # WebODM 4\n')
+        self.installed("numpy-1.26.2.dist-info")
+        self.assertEqual(converter.remove_stale_metadata(self.packages, self.requirements), [])
+        self.installed("numpy-2.5.4.dist-info")
+        self.assertEqual(converter.remove_stale_metadata(self.packages, self.requirements), ["numpy-1.26.2.dist-info"])
+        self.assertEqual(os.listdir(self.packages), ["numpy-2.5.4.dist-info"])
+
     def test_nothing_is_removed_until_the_pinned_version_is_installed(self):
         self.installed("dji_thermal_cli-1.9.0.dist-info")
         self.assertEqual(converter.remove_stale_metadata(self.packages, self.requirements), [])
         self.assertEqual(os.listdir(self.packages), ["dji_thermal_cli-1.9.0.dist-info"])
         shutil.rmtree(self.packages)
         self.assertEqual(converter.remove_stale_metadata(self.packages, self.requirements), [])
+
+    def test_packages_built_for_another_python_are_found(self):
+        this = "{}{}".format(*sys.version_info[:2])
+        self.installed("numpy/core", "PIL")
+        for name in ("numpy/core/_umath.cpython-{}-x86_64-linux-gnu.so".format(this), "PIL/_imaging.cp{}-win_amd64.pyd".format(this),
+                     "numpy/core/_simd.abi3.so", "PIL/__init__.py"):
+            open(os.path.join(self.packages, name), "w").close()
+        self.assertFalse(converter.built_for_another_python(self.packages))
+        other = "39" if this != "39" else "314"
+        open(os.path.join(self.packages, "numpy/core/_multiarray_umath.cpython-{}-darwin.so".format(other)), "w").close()
+        self.assertTrue(converter.built_for_another_python(self.packages))
+        self.assertFalse(converter.built_for_another_python(os.path.join(self.dir, "none")))
+
+    def test_the_plugin_installs_its_packages_again_when_they_were_built_for_another_python(self):
+        plugin = get_plugin_by_name("dji-thermal", only_active=False)
+        packages = self.packages
+        os.makedirs(packages)
+        md5 = os.path.join(packages, "install_md5")
+        seen = []
+        with mock.patch.object(type(plugin), "get_python_packages_path", return_value=packages), \
+                mock.patch.object(type(plugin).__mro__[1], "check_requirements",
+                                  side_effect=lambda: seen.append(os.path.exists(md5))), \
+                mock.patch.object(converter, "remove_stale_metadata", return_value=[]):
+            for other in (False, True):
+                open(md5, "w").close()
+                with mock.patch.object(converter, "built_for_another_python", return_value=other):
+                    plugin.check_requirements()
+        # WebODM's check saw the file of what was installed only when the packages were this Python's
+        self.assertEqual(seen, [True, False])
 
     def test_the_plugin_tidies_its_packages_after_webodm_installs_them(self):
         plugin = get_plugin_by_name("dji-thermal", only_active=False)
