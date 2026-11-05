@@ -162,7 +162,7 @@ then, photos fail with this reason rather than being measured by the built-in po
 
 **"Failed to install requirements.txt" in WebODM's log, at every start (native Windows)**
 
-A bug of WebODM 3.3.2's native Windows install, fixed in later releases. The packages are installed and the plugin
+A bug of WebODM 3.3.2's native Windows install, fixed in WebODM 4.0.0. The packages are installed and the plugin
 works; WebODM only runs pip again at each start, which needs an internet connection.
 
 If something isn't covered here, [open an issue](https://github.com/WinuxNomacs/webodm-dji-thermal/issues) with

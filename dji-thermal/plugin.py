@@ -1,3 +1,5 @@
+import os
+
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 
@@ -15,6 +17,15 @@ TASK = r'projects/(?P<project_pk>\d+)/tasks/(?P<pk>[^/.]+)'
 
 class Plugin(PluginBase):
     def check_requirements(self):
+        # Packages installed for another Python (WebODM upgraded from 3.x to 4.0.0): without the file of what was
+        # installed, WebODM installs them again for this one (see converter)
+        packages = self.get_python_packages_path()
+        if converter.built_for_another_python(packages):
+            logger.info("DJI Thermal: its packages were installed for another Python: installing them again")
+            try:
+                os.remove(os.path.join(packages, "install_md5"))
+            except OSError:
+                pass
         # After WebODM installs the requirements: the old versions' metadata pip leaves (see converter)
         super().check_requirements()
         try:

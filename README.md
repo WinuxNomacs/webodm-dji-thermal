@@ -54,7 +54,8 @@ settings, palettes, installing, DJI's SDK), troubleshooting and the plugin's API
 
 ## Installing
 
-WebODM 3.3.2 or later, in Docker (Linux, Windows, macOS) or from its native Windows installer; checked on both.
+WebODM 3.3.2 or later (4.0.0 included), in Docker (Linux, Windows, macOS) or from its native Windows installer;
+checked on both.
 
 - **From WebODM's plugin list**: Administration > Plugins, find DJI Thermal, install it.
 - **From a release**: download `dji-thermal-X.Y.Z.zip` from this repository's
@@ -62,8 +63,9 @@ WebODM 3.3.2 or later, in Docker (Linux, Windows, macOS) or from its native Wind
   Administration > Plugins > **Load Plugin (.zip)**. The zip holds the plugin's scripts built, so WebODM needs no
   webpack of its own (its native Windows install has none).
 
-WebODM installs the plugin's requirements in the plugin's own folder: dji-thermal-cli, with numpy and Pillow at
-WebODM's own versions. Restart WebODM if it asks you to.
+WebODM installs the plugin's requirements in the plugin's own folder: dji-thermal-cli and Shapely, with numpy and
+Pillow at WebODM's own versions (those of its Python: 3.9 for WebODM 3.3.2, 3.14 for 4.0.0). Restart WebODM if it asks
+you to.
 
 The plugin calls no outside service: photos are converted, analyzed and mosaicked on your WebODM server. The mosaic
 viewer's base layers are WebODM's own, loaded by your browser as on WebODM's other maps.
@@ -514,7 +516,9 @@ The plugin's parts:
   over a region, drawn in a palette, and the project's workset mosaics), `measurements.py` (the saved measurements)
   and `correction.py` (the approximate correction for another emissivity); in `public/`, `inspector.js`,
   `regions.js` and `inspector.css`.
-- **Shared**: `portable.py` (files the web app and the worker share, alike on Linux, macOS and Windows), and in
+- **Shared**: `portable.py` (files the web app and the worker share, alike on Linux, macOS and Windows),
+  `webodm_versions.py` (what differs between WebODM 3.3.2 and 4.0.0: rio-tiler, a task's crop, the colour maps, with
+  `colormaps.json` the three 4.0.0's tiler no longer has), and in
   `public/`, `scale.js` (colour scales and the Image section's controls), `recolour.js` (tiles coloured in the
   browser) and `frames.js` (the window of the frames that saw a point), for the mosaic viewer and the Inspector.
 

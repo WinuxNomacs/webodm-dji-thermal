@@ -11,10 +11,15 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
 - **Official plugin rules only** (https://docs.webodm.org/plugin-development-guide): no Django models or
   migrations (data goes in the plugin's data stores), only the `PluginsAPI` hooks and server signals WebODM has,
   no changes to WebODM itself.
-- **Python 3.9 and Django 2.2** (WebODM 3.3.2, numpy 1.26.2, Pillow 11.3.0): Ruff targets py39. WebODM installs a
-  plugin's `requirements.txt` with `pip install -U --target`, dependencies included, so it pins numpy and Pillow
-  to WebODM's own versions. It does so when it loads the plugin and the file's md5 changed; pip leaves an old
-  version's `.dist-info` behind, which `Plugin.check_requirements` removes.
+- **WebODM 3.3.2 and 4.0.0 both**: 3.3.2 is Python 3.9, Django 2.2, PostGIS, numpy 1.26.2, Pillow 11.3.0, rio-tiler
+  installed; 4.0.0 is Python 3.14, Django 5.2, no GIS (a task's crop is GeoJSON), numpy 2.5.4, Pillow 13.0.0,
+  rio-tiler only as WebODM's trimmed copy (`app.vendor.rio_tiler`). Ruff targets py39. What differs is in
+  `webodm_versions.py`; shapes go through Shapely (never Django's GEOS). WebODM installs a plugin's
+  `requirements.txt` with `pip install -U --target`, dependencies included, so it pins numpy, Pillow and Shapely
+  per Python with environment markers, at each WebODM's own versions. It installs them when it loads the plugin
+  and the file's md5 changed or a package's name is missing; `Plugin.check_requirements` makes it install them
+  again when they were built for another Python (WebODM upgraded), and removes the old versions' `.dist-info`
+  pip leaves behind.
 - **Linux, Windows and macOS**: WebODM runs in Docker on all three (the plugin's Python in its Linux container; the
   macOS installer is a manager for Docker) or from its native Windows installer (the plugin's Python on Windows,
   with no node, npm or webpack). So: no POSIX-only module at import time (OS differences in `portable.py`), no
@@ -48,18 +53,20 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
 ## Dev environment
 
 - `ignored/WebODM` is a checkout of https://github.com/WebODM/WebODM (ignored by git), at the commit the pinned
-  image was built from (tag `v3.3.2`). The dev server runs that checkout, so a branch checked out there is live on
-  :8002. `ignored/WebODM-Docs` is https://github.com/WebODM/Docs (the plugin guide), `ignored/WebODM-Plugins` is
+  image was built from (tag `v4.0.0`), and `ignored/WebODM-3.3.2` a worktree of it at `v3.3.2`
+  (`git -C ignored/WebODM worktree add ../WebODM-3.3.2 v3.3.2`). The dev servers run those checkouts, so a branch
+  checked out there is live. `ignored/WebODM-Docs` is https://github.com/WebODM/Docs (the plugin guide), `ignored/WebODM-Plugins` is
   https://github.com/WebODM/WebODM-Plugins (the directory and its guidance).
-- `dev/webodm.sh up | down | logs [service] | ps` runs it in dev mode with `dji-thermal/` mounted as
+- `dev/webodm.sh up | down | logs [service] | ps` runs WebODM 4.0.0 in dev mode with `dji-thermal/` mounted as
   `/webodm/coreplugins/dji-thermal`, on http://localhost:8002, containers `dt-webapp`, `dt-worker`, `dt-db`,
   `dt-broker`, `dt-node-odx-1`, project and volumes `webodm-dji-thermal`, so it runs beside another WebODM (port
-  8000 or 8001). Images are pinned by digest in `dev/compose.yml` (a local `webodm/webodm_webapp:latest` tag may be
-  a fork's build).
+  8000 or 8001). `DT_WEBODM=3.3.2 dev/webodm.sh ...` runs 3.3.2 alike on http://localhost:8003, containers `dt3-*`,
+  project and volumes `webodm-dji-thermal-3`. Each version's images are pinned by digest in `dev/webodm.sh` (a
+  local `webodm/webodm_webapp:latest` tag may be a fork's build).
 - The first start runs WebODM's dev setup (migrations, npm, webpack) for several minutes before the server
   answers.
-- Host tools: `uv venv --python 3.9 .venv && uv pip install -r requirements-dev.txt` (Django, DRF, numpy and
-  Pillow for the IDE, Ruff); `npm ci` (Jest, ESLint, Playwright). VSCode: interpreter `.venv`, `ignored/WebODM` on
+- Host tools: `uv venv --python 3.9 .venv && uv pip install -r requirements-dev.txt` (Django, DRF, numpy, Pillow
+  and Shapely as on 3.3.2, for the IDE, Ruff); `npm ci` (Jest, ESLint, Playwright). VSCode: interpreter `.venv`, `ignored/WebODM` on
   Pylance's extra paths (local `.vscode/settings.json`).
 
 ## Tests and checks
@@ -69,8 +76,9 @@ The `test`, `live-check`, `release-check` and `docs` skills in `.claude/skills` 
 - Django: `docker exec -w /webodm dt-webapp python manage.py test --noinput coreplugins.dji-thermal.tests.test_converter coreplugins.dji-thermal.tests.test_api coreplugins.dji-thermal.tests.test_sdk coreplugins.dji-thermal.tests.test_analyzer coreplugins.dji-thermal.tests.test_inspector coreplugins.dji-thermal.tests.test_frames coreplugins.dji-thermal.tests.test_portable`. The tests'
   images come from `DT_SAMPLES_DIR` and `DT_FLIGHT_DIR`, DJI's SDK zip from `DT_SDK_ZIP` (`.env`, untracked);
   never commit an image (but the docs' screenshots) or DJI's files. Each run installs `requirements.txt` afresh in WebODM's test media
-  folder, so the tests use the pinned dji-thermal-cli. One run
-  at a time: every run uses the same test database.
+  folder, so the tests use the pinned dji-thermal-cli. They run in `dt-webapp` (4.0.0) and, before a merge, in
+  `dt3-webapp` (3.3.2) too. One run at a time per stack: a stack's runs share its test database (the two stacks'
+  are separate).
 - Jest: `npm test` at the repo root (jsdom, babel-jest; Babel's settings in `package.json`). ESLint: `npm run lint
   -- dji-thermal` (`public/main.js` is ES5; `public/thermal/` is JSX and ES modules, built by WebODM's webpack
   into `public/build/` when the plugin is registered, with `public/webpack.config.js` generated: both untracked).

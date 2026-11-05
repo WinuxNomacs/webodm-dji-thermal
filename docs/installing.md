@@ -1,6 +1,6 @@
 # Installing
 
-The plugin needs WebODM 3.3.2 or later, installed any of the ways WebODM is:
+The plugin needs WebODM 3.3.2 or later (4.0.0 included), installed any of the ways WebODM is:
 
 - **Docker**, on Linux, Windows or macOS. WebODM's macOS installer is a manager for Docker, so it's the same.
 - **WebODM's native Windows installer**.
@@ -22,8 +22,9 @@ has none).
 
 ## What it installs
 
-WebODM installs the plugin's requirements in the plugin's own folder: dji-thermal-cli, with numpy and Pillow at
-WebODM's own versions. This needs an internet connection the first time. Restart WebODM if it asks you to.
+WebODM installs the plugin's requirements in the plugin's own folder: dji-thermal-cli and Shapely, with numpy and
+Pillow at WebODM's own versions (those of its Python: 3.9 for WebODM 3.3.2, 3.14 for 4.0.0). After WebODM is upgraded
+from 3.x to 4.0.0, it installs them again for its new Python by itself. This needs an internet connection the first time. Restart WebODM if it asks you to.
 
 The plugin calls no outside service: photos are converted, analyzed and mosaicked on your WebODM server. The maps'
 base layers are WebODM's own, loaded by your browser as on WebODM's other maps.
@@ -32,6 +33,6 @@ base layers are WebODM's own, loaded by your browser as on WebODM's other maps.
 
 - **Native Windows, WebODM 3.3.2**: WebODM logs "Failed to install requirements.txt" for the plugin at each start
   and runs pip again, although the packages are installed and the plugin works. It's a WebODM bug that affects
-  every plugin with requirements; it's fixed in WebODM releases after 3.3.2.
+  every plugin with requirements; it's fixed in WebODM 4.0.0.
 - **ARM servers** (such as Docker on an Apple Silicon Mac): everything works with the built-in port of DJI's SDK.
   [DJI's own Thermal SDK](dji-sdk.md) is built for x64 and x86 processors only, so it can't be used there.
