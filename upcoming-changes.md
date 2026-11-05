@@ -3,76 +3,6 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **WebODM 4.0.0** (the user, 2026-11-05: "WebODM 4.0.0 was just released and we need to ensure our plugin's
-  compatible"). 4.0.0 (tag `v4.0.0`, 42 commits after 3.3.2) moves to Ubuntu 24.04, **Python 3.14, Django 5.2,
-  numpy 2.5.4, Pillow 13.0.0**, Celery 5, Postgres 18 without PostGIS (`django.contrib.gis` out of
-  `INSTALLED_APPS`; a task's `crop` and extents are GeoJSON dicts in `JSONField`s, no longer GEOS geometries),
-  Valkey in place of Redis, `webpack_loader` removed, plugin URLs through `re_path`, and `pip freeze --path` for
-  plugin requirements (the user's #2046).
-  What breaks or may break here:
-  - `requirements.txt` pins numpy 1.26.2 and Pillow 11.3.0 (3.3.2's): no Python 3.14 wheels, so the install fails.
-    Environment markers pick each WebODM's versions (pip honours them; WebODM's `parse_requirements` keeps only the
-    name).
-  - `inspector.py` `_crop` (`task.crop.empty`) and `inspector_api.py` (`task.crop.wkt`) expect GEOS; the frames' and
-    the Inspector's shapes use `django.contrib.gis.geos` (needs GEOS's library, no longer WebODM's to provide).
-  - Everything else read against 4.0.0 while testing: Celery's `worker.celery`, `run_function_async`,
-    `TestSafeAsyncResult`, the templates the pages extend, the Administration sidebar link `main.js` inserts, JWT.
-  - The dev stack: `docker-compose.nodeodm.yml` is now `docker-compose.nodeodx.yml`; new images (webapp 4.0.0, db
-    18, valkey 9.1) pinned by digest.
-  Decided (the user, 2026-11-05): this repo's `ignored/WebODM` goes to 4.0.0 (not webodm-geojson's checkout); the
-  plugin supports **both 3.3.2 and 4.0.0** (markers, both kinds of crop, tests on both); the :8002 dev data
-  (Postgres 9 upgraded in place to 18 on the first start, one way) is **backed up first** to volumes
-  `webodm-dji-thermal-332_dbdata` and `webodm-dji-thermal-332_appmedia`.
-  Found by the tests on 4.0.0 (173 run: 3 failures, 4 errors): rio-tiler is no longer installed (WebODM vendors a
-  trimmed 2.x as `app.vendor.rio_tiler`, without `COGReader.point`), `morecantile` neither (the tests' tiles), the
-  colour maps hot, rainbow and gray_r are gone from its tiler, `geom_transform_wkt_bbox` takes a GeoJSON polygon
-  (GEOS in 3.3.2), and a colouring fixture's floats differ in the last digits (numpy 2).
-  Decided (the user, 2026-11-05): **Shapely** in place of Django's GEOS (2.0.7 for Python 3.9, 2.1.2 for 3.14:
-  wheels on all three systems); the plugin **carries its own copies** of hot, rainbow and gray_r (rio-tiler's, BSD),
-  so the palettes and the users' saved choices are the same on both versions; the user upgrades the native Windows
-  WebODM (`C:\WebODM`) to 4.0.0 for the Windows check.
-  Built (2026-11-05), `webodm-4`: `requirements.txt` with markers (numpy, Pillow, Shapely per Python);
-  `webodm_versions.py` (rio-tiler from `app.vendor` else installed, `task_crop` as Shapely from GeoJSON or GEOS,
-  `cutline` built by the plugin, `colormap_encoded`/`colormap` with `colormaps.json`); Shapely in `inspector.py`,
-  `frames.py` (imported from the plugin's packages, `converter.shapely`); the viewer's readout read with rasterio
-  (`mosaics` point); `converter.remove_stale_metadata` honours markers; `converter.built_for_another_python` and
-  `Plugin.check_requirements` make WebODM install the packages again after it moves to another Python (found
-  while checking: its md5 check would keep the 3.9 builds). Tests: `test_converter` (markers, another Python,
-  the reinstall), `test_inspector` (the crop as each version stores it, tiles without morecantile, the ETag with a
-  real crop), `test_analyzer` (fixtures within float rounding). `dev/webodm.sh`: 4.0.0 on :8002, `DT_WEBODM=3.3.2`
-  on :8003 (`ignored/WebODM-3.3.2`, a worktree). All 208 tests (the plugin's and WebODM's `app.tests.test_plugins`) pass on both, Jest (281) and ESLint too. Live on
-  4.0.0 (read only, the user's First Project after the database upgrade): the dashboard's button, the Analyzer's
-  list, dataset, Files pictures (Pillow 13), the mosaic viewer (hot, the readout, a click's frames), the frame
-  page (a region), the Thermal Inspector on WebODM's map (pin, region, hover, hot), the DJI Thermal page and its
-  Administration link; the upgrade path (3.3.2's installed packages put in place, reloaded: installed again for
-  3.14, the old metadata removed). README, `docs/installing.md`, `docs/troubleshooting.md`, CLAUDE.md, the test
-  and release-check skills. Left: **native Windows 4.0.0** (once the user has upgraded `C:\WebODM`: the zip
-  installed through Administration > Plugins, its requirements for Python 3.14, the pages; `test_portable` with
-  its Python), then the merge. At the next release, the release check installs the zip on both versions.
-  Native Windows 4.0.0 (2026-11-05, the zip installed through Administration > Plugins on the user's `C:\WebODM`, in
-  a "Live check Windows 4.0.0" project, deleted afterwards): requirements installed for Python 3.14 (cp314 wheels,
-  "Installed requirements.txt": 3.3.2's failing check is fixed); an Analyzer dataset of 40 M4T frames and 3 RGB photos
-  analyzed (5 s), a harmonized workset with mosaics (92 s), the viewer (rainbow, the readout, a click's 19 frames), the
-  frame page (a region), a task from the workset processed on the native node (664 s), the Inspector on its map (pin,
-  region, hot); a DJI Thermal Task of the same photos (the RGB ignored) processed (211 s, 10.1 to 31.7 °C);
-  `test_portable` passes with its Python 3.14 (an embeddable build: the test skill's runner). **Removing the plugin
-  failed**: "Access is denied" on Shapely's DLL, which WebODM had loaded (Windows can't delete a loaded DLL); WebODM
-  dropped the plugin's row but left its folder half deleted, to come back at the next start.
-  Decided (the user, 2026-11-05): **GDAL's OGR in place of Shapely** (WebODM's own GDAL, with GEOS, on 3.3.2 and
-  4.0.0, Docker and native Windows, checked on all three): the plugin then ships no compiled package of its own.
-  Built (2026-11-05): `shapes.py` (OGR geometries with what the plugin reads of them; buffers with GEOS's default
-  8 segments a quadrant; OGR's exceptions left as WebODM has them), used by `inspector.py`, `frames.py` and
-  `webodm_versions.task_crop`; Shapely out of `requirements.txt`, the docs and the dev venv. All 208 tests pass on
-  both versions, Jest and ESLint too. Left: the Windows re-check (the new zip installed, a region measured, the
-  plugin removed), once the user has restarted the Windows WebODM to free the half-deleted folder's DLL; then the
-  merge.
-  Re-check, part 1 (2026-11-05, after the user's restart): the restart had registered the half-deleted plugin again,
-  as expected; removed through Administration > Plugins (no DLL loaded: removed whole). The new zip installed
-  (dji-thermal-cli, numpy, Pillow; no Shapely), but WebODM kept running the old plugin's modules it had loaded at
-  start (a region: "No module named 'shapely'" from the old `converter.shapely`): WebODM runs a reinstalled plugin's
-  new code only after a restart (`docs/installing.md` now says so). Its project deleted, the new version left
-  installed. Left: the user restarts the Windows WebODM once more; then a region measured with OGR and the plugin
-  removed without a restart; then the merge.
 - **U2-4. Harmonize's alignment reused by the mosaics** (the user, 2026-11-02: in 1.0.0, the last known item before
   it). A harmonized workset aligns its frames twice: the conversion's `dtc.process(normalize=True)` runs
   dji-thermal-cli's `normalization()`, which builds a mosaic layout and aligns it (`mosaic._align`: 4 rounds of every
@@ -913,6 +843,84 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **WebODM 4.0.0** (the user, 2026-11-05: "WebODM 4.0.0 was just released and we need to ensure our plugin's
+  compatible"). 4.0.0 (tag `v4.0.0`, 42 commits after 3.3.2) moves to Ubuntu 24.04, **Python 3.14, Django 5.2,
+  numpy 2.5.4, Pillow 13.0.0**, Celery 5, Postgres 18 without PostGIS (`django.contrib.gis` out of
+  `INSTALLED_APPS`; a task's `crop` and extents are GeoJSON dicts in `JSONField`s, no longer GEOS geometries),
+  Valkey in place of Redis, `webpack_loader` removed, plugin URLs through `re_path`, and `pip freeze --path` for
+  plugin requirements (the user's #2046).
+  What breaks or may break here:
+  - `requirements.txt` pins numpy 1.26.2 and Pillow 11.3.0 (3.3.2's): no Python 3.14 wheels, so the install fails.
+    Environment markers pick each WebODM's versions (pip honours them; WebODM's `parse_requirements` keeps only the
+    name).
+  - `inspector.py` `_crop` (`task.crop.empty`) and `inspector_api.py` (`task.crop.wkt`) expect GEOS; the frames' and
+    the Inspector's shapes use `django.contrib.gis.geos` (needs GEOS's library, no longer WebODM's to provide).
+  - Everything else read against 4.0.0 while testing: Celery's `worker.celery`, `run_function_async`,
+    `TestSafeAsyncResult`, the templates the pages extend, the Administration sidebar link `main.js` inserts, JWT.
+  - The dev stack: `docker-compose.nodeodm.yml` is now `docker-compose.nodeodx.yml`; new images (webapp 4.0.0, db
+    18, valkey 9.1) pinned by digest.
+  Decided (the user, 2026-11-05): this repo's `ignored/WebODM` goes to 4.0.0 (not webodm-geojson's checkout); the
+  plugin supports **both 3.3.2 and 4.0.0** (markers, both kinds of crop, tests on both); the :8002 dev data
+  (Postgres 9 upgraded in place to 18 on the first start, one way) is **backed up first** to volumes
+  `webodm-dji-thermal-332_dbdata` and `webodm-dji-thermal-332_appmedia`.
+  Found by the tests on 4.0.0 (173 run: 3 failures, 4 errors): rio-tiler is no longer installed (WebODM vendors a
+  trimmed 2.x as `app.vendor.rio_tiler`, without `COGReader.point`), `morecantile` neither (the tests' tiles), the
+  colour maps hot, rainbow and gray_r are gone from its tiler, `geom_transform_wkt_bbox` takes a GeoJSON polygon
+  (GEOS in 3.3.2), and a colouring fixture's floats differ in the last digits (numpy 2).
+  Decided (the user, 2026-11-05): **Shapely** in place of Django's GEOS (2.0.7 for Python 3.9, 2.1.2 for 3.14:
+  wheels on all three systems); the plugin **carries its own copies** of hot, rainbow and gray_r (rio-tiler's, BSD),
+  so the palettes and the users' saved choices are the same on both versions; the user upgrades the native Windows
+  WebODM (`C:\WebODM`) to 4.0.0 for the Windows check.
+  Built (2026-11-05), `webodm-4`: `requirements.txt` with markers (numpy, Pillow, Shapely per Python);
+  `webodm_versions.py` (rio-tiler from `app.vendor` else installed, `task_crop` as Shapely from GeoJSON or GEOS,
+  `cutline` built by the plugin, `colormap_encoded`/`colormap` with `colormaps.json`); Shapely in `inspector.py`,
+  `frames.py` (imported from the plugin's packages, `converter.shapely`); the viewer's readout read with rasterio
+  (`mosaics` point); `converter.remove_stale_metadata` honours markers; `converter.built_for_another_python` and
+  `Plugin.check_requirements` make WebODM install the packages again after it moves to another Python (found
+  while checking: its md5 check would keep the 3.9 builds). Tests: `test_converter` (markers, another Python,
+  the reinstall), `test_inspector` (the crop as each version stores it, tiles without morecantile, the ETag with a
+  real crop), `test_analyzer` (fixtures within float rounding). `dev/webodm.sh`: 4.0.0 on :8002, `DT_WEBODM=3.3.2`
+  on :8003 (`ignored/WebODM-3.3.2`, a worktree). All 208 tests (the plugin's and WebODM's `app.tests.test_plugins`) pass on both, Jest (281) and ESLint too. Live on
+  4.0.0 (read only, the user's First Project after the database upgrade): the dashboard's button, the Analyzer's
+  list, dataset, Files pictures (Pillow 13), the mosaic viewer (hot, the readout, a click's frames), the frame
+  page (a region), the Thermal Inspector on WebODM's map (pin, region, hover, hot), the DJI Thermal page and its
+  Administration link; the upgrade path (3.3.2's installed packages put in place, reloaded: installed again for
+  3.14, the old metadata removed). README, `docs/installing.md`, `docs/troubleshooting.md`, CLAUDE.md, the test
+  and release-check skills. Left: **native Windows 4.0.0** (once the user has upgraded `C:\WebODM`: the zip
+  installed through Administration > Plugins, its requirements for Python 3.14, the pages; `test_portable` with
+  its Python), then the merge. At the next release, the release check installs the zip on both versions.
+  Native Windows 4.0.0 (2026-11-05, the zip installed through Administration > Plugins on the user's `C:\WebODM`, in
+  a "Live check Windows 4.0.0" project, deleted afterwards): requirements installed for Python 3.14 (cp314 wheels,
+  "Installed requirements.txt": 3.3.2's failing check is fixed); an Analyzer dataset of 40 M4T frames and 3 RGB photos
+  analyzed (5 s), a harmonized workset with mosaics (92 s), the viewer (rainbow, the readout, a click's 19 frames), the
+  frame page (a region), a task from the workset processed on the native node (664 s), the Inspector on its map (pin,
+  region, hot); a DJI Thermal Task of the same photos (the RGB ignored) processed (211 s, 10.1 to 31.7 °C);
+  `test_portable` passes with its Python 3.14 (an embeddable build: the test skill's runner). **Removing the plugin
+  failed**: "Access is denied" on Shapely's DLL, which WebODM had loaded (Windows can't delete a loaded DLL); WebODM
+  dropped the plugin's row but left its folder half deleted, to come back at the next start.
+  Decided (the user, 2026-11-05): **GDAL's OGR in place of Shapely** (WebODM's own GDAL, with GEOS, on 3.3.2 and
+  4.0.0, Docker and native Windows, checked on all three): the plugin then ships no compiled package of its own.
+  Built (2026-11-05): `shapes.py` (OGR geometries with what the plugin reads of them; buffers with GEOS's default
+  8 segments a quadrant; OGR's exceptions left as WebODM has them), used by `inspector.py`, `frames.py` and
+  `webodm_versions.task_crop`; Shapely out of `requirements.txt`, the docs and the dev venv. All 208 tests pass on
+  both versions, Jest and ESLint too. Left: the Windows re-check (the new zip installed, a region measured, the
+  plugin removed), once the user has restarted the Windows WebODM to free the half-deleted folder's DLL; then the
+  merge.
+  Re-check, part 1 (2026-11-05, after the user's restart): the restart had registered the half-deleted plugin again,
+  as expected; removed through Administration > Plugins (no DLL loaded: removed whole). The new zip installed
+  (dji-thermal-cli, numpy, Pillow; no Shapely), but WebODM kept running the old plugin's modules it had loaded at
+  start (a region: "No module named 'shapely'" from the old `converter.shapely`): WebODM runs a reinstalled plugin's
+  new code only after a restart (`docs/installing.md` now says so). Its project deleted, the new version left
+  installed. Left: the user restarts the Windows WebODM once more; then a region measured with OGR and the plugin
+  removed without a restart; then the merge.
+  Re-check, part 2 (2026-11-05, after the user's second restart), on native Windows 4.0.0 with the OGR version:
+  a dataset of 40 frames and a workset with mosaics, a mosaic region (84,570 pixels, mean 22.65 °C) and line (5.54 m,
+  264 samples, each with its frame), a one-point line refused ("A line needs two points"), a frame page region (mean
+  20.11 °C, as with Shapely); its project deleted, then **the plugin removed without a restart, folder and all**.
+  Done, merged as `webodm-4`: the code in `webodm_versions.py`, `shapes.py`, `colormaps.json`, `converter.py`
+  (markers, `built_for_another_python`), `plugin.py`, `inspector.py`, `frames.py`, `mosaics.py`; tests in
+  `test_converter`, `test_inspector`, `test_analyzer`; `dev/webodm.sh` and `dev/compose.yml` (both versions),
+  `dev/package.sh` (`DT_ZIP`).
 - **A palette in DJI Thermal Task** (the user, 2026-11-01, with a screenshot of the panel): "add a dropdown above
   the "Normalize:" checkbox that allows the user to select the color palette from the supported dji color palettes.
   If detectable, it should default to that of the source photos." Done 2026-11-01, `task-palette`. The task's TIFFs
