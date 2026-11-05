@@ -336,9 +336,9 @@ class TestStaleMetadata(unittest.TestCase):
 
     def test_packages_built_for_another_python_are_found(self):
         this = "{}{}".format(*sys.version_info[:2])
-        self.installed("shapely", "numpy/core", "PIL")
-        for name in ("shapely/lib.cpython-{}-x86_64-linux-gnu.so".format(this), "PIL/_imaging.cp{}-win_amd64.pyd".format(this),
-                     "numpy/core/_umath.abi3.so", "shapely/__init__.py"):
+        self.installed("numpy/core", "PIL")
+        for name in ("numpy/core/_umath.cpython-{}-x86_64-linux-gnu.so".format(this), "PIL/_imaging.cp{}-win_amd64.pyd".format(this),
+                     "numpy/core/_simd.abi3.so", "PIL/__init__.py"):
             open(os.path.join(self.packages, name), "w").close()
         self.assertFalse(converter.built_for_another_python(self.packages))
         other = "39" if this != "39" else "314"

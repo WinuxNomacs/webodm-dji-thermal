@@ -49,6 +49,17 @@
   and release-check skills. Left: **native Windows 4.0.0** (once the user has upgraded `C:\WebODM`: the zip
   installed through Administration > Plugins, its requirements for Python 3.14, the pages; `test_portable` with
   its Python), then the merge. At the next release, the release check installs the zip on both versions.
+  Native Windows 4.0.0 (2026-11-05, the zip installed through Administration > Plugins on the user's `C:\WebODM`, in
+  a "Live check Windows 4.0.0" project, deleted afterwards): requirements installed for Python 3.14 (cp314 wheels,
+  "Installed requirements.txt": 3.3.2's failing check is fixed); an Analyzer dataset of 40 M4T frames and 3 RGB photos
+  analyzed (5 s), a harmonized workset with mosaics (92 s), the viewer (rainbow, the readout, a click's 19 frames), the
+  frame page (a region), a task from the workset processed on the native node (664 s), the Inspector on its map (pin,
+  region, hot); a DJI Thermal Task of the same photos (the RGB ignored) processed (211 s, 10.1 to 31.7 °C);
+  `test_portable` passes with its Python 3.14 (an embeddable build: the test skill's runner). **Removing the plugin
+  failed**: "Access is denied" on Shapely's DLL, which WebODM had loaded (Windows can't delete a loaded DLL); WebODM
+  dropped the plugin's row but left its folder half deleted, to come back at the next start.
+  Decided (the user, 2026-11-05): **GDAL's OGR in place of Shapely** (WebODM's own GDAL, with GEOS, on 3.3.2 and
+  4.0.0, Docker and native Windows, checked on all three): the plugin then ships no compiled package of its own.
 - **U2-4. Harmonize's alignment reused by the mosaics** (the user, 2026-11-02: in 1.0.0, the last known item before
   it). A harmonized workset aligns its frames twice: the conversion's `dtc.process(normalize=True)` runs
   dji-thermal-cli's `normalization()`, which builds a mosaic layout and aligns it (`mosaic._align`: 4 rounds of every

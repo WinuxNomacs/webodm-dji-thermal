@@ -29,11 +29,13 @@ the 3.3.2 one too (`DT_WEBODM=3.3.2 dev/webodm.sh up`, containers `dt3-*`):
 
 6. **Windows** (after changing `portable.py`, the only code that differs on Windows): `test_portable` with a native
    Windows WebODM's Python, from a copy in a Windows folder (Windows' Python can't run from a `\\wsl.localhost`
-   path). From WSL, with WebODM installed in `C:\WebODM`:
+   path). WebODM 4.0.0's Python (`apps\python314`) is an embeddable build whose `python._pth` leaves the current
+   folder off its path, so a small runner adds the tests' own. From WSL, with WebODM installed in `C:\WebODM`:
    ```bash
    W=$(cmd.exe /c "echo %TEMP%" 2>/dev/null | tr -d '\r' | tail -1); D="$(wslpath "$W")/dji-thermal-portable-test"
    mkdir -p "$D/tests" && cp dji-thermal/portable.py "$D/" && cp dji-thermal/tests/test_portable.py "$D/tests/"
-   cd /mnt/c && cmd.exe /c "cd /d $W\\dji-thermal-portable-test\\tests && C:\\WebODM\\resources\\app\\apps\\python39\\python.exe -m unittest -v test_portable"
+   printf 'import os, sys, unittest\nsys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))\nunittest.main(module="test_portable", argv=["run", "-v"])\n' > "$D/tests/run.py"
+   cd /mnt/c && cmd.exe /c "cd /d $W\\dji-thermal-portable-test\\tests && C:\\WebODM\\resources\\app\\apps\\python314\\python.exe run.py"
    rm -rf "${D:?}"
    ```
 

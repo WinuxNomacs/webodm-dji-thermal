@@ -284,7 +284,7 @@ def region_response(read):
         return Response(read())
     except ValueError as e:
         raise ValidationError({'error': str(e)}) from None
-    except Exception:  # noqa: BLE001 - Shapely refuses what isn't a geometry
+    except Exception:  # noqa: BLE001 - OGR refuses what isn't a geometry
         raise ValidationError({'error': "Invalid geometry"}) from None
 
 
@@ -406,7 +406,7 @@ def saved_record(data, point, region, baseline):
             values = region(geometry, percentiles, bins, isotherm, fix)
         except ValueError as e:
             raise ValidationError({'error': str(e)}) from None
-        except Exception:  # noqa: BLE001 - Shapely refuses what isn't a geometry
+        except Exception:  # noqa: BLE001 - OGR refuses what isn't a geometry
             raise ValidationError({'error': "Invalid geometry"}) from None
         record = {'geometry': geometry,
                   'isotherm': {'low': isotherm[0], 'high': isotherm[1]} if isotherm else None}

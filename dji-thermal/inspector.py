@@ -60,13 +60,12 @@ def point(task, lon, lat):
     import rasterio
     from rasterio.warp import transform
 
-    from .converter import shapely
-    Point = shapely().geometry.Point
+    from . import shapes
     from rasterio.windows import Window
 
     out = {'coordinates': [lon, lat], 'valid': False, 'temperature': None, 'reason': None}
     crop = _crop(task)
-    if crop is not None and not crop.contains(Point(lon, lat)):
+    if crop is not None and not crop.contains(shapes.point(lon, lat)):
         out['reason'] = 'excluded'
         return out
     with rasterio.open(thermal_orthophoto(task)) as src:
@@ -106,7 +105,7 @@ def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS, isother
 def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILES, bins=HISTOGRAM_BINS, isotherm=None,
                   frames=None, correction=None):
     """
-    region of a raster's first band, within crop (a Shapely shape, lon/lat) when given; with unit (a mosaic's), its no-data
+    region of a raster's first band, within crop (a shapes.Shape, lon/lat) when given; with unit (a mosaic's), its no-data
     marker left out and the statistics in °C. A line measures a strip LINE_HALF_WIDTH either side of it, and adds its
     length (m) and profile: {distance (m), values (°C, None where there is none), points ([lon, lat])}, with frames
     ((raster, band, names): a mosaic's source frame band) the name of the frame each sample came from. The surroundings
@@ -123,10 +122,9 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
     from rasterio.errors import WindowError
     from rasterio.windows import Window, from_bounds, intersection
 
-    from .converter import shapely
-    shapely_shape = shapely().geometry.shape
+    from . import shapes
 
-    shape = shapely_shape(geometry)
+    shape = shapes.shape(geometry)
     if shape.geom_type not in ('Polygon', 'MultiPolygon', 'LineString'):
         raise ValueError("Not a polygon or a line")
     line = shape.geom_type == 'LineString'
@@ -155,7 +153,7 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
             return out
         crs = src.crs
         metre = crs.linear_units_factor[1] if crs.is_projected else DEGREE_M      # metres per unit of the raster's CRS
-        local = shapely_shape(transform_geom('EPSG:4326', crs, measured))
+        local = shapes.shape(transform_geom('EPSG:4326', crs, measured))
         inside = local.buffer(LINE_HALF_WIDTH / metre) if line else local
         width = RING_MIN if line else min(RING_MAX, max(RING_MIN, math.sqrt(inside.area) * metre))
         ring = inside.buffer(width / metre).difference(inside)
@@ -186,7 +184,7 @@ def raster_region(raster, geometry, crop=None, unit=None, percentiles=PERCENTILE
             return geometry_mask([polygons], out_shape=shape_out, transform=wt, invert=True, all_touched=True)
 
         if crop is not None:
-            usable &= mask(shapely_shape(transform_geom('EPSG:4326', crs, _polygons(crop))))
+            usable &= mask(shapes.shape(transform_geom('EPSG:4326', crs, _polygons(crop))))
         within = mask(inside)
         around = mask(ring) & ~within
         out['pixel_size'] = abs(wt.a) * metre
@@ -252,7 +250,7 @@ def statistics(data, keep, around, location, percentiles=PERCENTILES, bins=HISTO
 
 
 def _profile(line, data, usable, wt, crs, metre, frames=None):
-    """A line's (Shapely, in the raster's CRS) temperatures every pixel along it, at most MAX_SAMPLES of them, from the
+    """A line's (a shapes.Shape, in the raster's CRS) temperatures every pixel along it, at most MAX_SAMPLES of them, from the
     grid read (data where usable, its transform wt); frames as raster_region's"""
     import numpy as np
     import rasterio
@@ -372,7 +370,7 @@ def isotherm(task, z, x, y, low, high, rgb, size=256, crop=False):
 
 
 def raster_isotherm(raster, z, x, y, low, high, rgb, size=256, crop=None, unit=None):
-    """isotherm of a raster's first band, within crop (a Shapely shape, lon/lat) when given; with unit (a mosaic's), low and
+    """isotherm of a raster's first band, within crop (a shapes.Shape, lon/lat) when given; with unit (a mosaic's), low and
     high are still °C, its no-data marker is left out and it is read as its own tiles are (nearest pixel)"""
     import io
 
@@ -400,7 +398,7 @@ def raster_isotherm(raster, z, x, y, low, high, rgb, size=256, crop=None, unit=N
 
 def _raster_tile(raster, z, x, y, size, crop=None, resampling='bilinear', buffer=0, pixel=False):
     """A tile of a raster's first band as WebODM's map reads the thermal orthophoto (rio-tiler's ImageData), within crop
-    (a Shapely shape, lon/lat) when given, with buffer more pixels on each side; with pixel, (it, the raster's pixel width in
+    (a shapes.Shape, lon/lat) when given, with buffer more pixels on each side; with pixel, (it, the raster's pixel width in
     metres); None outside it"""
     from app.api.tiler import get_zoom_safe
     from app.raster_utils import ZOOM_EXTRA_LEVELS
@@ -453,7 +451,7 @@ def _coordinates(geometry):
 
 def _polygons(geometry):
     """
-    The polygonal parts of a Shapely shape as a GeoJSON MultiPolygon (lon/lat), or None when it has none (an
+    The polygonal parts of a shape (shapes.Shape) as a GeoJSON MultiPolygon (lon/lat), or None when it has none (an
     intersection along an edge)
     """
     found = []

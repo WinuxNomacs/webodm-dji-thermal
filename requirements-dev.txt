@@ -1,10 +1,9 @@
 # Host-only tools for the IDE and lint, pinned. The plugin itself runs in WebODM's own Python: 3.9 in WebODM 3.3.2
 # (ignored/WebODM-3.3.2), 3.14 in 4.0.0. This venv is 3.9, the oldest the plugin supports: the first four match 3.3.2's
-# requirements.txt and shapely the plugin's pin for 3.9, so Pylance sees the same APIs.
+# requirements.txt, so Pylance sees the same APIs (GDAL's osgeo, WebODM's own, needs the system's GDAL: not here).
 # Install: uv venv --python 3.9 .venv && uv pip install -r requirements-dev.txt
 Django==2.2.27
 djangorestframework==3.13.1
 numpy==1.26.2
 pillow==11.3.0
-shapely==2.0.7
 ruff==0.17.3

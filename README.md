@@ -63,8 +63,8 @@ checked on both.
   Administration > Plugins > **Load Plugin (.zip)**. The zip holds the plugin's scripts built, so WebODM needs no
   webpack of its own (its native Windows install has none).
 
-WebODM installs the plugin's requirements in the plugin's own folder: dji-thermal-cli and Shapely, with numpy and
-Pillow at WebODM's own versions (those of its Python: 3.9 for WebODM 3.3.2, 3.14 for 4.0.0). Restart WebODM if it asks
+WebODM installs the plugin's requirements in the plugin's own folder: dji-thermal-cli, with numpy and Pillow at
+WebODM's own versions (those of its Python: 3.9 for WebODM 3.3.2, 3.14 for 4.0.0). Restart WebODM if it asks
 you to.
 
 The plugin calls no outside service: photos are converted, analyzed and mosaicked on your WebODM server. The mosaic
@@ -518,7 +518,8 @@ The plugin's parts:
   `regions.js` and `inspector.css`.
 - **Shared**: `portable.py` (files the web app and the worker share, alike on Linux, macOS and Windows),
   `webodm_versions.py` (what differs between WebODM 3.3.2 and 4.0.0: rio-tiler, a task's crop, the colour maps, with
-  `colormaps.json` the three 4.0.0's tiler no longer has), and in
+  `colormaps.json` the three 4.0.0's tiler no longer has), `shapes.py` (the shapes measured, with WebODM's own GDAL),
+  and in
   `public/`, `scale.js` (colour scales and the Image section's controls), `recolour.js` (tiles coloured in the
   browser) and `frames.js` (the window of the frames that saw a point), for the mosaic viewer and the Inspector.
 

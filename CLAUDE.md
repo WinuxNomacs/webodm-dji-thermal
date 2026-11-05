@@ -14,9 +14,10 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
 - **WebODM 3.3.2 and 4.0.0 both**: 3.3.2 is Python 3.9, Django 2.2, PostGIS, numpy 1.26.2, Pillow 11.3.0, rio-tiler
   installed; 4.0.0 is Python 3.14, Django 5.2, no GIS (a task's crop is GeoJSON), numpy 2.5.4, Pillow 13.0.0,
   rio-tiler only as WebODM's trimmed copy (`app.vendor.rio_tiler`). Ruff targets py39. What differs is in
-  `webodm_versions.py`; shapes go through Shapely (never Django's GEOS). WebODM installs a plugin's
-  `requirements.txt` with `pip install -U --target`, dependencies included, so it pins numpy, Pillow and Shapely
-  per Python with environment markers, at each WebODM's own versions. It installs them when it loads the plugin
+  `webodm_versions.py`; shapes go through `shapes.py` (GDAL's OGR, WebODM's own; never Django's GEOS, nor a
+  compiled package of the plugin's: on native Windows a DLL WebODM loaded can't be deleted, so the plugin couldn't
+  be removed). WebODM installs a plugin's `requirements.txt` with `pip install -U --target`, dependencies included,
+  so it pins numpy and Pillow per Python with environment markers, at each WebODM's own versions. It installs them when it loads the plugin
   and the file's md5 changed or a package's name is missing; `Plugin.check_requirements` makes it install them
   again when they were built for another Python (WebODM upgraded), and removes the old versions' `.dist-info`
   pip leaves behind.
@@ -66,7 +67,7 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
 - The first start runs WebODM's dev setup (migrations, npm, webpack) for several minutes before the server
   answers.
 - Host tools: `uv venv --python 3.9 .venv && uv pip install -r requirements-dev.txt` (Django, DRF, numpy, Pillow
-  and Shapely as on 3.3.2, for the IDE, Ruff); `npm ci` (Jest, ESLint, Playwright). VSCode: interpreter `.venv`, `ignored/WebODM` on
+  as on 3.3.2, for the IDE, Ruff); `npm ci` (Jest, ESLint, Playwright). VSCode: interpreter `.venv`, `ignored/WebODM` on
   Pylance's extra paths (local `.vscode/settings.json`).
 
 ## Tests and checks

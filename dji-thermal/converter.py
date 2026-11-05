@@ -83,13 +83,13 @@ def remove_stale_metadata(path, requirements):
 
 def built_for_another_python(path):
     """
-    Whether the packages installed at path hold compiled modules (numpy's, Pillow's, Shapely's) built for another
+    Whether the packages installed at path hold compiled modules (numpy's, Pillow's) built for another
     Python than this one. WebODM installs a plugin's requirements again only when requirements.txt changed or a package
     is missing, by name: upgraded from 3.x (Python 3.9) to 4.0.0 (Python 3.14), it would keep the old ones, whose
     compiled modules this Python can't load.
     """
     this = "{}{}".format(*sys.version_info[:2])
-    for package in ('shapely', 'numpy', 'PIL'):
+    for package in ('numpy', 'PIL'):
         for _root, _dirs, files in os.walk(os.path.join(path, package)):
             for name in files:
                 # name.cpython-39-x86_64-linux-gnu.so, name.cpython-39-darwin.so, name.cp39-win_amd64.pyd
@@ -117,16 +117,6 @@ def _plugin_packages():
         yield
     finally:
         sys.path.remove(path)
-
-
-def shapely():
-    """Shapely, from the plugin's own packages (WebODM has none): its geometry and wkt modules imported at once, so
-    nothing is imported later without them on the path"""
-    with _plugin_packages():
-        import shapely
-        import shapely.geometry
-        import shapely.wkt
-    return shapely
 
 
 def library():

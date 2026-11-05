@@ -22,8 +22,8 @@ has none).
 
 ## What it installs
 
-WebODM installs the plugin's requirements in the plugin's own folder: dji-thermal-cli and Shapely, with numpy and
-Pillow at WebODM's own versions (those of its Python: 3.9 for WebODM 3.3.2, 3.14 for 4.0.0). After WebODM is upgraded
+WebODM installs the plugin's requirements in the plugin's own folder: dji-thermal-cli, with numpy and Pillow at
+WebODM's own versions (those of its Python: 3.9 for WebODM 3.3.2, 3.14 for 4.0.0). After WebODM is upgraded
 from 3.x to 4.0.0, it installs them again for its new Python by itself. This needs an internet connection the first time. Restart WebODM if it asks you to.
 
 The plugin calls no outside service: photos are converted, analyzed and mosaicked on your WebODM server. The maps'

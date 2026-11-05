@@ -25,20 +25,20 @@ def tiler():
 
 def task_crop(task):
     """
-    The task's crop as a Shapely shape (lon/lat), or None: a GeoJSON polygon in 4.0.0, a GEOS one in 3.3.2 (read from
-    its WKT: GEOS's GeoJSON goes through GDAL, which swaps the axes of EPSG:4326 with GDAL 3)
+    The task's crop as a shape (shapes.Shape, lon/lat), or None: a GeoJSON polygon in 4.0.0, a GEOS one in 3.3.2 (read
+    from its WKT: GEOS's GeoJSON goes through GDAL, which swaps the axes of EPSG:4326 with GDAL 3)
     """
     crop = task.crop
     if crop is None:
         return None
-    from .converter import shapely
-    crop = shapely().geometry.shape(crop) if isinstance(crop, dict) else shapely().wkt.loads(crop.wkt)
+    from . import shapes
+    crop = shapes.shape(crop) if isinstance(crop, dict) else shapes.from_wkt(crop.wkt)
     return None if crop.is_empty else crop
 
 
 def cutline(crop, dataset):
     """
-    A crop's (a Shapely polygon, lon/lat) outer ring in a raster's pixels as WKT, the cutline WebODM's tiles are read
+    A crop's (a shapes.Shape polygon, lon/lat) outer ring in a raster's pixels as WKT, the cutline WebODM's tiles are read
     with: as app.geoutils.geom_transform_wkt_bbox makes it, which takes a GEOS geometry in 3.3.2 and GeoJSON in 4.0.0
     :raises ValueError: not a polygon
     """
