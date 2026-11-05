@@ -66,6 +66,13 @@
   both versions, Jest and ESLint too. Left: the Windows re-check (the new zip installed, a region measured, the
   plugin removed), once the user has restarted the Windows WebODM to free the half-deleted folder's DLL; then the
   merge.
+  Re-check, part 1 (2026-11-05, after the user's restart): the restart had registered the half-deleted plugin again,
+  as expected; removed through Administration > Plugins (no DLL loaded: removed whole). The new zip installed
+  (dji-thermal-cli, numpy, Pillow; no Shapely), but WebODM kept running the old plugin's modules it had loaded at
+  start (a region: "No module named 'shapely'" from the old `converter.shapely`): WebODM runs a reinstalled plugin's
+  new code only after a restart (`docs/installing.md` now says so). Its project deleted, the new version left
+  installed. Left: the user restarts the Windows WebODM once more; then a region measured with OGR and the plugin
+  removed without a restart; then the merge.
 - **U2-4. Harmonize's alignment reused by the mosaics** (the user, 2026-11-02: in 1.0.0, the last known item before
   it). A harmonized workset aligns its frames twice: the conversion's `dtc.process(normalize=True)` runs
   dji-thermal-cli's `normalization()`, which builds a mosaic layout and aligns it (`mosaic._align`: 4 rounds of every

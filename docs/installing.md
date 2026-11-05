@@ -20,6 +20,11 @@ Once the plugin is in WebODM's plugin directory: **Administration > Plugins**, f
 The zip includes the plugin's built scripts, so WebODM needs no build tools of its own (the native Windows install
 has none).
 
+## Updating or reinstalling
+
+WebODM keeps running the version of the plugin it started with: after loading a new zip (or removing the plugin and
+loading it again), restart WebODM so it runs the new one.
+
 ## What it installs
 
 WebODM installs the plugin's requirements in the plugin's own folder: dji-thermal-cli, with numpy and Pillow at
