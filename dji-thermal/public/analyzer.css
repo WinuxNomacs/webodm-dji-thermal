@@ -359,6 +359,15 @@
 .ta-frame .ta-frame-items button:hover{ background: rgba(128, 128, 128, .15); }
 .ta-frame .ta-frame-items button[aria-current=true]{ background: #337ab7; color: #fff; }
 .ta-frame .ta-frame-item-about{ display: block; opacity: .7; font-size: 11px; }
+/* With thumbnails: a wider list, each frame's picture across it (room kept for it before it loads, DJI's 640×512) */
+.ta-frame .ta-frame-list.ta-frame-list-thumbs{ flex-basis: 280px; }
+.ta-frame .ta-frame-list-head{ display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
+.ta-frame .ta-frame-list-head .ta-message{ margin: 0; }
+.ta-frame .ta-frame-thumbs-box{ font-weight: normal; margin: 0; white-space: nowrap; }
+.ta-frame .ta-frame-thumbs-box input{ margin: 0 3px 0 0; vertical-align: middle; }
+.ta-frame .ta-frame-list-thumbs .ta-frame-items button{ padding: 4px; margin-bottom: 4px; }
+.ta-frame .ta-frame-thumb{ display: block; width: 100%; aspect-ratio: 5 / 4; object-fit: contain; margin-bottom: 3px;
+    background: rgba(128, 128, 128, .15); border-radius: 2px; }
 .ta-frame .ta-frame-download{ display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .ta-frame .ta-frame-panes{ flex: 1 1 auto; min-width: 0; display: flex; gap: 8px; }
 .ta-frame .ta-frame-pane{ flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
@@ -414,6 +423,8 @@
     .ta-frame .ta-frame-panes{ flex-direction: column; }
     .ta-frame .ta-frame-map{ height: 50vh; }
     .ta-frame .ta-frame-list{ flex-basis: auto; max-height: 30vh; }
+    .ta-frame .ta-frame-list.ta-frame-list-thumbs{ flex-basis: auto; }
+    .ta-frame .ta-frame-thumb{ max-width: 260px; }
 }
 .ta-viewer .ta-measurements-head{ display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .ta-viewer .ta-measurements-head > span:first-child{ margin-right: auto; }

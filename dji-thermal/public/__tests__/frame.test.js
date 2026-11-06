@@ -220,6 +220,32 @@ describe("the frame page", () => {
         expect(history.replaceState).toHaveBeenLastCalledWith(null, "", "?frame=c_T.JPG");
     });
 
+    it("shows each listed frame's thumbnail in the preferred DJI palette, until the Thumbnails box is cleared, remembered", async () => {
+        core.setPreferences({palette: "ironred"});
+        await start();
+        const thumbs = Array.from(document.querySelectorAll("#ta-frame-list img.ta-frame-thumb"));
+        expect(thumbs.map(i => i.getAttribute("src"))).toEqual(["a_T.JPG", "sub/b_T.JPG", "c_T.JPG"].map(p =>
+            "/api/plugins/dji-thermal/datasets/d1/thumbnail?workset=c1&size=list&palette=ironred&file=" + encodeURIComponent(p)));
+        expect(thumbs[0].getAttribute("loading")).toBe("lazy");
+        expect($("ta-frame-list").classList.contains("ta-frame-list-thumbs")).toBe(true);
+        const box = document.querySelector("#ta-frame-list [data-thumbs]");
+        box.checked = false;
+        box.dispatchEvent(new Event("change", {bubbles: true}));
+        expect(document.querySelectorAll("#ta-frame-list img").length).toBe(0);
+        expect($("ta-frame-list").classList.contains("ta-frame-list-thumbs")).toBe(false);
+        expect(document.querySelector("#ta-frame-list [data-thumbs]").checked).toBe(false);
+        // Names only on the next visit too; without a preferred palette, each frame's embedded picture
+        core.setPreferences({palette: null});
+        document.body.innerHTML = page();
+        await start();
+        expect(document.querySelectorAll("#ta-frame-list img").length).toBe(0);
+        window.localStorage.clear();
+        document.body.innerHTML = page();
+        await start();
+        expect(document.querySelector("#ta-frame-list img").getAttribute("src")).toBe(
+            "/api/plugins/dji-thermal/datasets/d1/thumbnail?workset=c1&size=list&file=a_T.JPG");
+    });
+
     it("scrolls the list to the frame shown once the page shows it, centred, and leaves it when it's in view", async () => {
         // The list 100 px high; the frame shown 20 px high, 400 px down it, until scrolled
         const box = $("ta-frame-list");

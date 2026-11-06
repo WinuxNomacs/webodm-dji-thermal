@@ -829,6 +829,15 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **Thumbnails in the frame page's list** (the user, 2026-11-06: "The frames browser list should show thumbnails
+  instead of just filenames. Large thumbnails."). **Decided** (the user, 2026-11-06): in the preferred DJI palette
+  (else the frame's own picture), as the Files tab's; about 260 px wide, the list 280 px, with a Thumbnails box to list
+  names only, remembered per browser, on by default. Built (`frame-list-thumbnails`): `analyzer_api.LIST_SIZE`
+  (`?size=list`, up to 320 px, cached beside the others), `frame.js` `thumbsUrl` and `listHtml`'s thumbnails (lazy),
+  the list redrawn when the palette changes, `analyzer.css`; Jest (`frame.test.js`), `test_analyzer` (the list size);
+  README, `quickstart-worksets.md`, `api.md`, `frame-page.png` and `frame-measure-again.png`. Live check on :8002
+  ("Thermal - 9/18/2026", 211 frames): the first thumbnails in under a second, 14 made as the list showed them,
+  the box off and kept after a reload, the phone layout; the thumbnails it cached removed. Done.
 - **Bug: the Thermal Inspector's button on RGB maps** (the user, 2026-11-06: "Why is the Thermal Inspector visible
   on a rgb only orthophoto? I thought the button was only supposed to be visible on thermal/radiometric orthos?").
   Since Mosaic Overlays (2026-11-01, Claude's design, never checked with the user) the button also showed on every map

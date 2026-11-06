@@ -313,6 +313,11 @@ class TestAnalysis(AnalyzerTestCase):
         self.assertEqual(len(os.listdir(datasets.data_path(task, "thumbnails", "rainbow1"))), 1)
         again = self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": row["path"], "palette": "rainbow1"})
         self.assertEqual(again.content, drawn.content)
+        # The frame page's list: larger, kept beside the small one
+        listed = self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": row["path"], "palette": "rainbow1", "size": "list"})
+        with Image.open(io.BytesIO(listed.content)) as im:
+            self.assertEqual(max(im.size), min(analyzer_api.LIST_SIZE[0], max(row["width"], row["height"])))
+        self.assertEqual(len(os.listdir(datasets.data_path(task, "thumbnails", "rainbow1"))), 2)
         # The detail pane's: at the frame's own size, in its own DJI palette when the user's is one of WebODM's
         large = self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": row["path"], "palette": "magma", "size": "large"})
         own = self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": row["path"], "palette": row["palette"], "size": "large"})
