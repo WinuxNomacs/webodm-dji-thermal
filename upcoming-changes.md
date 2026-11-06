@@ -3,6 +3,13 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **Bug: the Thermal Inspector's button on RGB maps** (the user, 2026-11-06: "Why is the Thermal Inspector visible
+  on a rgb only orthophoto? I thought the button was only supposed to be visible on thermal/radiometric orthos?").
+  Since Mosaic Overlays (2026-11-01, Claude's design, never checked with the user) the button also showed on every map
+  of a project with workset mosaics. **Decided** (the user, 2026-11-06): only on thermal orthophotos. Built
+  (`inspector-thermal-only`): `showButton` in `inspector.js` shows it for a thermal orthophoto, or a mosaic laid on
+  the map (the Analyzer's "Open on WebODM's map" opens the project's map, which may be RGB only), and while the panel
+  is open; Jest (the button's test rewritten); README and the Inspector quickstart.
 - **U2-4. Harmonize's alignment reused by the mosaics** (the user, 2026-11-02: in 1.0.0, the last known item before
   it). A harmonized workset aligns its frames twice: the conversion's `dtc.process(normalize=True)` runs
   dji-thermal-cli's `normalization()`, which builds a mosaic layout and aligns it (`mosaic._align`: 4 rounds of every

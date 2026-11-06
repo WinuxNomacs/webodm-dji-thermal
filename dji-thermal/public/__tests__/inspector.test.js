@@ -965,19 +965,36 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(s.panel().textContent).toContain("Mosaic Overlays");
     });
 
-    it("shows its button when the map has a thermal orthophoto or the project has workset mosaics, and not on public maps", async () => {
+    it("shows its button only where the map has temperatures: a thermal orthophoto or a linked mosaic, not an RGB map with mosaics", async () => {
         const rgb = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, RGB_TASK)}}];
-        let s = begin(leafletMap(), rgb, {[LIST]: {mosaics: []}});
+        const thermal = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}];
+        // An RGB orthophoto of a project with workset mosaics: no temperatures on the map
+        let s = begin(leafletMap(), rgb);
         await s.ins.mosaicsReady;
         expect(s.button().style.display).toBe("none");
-        s = begin(leafletMap(), rgb);
-        await s.ins.mosaicsReady;
-        expect(s.button().style.display).toBe("");
-        expect(s.panel().hidden).toBe(true);      // laid only when asked
-        // A project without tasks on its map: the project from the URL
+        // A project without tasks on its map (the project from the URL): none either
         s = begin(leafletMap(), [], {}, {path: "/map/project/2/"});
         await s.ins.mosaicsReady;
+        expect(s.button().style.display).toBe("none");
+        // A thermal orthophoto, with or without mosaics
+        s = begin(leafletMap(THERMAL_TASK), thermal, {[LIST]: {mosaics: []}});
+        await s.ins.mosaicsReady;
         expect(s.button().style.display).toBe("");
+        expect(s.panel().hidden).toBe(true);      // opened only when asked
+        // The Analyzer's "Open on WebODM's map" on an RGB map: the mosaic laid, the button there to close and reopen
+        s = begin(leafletMap(), rgb, {}, {search: "?dt-mosaic=d-1%2Fabc123def456"});
+        await s.ins.mosaicsReady;
+        expect(s.laid().length).toBe(1);
+        expect(s.button().style.display).toBe("");
+        s.ins.close();
+        expect(s.button().style.display).toBe("");
+        // Lifted in the panel, it can be laid again until the panel closes; then the RGB map has no button
+        s.ins.open();
+        change(s.panel().querySelector('[data-act="mosaic-on"]'), false);
+        expect(s.laid().length).toBe(0);
+        expect(s.button().style.display).toBe("");
+        s.ins.close();
+        expect(s.button().style.display).toBe("none");
         // WebODM's public maps have no workset mosaics: not asked for
         s = begin(leafletMap(), rgb, {}, {path: "/public/task/1f0a/map/"});
         await s.ins.mosaicsReady;

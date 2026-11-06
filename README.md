@@ -361,8 +361,8 @@ Temperatures are shown in the unit of your preferences (see above).
 ## The Thermal Inspector
 
 On WebODM's 2D map of a task whose orthophoto holds temperatures (a single thermal band, as ODM makes from the
-DJI Thermal Task's images or a workset's), or of a project with workset mosaics, a thermometer button opens the Thermal
-Inspector:
+DJI Thermal Task's images or a workset's), a thermometer button opens the Thermal Inspector. It isn't on maps of RGB
+orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, with a workset mosaic laid on it:
 
 - **Hover**: the temperature under the cursor, beside it and in the panel; outside the task's crop, outside the
   orthophoto and where it has no data it says so.
