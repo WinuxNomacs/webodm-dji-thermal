@@ -373,6 +373,9 @@ async function openFrame(p, env) {
     const conversion = (list.conversions || list)[0];
     await p.goto(env.url + "/plugins/dji-thermal/dataset/" + dataset + "/conversion/" + conversion.id + "/frame");
     await p.waitForSelector("#ta-frame-map-0 canvas", {timeout: 60000});
+    // The list's first thumbnails drawn (the server makes each once)
+    await p.waitForFunction(() => Array.from(document.querySelectorAll("#ta-frame-list img")).slice(0, 3)
+        .every(i => i.complete), null, {timeout: 60000}).catch(() => {});
     await p.waitForTimeout(2000);
 }
 

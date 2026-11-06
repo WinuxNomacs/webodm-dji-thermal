@@ -29,6 +29,7 @@
     var DISTANCE_SOURCES = {rangefinder: "the rangefinder's", embedded: "the one the frame records", option: "the workset's"};
     // The list's choices once the mosaics placed frames: all of them, those in the mosaic and those left out
     var LISTS = [["", "All"], ["mosaic", "In the mosaic"], ["oblique", "Oblique"]];
+    var THUMBS_KEY = "thermalAnalyzer.frameThumbnails";    // the list's Thumbnails box, remembered per browser ("0": off)
 
     function inMosaic(f) { return f.mosaic !== null && f.mosaic !== undefined; }
 
@@ -70,9 +71,17 @@
         return m ? m[1] + "-" + m[2] + "-" + m[3] + " " + m[4] : "";
     }
 
+    // The thumbnails' URL, followed by a frame's path: the dataset's thumbnail of it, at the list's size, in the
+    // user's preferred DJI palette when they have one (else its embedded picture); a workset's frames even in a
+    // dataset never analyzed
+    function thumbsUrl(api, dataset, cid, palette) {
+        return api + "datasets/" + dataset + "/thumbnail?workset=" + encodeURIComponent(cid) + "&size=list&" +
+            (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file=";
+    }
+
     // The list beside the frame: the switch between lists once the mosaics placed frames (sizes: each list's count),
-    // and the frames, the one shown marked
-    function listHtml(frames, current, list, sizes, maxPitch, built) {
+    // the Thumbnails box, and the frames, the one shown marked, each with its thumbnail when thumbs (their URL) is given
+    function listHtml(frames, current, list, sizes, maxPitch, built, thumbs) {
         var out = "";
         if (sizes) {
             out += '<div class="ta-frame-lists" role="group" aria-label="Which frames">' + LISTS.map(function (l, i) {
@@ -80,11 +89,14 @@
                     (list === l[0] ? ' aria-pressed="true"' : "") + (sizes[i] ? "" : " disabled") + ">" + esc(l[1]) + " " + sizes[i] + "</button>";
             }).join("") + "</div>";
         }
-        out += '<div class="ta-message">' + core.count(frames.length, "frame", "frames") + "</div>";
+        out += '<div class="ta-frame-list-head"><span class="ta-message">' + core.count(frames.length, "frame", "frames") + "</span>" +
+            '<label class="ta-frame-thumbs-box"><input type="checkbox" data-thumbs' + (thumbs ? " checked" : "") + "> Thumbnails</label></div>";
         return out + '<ol class="ta-frame-items">' + frames.map(function (f) {
             var tag = frameTag(f, list, maxPitch, built), about = [timeText(f.time).slice(11), tag].filter(Boolean).join(" · ");
             return '<li><button type="button" data-path="' + esc(f.path) + '" title="' + esc(f.path + (tag ? " (" + tag + ")" : "")) + '"' +
-                (f.path === current ? ' aria-current="true"' : "") + ">" + esc(fileName(f.path)) +
+                (f.path === current ? ' aria-current="true"' : "") + ">" +
+                (thumbs ? '<img class="ta-frame-thumb" loading="lazy" alt="" src="' + esc(thumbs + encodeURIComponent(f.path)) + '">' : "") +
+                esc(fileName(f.path)) +
                 (about ? '<span class="ta-frame-item-about">' + esc(about) + "</span>" : "") + "</button></li>";
         }).join("") + "</ol>";
     }
@@ -357,6 +369,8 @@
         var csrf = (page.querySelector("input[name=csrfmiddlewaretoken]") || {}).value;
         var asked = new root.URLSearchParams((ctx.location || {}).search || "");
         var meta = null, all = [], list = asked.get("list") || "", frame = null;
+        var thumbsOn = true;
+        try { thumbsOn = !root.localStorage || root.localStorage.getItem(THUMBS_KEY) !== "0"; } catch (e) { thumbsOn = true; }
         // The frame as converted and with the changes: figures (info) and values (tiles), each pane's
         var infos = [null, null], tiles = [null, null], changes = {}, typed = {}, changeError = null, withChanges = false;
         var style = null, L = null, maps = [null, null], canvases = [null, null], overlays = [null, null], fitted = false;
@@ -637,7 +651,9 @@
         function showList() {
             var frames = shown(), built = all.some(inMosaic);
             var sizes = built ? LISTS.map(function (l) { return listFrames(all, l[0]).length; }) : null;
-            $("ta-frame-list").innerHTML = listHtml(frames, frame, list, sizes, meta.max_pitch, meta.built);
+            var thumbs = thumbsOn ? thumbsUrl(page.getAttribute("data-api"), dataset, cid, core.preferences().palette) : null;
+            $("ta-frame-list").innerHTML = listHtml(frames, frame, list, sizes, meta.max_pitch, meta.built, thumbs);
+            $("ta-frame-list").classList.toggle("ta-frame-list-thumbs", !!thumbs);
             scrollList();
             var i = frames.map(function (f) { return f.path; }).indexOf(frame);
             $("ta-frame-prev").disabled = i <= 0;
@@ -762,7 +778,9 @@
                              restyle: function () { recolour(); remeasure(); },
                              // A palette is the user's, everywhere (DJI's keys carry the viewer's prefix)
                              onPalette: function (key) {
-                                 core.savePalette(fetchFn, page.getAttribute("data-api"), csrf, key.replace(/^dji_/, "")).catch(function () {});
+                                 // the list's thumbnails follow it
+                                 core.savePalette(fetchFn, page.getAttribute("data-api"), csrf, key.replace(/^dji_/, ""))
+                                     .then(function () { if (thumbsOn) showList(); }, function () {});
                              }});
 
         $("ta-frame-list").addEventListener("click", function (e) {
@@ -776,6 +794,12 @@
                 return showList();
             }
             if (b.hasAttribute("data-path")) choose(b.getAttribute("data-path"));
+        });
+        $("ta-frame-list").addEventListener("change", function (e) {
+            if (!e.target.hasAttribute("data-thumbs")) return;
+            thumbsOn = e.target.checked;
+            try { if (root.localStorage) root.localStorage.setItem(THUMBS_KEY, thumbsOn ? "1" : "0"); } catch (err) { /* not kept */ }
+            showList();
         });
 
         $("ta-frame-prev").addEventListener("click", function () { step(-1); });
@@ -883,7 +907,7 @@
     }
 
     var api = {CHANGES: CHANGES, listFrames: listFrames, frameTag: frameTag, changesQuery: changesQuery, frameApiUrl: frameApiUrl,
-               listHtml: listHtml, changeStarts: changeStarts, readChanges: readChanges, changesTyped: changesTyped,
+               listHtml: listHtml, thumbsUrl: thumbsUrl, changeStarts: changeStarts, readChanges: readChanges, changesTyped: changesTyped,
                newWorksetUrl: newWorksetUrl, paramsHtml: paramsHtml, infoHtml: infoHtml, valueAt: valueAt, readoutHtml: readoutHtml,
                downloadHtml: downloadHtml, canvasOverlay: canvasOverlay, timeText: timeText, toPixels: toPixels, circlePixels: circlePixels,
                isothermLimits: isothermLimits, changesText: changesText, measureHtml: measureHtml, savedHtml: savedHtml, init: init};

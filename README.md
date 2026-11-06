@@ -284,8 +284,9 @@ One frame of a workset at a time, as the workset measured it, opened from the fr
 in the mosaic viewer and the Thermal Inspector) or from the Files tab (a thermal frame's name, or **Open frame** in
 its detail pane: the frame page of the newest workset that converted):
 
-- the dataset's thermal frames listed beside it in the order they were taken, the one shown marked and scrolled into
-  view, stepped through with ← and → (or the arrows at the top); once the mosaics are built, **All**, **In the
+- the dataset's thermal frames listed beside it in the order they were taken, each with a large thumbnail (in your
+  preferred DJI palette, else the frame's own picture; **Thumbnails** clear lists the names only, remembered in your
+  browser), the one shown marked and scrolled into view, stepped through with ← and → (or the arrows at the top); once the mosaics are built, **All**, **In the
   mosaic** (where a frame opened from a mosaic starts) or **Oblique** (those the mosaics left out, and why); the
   frame and the list are in the page's address, to link to;
 - the frame, zoomed and moved like a map, coloured in your browser from its temperatures with the mosaic viewer's

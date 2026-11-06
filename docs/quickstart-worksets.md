@@ -113,8 +113,9 @@ closed, it goes back to its corner:
 ### One frame at a time
 
 **Open this frame**, under the frame in that window, opens it on the frame page in a new tab (a thermal frame's
-name on the Files tab opens it too). The frames are listed on the left in the order they were taken, the one shown
-highlighted and scrolled into view; click one, or step with ← and →. Once the mosaics are built, **All**, **In the
+name on the Files tab opens it too). The frames are listed on the left in the order they were taken, each with its
+thumbnail (in your preferred DJI palette, else the frame's own picture: clear **Thumbnails** for the names only),
+the one shown highlighted and scrolled into view; click one, or step with ← and →. Once the mosaics are built, **All**, **In the
 mosaic** and **Oblique** choose which are listed; a frame opened from a mosaic lists those in the mosaic.
 The panel has the same palette, range, **Image** and **Isotherm** as the mosaic viewer, and the temperature under the
 cursor.

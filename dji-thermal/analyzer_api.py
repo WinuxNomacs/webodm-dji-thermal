@@ -36,6 +36,8 @@ from . import (analysis, conversion_tasks, conversions, converter, correction, d
 
 THUMBNAIL_SIZE = (96, 96)
 LARGE_SIZE = (1280, 1280)      # the Files tab's detail pane (?size=large): a frame at its own size, up to this
+LIST_SIZE = (320, 320)         # the frame page's list (?size=list), shown about 260 pixels wide
+SIZES = {'large': LARGE_SIZE, 'list': LIST_SIZE}
 THUMBNAILS_DIR = 'thumbnails'
 OVER_QUOTA = "The project's owner is over their storage quota: free some space first"
 
@@ -378,7 +380,8 @@ class DatasetThumbnail(DatasetView):
     def get(self, request, pk):
         """A small JPEG of one of the files its analysis lists (?file=), for the Files tab: its embedded picture, or a
         thermal frame's temperatures in one of DJI's palettes (?palette=, the user's preferred), cached in the dataset;
-        with ?size=large, at the file's own size (up to LARGE_SIZE), for the detail pane; with ?workset=, also a frame
+        with ?size=large, at the file's own size (up to LARGE_SIZE), for the detail pane, with ?size=list, up to
+        LIST_SIZE, for the frame page's list; with ?workset=, also a frame
         that workset converted (a dataset never analyzed has its frames' thumbnails in the workset's Files)"""
         from PIL import Image
         task = get_dataset(request, pk)
@@ -390,7 +393,7 @@ class DatasetThumbnail(DatasetView):
             kinds[rel] = 'thermal'
         path = dataset_file(task, rel, kinds)
         palette = request.query_params.get('palette') or ""
-        size = LARGE_SIZE if request.query_params.get('size') == 'large' else THUMBNAIL_SIZE
+        size = SIZES.get(request.query_params.get('size'), THUMBNAIL_SIZE)
         if size == LARGE_SIZE and palette not in conversions.palettes():
             # The detail pane draws a frame in the palette it was shot in when the user's isn't one of DJI's
             palette = next((r.get('palette') for r in datasets.analysis(task).get('files') or [] if r.get('path') == rel), "") or ""
@@ -458,7 +461,7 @@ def palette_thumbnail(task, path, palette, size=THUMBNAIL_SIZE):
         return None
     im.thumbnail(size)
     out = io.BytesIO()
-    im.save(out, 'JPEG', quality=75 if size == THUMBNAIL_SIZE else 90)
+    im.save(out, 'JPEG', quality=90 if size == LARGE_SIZE else 75)
     os.makedirs(os.path.dirname(cached), exist_ok=True)
     with open(cached + '.part', 'wb') as f:
         f.write(out.getvalue())
