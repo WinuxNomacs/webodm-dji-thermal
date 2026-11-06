@@ -7,8 +7,8 @@
 // (inspector_api.py) in °C and are shown in WebODM's units (°F when imperial). The project's workset mosaics can be
 // laid on the map too (the Analyzer's tiles, above WebODM's layers, swiped against them with WebODM's own split
 // control): a thermal layer like the orthophotos, read through the Analyzer's API. main.js adds it through
-// PluginsAPI.Map.willAddControls, with WebODM's own Leaflet, to every map; its button shows when the map has a thermal
-// orthophoto or the project has mosaics. A click shows the frames that saw a point (frames.js, the Analyzer's source
+// PluginsAPI.Map.willAddControls, with WebODM's own Leaflet, to every map; its button shows only where the map has
+// temperatures: a thermal orthophoto, or a workset mosaic laid on it (the Analyzer's "Open on WebODM's map"). A click shows the frames that saw a point (frames.js, the Analyzer's source
 // frames window) beside the panel, on a mosaic and on an orthophoto processed from a workset's TIFFs. Pins, regions
 // and lines can be saved, named, with what they measured, for everyone who can view the project (kept with the task or
 // the workset: measurements.py); and the temperatures corrected for another emissivity and reflected temperature
@@ -1843,6 +1843,7 @@
             layer.__dtMosaic = info;
             state.laid[id] = {layer: layer, opacity: 100, swipe: false};
             layer.addTo(map);
+            showButton();
             return state.laid[id];
         }
 
@@ -1852,6 +1853,7 @@
             if (laid.swipe) swipe(laid, false);
             delete state.laid[id];
             map.removeLayer(laid.layer);
+            showButton();
         }
 
         // On the right of WebODM's split control (PluginsAPI.Map.sideBySideChanged, as its own layer panel does)
@@ -1881,9 +1883,11 @@
             render();
         }
 
-        // The button shows when the map has a thermal orthophoto or the project has mosaics
+        // The button shows only where the map has temperatures: a thermal orthophoto, or a workset mosaic laid on it (the
+        // Analyzer's "Open on WebODM's map"; kept while the panel is open, so a mosaic lifted there can be laid again).
+        // An RGB map of a project with mosaics has none.
         function showButton() {
-            container.style.display = hasThermal(args.tiles) || (state.mosaics && state.mosaics.length) ? "" : "none";
+            container.style.display = hasThermal(args.tiles) || Object.keys(state.laid).length || state.open ? "" : "none";
         }
 
         // Without a palette of the user's own, the map opens in the topmost orthophoto's task's (chosen in DJI Thermal
@@ -2051,6 +2055,7 @@
             state.readout = null;
             container.classList.remove("open");
             onOut();
+            showButton();
             render();
         }
 
@@ -2161,7 +2166,6 @@
             return fetchFn(API + "projects/" + project + "/inspector/mosaics", {credentials: "same-origin"}).then(readJson);
         }).then(function (r) {
             state.mosaics = r.ok && Array.isArray(r.data.mosaics) ? r.data.mosaics : [];
-            showButton();
             var linked = linkedMosaic(search);
             var m = linked && state.mosaics.filter(function (x) { return x.dataset.id === linked.dataset && x.workset.id === linked.workset; })[0];
             if (m) {

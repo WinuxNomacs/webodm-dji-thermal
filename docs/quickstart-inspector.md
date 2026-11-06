@@ -9,7 +9,8 @@ can view the project, and correct the temperatures for another emissivity.
 ## 1. Open it
 
 Open the task's map from the dashboard (**View Map**), and press the thermometer button on the map's right. The
-button is also on any map of a project with workset mosaics, even one with no thermal orthophoto.
+button is only on maps with temperatures: a thermal orthophoto, or a workset mosaic laid on the map by the Analyzer's
+**Open on WebODM's map**. A map of RGB orthophotos only has none.
 
 ![The Thermal Inspector on a task's map, with a pinned point and a region](images/inspector.png)
 
