@@ -47,10 +47,24 @@ export DT_SDK_ZIP="${DT_SDK_ZIP:-$repo/dev/no-images/no-sdk.zip}"
 compose=(docker compose -p "$project" --project-directory "$webodm"
          -f "$webodm/docker-compose.yml" -f "$webodm/docker-compose.dev.yml" -f "$repo/dev/compose.yml")
 
+# The anonymous volumes of the project's containers (named data volumes, such as appmedia and dbdata, are not)
+anon_volumes() {
+    "${compose[@]}" ps -aq | xargs -r docker inspect -f '{{range .Mounts}}{{if eq .Type "volume"}}{{.Name}} {{end}}{{end}}' |
+        tr ' ' '\n' | grep -E '^[0-9a-f]{64}$' || true
+}
+# Removes those of them no container uses any more: neither `up --renew-anon-volumes` nor `down` removes them, and
+# each holds a copy of the image's folders (about 0.5 GB)
+drop_unused() {
+    local v
+    for v in "$@"; do
+        [ -z "$(docker ps -aq --filter "volume=$v")" ] && docker volume rm "$v" >/dev/null || true
+    done
+}
+
 case "${1:-}" in
     # New anonymous volumes: the dev compose keeps the image's venv in one, which a new image must not reuse
-    up) shift; exec "${compose[@]}" up -d --renew-anon-volumes "$@" ;;
-    down) shift; exec "${compose[@]}" down --remove-orphans "$@" ;;
+    up) shift; old=$(anon_volumes); "${compose[@]}" up -d --renew-anon-volumes "$@"; drop_unused $old ;;
+    down) shift; old=$(anon_volumes); "${compose[@]}" down --remove-orphans "$@"; drop_unused $old ;;
     logs) shift; exec "${compose[@]}" logs -f --tail 100 "$@" ;;
     "") sed -n '2,4p' "$0"; exit 1 ;;
     *) exec "${compose[@]}" "$@" ;;
