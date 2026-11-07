@@ -761,6 +761,36 @@ class TestMosaics(AnalyzerTestCase):
     def url(self, task, cid, rest=""):
         return "{}/{}/conversions/{}/mosaics{}".format(API, task.id, cid, rest)
 
+    def test_a_large_mosaic_is_read_in_parts_its_hottest_pixel_still_its_maximum(self):
+        import tempfile
+
+        import numpy as np
+        import rasterio
+        from rasterio.transform import from_origin
+        values = np.tile(np.linspace(10, 30, 200, dtype=np.float32), (120, 1))
+        values[:, :20] = -272.15      # dji-thermal-cli's no-data marker
+        values[77, 133] = 95.5        # one hot pixel a reduced read would likely miss
+        folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, folder, True)
+        raster = os.path.join(folder, "mosaic.tif")
+        with rasterio.open(raster, 'w', driver='GTiff', width=200, height=120, count=1, dtype='float32',
+                           crs='EPSG:32616', transform=from_origin(0, 0, 1, 1)) as dst:
+            dst.write(values, 1)
+
+        with rasterio.open(raster) as src:
+            whole = mosaics.band_stats(src, 1, 'C')
+            with mock.patch.object(mosaics, "ROWS_PIXELS", 1000), mock.patch.object(mosaics, "SAMPLE_SIZE", 50):
+                rows = [r.shape for r in mosaics.band_rows(src, 1)]
+                sample = mosaics.band_sample(src, 1).shape
+                parts = mosaics.band_stats(src, 1, 'C')
+        self.assertEqual(whole['max'], 95.5)
+        self.assertEqual((parts['min'], parts['max']), (whole['min'], 95.5))
+        self.assertAlmostEqual(whole['min'], 12.01, places=2)
+        self.assertEqual((sum(h for h, _ in rows), max(h * w for h, w in rows)), (120, 1000))
+        self.assertEqual(sample, (30, 50))
+        self.assertAlmostEqual(parts['percentiles'][0], whole['percentiles'][0], delta=1)
+        self.assertAlmostEqual(parts['percentiles'][1], whole['percentiles'][1], delta=1)
+
     def test_the_source_frames_lines_are_a_black_and_a_white_pixel_either_side_of_where_frames_meet(self):
         import numpy as np
         frames = np.array([[0, 0, 1],
