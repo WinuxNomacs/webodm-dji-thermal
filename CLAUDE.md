@@ -49,6 +49,9 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
   `splash-source.png`) are the only images the repo takes: they never show where a
   flight was (no coordinates, addresses or basemap), nor a camera's serial number, and each is looked at before
   it is committed.
+- **`docs/developing.md` is the developers' guide** (the code's map, running, testing, recipes for the usual
+  additions): a change that moves what it describes (a module's job, a list a recipe names, a step) updates it on
+  the same branch.
 - Planned in `upcoming-changes.md`; new requests arrive in `new.md` (untracked).
 
 ## Dev environment

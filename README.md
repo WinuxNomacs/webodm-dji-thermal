@@ -500,51 +500,11 @@ checked on a real flight; the others on DJI's Thermal SDK sample images only.
 
 ## Developing
 
-`CLAUDE.md` describes the dev environment (WebODM in Docker on port 8002, `dev/webodm.sh`) and the checks. `dev/screenshots.js`
-takes the documentation's screenshots from it.
-
-The plugin's parts:
-
-- **DJI Thermal Task**: `converter.py` (R-JPEG to TIFF) and `api.py` (its API, under `/api/plugins/dji-thermal/`:
-  `describe` a photo's camera, recorded values and ranges; `projects/<id>/tasks/<id>/convert` one photo into a
-  partial task, with WebODM's project permission); in `public/`, `main.js` (the button beside "Select Images and
-  GCP", and the DJI Thermal page's link under Administration) and `thermal/` (the button and panel, JSX, and WebODM's
-  own Leaflet for the viewer, `Leaflet.js`, built by WebODM's webpack when the plugin is installed).
-- **DJI's own SDK**: `sdk.py` with `page.py` and `templates/sdk.html` (the DJI Thermal page,
-  `/plugins/dji-thermal/sdk/`).
-- **The DJI Thermal Analyzer**: `datasets.py` (the holder tasks, their records and the jobs WebODM's worker runs),
-  `analysis.py` (the analysis job), `conversions.py` (the worksets, their settings and job, and each user's defaults),
-  `mosaics.py` (a workset's mosaics, their job, and the viewer's tiles and values with WebODM's rio-tiler),
-  `colouring.py` (how tiles and frames are drawn: range, tone curve, sharpening, isotherm), `conversion_tasks.py` (a
-  WebODM task from a workset, or the dataset's own task given its TIFFs), `frames.py` and `frames_api.py` (the frame
-  page: a frame as converted or measured again), `analyzer_api.py` (its API under
-  `/api/plugins/dji-thermal/datasets`) and `analyzer_pages.py` with `templates/datasets.html`, `dataset.html`,
-  `viewer.html` and `frame.html` (its pages, `/plugins/dji-thermal/`, `.../dataset/<id>`, a workset's mosaics
-  `.../dataset/<id>/conversion/<id>` and its frames `.../conversion/<id>/frame`); in `public/`, `analyzer_core.js`,
-  `datasets.js`, `dataset.js`, `conversions.js`, `viewer.js`, `frame.js`, `picture_viewer.js`, `analyzer.css` and
-  `frames.css`, plain scripts.
-- **The Thermal Inspector**: `inspector.py` and `inspector_api.py` (a task's thermal orthophoto read at a point and
-  over a region, drawn in a palette, and the project's workset mosaics), `measurements.py` (the saved measurements)
-  and `correction.py` (the approximate correction for another emissivity); in `public/`, `inspector.js`,
-  `regions.js` and `inspector.css`.
-- **Shared**: `portable.py` (files the web app and the worker share, alike on Linux, macOS and Windows),
-  `webodm_versions.py` (what differs between WebODM 3.3.2 and 4.0.0: rio-tiler, a task's crop, the colour maps, with
-  `colormaps.json` the three 4.0.0's tiler no longer has), `shapes.py` (the shapes measured, with WebODM's own GDAL),
-  and in
-  `public/`, `scale.js` (colour scales and the Image section's controls), `recolour.js` (tiles coloured in the
-  browser) and `frames.js` (the window of the frames that saw a point), for the mosaic viewer and the Inspector.
-
-The tests never use images or DJI's files from this repository: none is committed or published. Those that need
-real R-JPEGs or DJI's SDK read them from your machine, set in an untracked `.env` file at the repo root, and are
-skipped when these are not set:
-
-```
-DT_SAMPLES_DIR=/path/to/dji_thermal_sdk/dataset   # DJI's Thermal SDK sample images, one folder per camera
-DT_FLIGHT_DIR=/path/to/a/flight                   # a real flight's photos, thermal and RGB, in any subfolders
-DT_SDK_ZIP=/path/to/dji_thermal_sdk_v1.8.zip      # DJI's Thermal SDK zip as DJI's site gives it
-```
-
-`dev/webodm.sh up` mounts them read-only in the dev containers.
+The plugin is meant to be changed: fork it or send a pull request. **[Developing the plugin](docs/developing.md)**
+has the code's map (what each module and script does, how a request reaches WebODM's worker and back, where data
+is kept), how to run WebODM 4.0.0 and 3.3.2 with the plugin mounted (`dev/webodm.sh`), the tests, and recipes for
+the usual additions: a palette, a workset output, a measuring tool, a section in the Thermal Inspector's panel, an
+API route and a page.
 
 ## Thanks
 

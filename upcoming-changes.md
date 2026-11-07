@@ -3,7 +3,16 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R2. The code made easy to extend** (the user, 2026-11-07, from `new.md`): "This plugin's codebase is meant to be
+- Nothing planned: new requests go in `new.md`.
+
+**Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
+
+**Done**
+- **R2. The code made easy to extend** (built 2026-11-07; the user, 2026-11-07, from `new.md`): "This plugin's codebase is meant to be
   extensible to make it as simple as possible for other developers to add their own WebODM DJI Thermal Analyzer
   modifications. Review the code structure and refactor as needed to make the code as accessible as possible for
   future updates and additions." Builds on the plugin's modules (about 18,700 lines: the server's `plugin.py`,
@@ -24,14 +33,18 @@
   others' code plugs into at runtime (proposed: the former).
   Decided (the user, 2026-11-07): changing the plugin's code (a fork or a pull request), no runtime extension API;
   the guide and the refactors its recipes call for, no file split for its own sake.
+  Built, `r2-developer-guide`: `docs/developing.md` (the code's map, a request's way to the worker and back, where
+  data is kept, running the dev stacks, the tests, and the six recipes), linked from the README's Developing section
+  (which it replaces), `docs/index.md` and `CLAUDE.md`. Refactors its recipes called for: `mosaics.palette_list`
+  and `palette_keys` (the viewers' palettes built once, from DJI's tables and `conversions.COLORMAPS`, in place of
+  three copies in `mosaics`, `frames_api` and `inspector_api`); `regions.js` `TOOLS` (each measuring tool's icon and
+  name, read by `inspector.js` and `frame.js`). Left as two lists, cross-referenced, as the recipe says:
+  `COLOURED` in `conversions.py` and `conversions.js` (serving it would change the tests' datasets for two names).
+  Not refactored, named in the recipes instead: the mosaic tabs' labels (`viewer.js`, `inspector.js`). Tests
+  unchanged; Jest 300 (with the frame page's fix, below R1), Django 212 on 4.0.0 and 3.3.2 (1 skipped). Live on
+  :8002 (read only): the same palettes on the mosaic viewer, the frame page and the Inspector's mosaics, the same
+  tool buttons on the frame page and the Inspector.
 
-**Later**
-- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
-  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
-
-**Done**
 - **R1. A review before the public release** (built 2026-11-07: R1-1 to R1-13; the user, 2026-11-07, from `new.md`): "Review the plugin code for
   possible breaking points, performance improvements, and reduction of possible negative webodm ux impacts. This
   plugin will soon be released to the world so it's important to refine any points where the experience could

@@ -12,7 +12,7 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from . import conversions, converter, datasets, frames, inspector, inspector_api, measurements, mosaics, webodm_versions
+from . import conversions, converter, datasets, frames, inspector, inspector_api, measurements, mosaics
 from .analyzer_api import DatasetView, download_name, get_conversion
 
 # What a frame's values tile is made of, in its ETag
@@ -22,10 +22,7 @@ measurements_path = measurements.frames_path
 
 def frame_palettes():
     """[{key, label, color_map (encoded)}]: DJI's palettes, then WebODM's colour maps (the mosaic viewer's keys)"""
-    dji = [{'key': mosaics.DJI_PREFIX + name, 'label': "DJI " + name, 'color_map': mosaics.encoded(lut)}
-           for name, lut in converter.palette_luts().items()]
-    return dji + [{'key': name, 'label': name, 'color_map': webodm_versions.colormap_encoded(name)}
-                  for name in mosaics.VIEWER_COLORMAPS]
+    return mosaics.palette_list(converter.palette_luts())
 
 
 def default_palette(settings, preferred):

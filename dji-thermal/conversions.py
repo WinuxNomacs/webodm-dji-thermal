@@ -87,7 +87,7 @@ SETTINGS_FIELDS = ('distance', 'humidity', 'emissivity', 'reflected_temp', 'ambi
 # dji-thermal-cli's products in words, for the pages; the coloured ones (pseudo, rjpeg) are drawn in the palette
 PRODUCT_NAMES = {'temp_c': '°C', 'temp_f': '°F', 'temp_k': 'K', 'temp_ck': 'centi-kelvin', 'temp_dc': 'tenth-°C',
                  'raw': 'raw counts', 'gray16': '16-bit grey', 'pseudo': 'colour', 'rjpeg': 'R-JPEG'}
-COLOURED = ('pseudo', 'rjpeg')
+COLOURED = ('pseudo', 'rjpeg')     # and conversions.js's COLOURED
 
 
 def products():

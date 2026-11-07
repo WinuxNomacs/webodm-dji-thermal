@@ -235,8 +235,7 @@
     }
 
     // The tools drawn on the frame, as the Thermal Inspector's (regions.js): [shape, icon, name]
-    var TOOLS = [["pin", "fa fa-map-pin", "Pin"], ["line", "fa fa-route", "Line"], ["rectangle", "far fa-square", "Rectangle"],
-                 ["circle", "far fa-circle", "Circle"], ["polygon", "fa fa-draw-polygon", "Polygon"]];
+    var TOOLS = ["pin", "line", "rectangle", "circle", "polygon"].map(function (k) { return [k, Regions.TOOLS[k].icon, Regions.TOOLS[k].name]; });
     var LABELS = {pin: "P", line: "L"};         // a pin's label, P1…, a line's L1…, the rest R1…
     var REASONS = {outside_raster: "Outside the frame", nodata: "No data here", too_few_points: "A polygon needs three corners",
                    self_intersecting: "The polygon's edges cross", no_area: "The polygon has no area", line_too_short: "A line needs two points"};

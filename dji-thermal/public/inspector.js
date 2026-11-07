@@ -28,11 +28,14 @@
     var SAVED_STYLE = {color: "#2e7d32", weight: 2, opacity: 0.9, dashArray: "6 4", fillOpacity: 0.08};
     var ISOTHERM_MODES = {off: "Off", above: "Above", below: "Below", between: "Between"};
     var ISOTHERM_COLORS = {red: "e53935", orange: "fb8c00", yellow: "fdd835", green: "43a047", blue: "1e88e5", magenta: "d81b60"};
-    var SHAPES = {rectangle: "far fa-square", circle: "far fa-circle", polygon: "fa fa-draw-polygon", line: "fa fa-route"};
-    var SHAPE_NAMES = {rectangle: "Rectangle", circle: "Circle", polygon: "Polygon", line: "Line"};
     var SQ_FT_PER_SQ_M = 10.7639104;
     var FT_PER_M = 3.2808399;
     var Regions = root.ThermalRegions || (typeof require !== "undefined" ? require("./regions.js") : null);
+    // The shapes drawn (regions.js's tools but the pin): their icons and names
+    var SHAPES = {}, SHAPE_NAMES = {};
+    Object.keys(Regions.TOOLS).forEach(function (k) {
+        if (k !== "pin") { SHAPES[k] = Regions.TOOLS[k].icon; SHAPE_NAMES[k] = Regions.TOOLS[k].name; }
+    });
     var Scale = root.ThermalScale || (typeof require !== "undefined" ? require("./scale.js") : null);
     var Frames = root.ThermalFrames || (typeof require !== "undefined" ? require("./frames.js") : null);
     var movable = Frames.movable;
@@ -792,7 +795,7 @@
         }
         var shown = items.filter(function (i) { return i.key === state.savedShown; })[0];
         return '<table class="table table-condensed dt-inspector-pins dt-inspector-regions"><tbody>' + items.map(function (i) {
-            var icon = i.m.shape === "pin" ? "fa fa-map-pin" : SHAPES[i.m.shape];
+            var icon = (Regions.TOOLS[i.m.shape] || {}).icon;
             return '<tr data-saved="' + escapeHtml(i.key) + '"' + (i === shown ? ' class="active"' : "") + '><td><i class="' + icon + '"></i> ' +
                 '<a href="javascript:void(0)" data-act="goto" title="Show on the map">' + escapeHtml(i.m.name) + "</a></td><td>" + savedValue(i.m, unit) +
                 '</td><td class="text-right">' + (i.source.can_change ? '<a href="javascript:void(0)" data-act="edit" title="Rename it or change its comment"><i class="fa fa-pencil-alt"></i></a>' +
@@ -819,7 +822,7 @@
             statisticsHtml(savedRegion(m), unit, true) +
             (m.values && m.values.profile && m.values.statistics ? '<button type="button" class="btn btn-default btn-xs" data-act="csv-saved-profile"><i class="fa fa-download"></i> Profile CSV</button>' : "");
         return '<div class="dt-inspector-shown" data-profile-of="saved"><strong>' + escapeHtml(m.name) + "</strong> " +
-            '<span class="text-muted">' + escapeHtml(m.shape === "pin" ? "Pin" : SHAPE_NAMES[m.shape] || "") + "</span>" +
+            '<span class="text-muted">' + escapeHtml((Regions.TOOLS[m.shape] || {}).name || "") + "</span>" +
             (m.comment ? '<div class="dt-inspector-comment">' + escapeHtml(m.comment) + "</div>" : "") +
             lines.map(function (l) { return '<div class="text-muted dt-inspector-hint">' + l + "</div>"; }).join("") + body + "</div>";
     }
@@ -895,7 +898,7 @@
             '<a href="javascript:void(0)" class="dt-inspector-close" data-act="close" title="Close"><i class="fa fa-times"></i></a></div>' +
             '<div class="btn-group btn-group-xs dt-inspector-modes">' +
             ["hover", "pin", "rectangle", "circle", "polygon", "line"].map(function (m) {
-                var label = m === "hover" ? '<i class="fa fa-mouse-pointer"></i> Hover' : m === "pin" ? '<i class="fa fa-map-pin"></i> Pin' :
+                var label = m === "hover" ? '<i class="fa fa-mouse-pointer"></i> Hover' : m === "pin" ? '<i class="' + Regions.TOOLS.pin.icon + '"></i> Pin' :
                     '<i class="' + SHAPES[m] + '"></i>';
                 return '<button type="button" class="btn btn-' + (state.mode === m ? "primary" : "default") + '" data-mode="' + m + '"' +
                     (SHAPES[m] ? ' title="' + (m === "line" ? "Draw a line: its temperatures along it" : "Draw a region: " + SHAPE_NAMES[m].toLowerCase()) + '"' : "") + ">" + label + "</button>";
