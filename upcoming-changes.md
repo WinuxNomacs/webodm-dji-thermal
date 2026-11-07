@@ -3,7 +3,7 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R1. A review before the public release** (R1-1 to R1-8 built 2026-11-07, the rest of the reading still to do; the user, 2026-11-07, from `new.md`): "Review the plugin code for
+- **R1. A review before the public release** (R1-1 to R1-8 built 2026-11-07, the reading finished: R1-9 to R1-13 for the user's decision; the user, 2026-11-07, from `new.md`): "Review the plugin code for
   possible breaking points, performance improvements, and reduction of possible negative webodm ux impacts. This
   plugin will soon be released to the world so it's important to refine any points where the experience could
   breakdown before they do." Builds on the walk-through for bugs and hangs and the UX review (2026-11-02, Done),
@@ -60,9 +60,38 @@
     every dataset's images. Polls go on in a tab in the background. Fix: while polling, the analysis sent only
     when it changed (the page sends the `analyzed_at` it has), the counts and sizes kept when the images change
     instead of walked each time, and polling slowed while the tab is hidden.
-  Read: the pages poll with a slower retry after a failed request. Still to read: what each page shows after a 500, the worker's jobs on a large
-  dataset (memory), disk full during a conversion, and native Windows.
-  Decided (the user, 2026-11-07): all eight fixed; DJI Thermal Task converts two photos at a time.
+  Read: the pages poll with a slower retry after a failed request; a 500's HTML answer shows each call's own message
+  (`core.readJson`, `errorText`); a failed worker job records its error and keeps nothing of a failed mosaic.
+  Native Windows (read): nothing of R1-1 to R1-8 differs by system (`st_ino` is NTFS's file index; renames go through
+  `portable.replace`), and ENOSPC is Windows' disk full too (Python maps `ERROR_DISK_FULL` to it).
+  The rest of the reading's findings (2026-11-07), for the user's decision:
+  - **R1-9. The Analyzer's list takes an error for the list** (breaking point): `datasets.js` `load` reads the
+    answer without checking its status: a session that ended (DRF's 403 `{"detail": ...}`) or a 500 with a JSON body
+    sets `datasets` to undefined, the page says "Could not show the datasets (...). Reload the page, bypassing the
+    browser's cache", and every later poll or click throws. Fix: `core.readJson`, the server's message shown, the
+    poll retried less often, as the dataset page does.
+  - **R1-10. The Analyzer's upload drops the server's reason** (UX): `core.uploadFiles` turns any refused batch into
+    "upload failed: 400" and sends it twice more, so "over their storage quota", "Wait for the analysis to finish"
+    or a full disk show only as "N images could not be sent: ...". Fix: a refusal with a reason (4xx) is not sent
+    again, and the page shows its reason beside the images not sent.
+  - **R1-11. A full disk leaves broken images in a dataset** (breaking point): `datasets.save_image` writes each
+    image in place (the Analyzer's upload, and DJI Thermal Task's photos kept in the dataset), so a full disk keeps
+    a truncated JPEG the analysis then reports as damaged; the request answers a bare 500; `write_json` leaves its
+    `.part` file. Fix: images written to a `.part` name then renamed, removed if the write fails; a full disk
+    answered "The server's disk is full" (DJI Thermal Task, the Analyzer's upload); `write_json` removes its part.
+  - **R1-12. A large mosaic is read whole, in float64** (memory): the viewer's histogram (`mosaics.temperatures`,
+    the first time a tab is equalized, in a web worker) and the build's ranges (`raster_info`, in the worker after
+    dji-thermal-cli's build) read the whole mosaic and copy it 3 or 4 times: about 25 bytes a pixel, 750 MB for a
+    30-million-pixel mosaic (about 1,000 M4T frames). The dev data's mosaics are 2 to 3.5 million pixels. Fix: read
+    in blocks: min and max exact, the histogram counted block by block over the span, its percentiles from a
+    reduced read (a few million pixels, from the overviews). dji-thermal-cli's own memory while building is its
+    concern, not the plugin's.
+  - **R1-13. Two viewer requests wait forever when the connection drops** (UX, small): the frame viewer's
+    "Measuring the frame…" (`frame.js` `measure`) and the mosaic viewer's readout and frames under the pointer
+    (`viewer.js` `readout`, `select`, the histogram) have no handler for a request that never reached the server.
+    Fix: `core.unreachable`, as the other calls have.
+  Decided (the user, 2026-11-07): all eight fixed; DJI Thermal Task converts two photos at a time; R1-9 to R1-13
+  all fixed.
   Built, `r1-fixes`: R1-1 and R1-2 `inspector.js` `create` (`loadDisplay`: never on a public map; on a map without a
   thermal layer only once the project's mosaics turn out not empty), `datasets.visible(user, project)` used by
   `InspectorMosaics`; R1-3 `main.js` `DjiThermalMapScripts` (the five scripts added in order on the map's
