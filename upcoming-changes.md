@@ -53,7 +53,14 @@
     dataset's `analysis.json` (about 400 bytes a frame: 2 MB for 5,000 frames) to check the file is the dataset's,
     and the detail pane's large ones read it twice; the Files tab asks for one thumbnail per row. Fix: the parsed
     file kept in memory by its path, size and time (a few entries).
-  Still to read: the pages' handling of a failed request (a stopped server, a 500), the worker's jobs on a large
+  - **R1-8. The dataset pages ask for everything every 2 or 3 seconds while a job runs** (performance): the
+    dataset page's poll (`dataset.js` `load`, `POLL_MS` 2 s) gets the whole dataset (`detail`): the full analysis
+    (2 MB at 5,000 frames, sent each time), every image's size (a walk of the images folder), each workset's
+    results and the size of its files (another walk), and who it's shared with; the Analyzer's list (3 s) walks
+    every dataset's images. Polls go on in a tab in the background. Fix: while polling, the analysis sent only
+    when it changed (the page sends the `analyzed_at` it has), the counts and sizes kept when the images change
+    instead of walked each time, and polling slowed while the tab is hidden.
+  Read: the pages poll with a slower retry after a failed request. Still to read: what each page shows after a 500, the worker's jobs on a large
   dataset (memory), disk full during a conversion, and native Windows.
 - **R2. The code made easy to extend** (the user, 2026-11-07, from `new.md`): "This plugin's codebase is meant to be
   extensible to make it as simple as possible for other developers to add their own WebODM DJI Thermal Analyzer
