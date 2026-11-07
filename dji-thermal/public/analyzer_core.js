@@ -66,6 +66,12 @@
         return {unit: (p && p.unit) || null, palette: (p && p.palette) || null};
     }
     function preferences() { return display; }
+
+    // The palette a workset's frames are drawn in (settings: the workset's): its own when it chose one (for its
+    // coloured images, or DJI Thermal Task's map), else the preferred one ("" for neither: the frames as shot)
+    function framesPalette(settings, preferred) {
+        return (settings && settings.palette) || preferred || "";
+    }
     function setPreferences(p) { display = {unit: (p && p.unit) || null, palette: (p && p.palette) || null}; }
 
     function unitOf(u) { return UNIT_SYMBOLS[u] ? u : "C"; }
@@ -605,7 +611,7 @@
         escapeHtml: escapeHtml, formatBytes: formatBytes, formatDate: formatDate, formatNumber: formatNumber,
         statusLabel: statusLabel, severityLabel: severityLabel, kindLabel: kindLabel, uploadName: uploadName,
         isImage: isImage, exifCamera: exifCamera, readCamera: readCamera, datasetName: datasetName, namingImage: namingImage, batches: batches, uploadFiles: uploadFiles, readJson: readJson, unreachable: unreachable, errorText: errorText,
-        unitOf: unitOf, userUnit: userUnit, unitSymbol: unitSymbol, convertTemp: convertTemp, convertDelta: convertDelta,
+        framesPalette: framesPalette, unitOf: unitOf, userUnit: userUnit, unitSymbol: unitSymbol, convertTemp: convertTemp, convertDelta: convertDelta,
         formatTemp: formatTemp, formatDelta: formatDelta, stageText: stageText, mosaicLabel: mosaicLabel,
         batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName,
         preferences: preferences, setPreferences: setPreferences, editPreferences: editPreferences, bindPreferences: bindPreferences,

@@ -284,13 +284,13 @@ One frame of a workset at a time, as the workset measured it, opened from the fr
 in the mosaic viewer and the Thermal Inspector) or from the Files tab (a thermal frame's name, or **Open frame** in
 its detail pane: the frame page of the newest workset that converted):
 
-- the dataset's thermal frames listed beside it in the order they were taken, each with a large thumbnail (in your
-  preferred DJI palette, else the frame's own picture; **Thumbnails** clear lists the names only, remembered in your
-  browser), the one shown marked and scrolled into view, stepped through with ← and → (or the arrows at the top); once the mosaics are built, **All**, **In the
+- the dataset's thermal frames listed beside it in the order they were taken, each with a large thumbnail (in
+  the workset's palette, else your preferred DJI palette, else the frame's own picture; **Thumbnails** clear lists
+  the names only, remembered in your browser), the one shown marked and scrolled into view, stepped through with ← and → (or the arrows at the top); once the mosaics are built, **All**, **In the
   mosaic** (where a frame opened from a mosaic starts) or **Oblique** (those the mosaics left out, and why); the
   frame and the list are in the page's address, to link to;
-- the frame, zoomed and moved like a map, coloured in your browser from its temperatures with the mosaic viewer's
-  palette, range, **Image** and **Isotherm** controls (Equalized from the frame's own histogram), following them as
+- the frame, zoomed and moved like a map, coloured in your browser from its temperatures (opening in the workset's
+  palette, else yours) with the mosaic viewer's palette, range, **Image** and **Isotherm** controls (Equalized from the frame's own histogram), following them as
   they move;
 - the temperature of the pixel under the cursor;
 - **Measure**: the Thermal Inspector's tools in the frame's pixels: a pin (a pixel's temperature), a line (a strip 1

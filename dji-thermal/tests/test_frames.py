@@ -21,6 +21,7 @@ conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
 datasets = importlib.import_module("coreplugins.dji-thermal.datasets")
 frames = importlib.import_module("coreplugins.dji-thermal.frames")
 colouring = importlib.import_module("coreplugins.dji-thermal.colouring")
+frames_api = importlib.import_module("coreplugins.dji-thermal.frames_api")
 
 
 def square(x0, y0, x1, y1):
@@ -97,6 +98,18 @@ class TestFrameSettings(AnalyzerTestCase):
 
 
 class TestFramePage(AnalyzerTestCase):
+    def test_a_worksets_frames_are_drawn_in_the_palette_it_chose_else_in_the_users(self):
+        self.assertEqual(conversions.frames_palette({"outputs": ["temp_c:tiff", "pseudo:png"], "palette": "ironred"}), "ironred")
+        # DJI Thermal Task's: temperatures only, the palette its map opens in
+        self.assertEqual(conversions.frames_palette({"outputs": ["temp_c:tiff"], "palette": "arctic"}), "arctic")
+        # Each image's own palette: none of its own
+        self.assertIsNone(conversions.frames_palette({"outputs": ["pseudo:png"], "palette": None}))
+        # The frame page starts in it, over the user's preferred palette
+        self.assertEqual(frames_api.default_palette({"outputs": ["temp_c:tiff"], "palette": "ironred"}, "magma"), "dji_ironred")
+        self.assertEqual(frames_api.default_palette({"outputs": ["temp_c:tiff"]}, "magma"), "magma")
+        self.assertEqual(frames_api.default_palette({"outputs": ["temp_c:tiff"]}, "arctic"), "dji_arctic")
+        self.assertEqual(frames_api.default_palette({"outputs": ["temp_c:tiff"]}, None), "inferno")
+
     def url(self, task, cid, rest):
         return "{}/{}/conversions/{}/{}".format(API, task.id, cid, rest)
 
@@ -119,6 +132,7 @@ class TestFramePage(AnalyzerTestCase):
         self.assertTrue(all(f["converted"] and f["mosaic"] is None for f in page["frames"]))
         self.assertEqual((page["unit"], page["built"], page["can_change"]), ("C", False, True))
         self.assertIn(page["default_palette"], [p["key"] for p in page["palettes"]])
+        self.assertIsNone(page["frames_palette"])
         rel = page["frames"][0]["path"]
 
         # As converted: what the workset's own TIFF holds

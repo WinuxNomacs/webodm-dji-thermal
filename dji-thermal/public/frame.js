@@ -72,8 +72,8 @@
     }
 
     // The thumbnails' URL, followed by a frame's path: the dataset's thumbnail of it, at the list's size, in the
-    // user's preferred DJI palette when they have one (else its embedded picture); a workset's frames even in a
-    // dataset never analyzed
+    // palette given (the workset's, else the user's preferred; one of WebODM's or none: its embedded picture); a
+    // workset's frames even in a dataset never analyzed
     function thumbsUrl(api, dataset, cid, palette) {
         return api + "datasets/" + dataset + "/thumbnail?workset=" + encodeURIComponent(cid) + "&size=list&" +
             (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file=";
@@ -651,7 +651,7 @@
         function showList() {
             var frames = shown(), built = all.some(inMosaic);
             var sizes = built ? LISTS.map(function (l) { return listFrames(all, l[0]).length; }) : null;
-            var thumbs = thumbsOn ? thumbsUrl(page.getAttribute("data-api"), dataset, cid, core.preferences().palette) : null;
+            var thumbs = thumbsOn ? thumbsUrl(page.getAttribute("data-api"), dataset, cid, meta.frames_palette || core.preferences().palette) : null;
             $("ta-frame-list").innerHTML = listHtml(frames, frame, list, sizes, meta.max_pitch, meta.built, thumbs);
             $("ta-frame-list").classList.toggle("ta-frame-list-thumbs", !!thumbs);
             scrollList();
@@ -778,9 +778,9 @@
                              restyle: function () { recolour(); remeasure(); },
                              // A palette is the user's, everywhere (DJI's keys carry the viewer's prefix)
                              onPalette: function (key) {
-                                 // the list's thumbnails follow it
+                                 // the list's thumbnails follow it, unless they are in the workset's palette
                                  core.savePalette(fetchFn, page.getAttribute("data-api"), csrf, key.replace(/^dji_/, ""))
-                                     .then(function () { if (thumbsOn) showList(); }, function () {});
+                                     .then(function () { if (thumbsOn && !meta.frames_palette) showList(); }, function () {});
                              }});
 
         $("ta-frame-list").addEventListener("click", function (e) {

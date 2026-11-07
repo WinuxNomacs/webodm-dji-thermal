@@ -29,13 +29,15 @@ def frame_palettes():
 
 
 def default_palette(settings, preferred):
-    """The user's preferred palette, else the workset's own, else the mosaic's (as the viewer), else inferno"""
+    """The workset's palette when it chose one, else the user's preferred palette, else inferno"""
+    dji = converter.palette_luts()
+    own = conversions.frames_palette(settings)
+    if own in dji:
+        return mosaics.DJI_PREFIX + own
     if preferred in mosaics.VIEWER_COLORMAPS:
         return preferred
-    dji = converter.palette_luts()
-    for name in (preferred, settings.get('palette')):
-        if name and name in dji:
-            return mosaics.DJI_PREFIX + name
+    if preferred in dji:
+        return mosaics.DJI_PREFIX + preferred
     return 'inferno'
 
 
@@ -62,7 +64,8 @@ def measured(read):
 class WorksetFrames(DatasetView):
     def get(self, request, pk, cid):
         """What the frame page shows of a workset: its frames (frames.frame_list), unit, whether it normalized or
-        harmonized, the mosaics' pitch limit and whether they are built, the palettes and the user's default"""
+        harmonized, the mosaics' pitch limit and whether they are built, the palettes, the one the page starts in and the
+        one the list's thumbnails are drawn in"""
         task = get_conversion(request, pk, cid)
         record = conversions.record(task, cid)
         settings = record.get('settings') or {}
@@ -71,7 +74,7 @@ class WorksetFrames(DatasetView):
             'normalized': bool(settings.get('normalize')), 'harmonized': conversions.harmonized(settings),
             'max_pitch': settings.get('max_pitch') if settings.get('max_pitch') is not None else mosaics.DEFAULT_MAX_PITCH,
             'built': bool(mosaics.result(task, cid).get('frames')), 'frames': frames.frame_list(task, cid),
-            'palettes': frame_palettes(),
+            'palettes': frame_palettes(), 'frames_palette': conversions.frames_palette(settings),
             'default_palette': default_palette(settings, conversions.display(request.user)['palette']),
             'can_change': request.user.has_perm('change_project', task.project),
         })
