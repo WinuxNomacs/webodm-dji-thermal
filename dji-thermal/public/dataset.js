@@ -1176,7 +1176,7 @@
                     $("ta-add-failed-text").textContent = u.canceled ?
                         "Upload canceled: " + core.count(u.saved, "image was", "images were") + " sent and kept (analyze again to include them), " +
                         core.count(unsent.length, "image was", "images were") + " not sent." :
-                        core.failedText(unsent);
+                        core.failedText(unsent, u.reason);
                     $("ta-add-failed").hidden = false;
                 });
             });
