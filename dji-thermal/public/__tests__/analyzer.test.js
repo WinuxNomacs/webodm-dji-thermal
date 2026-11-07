@@ -2888,6 +2888,19 @@ describe("the mosaic viewer", () => {
         expect(pip.style.transform).toBe("");
     });
 
+    it("says the server could not be reached when the readout's request never arrives", async () => {
+        const L = fakeLeaflet();
+        const at = "?lon=10.0005&lat=45.0005";
+        const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
+                                [C9 + "/mosaics/as_converted/frames" + at]: () => Promise.reject(new TypeError("Failed to fetch")),
+                                [C9 + "/mosaics/as_converted/point" + at]: () => Promise.reject(new TypeError("Failed to fetch"))});
+        await start(fetchFn, L);
+        await ticks();
+        L.maps[0].fire("click", {latlng: {lng: 10.0005, lat: 45.0005}});
+        await ticks();
+        expect($("ta-viewer-readout").textContent).toContain("Could not reach the server");
+    });
+
     it("a click keeps the readout on its point until Follow the cursor or Esc", async () => {
         const L = fakeLeaflet();
         const at = "?lon=10.0005&lat=45.0005", elsewhere = "?lon=10.0002&lat=45.0002";

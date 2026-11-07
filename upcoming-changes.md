@@ -86,10 +86,10 @@
     in blocks: min and max exact, the histogram counted block by block over the span, its percentiles from a
     reduced read (a few million pixels, from the overviews). dji-thermal-cli's own memory while building is its
     concern, not the plugin's.
-  - **R1-13. Two viewer requests wait forever when the connection drops** (UX, small): the frame viewer's
-    "Measuring the frame…" (`frame.js` `measure`) and the mosaic viewer's readout and frames under the pointer
-    (`viewer.js` `readout`, `select`, the histogram) have no handler for a request that never reached the server.
-    Fix: `core.unreachable`, as the other calls have.
+  - **R1-13. The mosaic viewer says nothing when the connection drops** (UX, small): its readout and frames under
+    the pointer (`viewer.js` `readout`, `select`) have no handler for a request that never reached the server, and
+    a histogram that never arrived stops equalization for that tab until the page reloads. Fix: `core.unreachable`,
+    as the other calls have; the histogram asked again. (The frame viewer's `measure`, first listed, has one.)
   Decided (the user, 2026-11-07): all eight fixed; DJI Thermal Task converts two photos at a time; R1-9 to R1-13
   all fixed.
   Built, `r1-fixes`: R1-1 and R1-2 `inspector.js` `create` (`loadDisplay`: never on a public map; on a map without a

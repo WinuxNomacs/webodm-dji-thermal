@@ -409,6 +409,9 @@
             histograms[tab] = fetchFn(base + "/mosaics/" + tab + "/histogram", {credentials: "same-origin"}).then(core.readJson).then(function (r) {
                 histograms[askedTab] = r.ok ? r.data : {counts: null, edges: null};
                 if (askedTab === tab) recolour();
+            }, function () {
+                // Never reached the server: asked again on the next change
+                delete histograms[askedTab];
             });
         }
 
@@ -453,7 +456,7 @@
         function readout(latlng) {
             var askedTab = tab, n = ++asked, kept = pinned;
             return fetchFn(base + "/mosaics/" + tab + "/point?lon=" + latlng.lng + "&lat=" + latlng.lat, {credentials: "same-origin"})
-                .then(core.readJson).then(function (r) {
+                .then(core.readJson, core.unreachable).then(function (r) {
                     if (askedTab !== tab || n !== asked || kept !== pinned) return;
                     $("ta-viewer-readout").innerHTML = r.ok ? readoutHtml(r.data, v.unit, !!pinned) : '<span class="text-danger">' +
                         esc(core.errorText(r.data, "Could not read the mosaic here.")) + "</span>" + (pinned ? followHtml() : "");
@@ -482,7 +485,7 @@
         function select(latlng, keep) {
             var askedTab = tab;
             return fetchFn(Frames.framesUrl(base, tab, latlng), {credentials: "same-origin"})
-                .then(core.readJson).then(function (r) {
+                .then(core.readJson, core.unreachable).then(function (r) {
                     if (askedTab !== tab) return;
                     if (!r.ok) {
                         pick = {latlng: latlng, frames: [], models: true, at: 0};
