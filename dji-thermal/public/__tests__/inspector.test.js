@@ -963,6 +963,29 @@ describe("the Thermal Inspector's workset mosaics", () => {
                 button: () => map.el.querySelector(".dt-inspector"), laid: () => Object.values(map._layers).filter(l => l.__dtMosaic)};
     }
 
+    it("asks for the user's preferences only where the map has temperatures, never on a public map", async () => {
+        const asked = s => s.fetchFn.mock.calls.filter(c => c[0].endsWith("/display")).length;
+        const rgb = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, RGB_TASK)}}];
+        const thermal = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}];
+        // An RGB map of a project without mosaics: nothing more than the mosaics asked for
+        let s = begin(leafletMap(), rgb, {[LIST]: {mosaics: []}});
+        await s.ins.mosaicsReady;
+        expect(asked(s)).toBe(0);
+        // with mosaics: asked, before one could be laid
+        s = begin(leafletMap(), rgb);
+        await s.ins.mosaicsReady;
+        expect(asked(s)).toBe(1);
+        // a thermal orthophoto: asked once
+        s = begin(leafletMap(THERMAL_TASK), thermal);
+        await s.ins.mosaicsReady;
+        expect(asked(s)).toBe(1);
+        // A public map, thermal: its viewer may not be logged in; the legend shown
+        s = begin(leafletMap(THERMAL_TASK), thermal, {}, {path: "/public/task/1f0a/map/"});
+        await s.ins.mosaicsReady;
+        expect(s.fetchFn).not.toHaveBeenCalledWith(expect.stringContaining("/display"), expect.anything());
+        expect(s.ins.state.legendVisible).toBe(true);
+    });
+
     it("shows Mosaic Overlays only when the project has built workset mosaics", async () => {
         const tasks = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}];
         let s = begin(leafletMap(THERMAL_TASK), tasks, {[LIST]: {mosaics: []}});

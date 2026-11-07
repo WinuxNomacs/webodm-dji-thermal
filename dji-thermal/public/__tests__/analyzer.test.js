@@ -1214,6 +1214,27 @@ describe("a dataset's page", () => {
         expect(document.getElementById("ta-tab-files").hidden).toBe(true);
     });
 
+    it("is spared the analysis it already has while polling a job, and polls less often in a tab in the background", async () => {
+        jest.useFakeTimers();
+        const converting = Object.assign({}, DATASET, {analysis: ANALYSIS, analysis_stamp: "s1",
+                                                       conversions: [{id: "abc123def456", status: "converting"}]});
+        const unchanged = Object.assign({}, converting, {analysis_unchanged: true});
+        delete unchanged.analysis;
+        const fetchFn = server({
+            "/api/plugins/dji-thermal/datasets/5": converting,
+            "/api/plugins/dji-thermal/datasets/5?analysis=s1": unchanged
+        });
+        dataset.init(document, fetchFn);
+        await ticks();
+        jest.advanceTimersByTime(2000);
+        await ticks();
+        expect(calls(fetchFn)).toContain("GET /api/plugins/dji-thermal/datasets/5?analysis=s1");
+        expect(document.getElementById("ta-files-count").textContent).toBe("3");
+        expect(core.pollDelay({hidden: true}, 2000)).toBe(10000);
+        expect(core.pollDelay({hidden: false}, 2000)).toBe(2000);
+        jest.clearAllTimers();
+    });
+
     it("hides what a viewer cannot do", async () => {
         const fetchFn = jest.fn(() => jsonResponse(Object.assign({}, DATASET, {analysis: ANALYSIS, can_change: false, can_delete: false})));
         dataset.init(document, fetchFn);

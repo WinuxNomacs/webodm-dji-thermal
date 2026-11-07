@@ -346,7 +346,7 @@ class InspectorMosaics(InspectorProjectView):
         name, then as each dataset lists its worksets"""
         project = self.project(request, project_pk)
         found = []
-        for task in sorted((t for t in datasets.visible(request.user) if t.project_id == project.id),
+        for task in sorted(datasets.visible(request.user, project),
                            key=lambda t: datasets.name_of(t).lower()):
             found.extend(map_mosaics(task, request.user))
         return Response({'mosaics': found})

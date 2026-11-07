@@ -116,6 +116,27 @@ class TestHolderTask(AnalyzerTestCase):
         self.assertFalse(Task.objects.filter(pk=task.id).exists())
         self.assertFalse(os.path.exists(folder))
 
+    def test_an_analysis_is_read_once_while_its_file_is_unchanged(self):
+        task = self.create()
+        path = datasets.data_path(task, datasets.ANALYSIS_FILE)
+        self.assertEqual(datasets.analysis(task), {})
+        datasets.write_json(path, {"files": [{"path": "a.jpg"}]})
+        with mock.patch.object(datasets, "read_json", wraps=datasets.read_json) as read:
+            first, again = datasets.analysis(task), datasets.analysis(task)
+        self.assertEqual(read.call_count, 1)
+        self.assertIs(first, again)
+        # A page polling a job is spared the analysis it has, until it changes
+        stamp = self.client.get("{}/{}".format(API, task.id)).data["analysis_stamp"]
+        polled = self.client.get("{}/{}".format(API, task.id), {"analysis": stamp}).data
+        self.assertTrue(polled["analysis_unchanged"])
+        self.assertNotIn("analysis", polled)
+        datasets.write_json(path, {"files": []})
+        self.assertEqual(datasets.analysis(task), {"files": []})
+        polled = self.client.get("{}/{}".format(API, task.id), {"analysis": stamp}).data
+        self.assertEqual((polled["analysis"], polled.get("analysis_unchanged")), ({"files": []}, None))
+        os.remove(path)
+        self.assertEqual(datasets.analysis(task), {})
+
     def test_only_tasks_with_the_tag_are_datasets(self):
         task = Task.objects.create(project=self.project, name="Thermal dataset: not one", tags="dji-thermal-dataset")
         self.assertEqual(self.client.get("{}/{}".format(API, task.id)).status_code, status.HTTP_404_NOT_FOUND)
@@ -326,6 +347,11 @@ class TestAnalysis(AnalyzerTestCase):
         self.assertEqual(large.content, own.content)
         self.assertEqual(self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": "../x.jpg"}).status_code,
                          status.HTTP_404_NOT_FOUND)
+        # A thumbnail that can't be kept (asked for twice at once, the disk full) is still sent, nothing left behind
+        with mock.patch.object(analyzer_api.portable, "replace", side_effect=OSError("held open")):
+            unkept = self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": row["path"], "palette": "arctic"})
+        self.assertEqual(unkept.status_code, status.HTTP_200_OK)
+        self.assertEqual(os.listdir(datasets.data_path(task, "thumbnails", "arctic")), [])
 
 
 class TestDatasetFiles(AnalyzerTestCase):
@@ -1448,6 +1474,12 @@ class TestConversionTasks(AnalyzerTestCase):
         Task.objects.filter(pk=made.pk).update(tags="survey")
         self.assertEqual(self.client.get(API).status_code, status.HTTP_200_OK)
         self.assertEqual(Task.objects.get(pk=made.pk).tags, "survey .dji-thermal-from-{}".format(task.id))
+
+    def test_a_dataset_is_deleted_in_webodm_even_when_its_jobs_cannot_be_canceled(self):
+        task, _cid = self.converted()
+        with mock.patch.object(datasets, "cancel_analysis", side_effect=OSError("read-only")):
+            Task.objects.get(pk=task.pk).delete()
+        self.assertFalse(Task.objects.filter(pk=task.pk).exists())
 
     def test_tasks_made_from_a_deleted_dataset_no_longer_link_to_it(self):
         task, cid = self.converted()

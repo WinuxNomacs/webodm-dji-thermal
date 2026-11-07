@@ -21,11 +21,13 @@ A job writes only while the job file still has its run id: canceling, deleting o
 job stops at its next progress write.
 """
 
+import collections
 import datetime
 import json
 import logging
 import os
 import shutil
+import threading
 import uuid
 from contextlib import contextmanager
 
@@ -123,9 +125,11 @@ def viewable_projects(user):
                                 accept_global_perms=False)
 
 
-def visible(user):
-    """The datasets of every project user can view, newest first"""
+def visible(user, project=None):
+    """The datasets of every project user can view (or of that one project only), newest first"""
     tasks = Task.objects.filter(project__in=viewable_projects(user), tags__contains=TAG).select_related('project')
+    if project is not None:
+        tasks = tasks.filter(project=project)
     return [t for t in tasks.order_by('-created_at') if is_dataset(t)]
 
 
@@ -211,9 +215,45 @@ def job(task, rel=JOB_FILE):
     return state
 
 
+_analyses = collections.OrderedDict()     # the analyses read last: {path: ((inode, size, time), analysis)}
+_analyses_lock = threading.Lock()
+ANALYSES_KEPT = 8
+
+
+def _analysis_stamp(path):
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return (st.st_ino, st.st_size, st.st_mtime_ns)
+
+
+def analysis_stamp(task):
+    """What changes whenever the analysis' file does (a page polling a job sends it back, to be spared the analysis
+    when it hasn't changed), or '' when there is none"""
+    stamp = _analysis_stamp(data_path(task, ANALYSIS_FILE))
+    return "-".join(str(x) for x in stamp) if stamp else ""
+
+
 def analysis(task):
-    """What the last analysis found, or {}"""
-    return read_json(data_path(task, ANALYSIS_FILE))
+    """What the last analysis found, or {}. Kept in memory while its file is unchanged (each thumbnail reads it): the
+    same dict for every caller, so never changed in place (a copy is changed, then written)."""
+    path = data_path(task, ANALYSIS_FILE)
+    stamp = _analysis_stamp(path)
+    if stamp is None:
+        return {}
+    with _analyses_lock:
+        kept = _analyses.get(path)
+        if kept and kept[0] == stamp:
+            _analyses.move_to_end(path)
+            return kept[1]
+    found = read_json(path)
+    with _analyses_lock:
+        _analyses[path] = (stamp, found)
+        _analyses.move_to_end(path)
+        while len(_analyses) > ANALYSES_KEPT:
+            _analyses.popitem(last=False)
+    return found
 
 
 def update_job(task, if_run=None, rel=JOB_FILE, **fields):
@@ -417,9 +457,13 @@ def task_removing(task_id):
     """The task being deleted: its jobs canceled (they would stop anyway, its folder gone), and the tasks made from
     its conversions no longer linked to it"""
     from . import conversion_tasks, conversions
-    task = Task.objects.filter(pk=task_id).first()
-    if task is not None and is_dataset(task):
-        cancel_analysis(task)
-        for c in conversions.ids(task):
-            conversions.cancel(task, c)
-        conversion_tasks.unlink_made(task)
+    # WebODM's signal before any task is deleted: an error here would stop WebODM deleting it, so it is only logged
+    try:
+        task = Task.objects.filter(pk=task_id).first()
+        if task is not None and is_dataset(task):
+            cancel_analysis(task)
+            for c in conversions.ids(task):
+                conversions.cancel(task, c)
+            conversion_tasks.unlink_made(task)
+    except Exception as e:  # noqa: BLE001 - the task is deleted whatever went wrong here
+        logger.warning("DJI Thermal: could not tidy the task {} being deleted: {}".format(task_id, e))

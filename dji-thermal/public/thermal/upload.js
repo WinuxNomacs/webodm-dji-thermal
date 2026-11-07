@@ -17,7 +17,9 @@
 import { tiffName, withImagesRenamed, worksetTiffName } from './textFiles';
 import { byPitch } from './plan';
 
-export const CONCURRENCY = 3;
+// Photos converted at once: each is converted inside its request, so on a one-CPU server (WebODM starts 2 x CPUs + 1
+// web workers) two leave one for every other page
+export const CONCURRENCY = 2;
 export const RETRIES = 2;           // times a request the server never answered is sent again
 export const DATASET_BATCH = 10;    // other photos per request to the dataset, as the Analyzer's own upload
 

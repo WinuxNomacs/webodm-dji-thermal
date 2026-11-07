@@ -669,6 +669,7 @@
         }
 
         function render(d) {
+            if (d.analysis_unchanged && dataset) d.analysis = dataset.analysis;
             dataset = d;
             $("ta-name").textContent = d.name;
             doc.title = d.name + " - DJI Thermal Analyzer";
@@ -725,7 +726,7 @@
 
             if (timer && root.clearTimeout) root.clearTimeout(timer);
             var converting = (d.conversions || []).some(function (c) { return c.status === "converting" || c.mosaic_status === "building"; });
-            timer = (analyzing || converting) && root.setTimeout ? root.setTimeout(load, POLL_MS) : null;
+            timer = (analyzing || converting) && root.setTimeout ? root.setTimeout(load, core.pollDelay(doc, POLL_MS)) : null;
         }
 
         function renderFiles() {
@@ -856,7 +857,9 @@
         }
 
         function load() {
-            return fetchFn(url, {credentials: "same-origin"})
+            // While polling, the analysis is sent only when it changed
+            var known = dataset && dataset.analysis_stamp ? "?analysis=" + encodeURIComponent(dataset.analysis_stamp) : "";
+            return fetchFn(url + known, {credentials: "same-origin"})
                 .then(core.readJson)
                 .then(function (r) {
                     if (!r.ok) {
