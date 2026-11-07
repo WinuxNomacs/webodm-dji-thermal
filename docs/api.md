@@ -58,7 +58,8 @@ workset's id (12 hexadecimal characters).
 | GET, POST | `.../conversions/<workset>/measurements` | The measurements saved on the workset's mosaics, with what they were measured with (`baseline`) and whether you can change them; saves one, as the Thermal Inspector's `measurements`, with the `tab` it was measured on. |
 | PATCH, DELETE | `.../conversions/<workset>/measurements/<id>` | Renames a saved measurement or changes its comment; deletes it. |
 | GET, PUT, DELETE | `preferences` | Your saved workset settings (your defaults); save them; back to dji-thermal-cli's. |
-| GET, PUT | `display` | Your palette, unit and whether the Thermal Inspector shows its legend, with DJI's palettes and WebODM's colour maps; save them (those sent). |
+| GET, PUT | `display` | Your palette, unit (`C`, `F` or null: not chosen; with the administrator's `default_unit`) and whether the Thermal Inspector shows its legend, with DJI's palettes and WebODM's colour maps; save them (those sent). |
+| GET | `unit` | The temperature unit, for anyone (no login needed): `logged_in`, your `unit` (or null) and the administrator's `default_unit`. |
 
 ## Thermal Inspector
 

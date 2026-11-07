@@ -197,6 +197,18 @@ class TestPage(SdkTestCase):
             res = client.post(PAGE_URL, {"action": "upload", "sdk_zip": f}, follow=True)
         self.assertContains(res, "the zip has no tsdk-core/lib/")
 
+    def test_a_superuser_sets_the_default_temperature_unit_on_the_page(self):
+        conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
+        self.assertEqual(self.client_for("testuser").post(PAGE_URL, {"action": "unit", "default_unit": "F"}).status_code, 403)
+        client = self.client_for("testsuperuser")
+        self.assertContains(client.get(PAGE_URL), '<option value="C" selected>')
+        res = client.post(PAGE_URL, {"action": "unit", "default_unit": "F"}, follow=True)
+        self.assertContains(res, "Temperatures are now shown in Fahrenheit")
+        self.assertContains(res, '<option value="F" selected>')
+        self.assertEqual(conversions.default_unit(), "F")
+        self.assertContains(client.post(PAGE_URL, {"action": "unit", "default_unit": "K"}, follow=True), "Not a unit")
+        self.assertEqual(conversions.default_unit(), "F")
+
     def test_the_page_needs_a_login(self):
         self.assertEqual(Client().get(PAGE_URL).status_code, 302)
 

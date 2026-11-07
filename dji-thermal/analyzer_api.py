@@ -695,6 +695,17 @@ class Preferences(DatasetView):
         return Response({'settings': conversions.DEFAULTS, 'saved': False})
 
 
+class Unit(APIView):
+    permission_classes = (permissions.AllowAny,)
+
+    def get(self, request):
+        """The temperature unit, for every page (units.js), anonymous viewers of a public map too: {'logged_in',
+        'unit': the user's choice (C or F) or None, 'default_unit': the administrator's (conversions.default_unit)}"""
+        user = request.user if request.user.is_authenticated else None
+        return Response({'logged_in': user is not None, 'unit': conversions.display(user)['unit'] if user else None,
+                         'default_unit': conversions.default_unit()})
+
+
 class Display(DatasetView):
     def get(self, request):
         """The user's display preferences (see conversions.display), DJI's palettes and WebODM's colour maps"""

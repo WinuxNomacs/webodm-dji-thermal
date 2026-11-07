@@ -166,25 +166,6 @@ describe("analyzer core", () => {
         window.localStorage.clear();
     });
 
-    it("makes a unit saved in the preferences before WebODM's, once, saving them again without it", async () => {
-        const saved = [];
-        const fetchFn = jest.fn((url, opts) => {
-            saved.push(JSON.parse(opts.body));
-            return jsonResponse(Object.assign({unit: null}, JSON.parse(opts.body)));
-        });
-        core.setPreferences({unit: "F", palette: "ironred"});
-        expect(await core.migrateUnit(fetchFn, "/api/plugins/dji-thermal/", "tok")).toBe(true);
-        expect(core.userUnit()).toBe("F");
-        expect(saved).toEqual([{palette: "ironred"}]);
-        expect(core.preferences()).toEqual({unit: null, palette: "ironred"});
-        expect(await core.migrateUnit(fetchFn, "/api/plugins/dji-thermal/", "tok")).toBe(false);
-        core.setPreferences({unit: "K", palette: null});
-        await core.migrateUnit(fetchFn, "/api/plugins/dji-thermal/", "tok");
-        expect(core.userUnit()).toBe("C");
-        core.setPreferences(null);
-        window.localStorage.clear();
-    });
-
     it("uploads an image under its place in the folder chosen, without that folder's own name", () => {
         expect(core.uploadName({name: "x_T.JPG", webkitRelativePath: "Flight 3/thermal/x_T.JPG"})).toBe("thermal/x_T.JPG");
         expect(core.uploadName({name: "x_T.JPG", webkitRelativePath: ""})).toBe("x_T.JPG");
@@ -326,7 +307,7 @@ describe("the pages' dialog", () => {
         expect(await beside).toBe(false);
     });
 
-    it("edits the preferences: the unit as WebODM's, the palette of DJI's or WebODM's and the Inspector's legend, saved for the user", async () => {
+    it("edits the preferences: the unit (with the account, then as WebODM's), the palette of DJI's or WebODM's and the Inspector's legend, saved for the user", async () => {
         const saved = [];
         const fetchFn = jest.fn((url, opts) => {
             if (opts && opts.method === "PUT") { saved.push(JSON.parse(opts.body)); return jsonResponse(Object.assign({unit: null, palettes: []}, JSON.parse(opts.body))); }
@@ -348,8 +329,8 @@ describe("the pages' dialog", () => {
         palette.value = "magma";
         legend.value = "hidden";
         click(button("Save"));
-        expect(await edited).toEqual({unit: null, palette: "magma"});
-        expect(saved).toEqual([{palette: "magma", legend: false}]);
+        expect(await edited).toEqual({unit: "F", palette: "magma"});
+        expect(saved).toEqual([{unit: "F", palette: "magma", legend: false}]);
         expect(fetchFn.mock.calls[1][1].headers["X-CSRFToken"]).toBe("tok");
         expect(window.localStorage.getItem("unit_system")).toBe("imperial");
         expect(core.userUnit()).toBe("F");

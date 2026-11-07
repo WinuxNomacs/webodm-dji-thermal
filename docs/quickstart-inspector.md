@@ -82,8 +82,8 @@ The panel and the legend can be moved out of the way: drag the panel by its head
 beside it), or the legend by any part. Both stay inside the map. Closing the panel or reloading the page puts
 them back where they started. The frames window (section 5) can be dragged on its own too.
 
-Temperatures are shown in WebODM's units: °F when its map is set to Imperial, °C otherwise. See
-[Palettes and units](palettes.md).
+Temperatures are shown in your unit: the °C / °F menu at the top of the page, beside your user icon, linked to
+WebODM's Metric/Imperial units. See [Palettes and units](palettes.md).
 
 ## 4. Mosaic Overlays on the map
 

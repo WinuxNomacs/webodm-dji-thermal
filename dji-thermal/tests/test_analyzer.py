@@ -462,17 +462,36 @@ class TestConversionSettings(AnalyzerTestCase):
         self.assertEqual(self.client.get(url).data["palette"], "magma")
         self.assertEqual(self.client_for("testuser2").get(url).data["palette"], None)
         self.assertContains(self.client.get("/plugins/dji-thermal/"),
-                            '<script id="ta-display" type="application/json">{"unit": null, "palette": "magma", "legend": true}')
+                            '<script id="ta-display" type="application/json">{"unit": null, "default_unit": "C", "palette": "magma", "legend": true}')
         self.client.put(url, {"palette": None}, format="json")
         self.assertEqual(self.client.get(url).data["palette"], None)
 
-    def test_a_unit_saved_before_is_handed_to_the_page_once_and_dropped_when_it_saves_again(self):
+    def test_a_user_saves_their_unit_celsius_or_fahrenheit_and_saving_the_palette_keeps_it(self):
         url = "/api/plugins/dji-thermal/display"
-        conversions.preferences_store(self.user).set_json(conversions.DISPLAY_KEY, {"unit": "F", "palette": "ironred"})
+        self.assertEqual((self.client.get(url).data["unit"], self.client.get(url).data["default_unit"]), (None, "C"))
+        self.assertIn("unit", self.client.put(url, {"unit": "K"}, format="json").data)
+        self.assertEqual(self.client.put(url, {"unit": "F"}, format="json").data["unit"], "F")
+        self.client.put(url, {"palette": "ironred"}, format="json")
         self.assertEqual((self.client.get(url).data["unit"], self.client.get(url).data["palette"]), ("F", "ironred"))
-        res = self.client.put(url, {"unit": "K", "palette": "ironred"}, format="json")
-        self.assertEqual((res.data["unit"], res.data["palette"]), (None, "ironred"))
-        self.assertEqual(self.client.get(url).data["unit"], None)
+        self.assertIsNone(self.client_for("testuser2").get(url).data["unit"])
+        # A Kelvin saved by an older version: not chosen
+        conversions.preferences_store(self.user).set_json(conversions.DISPLAY_KEY, {"unit": "K"})
+        self.assertIsNone(self.client.get(url).data["unit"])
+        self.client.put(url, {"unit": None}, format="json")
+        self.assertIsNone(self.client.get(url).data["unit"])
+
+    def test_the_administrators_default_unit_is_given_to_users_who_have_not_chosen_and_to_anyone(self):
+        from rest_framework.test import APIClient as Anonymous
+        url = "/api/plugins/dji-thermal/unit"
+        self.assertEqual(Anonymous().get(url).data, {"logged_in": False, "unit": None, "default_unit": "C"})
+        conversions.set_default_unit("F")
+        self.assertEqual(Anonymous().get(url).data, {"logged_in": False, "unit": None, "default_unit": "F"})
+        self.assertEqual(self.client.get("/api/plugins/dji-thermal/display").data["default_unit"], "F")
+        self.client.put("/api/plugins/dji-thermal/display", {"unit": "C"}, format="json")
+        self.assertEqual(self.client.get(url).data, {"logged_in": True, "unit": "C", "default_unit": "F"})
+        with self.assertRaises(ValueError):
+            conversions.set_default_unit("K")
+        self.assertEqual(conversions.default_unit(), "F")
 
     def test_a_user_hides_the_inspectors_legend_and_saving_the_palette_keeps_it_hidden(self):
         url = "/api/plugins/dji-thermal/display"

@@ -1,6 +1,6 @@
 """
-The plugin's DJI Thermal page, under Administration, for superusers only: which SDK computes the temperatures,
-uploading or updating DJI's own SDK, checking it and removing it (see sdk).
+The plugin's DJI Thermal page, under Administration, for superusers only: the default temperature unit, which SDK
+computes the temperatures, uploading or updating DJI's own SDK, checking it and removing it (see sdk).
 """
 
 from django.contrib import messages
@@ -8,10 +8,21 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy
 
-from . import api, sdk
+from . import api, conversions, sdk
 
-ACTIONS = ('upload', 'check', 'remove')
+ACTIONS = ('upload', 'check', 'remove', 'unit')
+UNIT_NAMES = {'C': gettext_lazy("Celsius (°C)"), 'F': gettext_lazy("Fahrenheit (°F)")}
+
+
+def _unit(request):
+    try:
+        conversions.set_default_unit(request.POST.get('default_unit'))
+    except ValueError as e:
+        raise sdk.SdkError(str(e)) from None
+    return _("Temperatures are now shown in %(unit)s to users who haven't chosen a unit") % {
+        'unit': UNIT_NAMES[conversions.default_unit()]}
 
 
 def _upload(request):
@@ -45,9 +56,11 @@ def sdk_page(request, template):
         action = request.POST.get('action')
         if action in ACTIONS:
             try:
-                messages.success(request, {'upload': _upload, 'check': _check, 'remove': _remove}[action](request))
+                messages.success(request, {'upload': _upload, 'check': _check, 'remove': _remove,
+                                           'unit': _unit}[action](request))
             except sdk.SdkError as e:
                 messages.error(request, str(e))
         return redirect(request.path)
 
-    return render(request, template, {'title': _("DJI Thermal"), 'status': sdk.status(), 'env': sdk.ENV})
+    return render(request, template, {'title': _("DJI Thermal"), 'status': sdk.status(), 'env': sdk.ENV,
+                                      'default_unit': conversions.default_unit(), 'units': UNIT_NAMES.items()})
