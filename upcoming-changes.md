@@ -62,6 +62,7 @@
     instead of walked each time, and polling slowed while the tab is hidden.
   Read: the pages poll with a slower retry after a failed request. Still to read: what each page shows after a 500, the worker's jobs on a large
   dataset (memory), disk full during a conversion, and native Windows.
+  Decided (the user, 2026-11-07): all eight fixed; DJI Thermal Task converts two photos at a time.
 - **R2. The code made easy to extend** (the user, 2026-11-07, from `new.md`): "This plugin's codebase is meant to be
   extensible to make it as simple as possible for other developers to add their own WebODM DJI Thermal Analyzer
   modifications. Review the code structure and refactor as needed to make the code as accessible as possible for
@@ -81,6 +82,8 @@
   Open: how far it goes (proposed: the guide and the refactors its recipes call for, not a rewrite); that
   "extensible" means changing the plugin's code (a fork or a pull request), not a plugin system of its own that
   others' code plugs into at runtime (proposed: the former).
+  Decided (the user, 2026-11-07): changing the plugin's code (a fork or a pull request), no runtime extension API;
+  the guide and the refactors its recipes call for, no file split for its own sake.
 
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
