@@ -3,7 +3,36 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R1. A review before the public release** (R1-1 to R1-8 built 2026-11-07, the reading finished: R1-9 to R1-13 for the user's decision; the user, 2026-11-07, from `new.md`): "Review the plugin code for
+- **R2. The code made easy to extend** (the user, 2026-11-07, from `new.md`): "This plugin's codebase is meant to be
+  extensible to make it as simple as possible for other developers to add their own WebODM DJI Thermal Analyzer
+  modifications. Review the code structure and refactor as needed to make the code as accessible as possible for
+  future updates and additions." Builds on the plugin's modules (about 18,700 lines: the server's `plugin.py`,
+  the APIs `api.py`, `analyzer_api.py`, `inspector_api.py`, `frames_api.py`, the work in `conversions.py`,
+  `mosaics.py`, `datasets.py`, `frames.py`, `inspector.py`; the pages' `public/*.js`, largest `inspector.js` 2,212
+  lines, `conversions.js` 1,632, `dataset.js` 1,219, `frame.js` 927; DJI Thermal Task's JSX in `public/thermal/`).
+  Proposed, after R1 (whose fixes and tests then guard the refactor):
+  1. **A developer's guide** (`docs/developing.md`, linked from the README and `CLAUDE.md`): the code's map (what
+     each module does, how a request flows from a page to the worker and back, where data is kept), how to run
+     the dev stacks and the tests, and recipes for the likely additions: a palette, a workset output, a
+     measurement tool, a section in the Thermal Inspector's panel, an API route, a page.
+  2. **Refactors where an addition today means edits in many places**, found while writing those recipes: lists
+     kept in several files made one (e.g. outputs, palettes, units), the largest scripts split by feature, shared
+     helpers kept once. Behaviour unchanged: the tests pass unchanged before and after each step, each step
+     live-checked.
+  Open: how far it goes (proposed: the guide and the refactors its recipes call for, not a rewrite); that
+  "extensible" means changing the plugin's code (a fork or a pull request), not a plugin system of its own that
+  others' code plugs into at runtime (proposed: the former).
+  Decided (the user, 2026-11-07): changing the plugin's code (a fork or a pull request), no runtime extension API;
+  the guide and the refactors its recipes call for, no file split for its own sake.
+
+**Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
+
+**Done**
+- **R1. A review before the public release** (built 2026-11-07: R1-1 to R1-13; the user, 2026-11-07, from `new.md`): "Review the plugin code for
   possible breaking points, performance improvements, and reduction of possible negative webodm ux impacts. This
   plugin will soon be released to the world so it's important to refine any points where the experience could
   breakdown before they do." Builds on the walk-through for bugs and hangs and the UX review (2026-11-02, Done),
@@ -64,7 +93,7 @@
   (`core.readJson`, `errorText`); a failed worker job records its error and keeps nothing of a failed mosaic.
   Native Windows (read): nothing of R1-1 to R1-8 differs by system (`st_ino` is NTFS's file index; renames go through
   `portable.replace`), and ENOSPC is Windows' disk full too (Python maps `ERROR_DISK_FULL` to it).
-  The rest of the reading's findings (2026-11-07), for the user's decision:
+  The rest of the reading's findings (2026-11-07):
   - **R1-9. The Analyzer's list takes an error for the list** (breaking point): `datasets.js` `load` reads the
     answer without checking its status: a session that ended (DRF's 403 `{"detail": ...}`) or a 500 with a JSON body
     sets `datasets` to undefined, the page says "Could not show the datasets (...). Reload the page, bypassing the
@@ -109,35 +138,18 @@
   map's check and made private again): the dashboard loads `units.js` and `main.js` only; a thermal map loads the
   five scripts in order and the Inspector opens; an anonymous public map asks no `display`, no 4xx; the dataset
   poll 110 KB → 11 KB ("Thermal - 9/18/2026", 211 frames); the thermal folders' files as before.
-- **R2. The code made easy to extend** (the user, 2026-11-07, from `new.md`): "This plugin's codebase is meant to be
-  extensible to make it as simple as possible for other developers to add their own WebODM DJI Thermal Analyzer
-  modifications. Review the code structure and refactor as needed to make the code as accessible as possible for
-  future updates and additions." Builds on the plugin's modules (about 18,700 lines: the server's `plugin.py`,
-  the APIs `api.py`, `analyzer_api.py`, `inspector_api.py`, `frames_api.py`, the work in `conversions.py`,
-  `mosaics.py`, `datasets.py`, `frames.py`, `inspector.py`; the pages' `public/*.js`, largest `inspector.js` 2,212
-  lines, `conversions.js` 1,632, `dataset.js` 1,219, `frame.js` 927; DJI Thermal Task's JSX in `public/thermal/`).
-  Proposed, after R1 (whose fixes and tests then guard the refactor):
-  1. **A developer's guide** (`docs/developing.md`, linked from the README and `CLAUDE.md`): the code's map (what
-     each module does, how a request flows from a page to the worker and back, where data is kept), how to run
-     the dev stacks and the tests, and recipes for the likely additions: a palette, a workset output, a
-     measurement tool, a section in the Thermal Inspector's panel, an API route, a page.
-  2. **Refactors where an addition today means edits in many places**, found while writing those recipes: lists
-     kept in several files made one (e.g. outputs, palettes, units), the largest scripts split by feature, shared
-     helpers kept once. Behaviour unchanged: the tests pass unchanged before and after each step, each step
-     live-checked.
-  Open: how far it goes (proposed: the guide and the refactors its recipes call for, not a rewrite); that
-  "extensible" means changing the plugin's code (a fork or a pull request), not a plugin system of its own that
-  others' code plugs into at runtime (proposed: the former).
-  Decided (the user, 2026-11-07): changing the plugin's code (a fork or a pull request), no runtime extension API;
-  the guide and the refactors its recipes call for, no file split for its own sake.
-
-**Later**
-- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
-  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
-
-**Done**
+  Built, `r1-fixes-2`: R1-9 `datasets.js` `load` (`core.readJson`, `failed`: the server's reason, retried); R1-10
+  `core.uploadFiles` (a refusal with a reason not sent again, the batches left not sent, `reason` in its result,
+  `failedText(files, reason)`); R1-11 `datasets.write_file` (a `.part` name, removed on failure; `write_json` and
+  `save_image` use it, `image_files` skips parts), `datasets.copy_upload`, `analyzer_api.disk_full_refused` and
+  `DiskFull` (507) in `DatasetUpload` and `api.TaskConvert`; R1-12 `mosaics.band_rows`, `band_sample`
+  (`ROWS_PIXELS`, `SAMPLE_SIZE` 2048), `band_stats(src, band, unit)`, `temperatures` sampled; R1-13 `viewer.js`
+  `readout`, `select` (`core.unreachable`), the histogram asked again. Tests: Jest (`analyzer.test.js`: the list
+  refused, an upload refused with a reason, the readout unreachable), Django (`test_analyzer`: a full disk in an
+  upload, a record not written, a large mosaic read in parts; `test_api`: a full disk in DJI Thermal Task). 212
+  Django tests on 4.0.0 and 3.3.2 (1 skipped), Jest 294. Live on :8002 (read only): the list as before, and a 403
+  answer shows its reason; the block reads give exactly the ranges and histograms the dev mosaics' builds stored,
+  and read at 400 pixels a side the same min and max, percentiles within 0.05 °C.
 - **Thanks in the README** (the user, 2026-11-07, `new.md`: "Create a thank you section in the README and list all
   known projects and developers that made this plugin possible."). A "Thanks" section near the end of `README.md`
   (and `docs/index.md` linking to it). What the plugin is built on, found in its code: **WebODM** and
