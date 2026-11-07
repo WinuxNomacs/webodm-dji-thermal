@@ -10,6 +10,11 @@
     var CLOSE_DISTANCE_PX = 10;     // a click this near the first corner closes a polygon
     var EARTH_RADIUS = 6371000;     // Leaflet's: a ring made here matches the circle it draws
     var CIRCLE_SEGMENTS = 64;
+    // The measuring tools, as the Thermal Inspector (inspector.js) and the frame page (frame.js) show them: {icon,
+    // name}. Each page lists them in its own order; a shape the server saves is in measurements.SHAPES too.
+    var TOOLS = {pin: {icon: "fa fa-map-pin", name: "Pin"}, line: {icon: "fa fa-route", name: "Line"},
+                 rectangle: {icon: "far fa-square", name: "Rectangle"}, circle: {icon: "far fa-circle", name: "Circle"},
+                 polygon: {icon: "fa fa-draw-polygon", name: "Polygon"}};
 
     function assign(target) {
         for (var i = 1; i < arguments.length; i++) {
@@ -244,7 +249,7 @@
         this.isActive = function () { return active; };
     }
 
-    var api = {STYLE: STYLE, rectangleRing: rectangleRing, polygonRing: polygonRing, circleRing: circleRing,
+    var api = {STYLE: STYLE, TOOLS: TOOLS, rectangleRing: rectangleRing, polygonRing: polygonRing, circleRing: circleRing,
                ringToGeometry: ringToGeometry, validatePolygon: validatePolygon, lineGeometry: lineGeometry, DrawTool: DrawTool};
     root.ThermalRegions = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

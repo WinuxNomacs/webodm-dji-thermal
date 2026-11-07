@@ -319,8 +319,7 @@ def map_mosaics(task, user):
             'dataset': {'id': str(task.id), 'name': datasets.name_of(task)},
             'workset': {'id': cid, 'name': conversions.record(task, cid).get('name') or cid},
             'unit': built.get('unit') or settings.get('unit') or 'C', 'built_at': built.get('built_at'),
-            'palettes': [mosaics.DJI_PREFIX + name for name in mosaics.palettes_of(task, cid)] +
-                        list(mosaics.VIEWER_COLORMAPS),
+            'palettes': mosaics.palette_keys(mosaics.palettes_of(task, cid)),
             'default_palette': mosaics.default_palette(task, cid, settings, preferred),
             'tabs': tabs,
             'tasks': conversion_tasks.holding(task, cid),

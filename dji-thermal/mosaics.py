@@ -443,12 +443,22 @@ def palettes_of(task, cid):
         return {}
 
 
+def palette_keys(dji):
+    """The viewers' palette keys: DJI's palettes (dji: their names) with DJI_PREFIX, then WebODM's colour maps"""
+    return [DJI_PREFIX + name for name in dji] + list(VIEWER_COLORMAPS)
+
+
+def palette_list(dji):
+    """The viewers' palettes, [{key, label, color_map (encoded)}]: DJI's (dji: {name: [[r, g, b] x 256]}), then
+    WebODM's colour maps. A palette added to either (dji-thermal-cli's PALETTES, conversions.COLORMAPS) is listed
+    by every viewer."""
+    return ([{'key': DJI_PREFIX + name, 'label': "DJI " + name, 'color_map': encoded(lut)} for name, lut in dji.items()] +
+            [{'key': name, 'label': name, 'color_map': webodm_versions.colormap_encoded(name)} for name in VIEWER_COLORMAPS])
+
+
 def viewer_palettes(task, cid):
-    """[{key, label, color_map (encoded)}]: DJI's, then WebODM's"""
-    dji = [{'key': DJI_PREFIX + name, 'label': "DJI " + name, 'color_map': encoded(lut)}
-           for name, lut in palettes_of(task, cid).items()]
-    return dji + [{'key': name, 'label': name, 'color_map': webodm_versions.colormap_encoded(name)}
-                  for name in VIEWER_COLORMAPS]
+    """[{key, label, color_map (encoded)}]: DJI's as the workset's frames hold them, then WebODM's"""
+    return palette_list(palettes_of(task, cid))
 
 
 def colormap(task, cid, name):

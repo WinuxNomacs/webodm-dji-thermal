@@ -249,7 +249,7 @@
     // The outputs' names in words, from the server (conversions.PRODUCT_NAMES, with the dataset)
     var productNames = {};
     function setProductNames(names) { productNames = names || {}; }
-    var COLOURED = ["pseudo", "rjpeg"];
+    var COLOURED = ["pseudo", "rjpeg"];     // as conversions.COLOURED: the outputs drawn in the palette
 
     // An output ("temp_c:tiff", or a product alone) in words, as conversions.output_text: "°C TIFF", "colour PNG"
     function outputText(o) {
