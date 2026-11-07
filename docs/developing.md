@@ -187,6 +187,10 @@ An output the plugin makes itself, after dji-thermal-cli has written the frames,
 it under the workset's `output/` folder and list it in the frame's `outputs` in `results.json`, so the Files list,
 the downloads and the frame removal all see it.
 
+A new tab in the mosaic viewer (another band of the mosaic dji-thermal-cli writes) goes in `TABS` in `mosaics.py`.
+Its label and hint go in `TAB_LABELS` and `TAB_HINTS` in `viewer.js`. If it can be laid on WebODM's map, it also
+goes in `MAP_TABS` in `inspector_api.py` and `MOSAIC_TABS` in `inspector.js`.
+
 ### A measuring tool
 
 The measuring tools (pin, line, rectangle, circle, polygon) are on the Thermal Inspector's panel (`inspector.js`) and
