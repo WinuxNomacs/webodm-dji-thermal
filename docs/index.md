@@ -71,6 +71,7 @@ Each one walks through a task from start to finish.
 - [The converted images](converted-images.md): what a temperature TIFF holds.
 - [Troubleshooting](troubleshooting.md): messages you may see and what to do about them.
 - [The plugin's API](api.md): the HTTP endpoints the pages use.
+- [Developing the plugin](developing.md): the code's map, the dev environment, the tests, and recipes for changing it.
 
 ## Cameras
 
