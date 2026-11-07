@@ -3,6 +3,279 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **R1. A review before the public release** (the user, 2026-11-07, from `new.md`): "Review the plugin code for
+  possible breaking points, performance improvements, and reduction of possible negative webodm ux impacts. This
+  plugin will soon be released to the world so it's important to refine any points where the experience could
+  breakdown before they do." Builds on the walk-through for bugs and hangs and the UX review (2026-11-02, Done),
+  which followed the workflows in the browser; this reads the code. Proposed: a review in three passes, its findings
+  listed here, each with where it is, what a user would meet and a proposed fix:
+  1. **Breaking points**: what fails on a server unlike the dev stack (native Windows, no DJI SDK, a large dataset,
+     a stopped worker or node, a full disk), a missing or old saved file (older worksets, data store values from
+     earlier versions), permissions (shared and public projects, anonymous viewers), errors swallowed or shown raw.
+  2. **Performance**: heavy work in WebODM's web process instead of its worker, folders scanned or files read again
+     on every request, caches that grow without bound, the browser's work on large datasets.
+  3. **WebODM's own pages**: what the plugin adds to every page (`main.js`, `units.js`, CSS that could reach
+     WebODM's own elements, requests, console errors), and to the dashboard, the map and the task panel; what
+     happens there when the plugin's server side fails.
+  Fixes then on branches grouped by area, each with its test and a live check. Open: which findings are fixed
+  before the release (proposed: every breaking point and everything on WebODM's own pages; performance where the
+  fix is small).
+  **Findings** (the code read 2026-11-07; each still to confirm on the dev stack before it is fixed):
+  - **R1-1. A public map's 403** (WebODM's own pages): the Thermal Inspector is set up on every 2D map, public ones
+    too, and asks `GET display` (`inspector.js` `create`), which answers only logged-in users (`Display` is a
+    `DatasetView`, `IsAuthenticated`): an anonymous viewer of any public map, thermal or not, gets a 403 in the
+    console, the same error `units.js` had. Fix: on a public map (`projectOf` already knows), not asked; the
+    legend shown and the task's palette kept, as when the request fails.
+  - **R1-2. Two requests on every map, thermal or not** (WebODM's own pages): `GET display` and
+    `GET projects/<id>/inspector/mosaics`, which reads every dataset of every project the user can view and keeps
+    the map's project's in Python (`InspectorMosaics`, `datasets.visible`): slow on a server with many projects.
+    Fix: the datasets filtered by the project in the query; the Inspector's requests made only when the map has a
+    thermal layer or its project has datasets (one cheap query), else none.
+  - **R1-3. Five map scripts on every WebODM page** (performance, WebODM's own pages): `include_js_files` loads
+    `scale.js`, `recolour.js`, `regions.js`, `frames.js` and `inspector.js` (about 3,700 lines) on the dashboard,
+    Administration and every other page, though only the 2D map uses them. Fix, if WebODM's loader allows it: they
+    become dependencies of the map's `willAddControls` (as `inspector.css` is), loaded on map pages only; to check
+    that SystemJS runs them as plain scripts.
+  - **R1-4. DJI Thermal Task can hold all of a small server's web workers** (WebODM's own pages): each photo is
+    converted inside the request (`api.TaskConvert`), three at a time (`upload.js` `CONCURRENCY`); WebODM starts
+    2 × CPUs + 1 web workers, so on a one-CPU server one upload keeps all three busy and every other page waits for
+    the upload to finish. Fix: two at a time (still overlapping upload and conversion); to measure how long a photo
+    takes to convert.
+  - **R1-5. A thumbnail asked for twice at once can fail** (breaking point): `palette_thumbnail` writes the cached
+    picture to `<name>.part`, the same name for every request, then renames it; two requests for the same
+    thumbnail (two tabs, two users) write one file together, and the second's rename or `os.remove` raises a 500
+    (on Windows, the file held open too). Fix: a `.part` name of its own per request, as `write_json` has.
+  - **R1-6. Deleting a task depends on the plugin** (breaking point): `task_removing`, WebODM's signal before any
+    task is deleted, cancels a dataset's jobs and unlinks its tasks; an error there (a file it can't write) would
+    stop WebODM deleting the task. Celery's `revoke` with the broker down may also wait for it (to check). Fix: the
+    handler's errors logged, never raised.
+  - **R1-7. The analysis read again for each thumbnail** (performance): every thumbnail and file request reads the
+    dataset's `analysis.json` (about 400 bytes a frame: 2 MB for 5,000 frames) to check the file is the dataset's,
+    and the detail pane's large ones read it twice; the Files tab asks for one thumbnail per row. Fix: the parsed
+    file kept in memory by its path, size and time (a few entries).
+  - **R1-8. The dataset pages ask for everything every 2 or 3 seconds while a job runs** (performance): the
+    dataset page's poll (`dataset.js` `load`, `POLL_MS` 2 s) gets the whole dataset (`detail`): the full analysis
+    (2 MB at 5,000 frames, sent each time), every image's size (a walk of the images folder), each workset's
+    results and the size of its files (another walk), and who it's shared with; the Analyzer's list (3 s) walks
+    every dataset's images. Polls go on in a tab in the background. Fix: while polling, the analysis sent only
+    when it changed (the page sends the `analyzed_at` it has), the counts and sizes kept when the images change
+    instead of walked each time, and polling slowed while the tab is hidden.
+  Read: the pages poll with a slower retry after a failed request. Still to read: what each page shows after a 500, the worker's jobs on a large
+  dataset (memory), disk full during a conversion, and native Windows.
+  Decided (the user, 2026-11-07): all eight fixed; DJI Thermal Task converts two photos at a time.
+- **R2. The code made easy to extend** (the user, 2026-11-07, from `new.md`): "This plugin's codebase is meant to be
+  extensible to make it as simple as possible for other developers to add their own WebODM DJI Thermal Analyzer
+  modifications. Review the code structure and refactor as needed to make the code as accessible as possible for
+  future updates and additions." Builds on the plugin's modules (about 18,700 lines: the server's `plugin.py`,
+  the APIs `api.py`, `analyzer_api.py`, `inspector_api.py`, `frames_api.py`, the work in `conversions.py`,
+  `mosaics.py`, `datasets.py`, `frames.py`, `inspector.py`; the pages' `public/*.js`, largest `inspector.js` 2,212
+  lines, `conversions.js` 1,632, `dataset.js` 1,219, `frame.js` 927; DJI Thermal Task's JSX in `public/thermal/`).
+  Proposed, after R1 (whose fixes and tests then guard the refactor):
+  1. **A developer's guide** (`docs/developing.md`, linked from the README and `CLAUDE.md`): the code's map (what
+     each module does, how a request flows from a page to the worker and back, where data is kept), how to run
+     the dev stacks and the tests, and recipes for the likely additions: a palette, a workset output, a
+     measurement tool, a section in the Thermal Inspector's panel, an API route, a page.
+  2. **Refactors where an addition today means edits in many places**, found while writing those recipes: lists
+     kept in several files made one (e.g. outputs, palettes, units), the largest scripts split by feature, shared
+     helpers kept once. Behaviour unchanged: the tests pass unchanged before and after each step, each step
+     live-checked.
+  Open: how far it goes (proposed: the guide and the refactors its recipes call for, not a rewrite); that
+  "extensible" means changing the plugin's code (a fork or a pull request), not a plugin system of its own that
+  others' code plugs into at runtime (proposed: the former).
+  Decided (the user, 2026-11-07): changing the plugin's code (a fork or a pull request), no runtime extension API;
+  the guide and the refactors its recipes call for, no file split for its own sake.
+
+**Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
+
+**Done**
+- **Thanks in the README** (the user, 2026-11-07, `new.md`: "Create a thank you section in the README and list all
+  known projects and developers that made this plugin possible."). A "Thanks" section near the end of `README.md`
+  (and `docs/index.md` linking to it). What the plugin is built on, found in its code: **WebODM** and
+  **OpenDroneMap** (ODM, NodeODM; the plugin system, the map, Leaflet and React as WebODM ships them, rio-tiler as
+  WebODM vendors or installs it), **DJI** (the Thermal SDK and its documented R-JPEG format; the palettes; the
+  sample images the tests use, not shipped), **dji-thermal-cli** (the temperatures, the mosaics), **NumPy**,
+  **Pillow**, **GDAL** (OGR, through WebODM), **rasterio**, **Django** and **Django REST framework**,
+  **django-guardian**, **Celery**, **zipstream-ng**; for development, Jest, Babel, ESLint, Playwright and Ruff.
+  Each with a link to its own site and its license name, credited as the project's authors name themselves
+  ("the NumPy developers"), naming a person only where the project does (WebODM: Piero Toffanin and contributors).
+  **Decided** (the user, 2026-11-07): what runs and the development tools; people named only where the project
+  names them (WebODM's package: Piero Toffanin; Pillow's: Jeffrey A. Clark); one line that the plugin was developed
+  with the help of Claude (Anthropic). WebODM 4.0's engines are ODX and NodeODX (formerly ODM and NodeODM).
+  Built (`readme-thanks`): README's Thanks, before License, each license read from the project's own files or
+  package metadata (WebODM's checkout and image, the dev venv, `node_modules`); `docs/index.md` links to it. Done.
+- **The temperature unit (°C or °F) in WebODM's header, an administrator's default** (the user, 2026-11-07: "a
+  global option for the user to control it via dropdown in the header row next to the user icon. The visible
+  temperature conversions should support C, F and K. This setting is global for the user of the DJI Thermal Analyzer
+  plugin. If possible, add a dropdown setting to the plugin Admin configuration page that allows Administrators to
+  configure the default for a system. Otherwise default to C"; then: "Drop Kelvin, we may decide to add it back
+  later if webodm adds more traditional Kelvin support"). Builds on "The unit and palette shared" (2026-10-30,
+  below): the unit stays WebODM's metric/imperial in each browser, and is now also saved per user.
+  **Design**:
+  - **Saved per WebODM user** in the display preferences (`conversions.display`'s `unit`: C or F, the user data
+    store), so it follows them to any browser; `migrateUnit` (which handed a saved unit to WebODM once and dropped
+    it) goes. A user who never chose gets the **administrator's default**, else °C.
+  - **The administrator's default**: a "Default temperature unit" dropdown (°C, °F) on the DJI Thermal page under
+    Administration (`sdk.html`, superusers), kept in the plugin's global data store; °C until one is set.
+  - **The header dropdown**: `main.js` (on every WebODM page) adds a °C / °F menu to WebODM's top bar, just left of
+    the user icon, wherever the header has that icon (logged in). Picking one saves it (`PUT display`) and redraws
+    every open view (the Thermal Inspector, the Analyzer's pages) through WebODM's `onUnitSystemChanged`.
+  - **Kept in sync with the Preferences dialog's unit** (both change the same saved setting).
+  - **Linked to WebODM's units** (metric/imperial, per browser): °F is imperial, °C metric, both ways (picking one
+    sets WebODM's units, so its distances and areas follow; WebODM's switch saves the unit). On load the saved unit
+    sets this browser's WebODM units to match. A user who never chose follows this browser's WebODM units when they
+    were set, else the administrator's default (WebODM's units set to match).
+  - **Anonymous viewers** (a public or shared map): the administrator's default, no dropdown, WebODM's units not
+    touched.
+  - The server keeps measuring in °C; a workset's own unit (its files, K among them) is unchanged; new worksets and
+    the Thermal Task panel start in the user's unit.
+  - The unit reaches the pages: the Analyzer's in `#ta-display` (the unit resolved, with the default); WebODM's
+    pages (maps, the Thermal Task panel) from `GET display` once, by `main.js`.
+  Tests: Django (`test_api`: the default, the saved unit, a superuser's default, others refused), Jest (the
+  resolution order and the linking, the header menu). README, the Inspector and Analyzer quickstarts,
+  `measurement.md`, the admin page's docs; screenshots retaken where the header shows.
+  **Decided** (the user, 2026-11-07): linked to WebODM's units; the menu on every WebODM page; the Preferences
+  dialog's unit kept, in sync; anonymous viewers get the administrator's default; **no Kelvin** on screen (maybe
+  later, if WebODM supports Kelvin: see Later).
+  Built (`header-unit`): `conversions.DISPLAY_UNITS`, `default_unit`/`set_default_unit` (the global data store),
+  `display`'s `unit` saved again and `default_unit`; the public `GET unit` (`analyzer_api.Unit`: `logged_in`, the
+  user's unit, the default; one request, so anonymous pages log no 403); the admin page's Temperature unit panel
+  (`page.py` `_unit`, `sdk.html`); `public/units.js` (every page, before `main.js`: `resolve`, the menu, the link to
+  WebODM's units, anonymous viewers; imperial US counts as °F); `inspector.js` and `analyzer_core.js` `userUnit`
+  read it; the Preferences dialog saves the unit with the account, then sets WebODM's; `migrateUnit` removed; the
+  Analyzer's pages reload when the unit changes. Tests: `test_analyzer` (the saved unit, the default and `unit`),
+  `test_sdk` (the admin page), Jest (`units.test.js`, the dialog, the Inspector). README, `palettes.md`,
+  `quickstart-inspector.md`, `dji-sdk.md`, `api.md`; the whole-page screenshots retaken (the menu in the header).
+  Live check on :8002 (a fresh browser): the menu left of the user icon, °F saved before WebODM's units turned
+  imperial, the Inspector's readout in °F then °C, the Preferences dialog in step, the Analyzer reloading on a
+  change, the admin default saved, an anonymous page in the default with no menu and WebODM's units untouched, no
+  console errors; the admin user's preferences and the default put back as they were. Done.
+- **A workset's frames drawn in its palette** (the user, 2026-11-07: "why is it when a thermal task is created to
+  convert the color palette to ironred (for example) that the source frames still show up in their original palette
+  after conversion?"). Why: the workset's palette goes only into the files it writes (its pseudo and rjpeg outputs:
+  the task's images, the downloads); every picture of a frame in the Analyzer is the dataset's source R-JPEG, drawn
+  in the user's preferred DJI palette, else as shot (its embedded picture) - the workset's Files table and detail
+  pane (`conversions.js` `thumbsUrl`, `resultDetailHtml`), the frame page's list (`frame.js` `thumbsUrl`). Only the
+  frame page's view falls back to the workset's (`frames_api.default_palette`: preferred, workset's, inferno).
+  **Design** (agreed with the user, 2026-11-07): inside a workset, its frames are drawn in the workset's palette when
+  it set one (a DJI palette, and a coloured output: pseudo or rjpeg), else the user's preferred DJI palette, else as
+  shot: one helper in `analyzer_core.js` used by the workset's Files table, its detail pane and the frame page's list
+  (the frames API returning the workset's palette). The dataset's Files tab keeps the preferred palette (no one
+  workset); the frames window in the mosaic viewer and the Inspector keeps drawing the frame as its layer is.
+  Tests: Jest (the helper, the Files table's and the frame list's URLs), `test_frames` (the palette returned).
+  README, `quickstart-worksets.md`; screenshots retaken if a frame shown changes colour.
+  **Decided** (the user, 2026-11-07): the frame page's own view (the big frame) starts in the same order, the
+  workset's palette first (`frames_api.default_palette`: the workset's DJI palette with a coloured output, then the
+  preferred, then inferno); a palette picked in its panel still applies and is saved as the preference, and the next
+  visit to that workset's frames opens in the workset's again.
+  Changed while building (2026-11-07): no "coloured output" condition. DJI Thermal Task's workset writes only °C
+  TIFFs yet keeps the palette chosen for the task's map (the user's own example: "DJI Thermal Task", `temp_c:tiff`,
+  ironred), so a workset's palette counts whenever it chose one. Built (`workset-palette-thumbnails`):
+  `conversions.frames_palette`, `frames_api.default_palette` (the workset's, the preferred, inferno) and the frames
+  API's `frames_palette`; `analyzer_core.js` `framesPalette`, used by `conversions.js` (the Files table, detail pane
+  and picture viewer) and `frame.js` (the list). Tests: `test_frames`, Jest (`analyzer.test.js`, `frame.test.js`).
+  README, `palettes.md`, `quickstart-worksets.md`. Live check on :8002 ("ThermalTest", its workset in arctic, the
+  preference ironred): the Files table, detail pane, frame list and frame all arctic; what it made (the dataset's
+  thumbnails, the workset's figures) removed. Done.
+- **Thumbnails in the frame page's list** (the user, 2026-11-06: "The frames browser list should show thumbnails
+  instead of just filenames. Large thumbnails."). **Decided** (the user, 2026-11-06): in the preferred DJI palette
+  (else the frame's own picture), as the Files tab's; about 260 px wide, the list 280 px, with a Thumbnails box to list
+  names only, remembered per browser, on by default. Built (`frame-list-thumbnails`): `analyzer_api.LIST_SIZE`
+  (`?size=list`, up to 320 px, cached beside the others), `frame.js` `thumbsUrl` and `listHtml`'s thumbnails (lazy),
+  the list redrawn when the palette changes, `analyzer.css`; Jest (`frame.test.js`), `test_analyzer` (the list size);
+  README, `quickstart-worksets.md`, `api.md`, `frame-page.png` and `frame-measure-again.png`. Live check on :8002
+  ("Thermal - 9/18/2026", 211 frames): the first thumbnails in under a second, 14 made as the list showed them,
+  the box off and kept after a reload, the phone layout; the thumbnails it cached removed. Done.
+- **Bug: the Thermal Inspector's button on RGB maps** (the user, 2026-11-06: "Why is the Thermal Inspector visible
+  on a rgb only orthophoto? I thought the button was only supposed to be visible on thermal/radiometric orthos?").
+  Since Mosaic Overlays (2026-11-01, Claude's design, never checked with the user) the button also showed on every map
+  of a project with workset mosaics. **Decided** (the user, 2026-11-06): only on thermal orthophotos. Built
+  (`inspector-thermal-only`): `showButton` in `inspector.js` shows it for a thermal orthophoto, or a mosaic laid on
+  the map (the Analyzer's "Open on WebODM's map" opens the project's map, which may be RGB only), and while the panel
+  is open; Jest (the button's test rewritten); README and the Inspector quickstart. Live check on :8002 (read
+  only): the RGB task's map of a project with mosaics has no button; a thermal task's and the project's map have
+  it; "Open on WebODM's map" on the RGB map lays the mosaic with the panel open, the button kept. Done.
+- **WebODM 4.0.0** (the user, 2026-11-05: "WebODM 4.0.0 was just released and we need to ensure our plugin's
+  compatible"). 4.0.0 (tag `v4.0.0`, 42 commits after 3.3.2) moves to Ubuntu 24.04, **Python 3.14, Django 5.2,
+  numpy 2.5.4, Pillow 13.0.0**, Celery 5, Postgres 18 without PostGIS (`django.contrib.gis` out of
+  `INSTALLED_APPS`; a task's `crop` and extents are GeoJSON dicts in `JSONField`s, no longer GEOS geometries),
+  Valkey in place of Redis, `webpack_loader` removed, plugin URLs through `re_path`, and `pip freeze --path` for
+  plugin requirements (the user's #2046).
+  What breaks or may break here:
+  - `requirements.txt` pins numpy 1.26.2 and Pillow 11.3.0 (3.3.2's): no Python 3.14 wheels, so the install fails.
+    Environment markers pick each WebODM's versions (pip honours them; WebODM's `parse_requirements` keeps only the
+    name).
+  - `inspector.py` `_crop` (`task.crop.empty`) and `inspector_api.py` (`task.crop.wkt`) expect GEOS; the frames' and
+    the Inspector's shapes use `django.contrib.gis.geos` (needs GEOS's library, no longer WebODM's to provide).
+  - Everything else read against 4.0.0 while testing: Celery's `worker.celery`, `run_function_async`,
+    `TestSafeAsyncResult`, the templates the pages extend, the Administration sidebar link `main.js` inserts, JWT.
+  - The dev stack: `docker-compose.nodeodm.yml` is now `docker-compose.nodeodx.yml`; new images (webapp 4.0.0, db
+    18, valkey 9.1) pinned by digest.
+  Decided (the user, 2026-11-05): this repo's `ignored/WebODM` goes to 4.0.0 (not webodm-geojson's checkout); the
+  plugin supports **both 3.3.2 and 4.0.0** (markers, both kinds of crop, tests on both); the :8002 dev data
+  (Postgres 9 upgraded in place to 18 on the first start, one way) is **backed up first** to volumes
+  `webodm-dji-thermal-332_dbdata` and `webodm-dji-thermal-332_appmedia`.
+  Found by the tests on 4.0.0 (173 run: 3 failures, 4 errors): rio-tiler is no longer installed (WebODM vendors a
+  trimmed 2.x as `app.vendor.rio_tiler`, without `COGReader.point`), `morecantile` neither (the tests' tiles), the
+  colour maps hot, rainbow and gray_r are gone from its tiler, `geom_transform_wkt_bbox` takes a GeoJSON polygon
+  (GEOS in 3.3.2), and a colouring fixture's floats differ in the last digits (numpy 2).
+  Decided (the user, 2026-11-05): **Shapely** in place of Django's GEOS (2.0.7 for Python 3.9, 2.1.2 for 3.14:
+  wheels on all three systems); the plugin **carries its own copies** of hot, rainbow and gray_r (rio-tiler's, BSD),
+  so the palettes and the users' saved choices are the same on both versions; the user upgrades the native Windows
+  WebODM (`C:\WebODM`) to 4.0.0 for the Windows check.
+  Built (2026-11-05), `webodm-4`: `requirements.txt` with markers (numpy, Pillow, Shapely per Python);
+  `webodm_versions.py` (rio-tiler from `app.vendor` else installed, `task_crop` as Shapely from GeoJSON or GEOS,
+  `cutline` built by the plugin, `colormap_encoded`/`colormap` with `colormaps.json`); Shapely in `inspector.py`,
+  `frames.py` (imported from the plugin's packages, `converter.shapely`); the viewer's readout read with rasterio
+  (`mosaics` point); `converter.remove_stale_metadata` honours markers; `converter.built_for_another_python` and
+  `Plugin.check_requirements` make WebODM install the packages again after it moves to another Python (found
+  while checking: its md5 check would keep the 3.9 builds). Tests: `test_converter` (markers, another Python,
+  the reinstall), `test_inspector` (the crop as each version stores it, tiles without morecantile, the ETag with a
+  real crop), `test_analyzer` (fixtures within float rounding). `dev/webodm.sh`: 4.0.0 on :8002, `DT_WEBODM=3.3.2`
+  on :8003 (`ignored/WebODM-3.3.2`, a worktree). All 208 tests (the plugin's and WebODM's `app.tests.test_plugins`) pass on both, Jest (281) and ESLint too. Live on
+  4.0.0 (read only, the user's First Project after the database upgrade): the dashboard's button, the Analyzer's
+  list, dataset, Files pictures (Pillow 13), the mosaic viewer (hot, the readout, a click's frames), the frame
+  page (a region), the Thermal Inspector on WebODM's map (pin, region, hover, hot), the DJI Thermal page and its
+  Administration link; the upgrade path (3.3.2's installed packages put in place, reloaded: installed again for
+  3.14, the old metadata removed). README, `docs/installing.md`, `docs/troubleshooting.md`, CLAUDE.md, the test
+  and release-check skills. Left: **native Windows 4.0.0** (once the user has upgraded `C:\WebODM`: the zip
+  installed through Administration > Plugins, its requirements for Python 3.14, the pages; `test_portable` with
+  its Python), then the merge. At the next release, the release check installs the zip on both versions.
+  Native Windows 4.0.0 (2026-11-05, the zip installed through Administration > Plugins on the user's `C:\WebODM`, in
+  a "Live check Windows 4.0.0" project, deleted afterwards): requirements installed for Python 3.14 (cp314 wheels,
+  "Installed requirements.txt": 3.3.2's failing check is fixed); an Analyzer dataset of 40 M4T frames and 3 RGB photos
+  analyzed (5 s), a harmonized workset with mosaics (92 s), the viewer (rainbow, the readout, a click's 19 frames), the
+  frame page (a region), a task from the workset processed on the native node (664 s), the Inspector on its map (pin,
+  region, hot); a DJI Thermal Task of the same photos (the RGB ignored) processed (211 s, 10.1 to 31.7 °C);
+  `test_portable` passes with its Python 3.14 (an embeddable build: the test skill's runner). **Removing the plugin
+  failed**: "Access is denied" on Shapely's DLL, which WebODM had loaded (Windows can't delete a loaded DLL); WebODM
+  dropped the plugin's row but left its folder half deleted, to come back at the next start.
+  Decided (the user, 2026-11-05): **GDAL's OGR in place of Shapely** (WebODM's own GDAL, with GEOS, on 3.3.2 and
+  4.0.0, Docker and native Windows, checked on all three): the plugin then ships no compiled package of its own.
+  Built (2026-11-05): `shapes.py` (OGR geometries with what the plugin reads of them; buffers with GEOS's default
+  8 segments a quadrant; OGR's exceptions left as WebODM has them), used by `inspector.py`, `frames.py` and
+  `webodm_versions.task_crop`; Shapely out of `requirements.txt`, the docs and the dev venv. All 208 tests pass on
+  both versions, Jest and ESLint too. Left: the Windows re-check (the new zip installed, a region measured, the
+  plugin removed), once the user has restarted the Windows WebODM to free the half-deleted folder's DLL; then the
+  merge.
+  Re-check, part 1 (2026-11-05, after the user's restart): the restart had registered the half-deleted plugin again,
+  as expected; removed through Administration > Plugins (no DLL loaded: removed whole). The new zip installed
+  (dji-thermal-cli, numpy, Pillow; no Shapely), but WebODM kept running the old plugin's modules it had loaded at
+  start (a region: "No module named 'shapely'" from the old `converter.shapely`): WebODM runs a reinstalled plugin's
+  new code only after a restart (`docs/installing.md` now says so). Its project deleted, the new version left
+  installed. Left: the user restarts the Windows WebODM once more; then a region measured with OGR and the plugin
+  removed without a restart; then the merge.
+  Re-check, part 2 (2026-11-05, after the user's second restart), on native Windows 4.0.0 with the OGR version:
+  a dataset of 40 frames and a workset with mosaics, a mosaic region (84,570 pixels, mean 22.65 °C) and line (5.54 m,
+  264 samples, each with its frame), a one-point line refused ("A line needs two points"), a frame page region (mean
+  20.11 °C, as with Shapely); its project deleted, then **the plugin removed without a restart, folder and all**.
+  Done, merged as `webodm-4`: the code in `webodm_versions.py`, `shapes.py`, `colormaps.json`, `converter.py`
+  (markers, `built_for_another_python`), `plugin.py`, `inspector.py`, `frames.py`, `mosaics.py`; tests in
+  `test_converter`, `test_inspector`, `test_analyzer`; `dev/webodm.sh` and `dev/compose.yml` (both versions),
+  `dev/package.sh` (`DT_ZIP`).
 - **U2-4. Harmonize's alignment reused by the mosaics** (the user, 2026-11-02: in 1.0.0, the last known item before
   it). A harmonized workset aligns its frames twice: the conversion's `dtc.process(normalize=True)` runs
   dji-thermal-cli's `normalization()`, which builds a mosaic layout and aligns it (`mosaic._align`: 4 rounds of every
@@ -823,198 +1096,6 @@
     open or closed; **Outputs** a closed `details` section whose header shows its own chips when closed; every
     section's caret drawn by the plugin (WebODM hid the browser's). Jest 122; live check on the test flight (read
     only): the tabs Worksets, Files, Problems, WebODM plan, opened on Worksets; no console error.
-
-**Later**
-- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
-  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
-
-**Done**
-- **Thanks in the README** (the user, 2026-11-07, `new.md`: "Create a thank you section in the README and list all
-  known projects and developers that made this plugin possible."). A "Thanks" section near the end of `README.md`
-  (and `docs/index.md` linking to it). What the plugin is built on, found in its code: **WebODM** and
-  **OpenDroneMap** (ODM, NodeODM; the plugin system, the map, Leaflet and React as WebODM ships them, rio-tiler as
-  WebODM vendors or installs it), **DJI** (the Thermal SDK and its documented R-JPEG format; the palettes; the
-  sample images the tests use, not shipped), **dji-thermal-cli** (the temperatures, the mosaics), **NumPy**,
-  **Pillow**, **GDAL** (OGR, through WebODM), **rasterio**, **Django** and **Django REST framework**,
-  **django-guardian**, **Celery**, **zipstream-ng**; for development, Jest, Babel, ESLint, Playwright and Ruff.
-  Each with a link to its own site and its license name, credited as the project's authors name themselves
-  ("the NumPy developers"), naming a person only where the project does (WebODM: Piero Toffanin and contributors).
-  **Decided** (the user, 2026-11-07): what runs and the development tools; people named only where the project
-  names them (WebODM's package: Piero Toffanin; Pillow's: Jeffrey A. Clark); one line that the plugin was developed
-  with the help of Claude (Anthropic). WebODM 4.0's engines are ODX and NodeODX (formerly ODM and NodeODM).
-  Built (`readme-thanks`): README's Thanks, before License, each license read from the project's own files or
-  package metadata (WebODM's checkout and image, the dev venv, `node_modules`); `docs/index.md` links to it. Done.
-- **The temperature unit (°C or °F) in WebODM's header, an administrator's default** (the user, 2026-11-07: "a
-  global option for the user to control it via dropdown in the header row next to the user icon. The visible
-  temperature conversions should support C, F and K. This setting is global for the user of the DJI Thermal Analyzer
-  plugin. If possible, add a dropdown setting to the plugin Admin configuration page that allows Administrators to
-  configure the default for a system. Otherwise default to C"; then: "Drop Kelvin, we may decide to add it back
-  later if webodm adds more traditional Kelvin support"). Builds on "The unit and palette shared" (2026-10-30,
-  below): the unit stays WebODM's metric/imperial in each browser, and is now also saved per user.
-  **Design**:
-  - **Saved per WebODM user** in the display preferences (`conversions.display`'s `unit`: C or F, the user data
-    store), so it follows them to any browser; `migrateUnit` (which handed a saved unit to WebODM once and dropped
-    it) goes. A user who never chose gets the **administrator's default**, else °C.
-  - **The administrator's default**: a "Default temperature unit" dropdown (°C, °F) on the DJI Thermal page under
-    Administration (`sdk.html`, superusers), kept in the plugin's global data store; °C until one is set.
-  - **The header dropdown**: `main.js` (on every WebODM page) adds a °C / °F menu to WebODM's top bar, just left of
-    the user icon, wherever the header has that icon (logged in). Picking one saves it (`PUT display`) and redraws
-    every open view (the Thermal Inspector, the Analyzer's pages) through WebODM's `onUnitSystemChanged`.
-  - **Kept in sync with the Preferences dialog's unit** (both change the same saved setting).
-  - **Linked to WebODM's units** (metric/imperial, per browser): °F is imperial, °C metric, both ways (picking one
-    sets WebODM's units, so its distances and areas follow; WebODM's switch saves the unit). On load the saved unit
-    sets this browser's WebODM units to match. A user who never chose follows this browser's WebODM units when they
-    were set, else the administrator's default (WebODM's units set to match).
-  - **Anonymous viewers** (a public or shared map): the administrator's default, no dropdown, WebODM's units not
-    touched.
-  - The server keeps measuring in °C; a workset's own unit (its files, K among them) is unchanged; new worksets and
-    the Thermal Task panel start in the user's unit.
-  - The unit reaches the pages: the Analyzer's in `#ta-display` (the unit resolved, with the default); WebODM's
-    pages (maps, the Thermal Task panel) from `GET display` once, by `main.js`.
-  Tests: Django (`test_api`: the default, the saved unit, a superuser's default, others refused), Jest (the
-  resolution order and the linking, the header menu). README, the Inspector and Analyzer quickstarts,
-  `measurement.md`, the admin page's docs; screenshots retaken where the header shows.
-  **Decided** (the user, 2026-11-07): linked to WebODM's units; the menu on every WebODM page; the Preferences
-  dialog's unit kept, in sync; anonymous viewers get the administrator's default; **no Kelvin** on screen (maybe
-  later, if WebODM supports Kelvin: see Later).
-  Built (`header-unit`): `conversions.DISPLAY_UNITS`, `default_unit`/`set_default_unit` (the global data store),
-  `display`'s `unit` saved again and `default_unit`; the public `GET unit` (`analyzer_api.Unit`: `logged_in`, the
-  user's unit, the default; one request, so anonymous pages log no 403); the admin page's Temperature unit panel
-  (`page.py` `_unit`, `sdk.html`); `public/units.js` (every page, before `main.js`: `resolve`, the menu, the link to
-  WebODM's units, anonymous viewers; imperial US counts as °F); `inspector.js` and `analyzer_core.js` `userUnit`
-  read it; the Preferences dialog saves the unit with the account, then sets WebODM's; `migrateUnit` removed; the
-  Analyzer's pages reload when the unit changes. Tests: `test_analyzer` (the saved unit, the default and `unit`),
-  `test_sdk` (the admin page), Jest (`units.test.js`, the dialog, the Inspector). README, `palettes.md`,
-  `quickstart-inspector.md`, `dji-sdk.md`, `api.md`; the whole-page screenshots retaken (the menu in the header).
-  Live check on :8002 (a fresh browser): the menu left of the user icon, °F saved before WebODM's units turned
-  imperial, the Inspector's readout in °F then °C, the Preferences dialog in step, the Analyzer reloading on a
-  change, the admin default saved, an anonymous page in the default with no menu and WebODM's units untouched, no
-  console errors; the admin user's preferences and the default put back as they were. Done.
-- **A workset's frames drawn in its palette** (the user, 2026-11-07: "why is it when a thermal task is created to
-  convert the color palette to ironred (for example) that the source frames still show up in their original palette
-  after conversion?"). Why: the workset's palette goes only into the files it writes (its pseudo and rjpeg outputs:
-  the task's images, the downloads); every picture of a frame in the Analyzer is the dataset's source R-JPEG, drawn
-  in the user's preferred DJI palette, else as shot (its embedded picture) - the workset's Files table and detail
-  pane (`conversions.js` `thumbsUrl`, `resultDetailHtml`), the frame page's list (`frame.js` `thumbsUrl`). Only the
-  frame page's view falls back to the workset's (`frames_api.default_palette`: preferred, workset's, inferno).
-  **Design** (agreed with the user, 2026-11-07): inside a workset, its frames are drawn in the workset's palette when
-  it set one (a DJI palette, and a coloured output: pseudo or rjpeg), else the user's preferred DJI palette, else as
-  shot: one helper in `analyzer_core.js` used by the workset's Files table, its detail pane and the frame page's list
-  (the frames API returning the workset's palette). The dataset's Files tab keeps the preferred palette (no one
-  workset); the frames window in the mosaic viewer and the Inspector keeps drawing the frame as its layer is.
-  Tests: Jest (the helper, the Files table's and the frame list's URLs), `test_frames` (the palette returned).
-  README, `quickstart-worksets.md`; screenshots retaken if a frame shown changes colour.
-  **Decided** (the user, 2026-11-07): the frame page's own view (the big frame) starts in the same order, the
-  workset's palette first (`frames_api.default_palette`: the workset's DJI palette with a coloured output, then the
-  preferred, then inferno); a palette picked in its panel still applies and is saved as the preference, and the next
-  visit to that workset's frames opens in the workset's again.
-  Changed while building (2026-11-07): no "coloured output" condition. DJI Thermal Task's workset writes only °C
-  TIFFs yet keeps the palette chosen for the task's map (the user's own example: "DJI Thermal Task", `temp_c:tiff`,
-  ironred), so a workset's palette counts whenever it chose one. Built (`workset-palette-thumbnails`):
-  `conversions.frames_palette`, `frames_api.default_palette` (the workset's, the preferred, inferno) and the frames
-  API's `frames_palette`; `analyzer_core.js` `framesPalette`, used by `conversions.js` (the Files table, detail pane
-  and picture viewer) and `frame.js` (the list). Tests: `test_frames`, Jest (`analyzer.test.js`, `frame.test.js`).
-  README, `palettes.md`, `quickstart-worksets.md`. Live check on :8002 ("ThermalTest", its workset in arctic, the
-  preference ironred): the Files table, detail pane, frame list and frame all arctic; what it made (the dataset's
-  thumbnails, the workset's figures) removed. Done.
-- **Thumbnails in the frame page's list** (the user, 2026-11-06: "The frames browser list should show thumbnails
-  instead of just filenames. Large thumbnails."). **Decided** (the user, 2026-11-06): in the preferred DJI palette
-  (else the frame's own picture), as the Files tab's; about 260 px wide, the list 280 px, with a Thumbnails box to list
-  names only, remembered per browser, on by default. Built (`frame-list-thumbnails`): `analyzer_api.LIST_SIZE`
-  (`?size=list`, up to 320 px, cached beside the others), `frame.js` `thumbsUrl` and `listHtml`'s thumbnails (lazy),
-  the list redrawn when the palette changes, `analyzer.css`; Jest (`frame.test.js`), `test_analyzer` (the list size);
-  README, `quickstart-worksets.md`, `api.md`, `frame-page.png` and `frame-measure-again.png`. Live check on :8002
-  ("Thermal - 9/18/2026", 211 frames): the first thumbnails in under a second, 14 made as the list showed them,
-  the box off and kept after a reload, the phone layout; the thumbnails it cached removed. Done.
-- **Bug: the Thermal Inspector's button on RGB maps** (the user, 2026-11-06: "Why is the Thermal Inspector visible
-  on a rgb only orthophoto? I thought the button was only supposed to be visible on thermal/radiometric orthos?").
-  Since Mosaic Overlays (2026-11-01, Claude's design, never checked with the user) the button also showed on every map
-  of a project with workset mosaics. **Decided** (the user, 2026-11-06): only on thermal orthophotos. Built
-  (`inspector-thermal-only`): `showButton` in `inspector.js` shows it for a thermal orthophoto, or a mosaic laid on
-  the map (the Analyzer's "Open on WebODM's map" opens the project's map, which may be RGB only), and while the panel
-  is open; Jest (the button's test rewritten); README and the Inspector quickstart. Live check on :8002 (read
-  only): the RGB task's map of a project with mosaics has no button; a thermal task's and the project's map have
-  it; "Open on WebODM's map" on the RGB map lays the mosaic with the panel open, the button kept. Done.
-- **WebODM 4.0.0** (the user, 2026-11-05: "WebODM 4.0.0 was just released and we need to ensure our plugin's
-  compatible"). 4.0.0 (tag `v4.0.0`, 42 commits after 3.3.2) moves to Ubuntu 24.04, **Python 3.14, Django 5.2,
-  numpy 2.5.4, Pillow 13.0.0**, Celery 5, Postgres 18 without PostGIS (`django.contrib.gis` out of
-  `INSTALLED_APPS`; a task's `crop` and extents are GeoJSON dicts in `JSONField`s, no longer GEOS geometries),
-  Valkey in place of Redis, `webpack_loader` removed, plugin URLs through `re_path`, and `pip freeze --path` for
-  plugin requirements (the user's #2046).
-  What breaks or may break here:
-  - `requirements.txt` pins numpy 1.26.2 and Pillow 11.3.0 (3.3.2's): no Python 3.14 wheels, so the install fails.
-    Environment markers pick each WebODM's versions (pip honours them; WebODM's `parse_requirements` keeps only the
-    name).
-  - `inspector.py` `_crop` (`task.crop.empty`) and `inspector_api.py` (`task.crop.wkt`) expect GEOS; the frames' and
-    the Inspector's shapes use `django.contrib.gis.geos` (needs GEOS's library, no longer WebODM's to provide).
-  - Everything else read against 4.0.0 while testing: Celery's `worker.celery`, `run_function_async`,
-    `TestSafeAsyncResult`, the templates the pages extend, the Administration sidebar link `main.js` inserts, JWT.
-  - The dev stack: `docker-compose.nodeodm.yml` is now `docker-compose.nodeodx.yml`; new images (webapp 4.0.0, db
-    18, valkey 9.1) pinned by digest.
-  Decided (the user, 2026-11-05): this repo's `ignored/WebODM` goes to 4.0.0 (not webodm-geojson's checkout); the
-  plugin supports **both 3.3.2 and 4.0.0** (markers, both kinds of crop, tests on both); the :8002 dev data
-  (Postgres 9 upgraded in place to 18 on the first start, one way) is **backed up first** to volumes
-  `webodm-dji-thermal-332_dbdata` and `webodm-dji-thermal-332_appmedia`.
-  Found by the tests on 4.0.0 (173 run: 3 failures, 4 errors): rio-tiler is no longer installed (WebODM vendors a
-  trimmed 2.x as `app.vendor.rio_tiler`, without `COGReader.point`), `morecantile` neither (the tests' tiles), the
-  colour maps hot, rainbow and gray_r are gone from its tiler, `geom_transform_wkt_bbox` takes a GeoJSON polygon
-  (GEOS in 3.3.2), and a colouring fixture's floats differ in the last digits (numpy 2).
-  Decided (the user, 2026-11-05): **Shapely** in place of Django's GEOS (2.0.7 for Python 3.9, 2.1.2 for 3.14:
-  wheels on all three systems); the plugin **carries its own copies** of hot, rainbow and gray_r (rio-tiler's, BSD),
-  so the palettes and the users' saved choices are the same on both versions; the user upgrades the native Windows
-  WebODM (`C:\WebODM`) to 4.0.0 for the Windows check.
-  Built (2026-11-05), `webodm-4`: `requirements.txt` with markers (numpy, Pillow, Shapely per Python);
-  `webodm_versions.py` (rio-tiler from `app.vendor` else installed, `task_crop` as Shapely from GeoJSON or GEOS,
-  `cutline` built by the plugin, `colormap_encoded`/`colormap` with `colormaps.json`); Shapely in `inspector.py`,
-  `frames.py` (imported from the plugin's packages, `converter.shapely`); the viewer's readout read with rasterio
-  (`mosaics` point); `converter.remove_stale_metadata` honours markers; `converter.built_for_another_python` and
-  `Plugin.check_requirements` make WebODM install the packages again after it moves to another Python (found
-  while checking: its md5 check would keep the 3.9 builds). Tests: `test_converter` (markers, another Python,
-  the reinstall), `test_inspector` (the crop as each version stores it, tiles without morecantile, the ETag with a
-  real crop), `test_analyzer` (fixtures within float rounding). `dev/webodm.sh`: 4.0.0 on :8002, `DT_WEBODM=3.3.2`
-  on :8003 (`ignored/WebODM-3.3.2`, a worktree). All 208 tests (the plugin's and WebODM's `app.tests.test_plugins`) pass on both, Jest (281) and ESLint too. Live on
-  4.0.0 (read only, the user's First Project after the database upgrade): the dashboard's button, the Analyzer's
-  list, dataset, Files pictures (Pillow 13), the mosaic viewer (hot, the readout, a click's frames), the frame
-  page (a region), the Thermal Inspector on WebODM's map (pin, region, hover, hot), the DJI Thermal page and its
-  Administration link; the upgrade path (3.3.2's installed packages put in place, reloaded: installed again for
-  3.14, the old metadata removed). README, `docs/installing.md`, `docs/troubleshooting.md`, CLAUDE.md, the test
-  and release-check skills. Left: **native Windows 4.0.0** (once the user has upgraded `C:\WebODM`: the zip
-  installed through Administration > Plugins, its requirements for Python 3.14, the pages; `test_portable` with
-  its Python), then the merge. At the next release, the release check installs the zip on both versions.
-  Native Windows 4.0.0 (2026-11-05, the zip installed through Administration > Plugins on the user's `C:\WebODM`, in
-  a "Live check Windows 4.0.0" project, deleted afterwards): requirements installed for Python 3.14 (cp314 wheels,
-  "Installed requirements.txt": 3.3.2's failing check is fixed); an Analyzer dataset of 40 M4T frames and 3 RGB photos
-  analyzed (5 s), a harmonized workset with mosaics (92 s), the viewer (rainbow, the readout, a click's 19 frames), the
-  frame page (a region), a task from the workset processed on the native node (664 s), the Inspector on its map (pin,
-  region, hot); a DJI Thermal Task of the same photos (the RGB ignored) processed (211 s, 10.1 to 31.7 °C);
-  `test_portable` passes with its Python 3.14 (an embeddable build: the test skill's runner). **Removing the plugin
-  failed**: "Access is denied" on Shapely's DLL, which WebODM had loaded (Windows can't delete a loaded DLL); WebODM
-  dropped the plugin's row but left its folder half deleted, to come back at the next start.
-  Decided (the user, 2026-11-05): **GDAL's OGR in place of Shapely** (WebODM's own GDAL, with GEOS, on 3.3.2 and
-  4.0.0, Docker and native Windows, checked on all three): the plugin then ships no compiled package of its own.
-  Built (2026-11-05): `shapes.py` (OGR geometries with what the plugin reads of them; buffers with GEOS's default
-  8 segments a quadrant; OGR's exceptions left as WebODM has them), used by `inspector.py`, `frames.py` and
-  `webodm_versions.task_crop`; Shapely out of `requirements.txt`, the docs and the dev venv. All 208 tests pass on
-  both versions, Jest and ESLint too. Left: the Windows re-check (the new zip installed, a region measured, the
-  plugin removed), once the user has restarted the Windows WebODM to free the half-deleted folder's DLL; then the
-  merge.
-  Re-check, part 1 (2026-11-05, after the user's restart): the restart had registered the half-deleted plugin again,
-  as expected; removed through Administration > Plugins (no DLL loaded: removed whole). The new zip installed
-  (dji-thermal-cli, numpy, Pillow; no Shapely), but WebODM kept running the old plugin's modules it had loaded at
-  start (a region: "No module named 'shapely'" from the old `converter.shapely`): WebODM runs a reinstalled plugin's
-  new code only after a restart (`docs/installing.md` now says so). Its project deleted, the new version left
-  installed. Left: the user restarts the Windows WebODM once more; then a region measured with OGR and the plugin
-  removed without a restart; then the merge.
-  Re-check, part 2 (2026-11-05, after the user's second restart), on native Windows 4.0.0 with the OGR version:
-  a dataset of 40 frames and a workset with mosaics, a mosaic region (84,570 pixels, mean 22.65 °C) and line (5.54 m,
-  264 samples, each with its frame), a one-point line refused ("A line needs two points"), a frame page region (mean
-  20.11 °C, as with Shapely); its project deleted, then **the plugin removed without a restart, folder and all**.
-  Done, merged as `webodm-4`: the code in `webodm_versions.py`, `shapes.py`, `colormaps.json`, `converter.py`
-  (markers, `built_for_another_python`), `plugin.py`, `inspector.py`, `frames.py`, `mosaics.py`; tests in
-  `test_converter`, `test_inspector`, `test_analyzer`; `dev/webodm.sh` and `dev/compose.yml` (both versions),
-  `dev/package.sh` (`DT_ZIP`).
 - **A palette in DJI Thermal Task** (the user, 2026-11-01, with a screenshot of the panel): "add a dropdown above
   the "Normalize:" checkbox that allows the user to select the color palette from the supported dji color palettes.
   If detectable, it should default to that of the source photos." Done 2026-11-01, `task-palette`. The task's TIFFs
