@@ -7,6 +7,7 @@ The tests with real R-JPEGs read them from DJI_THERMAL_FLIGHT_DIR and are skippe
 import collections
 import contextlib
 import datetime
+import errno
 import importlib
 import io
 import math
@@ -206,6 +207,31 @@ class TestUpload(AnalyzerTestCase):
         self.assertIn("quota", res.data["error"])
         res = self.client.post(API, {"name": "More", "project": self.project.id}, format="json")
         self.assertIn("quota", res.data["project"])
+
+    def test_a_full_disk_keeps_the_images_written_before_it_and_no_part_of_the_next(self):
+        task = self.create()
+        real, written = datasets.copy_upload, []
+
+        def fills_the_disk(upload, path):
+            real(upload, path)
+            written.append(path)
+            if len(written) == 2:
+                raise OSError(errno.ENOSPC, "No space left on device")
+
+        with mock.patch.object(datasets, "copy_upload", side_effect=fills_the_disk):
+            res = self.upload(task, [jpeg("a.jpg"), jpeg("b.jpg"), jpeg("c.jpg")])
+        self.assertEqual(res.status_code, 507)
+        self.assertEqual(res.data["detail"], "The server's disk is full: free some space, then try again")
+        self.assertEqual(sorted(os.listdir(datasets.images_path(task))), ["a.jpg"])
+
+    def test_a_record_that_cannot_be_written_leaves_no_part_of_it(self):
+        task = self.create()
+        folder = datasets.data_path(task)
+        before = sorted(os.listdir(folder))
+        with mock.patch.object(datasets.json, "dump", side_effect=OSError(errno.ENOSPC, "No space left on device")), \
+                self.assertRaises(OSError):
+            datasets.write_json(os.path.join(folder, "job.json"), {"status": "new"})
+        self.assertEqual(sorted(os.listdir(folder)), before)
 
     def test_images_added_after_an_analysis_mark_it_out_of_date(self):
         task = self.create()

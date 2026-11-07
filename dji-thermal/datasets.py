@@ -22,6 +22,7 @@ job stops at its next progress write.
 """
 
 import collections
+import contextlib
 import datetime
 import json
 import logging
@@ -95,11 +96,27 @@ def read_json(path, default=None):
         return {} if default is None else default
 
 
+PART = '.part'      # a file being written (write_file), not one of the dataset's
+
+
+def write_file(path, write):
+    """A file written by write(part) under a name of its own, then renamed to path: one that fails (a full disk)
+    leaves no part of it behind"""
+    part = '{}.{}{}'.format(path, uuid.uuid4().hex[:8], PART)
+    try:
+        write(part)
+        portable.replace(part, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.remove(part)
+        raise
+
+
 def write_json(path, value):
-    part = '{}.{}.part'.format(path, uuid.uuid4().hex[:8])
-    with open(part, 'w') as f:
-        json.dump(value, f)
-    portable.replace(part, path)
+    def write(part):
+        with open(part, 'w') as f:
+            json.dump(value, f)
+    write_file(path, write)
 
 
 @contextmanager
@@ -334,7 +351,7 @@ def image_files(task):
         dirnames.sort()
         for f in sorted(filenames):
             fp = os.path.join(dirpath, f)
-            if not os.path.islink(fp):
+            if not os.path.islink(fp) and not f.endswith(PART):
                 try:
                     out.append((os.path.relpath(fp, root), os.path.getsize(fp)))
                 except OSError:
@@ -356,11 +373,16 @@ def save_image(task, rel, upload):
     root = images_path(task)
     dest = path_traversal_check(os.path.join(root, rel), root)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
+    write_file(dest, lambda part: copy_upload(upload, part))
+
+
+def copy_upload(upload, path):
+    """An uploaded file written at path"""
     if hasattr(upload, 'temporary_file_path'):
         # WebODM's upload handler closes an upload kept on disk (over 4.5 MB): it is read from its path
-        shutil.copyfile(upload.temporary_file_path(), dest)
+        shutil.copyfile(upload.temporary_file_path(), path)
     else:
-        with open(dest, 'wb') as f:
+        with open(path, 'wb') as f:
             f.writelines(upload.chunks())
 
 
