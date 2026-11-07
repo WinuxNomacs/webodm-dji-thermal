@@ -3,7 +3,7 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R1. A review before the public release** (Done 2026-11-07; the user, 2026-11-07, from `new.md`): "Review the plugin code for
+- **R1. A review before the public release** (R1-1 to R1-8 built 2026-11-07, the rest of the reading still to do; the user, 2026-11-07, from `new.md`): "Review the plugin code for
   possible breaking points, performance improvements, and reduction of possible negative webodm ux impacts. This
   plugin will soon be released to the world so it's important to refine any points where the experience could
   breakdown before they do." Builds on the walk-through for bugs and hangs and the UX review (2026-11-02, Done),
