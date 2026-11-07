@@ -15,6 +15,7 @@ import glob
 import hashlib
 import io
 import os
+import uuid
 
 from django.core.exceptions import SuspiciousFileOperation
 from django.db.models import Q
@@ -99,9 +100,15 @@ def summary(task, user):
     }
 
 
-def detail(task, user):
+def detail(task, user, known_analysis=None):
+    """A dataset as its page shows it; without its analysis ('analysis_unchanged') when known_analysis is the stamp
+    of the one the page has (datasets.analysis_stamp: polling while a job runs)"""
     out = summary(task, user)
-    out['analysis'] = datasets.analysis(task)
+    out['analysis_stamp'] = datasets.analysis_stamp(task)
+    if known_analysis and known_analysis == out['analysis_stamp']:
+        out['analysis_unchanged'] = True
+    else:
+        out['analysis'] = datasets.analysis(task)
     # Newest first
     out['conversions'] = [conversion_summary(task, cid) for cid in reversed(conversions.ids(task))]
     # What the conversions' settings are compared against, to list what each one changed
@@ -233,7 +240,9 @@ class DatasetListCreate(DatasetView):
 
 class DatasetDetail(DatasetView):
     def get(self, request, pk):
-        return Response(detail(datasets.check_stale(get_dataset(request, pk)), request.user))
+        """The dataset; ?analysis=<its stamp> leaves out an analysis the page already has"""
+        return Response(detail(datasets.check_stale(get_dataset(request, pk)), request.user,
+                               request.query_params.get('analysis')))
 
     def patch(self, request, pk):
         task = get_dataset(request, pk, 'change_project')
@@ -462,13 +471,18 @@ def palette_thumbnail(task, path, palette, size=THUMBNAIL_SIZE):
     im.thumbnail(size)
     out = io.BytesIO()
     im.save(out, 'JPEG', quality=90 if size == LARGE_SIZE else 75)
-    os.makedirs(os.path.dirname(cached), exist_ok=True)
-    with open(cached + '.part', 'wb') as f:
-        f.write(out.getvalue())
+    # A name of its own: the same thumbnail may be asked for twice at once (two tabs, two users)
+    part = '{}.{}.part'.format(cached, uuid.uuid4().hex[:8])
     try:
-        portable.replace(cached + '.part', cached)
-    except OSError:     # the cached copy is held open: it is the same picture
-        os.remove(cached + '.part')
+        os.makedirs(os.path.dirname(cached), exist_ok=True)
+        with open(part, 'wb') as f:
+            f.write(out.getvalue())
+        portable.replace(part, cached)
+    except OSError:     # not kept (the cached copy held open is the same picture, or the disk is full): still sent
+        try:
+            os.remove(part)
+        except OSError:
+            pass
     return out.getvalue()
 
 

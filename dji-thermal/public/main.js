@@ -10,10 +10,40 @@ PluginsAPI.Dashboard.addNewTaskButton(
     }
 );
 
+// The Thermal Inspector's scripts, loaded on a map page only (WebODM loads include_js_files on every page), in order
+// (inspector.js uses the others), at main.js's own version (plugin.py include_js_files). Resolves once they ran.
+window.DjiThermalMapScripts = (function(){
+    var NAMES = ["scale.js", "recolour.js", "regions.js", "frames.js", "inspector.js"];
+    var me = document.currentScript && document.currentScript.src || "";
+    var base = me ? me.replace(/main\.js(\?.*)?$/, "") : "/plugins/dji-thermal/";
+    var query = (/\?v=[^&]*/.exec(me) || [""])[0];
+    var loading = null;
+    function one(name){
+        return new Promise(function(resolve, reject){
+            var s = document.createElement("script");
+            s.src = base + name + query;
+            s.onload = resolve;
+            s.onerror = function(){ reject(new Error("Could not load " + name)); };
+            document.head.appendChild(s);
+        });
+    }
+    return function(){
+        if (!loading){
+            loading = NAMES.reduce(function(p, name){ return p.then(function(){ return one(name); }); }, Promise.resolve());
+            loading.catch(function(){ loading = null; });
+        }
+        return loading;
+    };
+})();
+
 // The Thermal Inspector on WebODM's 2D map (inspector.js, with frames.js's source frames window), with WebODM's Leaflet:
 // its button shows when the map has a thermal orthophoto or the project has workset mosaics
 PluginsAPI.Map.willAddControls(["leaflet", "dji-thermal/inspector.css", "dji-thermal/frames.css"], function(args, L){
-    if (window.ThermalInspector) window.ThermalInspector.create(args, L);
+    window.DjiThermalMapScripts().then(function(){
+        if (window.ThermalInspector) window.ThermalInspector.create(args, L);
+    }, function(e){
+        if (window.console) window.console.warn("DJI Thermal: the Thermal Inspector is not available: " + e.message);
+    });
 });
 
 // A component of the plugin's built bundles (public/build), loaded once it is shown. A task panel's button can't wait

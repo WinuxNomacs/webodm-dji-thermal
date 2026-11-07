@@ -510,6 +510,12 @@
         });
     }
 
+    // How long a page waits before asking again while a job runs: longer in a tab in the background
+    var HIDDEN_POLL_FACTOR = 5;
+    function pollDelay(doc, ms) {
+        return doc && doc.hidden ? ms * HIDDEN_POLL_FACTOR : ms;
+    }
+
     function readJson(res) {
         return res.json().then(function (data) { return {ok: res.ok, data: data}; },
                                function () { return {ok: res.ok, data: {}}; });
@@ -604,7 +610,7 @@
     var api = {
         escapeHtml: escapeHtml, formatBytes: formatBytes, formatDate: formatDate, formatNumber: formatNumber,
         statusLabel: statusLabel, severityLabel: severityLabel, kindLabel: kindLabel, uploadName: uploadName,
-        isImage: isImage, exifCamera: exifCamera, readCamera: readCamera, datasetName: datasetName, namingImage: namingImage, batches: batches, uploadFiles: uploadFiles, readJson: readJson, unreachable: unreachable, errorText: errorText,
+        isImage: isImage, exifCamera: exifCamera, readCamera: readCamera, datasetName: datasetName, namingImage: namingImage, batches: batches, uploadFiles: uploadFiles, readJson: readJson, pollDelay: pollDelay, unreachable: unreachable, errorText: errorText,
         framesPalette: framesPalette, unitOf: unitOf, userUnit: userUnit, unitSymbol: unitSymbol, convertTemp: convertTemp, convertDelta: convertDelta,
         formatTemp: formatTemp, formatDelta: formatDelta, stageText: stageText, mosaicLabel: mosaicLabel,
         batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName,

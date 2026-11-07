@@ -527,7 +527,7 @@ def remove_images(task, paths, user):
         except FileNotFoundError:
             pass
     with datasets.locked(task):
-        a = datasets.analysis(task)
+        a = dict(datasets.analysis(task))       # shared while unchanged: a copy changed (see datasets.analysis)
         if a.get('files'):
             a['files'] = [f for f in a['files'] if f.get('path') not in gone]
             datasets.write_json(datasets.data_path(task, datasets.ANALYSIS_FILE), a)

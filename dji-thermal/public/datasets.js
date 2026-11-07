@@ -198,7 +198,7 @@
             if (timer) root.clearTimeout && root.clearTimeout(timer);
             timer = null;
             if (datasets.some(function (d) { return d.status === "analyzing" || d.busy; }) && root.setTimeout) {
-                timer = root.setTimeout(load, POLL_MS);
+                timer = root.setTimeout(load, core.pollDelay(doc, POLL_MS));
             }
         }
 

@@ -2143,32 +2143,47 @@
         doc.addEventListener("djiThermalUnitChanged", onUnits);
 
         // The user's palette and whether the legend is shown, from the Analyzer's preferences (shown when they can't
-        // be read)
-        var ready = fetchFn(API + "display", {credentials: "same-origin"}).then(readJson).then(function (r) {
-            state.legendVisible = !r.ok || r.data.legend !== false;
-            if (!r.ok) return renderLegend();
-            state.display = r.data;
-            var preferred = r.data.palette;
-            if (preferred && paletteNames(r.data).indexOf(preferred) !== -1) {
-                state.palette = preferred;
-                thermalLayers(map).forEach(applyPalette);
-            } else {
-                var shown = thermalLayers(map)[0];
-                state.palette = shown ? paletteOf(shown.layer._url) : "";
-                openInTaskPalette();
+        // be read). Asked for only where there are temperatures: a thermal layer on the map, or the project's mosaics
+        // (below); never on a public map, whose viewer may not be logged in (the legend shown, the task's palette).
+        var publicMap = /^\/public\//.test((deps.path !== undefined ? deps.path : root.location && root.location.pathname) || "");
+        function loadDisplay() {
+            if (publicMap) {
+                state.legendVisible = true;
+                renderLegend();
+                return Promise.resolve();
             }
-            renderLegend();
-            render();
-        }, function () {
-            state.legendVisible = true;
-            renderLegend();
-        });
+            return fetchFn(API + "display", {credentials: "same-origin"}).then(readJson).then(function (r) {
+                state.legendVisible = !r.ok || r.data.legend !== false;
+                if (!r.ok) return renderLegend();
+                state.display = r.data;
+                var preferred = r.data.palette;
+                if (preferred && paletteNames(r.data).indexOf(preferred) !== -1) {
+                    state.palette = preferred;
+                    thermalLayers(map).forEach(applyPalette);
+                } else {
+                    var shown = thermalLayers(map)[0];
+                    state.palette = shown ? paletteOf(shown.layer._url) : "";
+                    openInTaskPalette();
+                }
+                renderLegend();
+                render();
+            }, function () {
+                state.legendVisible = true;
+                renderLegend();
+            });
+        }
+        var temperatures = !!(thermalLayers(map, true).length || hasThermal(args.tiles));
+        var ready = temperatures ? loadDisplay() : Promise.resolve();
 
         // The project's workset mosaics, then the one a link asks for laid on the map, the panel open
         var mosaicsReady = !project ? Promise.resolve() : ready.then(function () {
             return fetchFn(API + "projects/" + project + "/inspector/mosaics", {credentials: "same-origin"}).then(readJson);
         }).then(function (r) {
-            state.mosaics = r.ok && Array.isArray(r.data.mosaics) ? r.data.mosaics : [];
+            var found = r.ok && Array.isArray(r.data.mosaics) ? r.data.mosaics : [];
+            // An RGB map whose project has mosaics: the preferences now, before one is laid
+            return (found.length && !temperatures ? loadDisplay() : Promise.resolve()).then(function () { return found; });
+        }).then(function (found) {
+            state.mosaics = found;
             var linked = linkedMosaic(search);
             var m = linked && state.mosaics.filter(function (x) { return x.dataset.id === linked.dataset && x.workset.id === linked.workset; })[0];
             if (m) {
