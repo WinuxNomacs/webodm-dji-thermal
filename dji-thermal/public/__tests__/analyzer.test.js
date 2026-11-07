@@ -188,13 +188,13 @@ describe("analyzer core", () => {
         });
         const progress = jest.fn();
         const r = await core.uploadFiles(fetchFn, "/up", "tok", files, progress, FD);
-        expect(r).toEqual({saved: 2, failed: [], canceled: false});
+        expect(r).toEqual({saved: 2, failed: [], canceled: false, reason: ""});
         const body = fetchFn.mock.calls[1][1].body.parts;
         expect(body).toEqual([["images", "a.JPG"], ["paths", "t/a.JPG"], ["images", "b.jpeg"], ["paths", "b.jpeg"]]);
         expect(progress).toHaveBeenLastCalledWith({sent: 2, total: 2, bytesSent: 20, bytesTotal: 20});
 
         const failing = jest.fn(() => Promise.reject(new Error("offline")));
-        expect(await core.uploadFiles(failing, "/up", "tok", files, null, FD)).toEqual({saved: 0, failed: [files[0], files[2]], canceled: false});
+        expect(await core.uploadFiles(failing, "/up", "tok", files, null, FD)).toEqual({saved: 0, failed: [files[0], files[2]], canceled: false, reason: ""});
         expect(failing).toHaveBeenCalledTimes(3);
     });
 
@@ -233,7 +233,7 @@ describe("analyzer core", () => {
         jest.advanceTimersByTime(core.batchTimeout(1048576));
         await ticks();
         expect(stalled).toHaveBeenCalledTimes(3);
-        expect(r).toEqual({saved: 0, failed: files, canceled: false});
+        expect(r).toEqual({saved: 0, failed: files, canceled: false, reason: ""});
 
         // A request that answers late, but before its timeout, is not sent again
         let answer;
@@ -245,7 +245,7 @@ describe("analyzer core", () => {
         answer({ok: true, json: () => Promise.resolve({saved: 1})});
         await ticks();
         expect(slow).toHaveBeenCalledTimes(1);
-        expect(r).toEqual({saved: 1, failed: [], canceled: false});
+        expect(r).toEqual({saved: 1, failed: [], canceled: false, reason: ""});
     });
 
     it("cancels an upload: aborts the requests in flight, sends no more, and returns every image not saved", async () => {
@@ -265,6 +265,20 @@ describe("analyzer core", () => {
         expect(r.saved).toBe(0);
         expect(r.failed.length).toBe(40);
         expect(progress).not.toHaveBeenCalled();
+    });
+
+    it("stops an upload the server refuses with a reason, without sending it again, and says why", async () => {
+        class FD { append() {} }
+        const files = Array.from({length: 40}, (_, i) => ({name: i + ".JPG", size: 1}));
+        const fetchFn = jest.fn(() => Promise.resolve({ok: false, status: 400,
+            json: () => Promise.resolve({error: "The project's owner is over their storage quota: free some space first"})}));
+        const r = await core.uploadFiles(fetchFn, "/up", "tok", files, null, FD);
+        expect(fetchFn).toHaveBeenCalledTimes(3);       // the PARALLEL batches in flight, none sent again, no more sent
+        expect(r.saved).toBe(0);
+        expect(r.failed.length).toBe(40);
+        expect(r.reason).toBe("The project's owner is over their storage quota: free some space first");
+        expect(core.failedText(r.failed.slice(0, 1), r.reason)).toBe("1 image could not be sent: 0.JPG. " +
+            "The project's owner is over their storage quota: free some space first.");
     });
 
     it("finds the median of the values given, leaving out the missing ones", () => {
@@ -408,6 +422,28 @@ describe("datasets list", () => {
 
         jest.runOnlyPendingTimers();
         expect(fetchFn).toHaveBeenCalledTimes(2);
+    });
+
+    it("says why the list could not load when the server refuses it, keeps the list it has and tries again", async () => {
+        jest.useFakeTimers();
+        const busy = Object.assign({}, DATASET, {status: "analyzing", progress: 0.5});
+        const fetchFn = server({"/api/plugins/dji-thermal/datasets": [
+            {datasets: [busy], projects: []},
+            () => jsonResponse({detail: "Authentication credentials were not provided."}, false),
+            {datasets: [DATASET], projects: []}
+        ]});
+        datasets.init(document, fetchFn);
+        await ticks();
+        jest.runOnlyPendingTimers();
+        await ticks();
+
+        const message = document.getElementById("ta-message");
+        expect(message.textContent).toBe("Could not load the datasets: Authentication credentials were not provided.");
+        expect(document.querySelectorAll("#ta-body tr").length).toBe(1);
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect(message.textContent).toBe("");
+        expect(document.querySelector("#ta-body tr").textContent).not.toContain("50%");
     });
 
     it("sorts by any column, both ways, with what has nothing to sort by last", () => {
@@ -2850,6 +2886,19 @@ describe("the mosaic viewer", () => {
         click(pip.querySelector('[data-pip="close"]'));
         expect(pip.hidden).toBe(true);
         expect(pip.style.transform).toBe("");
+    });
+
+    it("says the server could not be reached when the readout's request never arrives", async () => {
+        const L = fakeLeaflet();
+        const at = "?lon=10.0005&lat=45.0005";
+        const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
+                                [C9 + "/mosaics/as_converted/frames" + at]: () => Promise.reject(new TypeError("Failed to fetch")),
+                                [C9 + "/mosaics/as_converted/point" + at]: () => Promise.reject(new TypeError("Failed to fetch"))});
+        await start(fetchFn, L);
+        await ticks();
+        L.maps[0].fire("click", {latlng: {lng: 10.0005, lat: 45.0005}});
+        await ticks();
+        expect($("ta-viewer-readout").textContent).toContain("Could not reach the server");
     });
 
     it("a click keeps the readout on its point until Follow the cursor or Esc", async () => {

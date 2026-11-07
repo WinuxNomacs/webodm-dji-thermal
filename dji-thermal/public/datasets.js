@@ -205,10 +205,13 @@
         function load() {
             if (!datasets.length) message.textContent = "Loading…";
             return fetchFn(API + "datasets", {credentials: "same-origin"})
-                .then(function (res) { return res.json(); })
-                .then(function (r) {
+                .then(core.readJson, core.unreachable)
+                .then(function (answer) {
+                    // Refused (a session that ended, a server error): said, the list kept as it was
+                    if (!answer.ok || !Array.isArray(answer.data.datasets)) return failed(core.errorText(answer.data, ""));
+                    var r = answer.data;
                     datasets = r.datasets;
-                    projects = r.projects;
+                    projects = r.projects || [];
                     // Loaded, but the page failed drawing them: said apart from a failed request, and logged
                     try {
                         fillProjects(projects);
@@ -219,11 +222,13 @@
                         return;
                     }
                     schedule();
-                }, function () {
-                    message.textContent = "Could not load the datasets.";
-                    // Tried again, less often, while a dataset is busy: one dropped request must not leave its progress as it was
-                    if (timer && root.setTimeout) timer = root.setTimeout(load, POLL_MS * 5);
                 });
+        }
+
+        function failed(reason) {
+            message.textContent = "Could not load the datasets" + (reason ? ": " + reason : ".");
+            // Tried again, less often, while a dataset is busy: one dropped request must not leave its progress as it was
+            if (timer && root.setTimeout) timer = root.setTimeout(load, POLL_MS * 5);
         }
 
         function find(id) { return datasets.filter(function (d) { return String(d.id) === String(id); })[0]; }
@@ -384,7 +389,7 @@
                 if (!u.failed.length) return analyze();
                 made.failed = u.failed;
                 setStage("failed");
-                setError(core.failedText(u.failed) + " " + (made.saved ? core.count(made.saved, "image", "images") + " arrived: send the others again, or analyze without them." :
+                setError(core.failedText(u.failed, u.reason) + " " + (made.saved ? core.count(made.saved, "image", "images") + " arrived: send the others again, or analyze without them." :
                     "None arrived: send them again, or cancel."));
             });
         }

@@ -11,17 +11,19 @@ outputs, changing it allows uploading, renaming, analyzing and converting (and d
 from them), and deleting a dataset needs the project's delete permission (as a task does).
 """
 
+import errno
 import glob
 import hashlib
 import io
 import os
 import uuid
+from contextlib import contextmanager
 
 from django.core.exceptions import SuspiciousFileOperation
 from django.db.models import Q
 from django.http import HttpResponse
 from rest_framework import permissions, status
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import APIException, NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -41,6 +43,24 @@ LIST_SIZE = (320, 320)         # the frame page's list (?size=list), shown about
 SIZES = {'large': LARGE_SIZE, 'list': LIST_SIZE}
 THUMBNAILS_DIR = 'thumbnails'
 OVER_QUOTA = "The project's owner is over their storage quota: free some space first"
+DISK_FULL = "The server's disk is full: free some space, then try again"
+
+
+class DiskFull(APIException):
+    status_code = 507       # Insufficient Storage
+    default_detail = DISK_FULL
+    default_code = 'disk_full'
+
+
+@contextmanager
+def disk_full_refused():
+    """A full disk while writing what a request sent answered as such, not as a server error"""
+    try:
+        yield
+    except OSError as e:
+        if e.errno == errno.ENOSPC:
+            raise DiskFull() from None
+        raise
 
 
 def get_dataset(request, pk, perm='view_project'):
@@ -275,20 +295,23 @@ class DatasetUpload(DatasetView):
         if len(paths) != len(files):
             paths = [f.name for f in files]
         saved, skipped = 0, []
-        for f, name in zip(files, paths):
-            rel = datasets.upload_path(name or "")
-            if rel is None or not rel.lower().endswith(datasets.IMAGE_EXTENSIONS):
-                skipped.append(name)
-                continue
-            try:
-                datasets.save_image(task, rel, f)
-            except SuspiciousFileOperation:
-                skipped.append(name)
-                continue
-            saved += 1
-
-        if saved:
-            datasets.images_changed(task)
+        try:
+            with disk_full_refused():
+                for f, name in zip(files, paths):
+                    rel = datasets.upload_path(name or "")
+                    if rel is None or not rel.lower().endswith(datasets.IMAGE_EXTENSIONS):
+                        skipped.append(name)
+                        continue
+                    try:
+                        datasets.save_image(task, rel, f)
+                    except SuspiciousFileOperation:
+                        skipped.append(name)
+                        continue
+                    saved += 1
+        finally:
+            # Those saved before the disk was full are the dataset's too
+            if saved:
+                datasets.images_changed(task)
         datasets.update_size(task)
         images = datasets.image_files(task)
         return Response({'saved': saved, 'skipped': skipped, 'file_count': len(images),

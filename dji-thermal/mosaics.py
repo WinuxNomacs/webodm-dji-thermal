@@ -42,6 +42,10 @@ PALETTES_FILE = 'palettes.json'
 JOB_FILE = 'mosaic-job.json'
 RESULT_FILE = 'mosaics.json'
 PERCENTILES = (2, 98)
+# A large mosaic is never read whole: its range block by block (ROWS_PIXELS at a time), its percentiles and its
+# histogram from a read of at most SAMPLE_SIZE pixels a side (all of it when smaller)
+ROWS_PIXELS = 1 << 22
+SAMPLE_SIZE = 2048
 ABSOLUTE_ZERO = {'C': -273.15, 'F': -459.67, 'K': 0.0}
 # dji-thermal-cli's mosaic default (nadir frames), unless the conversion sets its own pitch limit
 DEFAULT_MAX_PITCH = -80.0
@@ -92,28 +96,56 @@ def low_value(unit):
     return ABSOLUTE_ZERO.get(unit, ABSOLUTE_ZERO['C']) + 1
 
 
-def band_stats(values):
-    """min, max and the PERCENTILES of the finite values of an array, or None when there are none"""
+def valid_values(values, unit=None):
+    """An array's finite values (above the no-data marker, with a unit: temperatures), as float64"""
     import numpy as np
-    v = values[np.isfinite(values)]
-    if v.size == 0:
+    keep = np.isfinite(values)
+    if unit is not None:
+        keep &= values > low_value(unit)
+    return values[keep].astype(np.float64)
+
+
+def band_rows(src, band):
+    """A rasterio dataset's band, ROWS_PIXELS at a time"""
+    from rasterio.windows import Window
+    rows = max(1, ROWS_PIXELS // max(1, src.width))
+    for row in range(0, src.height, rows):
+        yield src.read(band, window=Window(0, row, src.width, min(rows, src.height - row)))
+
+
+def band_sample(src, band):
+    """A rasterio dataset's band, read whole up to SAMPLE_SIZE pixels a side, else reduced to that"""
+    scale = max(1.0, max(src.width, src.height) / SAMPLE_SIZE)
+    if scale == 1.0:
+        return src.read(band)
+    return src.read(band, out_shape=(max(1, int(src.height / scale)), max(1, int(src.width / scale))))
+
+
+def band_stats(src, band, unit=None):
+    """min and max (of every pixel) and the PERCENTILES (of band_sample) of a band's valid values (valid_values), or
+    None when there are none"""
+    import numpy as np
+    low = high = None
+    for rows in band_rows(src, band):
+        v = valid_values(rows, unit)
+        if v.size:
+            low = float(v.min()) if low is None else min(low, float(v.min()))
+            high = float(v.max()) if high is None else max(high, float(v.max()))
+    if low is None:
         return None
-    low, high = (float(p) for p in np.percentile(v, PERCENTILES))
-    return {'min': float(v.min()), 'max': float(v.max()), 'percentiles': [low, high]}
+    sample = valid_values(band_sample(src, band), unit)
+    percentiles = [float(p) for p in np.percentile(sample, PERCENTILES)] if sample.size else [low, high]
+    return {'min': low, 'max': high, 'percentiles': percentiles}
 
 
 def raster_info(raster, unit):
     """Where a mosaic is (lon/lat bounds, zooms) and the range of its temperature and view angle bands"""
-    import numpy as np
-
     from app.api.tiler import get_zoom_safe
     with webodm_versions.tiler().COGReader(raster) as src:
         minzoom, maxzoom = get_zoom_safe(src)
         info = {'bounds': list(src.bounds), 'minzoom': minzoom, 'maxzoom': maxzoom}
-        temperature = src.dataset.read(1)
-        temperature = np.where(temperature > low_value(unit), temperature, np.nan)
-        info['temperature'] = band_stats(temperature)
-        info['view_angle'] = band_stats(src.dataset.read(3))
+        info['temperature'] = band_stats(src.dataset, 1, unit)
+        info['view_angle'] = band_stats(src.dataset, 3)
     return info
 
 
@@ -472,11 +504,11 @@ def is_temperature(tab):
 
 
 def temperatures(raster, unit):
-    """A mosaic's temperatures, NaN where it has none"""
+    """A mosaic's temperatures (band_sample: reduced to SAMPLE_SIZE pixels a side when larger), NaN where it has none"""
     import numpy as np
     import rasterio
     with rasterio.open(raster) as src:
-        values = src.read(1).astype(np.float64)
+        values = band_sample(src, 1).astype(np.float64)
     values[~np.isfinite(values) | (values <= low_value(unit))] = np.nan
     return values
 

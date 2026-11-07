@@ -237,8 +237,10 @@
 
     // Uploads images to a dataset, PARALLEL requests at a time. onProgress({sent, total, bytesSent, bytesTotal}).
     // options.signal: an AbortSignal that cancels the upload (the requests in flight are aborted, no more are sent).
-    // Resolves to {saved, failed, canceled} (failed: the images that were not saved, as the Files given, to send
-    // them again; when canceled, those not sent too).
+    // Resolves to {saved, failed, canceled, reason} (failed: the images that were not saved, as the Files given, to
+    // send them again; when canceled, those not sent too; reason: why the server refused them, or ""). A refusal the
+    // server gives a reason for (over quota, an analysis running, a full disk) holds for the whole dataset: it is not
+    // sent again, and the batches not sent yet are not sent.
     function uploadFiles(fetchFn, url, csrf, files, onProgress, FormDataClass, options) {
         FormDataClass = FormDataClass || root.FormData;
         options = options || {};
@@ -247,7 +249,7 @@
         var queue = batches(images);
         var total = images.length;
         var bytesTotal = images.reduce(function (s, f) { return s + f.size; }, 0);
-        var state = {sent: 0, bytesSent: 0, saved: 0, failed: []};
+        var state = {sent: 0, bytesSent: 0, saved: 0, failed: [], reason: ""};
 
         function canceled() { return !!(signal && signal.aborted); }
 
@@ -278,8 +280,12 @@
                 if (signal) signal.removeEventListener("abort", onCancel);
             }
             var sent = fetchFn(url, opts).then(function (res) {
-                if (!res.ok) throw new Error("upload failed: " + res.status);
-                return res.json();
+                if (res.ok) return res.json();
+                return readJson(res).then(function (r) {
+                    var e = new Error("upload failed: " + res.status);
+                    e.reason = errorText(r.data, "");
+                    throw e;
+                });
             });
             return Promise.race([sent, givenUp]).then(function (r) { done(); return r; },
                                                        function (e) { done(); throw e; });
@@ -289,8 +295,9 @@
         function send(batch, attempt) {
             return request(batch)
                 .then(function (r) { return r.saved || 0; })
-                .catch(function () {
-                    if (attempt < RETRIES && !canceled()) return send(batch, attempt + 1);
+                .catch(function (e) {
+                    if (e.reason) state.reason = state.reason || e.reason;
+                    else if (attempt < RETRIES && !canceled()) return send(batch, attempt + 1);
                     batch.forEach(function (f) { state.failed.push(f); });
                     return null;
                 });
@@ -308,7 +315,7 @@
         }
 
         function worker() {
-            if (canceled()) return Promise.resolve();
+            if (canceled() || state.reason) return Promise.resolve();
             var next = queue.shift();
             return next ? sendBatch(next).then(worker) : Promise.resolve();
         }
@@ -318,17 +325,17 @@
         return Promise.all(workers).then(function () {
             // Canceled: the batches never sent are not saved either
             queue.forEach(function (batch) { batch.forEach(function (f) { state.failed.push(f); }); });
-            return {saved: state.saved, failed: state.failed, canceled: canceled()};
+            return {saved: state.saved, failed: state.failed, canceled: canceled(), reason: state.reason};
         });
     }
 
-    // What an upload could not send, naming the first few images
-    function failedText(files, shown) {
+    // What an upload could not send, naming the first few images, and why when the server said (uploadFiles' reason)
+    function failedText(files, reason, shown) {
         shown = shown || 5;
         var names = files.slice(0, shown).map(function (f) { return f.webkitRelativePath || f.name; });
         var more = files.length - names.length;
         return files.length + (files.length === 1 ? " image" : " images") + " could not be sent: " + names.join(", ") +
-            (more ? " and " + more + " more" : "") + ".";
+            (more ? " and " + more + " more" : "") + "." + (reason ? " " + reason.replace(/\.?$/, ".") : "");
     }
 
     function count(n, one, many) { return n + " " + (n === 1 ? one : many); }

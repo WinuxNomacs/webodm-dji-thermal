@@ -20,7 +20,7 @@ from app.api.tasks import flatten_files
 from app.models import Task
 
 from . import conversion_tasks, converter, datasets
-from .analyzer_api import OVER_QUOTA
+from .analyzer_api import OVER_QUOTA, disk_full_refused
 
 NOT_THERMAL = "not a DJI thermal image"
 
@@ -34,12 +34,7 @@ def work_folder():
 def save_upload(upload, folder):
     """The uploaded file written into folder (the library reads files), keeping its extension"""
     path = os.path.join(folder, 'source' + os.path.splitext(upload.name or '')[1].lower())
-    if hasattr(upload, 'temporary_file_path'):
-        # WebODM's upload handler closes an upload kept on disk (over 4.5 MB): it is read from its path
-        shutil.copyfile(upload.temporary_file_path(), path)
-    else:
-        with open(path, 'wb') as f:
-            f.writelines(upload.chunks())
+    datasets.copy_upload(upload, path)
     return path
 
 
@@ -131,7 +126,7 @@ class TaskConvert(APIView):
         except SuspiciousFileOperation:
             raise exceptions.ValidationError(detail="Invalid image name") from None
 
-        with work_folder() as folder:
+        with disk_full_refused(), work_folder() as folder:
             source = save_upload(upload, folder)
             if dataset is not None:
                 keep_in_dataset(dataset, upload)

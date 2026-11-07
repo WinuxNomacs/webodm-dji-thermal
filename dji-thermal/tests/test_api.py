@@ -5,6 +5,7 @@ task's DJI Thermal Analyzer dataset.
 As in test_converter, the tests with real R-JPEGs read them from DJI_THERMAL_SAMPLES_DIR and are skipped without it.
 """
 import contextlib
+import errno
 import importlib
 import io
 import os
@@ -162,6 +163,23 @@ class TestConvert(ApiTestCase):
         res = self.post_file(convert_url(self.task), jpeg_upload(), dataset=str(other.id))
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(datasets.image_files(other), [])
+
+    def test_a_full_disk_is_said_and_leaves_no_part_of_the_photo_in_the_dataset(self):
+        dataset = self.link_dataset()
+        real = datasets.copy_upload
+
+        def fills_the_disk(upload, path):
+            real(upload, path)
+            if os.path.dirname(path).startswith(datasets.images_path(dataset)):
+                raise OSError(errno.ENOSPC, "No space left on device")
+
+        with mock.patch.object(datasets, "copy_upload", side_effect=fills_the_disk):
+            res = self.post_file(convert_url(self.task), jpeg_upload("DJI_0001_V.JPG"), dataset=str(dataset.id))
+        self.assertEqual(res.status_code, 507)
+        self.assertEqual(res.data["detail"], "The server's disk is full: free some space, then try again")
+        self.assertEqual(os.listdir(datasets.images_path(dataset)), [])
+        self.assertEqual(self.task_images(), [])
+        self.assertNoWorkFilesLeft()
 
     def link_dataset(self):
         res = self.client.post(dataset_url(self.task))
