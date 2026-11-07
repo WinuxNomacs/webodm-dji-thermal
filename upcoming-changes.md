@@ -21,40 +21,39 @@
   workset's palette first (`frames_api.default_palette`: the workset's DJI palette with a coloured output, then the
   preferred, then inferno); a palette picked in its panel still applies and is saved as the preference, and the next
   visit to that workset's frames opens in the workset's again.
-- **The temperature unit: °C, °F or K, in WebODM's header, an administrator's default** (the user, 2026-11-07: "a
+- **The temperature unit (°C or °F) in WebODM's header, an administrator's default** (the user, 2026-11-07: "a
   global option for the user to control it via dropdown in the header row next to the user icon. The visible
   temperature conversions should support C, F and K. This setting is global for the user of the DJI Thermal Analyzer
   plugin. If possible, add a dropdown setting to the plugin Admin configuration page that allows Administrators to
-  configure the default for a system. Otherwise default to C"). Builds on "The unit and palette shared" (2026-10-30,
-  below), whose "one unit, WebODM's; Kelvin dropped" it replaces: the unit is the plugin's again, saved per user.
+  configure the default for a system. Otherwise default to C"; then: "Drop Kelvin, we may decide to add it back
+  later if webodm adds more traditional Kelvin support"). Builds on "The unit and palette shared" (2026-10-30,
+  below): the unit stays WebODM's metric/imperial in each browser, and is now also saved per user.
   **Design**:
-  - **Saved per WebODM user** in the display preferences (`conversions.display`'s `unit`: C, F or K, the user data
+  - **Saved per WebODM user** in the display preferences (`conversions.display`'s `unit`: C or F, the user data
     store), so it follows them to any browser; `migrateUnit` (which handed a saved unit to WebODM once and dropped
     it) goes. A user who never chose gets the **administrator's default**, else °C.
-  - **The administrator's default**: a "Default temperature unit" dropdown (°C, °F, K) on the DJI Thermal page under
+  - **The administrator's default**: a "Default temperature unit" dropdown (°C, °F) on the DJI Thermal page under
     Administration (`sdk.html`, superusers), kept in the plugin's global data store; °C until one is set.
-  - **The header dropdown**: `main.js` (on every WebODM page) adds a °C / °F / K menu to WebODM's top bar, just left
-    of the user icon, wherever the header has that icon (logged in). Picking one saves it (`PUT display`) and
-    redraws every open view (the Thermal Inspector, the Analyzer's pages) through one page event.
+  - **The header dropdown**: `main.js` (on every WebODM page) adds a °C / °F menu to WebODM's top bar, just left of
+    the user icon, wherever the header has that icon (logged in). Picking one saves it (`PUT display`) and redraws
+    every open view (the Thermal Inspector, the Analyzer's pages) through WebODM's `onUnitSystemChanged`.
   - **Kept in sync with the Preferences dialog's unit** (both change the same saved setting).
-  - **Linked to WebODM's units** (metric/imperial, per browser): picking °F sets WebODM to imperial, °C or K to
-    metric (WebODM's distances and areas follow); WebODM's switch changes the unit: imperial is °F, metric the
-    user's last metric pick (°C or K, kept beside the unit). On load the saved unit sets this browser's WebODM units
-    to match. A user who never chose follows this browser's WebODM units when they were set (imperial: °F), else the
-    administrator's default (WebODM's units set to match).
+  - **Linked to WebODM's units** (metric/imperial, per browser): °F is imperial, °C metric, both ways (picking one
+    sets WebODM's units, so its distances and areas follow; WebODM's switch saves the unit). On load the saved unit
+    sets this browser's WebODM units to match. A user who never chose follows this browser's WebODM units when they
+    were set, else the administrator's default (WebODM's units set to match).
   - **Anonymous viewers** (a public or shared map): the administrator's default, no dropdown, WebODM's units not
     touched.
-  - **K everywhere temperatures show**: the Inspector's own conversions (`inspector.js` `userUnit`, `formatTemp`,
-    the typed isotherm, range and reflected temperature) gain K (differences as °C); the Analyzer's already convert
-    K (`analyzer_core.js`). The server keeps measuring in °C. A workset's own unit (its files) is unchanged; new
-    worksets and the Thermal Task panel start in the user's unit.
+  - The server keeps measuring in °C; a workset's own unit (its files, K among them) is unchanged; new worksets and
+    the Thermal Task panel start in the user's unit.
   - The unit reaches the pages: the Analyzer's in `#ta-display` (the unit resolved, with the default); WebODM's
     pages (maps, the Thermal Task panel) from `GET display` once, by `main.js`.
   Tests: Django (`test_api`: the default, the saved unit, a superuser's default, others refused), Jest (the
-  resolution order and the linking, the header menu, the Inspector in K). README, the Inspector and Analyzer
-  quickstarts, `measurement.md`, the admin page's docs; screenshots retaken where the header shows.
+  resolution order and the linking, the header menu). README, the Inspector and Analyzer quickstarts,
+  `measurement.md`, the admin page's docs; screenshots retaken where the header shows.
   **Decided** (the user, 2026-11-07): linked to WebODM's units; the menu on every WebODM page; the Preferences
-  dialog's unit kept, in sync; anonymous viewers get the administrator's default.
+  dialog's unit kept, in sync; anonymous viewers get the administrator's default; **no Kelvin** on screen (maybe
+  later, if WebODM supports Kelvin: see Later).
 - **U2-4. Harmonize's alignment reused by the mosaics** (the user, 2026-11-02: in 1.0.0, the last known item before
   it). A harmonized workset aligns its frames twice: the conversion's `dtc.process(normalize=True)` runs
   dji-thermal-cli's `normalization()`, which builds a mosaic layout and aligns it (`mosaic._align`: 4 rounds of every
@@ -877,6 +876,8 @@
     only): the tabs Worksets, Files, Problems, WebODM plan, opened on Worksets; no console error.
 
 **Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
 - **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
   the earlier "Folder conversion" item (below).
 
