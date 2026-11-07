@@ -3042,3 +3042,13 @@ describe("the mosaic viewer", () => {
         expect(viewer.statusHtml({status: "ready", mosaic_status: "ready"}).text).toBe("");
     });
 });
+
+describe("the palette a workset's frames are drawn in", () => {
+    it("is the one the workset chose, else the preferred one, else none (the frames as shot)", () => {
+        expect(core.framesPalette({outputs: ["temp_c:tiff", "pseudo:png"], palette: "ironred"}, "arctic")).toBe("ironred");
+        // DJI Thermal Task's: temperatures only, the palette its map opens in
+        expect(core.framesPalette({outputs: ["temp_c:tiff"], palette: "ironred"}, "arctic")).toBe("ironred");
+        expect(core.framesPalette({outputs: ["pseudo:png"], palette: null}, "magma")).toBe("magma");
+        expect(core.framesPalette(undefined, null)).toBe("");
+    });
+});

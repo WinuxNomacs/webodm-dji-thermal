@@ -244,6 +244,18 @@ describe("the frame page", () => {
         await start();
         expect(document.querySelector("#ta-frame-list img").getAttribute("src")).toBe(
             "/api/plugins/dji-thermal/datasets/d1/thumbnail?workset=c1&size=list&file=a_T.JPG");
+        // A workset writing coloured images: in its palette, over the preferred one
+        core.setPreferences({palette: "arctic"});
+        FRAMES.frames_palette = "ironred";
+        try {
+            document.body.innerHTML = page();
+            await start();
+            expect(document.querySelector("#ta-frame-list img").getAttribute("src")).toBe(
+                "/api/plugins/dji-thermal/datasets/d1/thumbnail?workset=c1&size=list&palette=ironred&file=a_T.JPG");
+        } finally {
+            delete FRAMES.frames_palette;
+            core.setPreferences({palette: null});
+        }
     });
 
     it("scrolls the list to the frame shown once the page shows it, centred, and leaves it when it's in view", async () => {

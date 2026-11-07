@@ -52,7 +52,8 @@ thermal (the RGB photos) and skipped (those that failed), and its size.
 
 - **Files** opens a table of each image: its thumbnail, result, minimum and maximum temperature, emissivity,
   reflected temperature and distance as the workset measured them, and why any image was skipped. Its headings stay
-  in view as it scrolls; click one to sort by it, and again to reverse the order. The detail pane beside it shows the image under the mouse, or the one you click: the frame at its own
+  in view as it scrolls; click one to sort by it, and again to reverse the order. The frames are drawn in the
+  workset's palette (else yours). The detail pane beside it shows the image under the mouse, or the one you click: the frame at its own
   size (click it for the picture viewer), all it was measured with, the workset's files for it, its temperatures as
   CSV or a float TIFF, and **Open frame**. Ctrl/Cmd-click or Shift-click selects several images, to download their
   files as one zip. **Remove from workset**, at the bottom of the pane, takes out an image that is more noise than
@@ -114,7 +115,8 @@ closed, it goes back to its corner:
 
 **Open this frame**, under the frame in that window, opens it on the frame page in a new tab (a thermal frame's
 name on the Files tab opens it too). The frames are listed on the left in the order they were taken, each with its
-thumbnail (in your preferred DJI palette, else the frame's own picture: clear **Thumbnails** for the names only),
+thumbnail (in the workset's palette, else your preferred DJI palette, else the frame's own picture: clear
+**Thumbnails** for the names only),
 the one shown highlighted and scrolled into view; click one, or step with ← and →. Once the mosaics are built, **All**, **In the
 mosaic** and **Oblique** choose which are listed; a frame opened from a mosaic lists those in the mosaic.
 The panel has the same palette, range, **Image** and **Isotherm** as the mosaic viewer, and the temperature under the

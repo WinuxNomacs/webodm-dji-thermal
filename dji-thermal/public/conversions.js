@@ -865,11 +865,14 @@
         var results = {}, sorts = {};                     // each one's files as loaded, and how its table is sorted
         var picks = {}, polls = {};                       // each one's images selected and under the mouse; its reload while measuring
         var mosaicPicks = {};                             // and its mosaics selected and under the mouse
-        // The source frames' thumbnails and pictures, in the user's preferred DJI palette when they have one
-        var palette = core.preferences().palette || "";
-        // (a workset's own frames, even in a dataset never analyzed)
+        // The source frames' thumbnails and pictures, in the workset's palette when it chose one, else
+        // the user's preferred DJI palette when they have one (a workset's own frames, even in a dataset never analyzed)
         var thumbnailUrl = ctx.api + "datasets/" + ctx.datasetId + "/thumbnail";
-        var thumbsUrl = function (id) { return thumbnailUrl + "?workset=" + id + "&" + (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file="; };
+        var paletteOf = function (id) { return core.framesPalette((conversionOf(id) || {}).settings, core.preferences().palette); };
+        var thumbsUrl = function (id) {
+            var palette = paletteOf(id);
+            return thumbnailUrl + "?workset=" + id + "&" + (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file=";
+        };
         var fresh = null; // the conversion just started, highlighted for a few seconds
         var editing = null; // the form unfolded: at first only for a dataset without conversions, then once opened
         var menu = null;    // the conversion whose menu is open
@@ -1063,7 +1066,7 @@
 
         // A workset's detail pane: the images selected, else the one under the mouse
         function detailUrls(id) {
-            return {picture: thumbnailUrl + "?workset=" + id, palette: palette, download: base + id + "/download", frameDownload: base + id + "/frame/download",
+            return {picture: thumbnailUrl + "?workset=" + id, palette: paletteOf(id), download: base + id + "/download", frameDownload: base + id + "/frame/download",
                     frame: viewerBase ? viewerBase + id + "/frame" : null, canRemove: !!(dataset && dataset.can_change)};
         }
 
@@ -1180,7 +1183,7 @@
             var viewer = root.ThermalPictureViewer;
             var urls = detailUrls(id);
             var items = resultRows(results[id], sorts[id]).map(function (f) {
-                var src = urls.picture + (urls.picture.indexOf("?") >= 0 ? "&" : "?") + "size=large&" + (palette ? "palette=" + encodeURIComponent(palette) + "&" : "") + "file=" + encodeURIComponent(f.path);
+                var src = urls.picture + (urls.picture.indexOf("?") >= 0 ? "&" : "?") + "size=large&" + (urls.palette ? "palette=" + encodeURIComponent(urls.palette) + "&" : "") + "file=" + encodeURIComponent(f.path);
                 var first = (f.outputs || [])[0];
                 return {name: f.path.split("/").pop(), path: f.path, src: src, download: first ? urls.download + "?file=" + encodeURIComponent(first) : src};
             });

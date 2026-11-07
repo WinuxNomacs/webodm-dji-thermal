@@ -96,6 +96,13 @@ def products():
             for name, p in converter.library().outputs.PRODUCTS.items()]
 
 
+def frames_palette(settings):
+    """The DJI palette a workset's frames are drawn in: the one it chose (for its coloured images, or DJI Thermal
+    Task's map), else None"""
+    palette = settings.get('palette')
+    return palette if palette in palettes() else None
+
+
 def output_text(output, palette=None):
     """An output ('temp_c:tiff', or a product alone) in words: '°C TIFF', 'colour PNG in ironred'"""
     product, _, fmt = output.partition(':')

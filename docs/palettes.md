@@ -12,7 +12,8 @@ palette it was shot in.
 It's used:
 
 - in the DJI Thermal Analyzer, for the Files tab's thumbnails and detail pane (drawn from the frames' temperatures, on
-  the server; the first view of a large dataset takes a while), and as the palette new worksets start with;
+  the server; the first view of a large dataset takes a while), and as the palette new worksets start with; a
+  workset's frames (its Files, the frame page) are drawn in the workset's own palette when it chose one;
 - in the DJI Thermal Task panel, where the palette the task's map opens in starts on yours (else on the one the
   photos were shot in);
 - in the mosaic viewer, where its temperature tabs open in it;
@@ -27,6 +28,10 @@ WebODM has that the plugin's list doesn't is drawn but not saved.
 
 A workset's colour pictures (the colour PNG and DJI R-JPEG outputs) are drawn in the palette and colour range set
 in the Workset Creation Settings' Colours section. With no range, each picture uses its own.
+
+The palette a workset chose (there, or in DJI Thermal Task, for the task's map) is also how its frames are shown:
+the thumbnails and pictures in its Files, and the frame page (its list and the frame, which you can still draw in
+another palette there). A workset left on "Each image's own" shows them in your palette, else as shot.
 
 ## The temperature unit
 

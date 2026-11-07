@@ -3,6 +3,39 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **The temperature unit (°C or °F) in WebODM's header, an administrator's default** (the user, 2026-11-07: "a
+  global option for the user to control it via dropdown in the header row next to the user icon. The visible
+  temperature conversions should support C, F and K. This setting is global for the user of the DJI Thermal Analyzer
+  plugin. If possible, add a dropdown setting to the plugin Admin configuration page that allows Administrators to
+  configure the default for a system. Otherwise default to C"; then: "Drop Kelvin, we may decide to add it back
+  later if webodm adds more traditional Kelvin support"). Builds on "The unit and palette shared" (2026-10-30,
+  below): the unit stays WebODM's metric/imperial in each browser, and is now also saved per user.
+  **Design**:
+  - **Saved per WebODM user** in the display preferences (`conversions.display`'s `unit`: C or F, the user data
+    store), so it follows them to any browser; `migrateUnit` (which handed a saved unit to WebODM once and dropped
+    it) goes. A user who never chose gets the **administrator's default**, else °C.
+  - **The administrator's default**: a "Default temperature unit" dropdown (°C, °F) on the DJI Thermal page under
+    Administration (`sdk.html`, superusers), kept in the plugin's global data store; °C until one is set.
+  - **The header dropdown**: `main.js` (on every WebODM page) adds a °C / °F menu to WebODM's top bar, just left of
+    the user icon, wherever the header has that icon (logged in). Picking one saves it (`PUT display`) and redraws
+    every open view (the Thermal Inspector, the Analyzer's pages) through WebODM's `onUnitSystemChanged`.
+  - **Kept in sync with the Preferences dialog's unit** (both change the same saved setting).
+  - **Linked to WebODM's units** (metric/imperial, per browser): °F is imperial, °C metric, both ways (picking one
+    sets WebODM's units, so its distances and areas follow; WebODM's switch saves the unit). On load the saved unit
+    sets this browser's WebODM units to match. A user who never chose follows this browser's WebODM units when they
+    were set, else the administrator's default (WebODM's units set to match).
+  - **Anonymous viewers** (a public or shared map): the administrator's default, no dropdown, WebODM's units not
+    touched.
+  - The server keeps measuring in °C; a workset's own unit (its files, K among them) is unchanged; new worksets and
+    the Thermal Task panel start in the user's unit.
+  - The unit reaches the pages: the Analyzer's in `#ta-display` (the unit resolved, with the default); WebODM's
+    pages (maps, the Thermal Task panel) from `GET display` once, by `main.js`.
+  Tests: Django (`test_api`: the default, the saved unit, a superuser's default, others refused), Jest (the
+  resolution order and the linking, the header menu). README, the Inspector and Analyzer quickstarts,
+  `measurement.md`, the admin page's docs; screenshots retaken where the header shows.
+  **Decided** (the user, 2026-11-07): linked to WebODM's units; the menu on every WebODM page; the Preferences
+  dialog's unit kept, in sync; anonymous viewers get the administrator's default; **no Kelvin** on screen (maybe
+  later, if WebODM supports Kelvin: see Later).
 - **U2-4. Harmonize's alignment reused by the mosaics** (the user, 2026-11-02: in 1.0.0, the last known item before
   it). A harmonized workset aligns its frames twice: the conversion's `dtc.process(normalize=True)` runs
   dji-thermal-cli's `normalization()`, which builds a mosaic layout and aligns it (`mosaic._align`: 4 rounds of every
@@ -825,10 +858,39 @@
     only): the tabs Worksets, Files, Problems, WebODM plan, opened on Worksets; no console error.
 
 **Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
 - **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **A workset's frames drawn in its palette** (the user, 2026-11-07: "why is it when a thermal task is created to
+  convert the color palette to ironred (for example) that the source frames still show up in their original palette
+  after conversion?"). Why: the workset's palette goes only into the files it writes (its pseudo and rjpeg outputs:
+  the task's images, the downloads); every picture of a frame in the Analyzer is the dataset's source R-JPEG, drawn
+  in the user's preferred DJI palette, else as shot (its embedded picture) - the workset's Files table and detail
+  pane (`conversions.js` `thumbsUrl`, `resultDetailHtml`), the frame page's list (`frame.js` `thumbsUrl`). Only the
+  frame page's view falls back to the workset's (`frames_api.default_palette`: preferred, workset's, inferno).
+  **Design** (agreed with the user, 2026-11-07): inside a workset, its frames are drawn in the workset's palette when
+  it set one (a DJI palette, and a coloured output: pseudo or rjpeg), else the user's preferred DJI palette, else as
+  shot: one helper in `analyzer_core.js` used by the workset's Files table, its detail pane and the frame page's list
+  (the frames API returning the workset's palette). The dataset's Files tab keeps the preferred palette (no one
+  workset); the frames window in the mosaic viewer and the Inspector keeps drawing the frame as its layer is.
+  Tests: Jest (the helper, the Files table's and the frame list's URLs), `test_frames` (the palette returned).
+  README, `quickstart-worksets.md`; screenshots retaken if a frame shown changes colour.
+  **Decided** (the user, 2026-11-07): the frame page's own view (the big frame) starts in the same order, the
+  workset's palette first (`frames_api.default_palette`: the workset's DJI palette with a coloured output, then the
+  preferred, then inferno); a palette picked in its panel still applies and is saved as the preference, and the next
+  visit to that workset's frames opens in the workset's again.
+  Changed while building (2026-11-07): no "coloured output" condition. DJI Thermal Task's workset writes only °C
+  TIFFs yet keeps the palette chosen for the task's map (the user's own example: "DJI Thermal Task", `temp_c:tiff`,
+  ironred), so a workset's palette counts whenever it chose one. Built (`workset-palette-thumbnails`):
+  `conversions.frames_palette`, `frames_api.default_palette` (the workset's, the preferred, inferno) and the frames
+  API's `frames_palette`; `analyzer_core.js` `framesPalette`, used by `conversions.js` (the Files table, detail pane
+  and picture viewer) and `frame.js` (the list). Tests: `test_frames`, Jest (`analyzer.test.js`, `frame.test.js`).
+  README, `palettes.md`, `quickstart-worksets.md`. Live check on :8002 ("ThermalTest", its workset in arctic, the
+  preference ironred): the Files table, detail pane, frame list and frame all arctic; what it made (the dataset's
+  thumbnails, the workset's figures) removed. Done.
 - **Thumbnails in the frame page's list** (the user, 2026-11-06: "The frames browser list should show thumbnails
   instead of just filenames. Large thumbnails."). **Decided** (the user, 2026-11-06): in the preferred DJI palette
   (else the frame's own picture), as the Files tab's; about 260 px wide, the list 280 px, with a Thumbnails box to list
