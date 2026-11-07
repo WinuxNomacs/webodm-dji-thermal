@@ -546,6 +546,37 @@ DT_SDK_ZIP=/path/to/dji_thermal_sdk_v1.8.zip      # DJI's Thermal SDK zip as DJI
 
 `dev/webodm.sh up` mounts them read-only in the dev containers.
 
+## Thanks
+
+This plugin stands on the work of these projects and the people behind them:
+
+- **[WebODM](https://github.com/WebODM/WebODM)** (AGPL-3.0), by Piero Toffanin and its contributors: the app this
+  plugin lives in, its plugin system, its map and its processing. With it, **[ODX](https://github.com/WebODM/ODX)**
+  and **[NodeODX](https://github.com/WebODM/NodeODX)** (AGPL-3.0; formerly OpenDroneMap's ODM and NodeODM), which turn
+  the temperature images into orthophotos.
+- **[DJI](https://www.dji.com/)**: the [Thermal SDK](https://www.dji.com/downloads/softwares/dji-thermal-sdk) (DJI's
+  own license), its documentation of the R-JPEG format and its palettes, and its sample images, which the tests read
+  from your machine (none is in this repository).
+- **[dji-thermal-cli](https://github.com/WinuxNomacs/dji-thermal-cli)** (AGPL-3.0): every temperature, the
+  conversions, the palettes and the mosaics.
+- **[NumPy](https://numpy.org/)** (BSD-3-Clause), by the NumPy developers, and
+  **[Pillow](https://python-pillow.github.io/)** (MIT-CMU), by Jeffrey A. Clark and its contributors: the arrays and
+  the pictures.
+- **[GDAL](https://gdal.org/)** (MIT), **[rasterio](https://rasterio.readthedocs.io/)** (BSD-3-Clause) and
+  **[rio-tiler](https://github.com/cogeotiff/rio-tiler)** (BSD-3-Clause), as WebODM ships them: the shapes, the
+  rasters and the map's tiles.
+- **[Django](https://www.djangoproject.com/)** (BSD-3-Clause), **[Django REST framework](https://www.django-rest-framework.org/)**
+  (BSD-3-Clause), **[django-guardian](https://github.com/django-guardian/django-guardian)** (BSD-2-Clause),
+  **[Celery](https://docs.celeryq.dev/)** (BSD-3-Clause) and **[zipstream-ng](https://github.com/pR0Ps/zipstream-ng)**
+  (LGPL-3.0): the pages, the API, the permissions, the background jobs and the downloads.
+- **[Leaflet](https://leafletjs.com/)** (BSD-2-Clause) and **[React](https://react.dev/)** (MIT), as WebODM ships
+  them: the maps and the task panel.
+- For development: **[Jest](https://jestjs.io/)** (MIT), **[Babel](https://babeljs.io/)** (MIT),
+  **[ESLint](https://eslint.org/)** (MIT), **[Playwright](https://playwright.dev/)** (Apache-2.0) and
+  **[Ruff](https://docs.astral.sh/ruff/)** (MIT).
+
+The plugin was developed with the help of [Claude](https://claude.ai/), by Anthropic.
+
 ## License
 
 [AGPL-3.0](LICENSE).
