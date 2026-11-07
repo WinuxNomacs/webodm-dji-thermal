@@ -79,4 +79,6 @@ checked on a real flight; the others on DJI's Thermal SDK sample images.
 
 The plugin's source, releases and issues are on
 [GitHub](https://github.com/WinuxNomacs/webodm-dji-thermal). It's licensed under the
-[AGPL-3.0](https://github.com/WinuxNomacs/webodm-dji-thermal/blob/main/LICENSE).
+[AGPL-3.0](https://github.com/WinuxNomacs/webodm-dji-thermal/blob/main/LICENSE). It's built on WebODM,
+dji-thermal-cli, DJI's thermal format and SDK, and many open-source projects: see the README's
+[Thanks](https://github.com/WinuxNomacs/webodm-dji-thermal#thanks).

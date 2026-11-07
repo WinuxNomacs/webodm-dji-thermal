@@ -3,18 +3,6 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **Thanks in the README** (the user, 2026-11-07, `new.md`: "Create a thank you section in the README and list all
-  known projects and developers that made this plugin possible."). A "Thanks" section near the end of `README.md`
-  (and `docs/index.md` linking to it). What the plugin is built on, found in its code: **WebODM** and
-  **OpenDroneMap** (ODM, NodeODM; the plugin system, the map, Leaflet and React as WebODM ships them, rio-tiler as
-  WebODM vendors or installs it), **DJI** (the Thermal SDK and its documented R-JPEG format; the palettes; the
-  sample images the tests use, not shipped), **dji-thermal-cli** (the temperatures, the mosaics), **NumPy**,
-  **Pillow**, **GDAL** (OGR, through WebODM), **rasterio**, **Django** and **Django REST framework**,
-  **django-guardian**, **Celery**, **zipstream-ng**; for development, Jest, Babel, ESLint, Playwright and Ruff.
-  Each with a link to its own site and its license name, credited as the project's authors name themselves
-  ("the NumPy developers"), naming a person only where the project does (WebODM: Piero Toffanin and contributors).
-  **Open**: which of these to list (what ships and runs, or the development tools too); people named or projects
-  only; whether to say how the plugin was written (AI-assisted).
 - **U2-4. Harmonize's alignment reused by the mosaics** (the user, 2026-11-02: in 1.0.0, the last known item before
   it). A harmonized workset aligns its frames twice: the conversion's `dtc.process(normalize=True)` runs
   dji-thermal-cli's `normalization()`, which builds a mosaic layout and aligns it (`mosaic._align`: 4 rounds of every
@@ -843,6 +831,21 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **Thanks in the README** (the user, 2026-11-07, `new.md`: "Create a thank you section in the README and list all
+  known projects and developers that made this plugin possible."). A "Thanks" section near the end of `README.md`
+  (and `docs/index.md` linking to it). What the plugin is built on, found in its code: **WebODM** and
+  **OpenDroneMap** (ODM, NodeODM; the plugin system, the map, Leaflet and React as WebODM ships them, rio-tiler as
+  WebODM vendors or installs it), **DJI** (the Thermal SDK and its documented R-JPEG format; the palettes; the
+  sample images the tests use, not shipped), **dji-thermal-cli** (the temperatures, the mosaics), **NumPy**,
+  **Pillow**, **GDAL** (OGR, through WebODM), **rasterio**, **Django** and **Django REST framework**,
+  **django-guardian**, **Celery**, **zipstream-ng**; for development, Jest, Babel, ESLint, Playwright and Ruff.
+  Each with a link to its own site and its license name, credited as the project's authors name themselves
+  ("the NumPy developers"), naming a person only where the project does (WebODM: Piero Toffanin and contributors).
+  **Decided** (the user, 2026-11-07): what runs and the development tools; people named only where the project
+  names them (WebODM's package: Piero Toffanin; Pillow's: Jeffrey A. Clark); one line that the plugin was developed
+  with the help of Claude (Anthropic). WebODM 4.0's engines are ODX and NodeODX (formerly ODM and NodeODM).
+  Built (`readme-thanks`): README's Thanks, before License, each license read from the project's own files or
+  package metadata (WebODM's checkout and image, the dev venv, `node_modules`); `docs/index.md` links to it. Done.
 - **The temperature unit (°C or °F) in WebODM's header, an administrator's default** (the user, 2026-11-07: "a
   global option for the user to control it via dropdown in the header row next to the user icon. The visible
   temperature conversions should support C, F and K. This setting is global for the user of the DJI Thermal Analyzer
