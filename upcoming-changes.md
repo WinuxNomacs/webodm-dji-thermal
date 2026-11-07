@@ -150,6 +150,11 @@
   Django tests on 4.0.0 and 3.3.2 (1 skipped), Jest 294. Live on :8002 (read only): the list as before, and a 403
   answer shows its reason; the block reads give exactly the ranges and histograms the dev mosaics' builds stored,
   and read at 400 pixels a side the same min and max, percentiles within 0.05 °C.
+  Fixed after (found 2026-11-07 while building R2, `fix-frame-page-scripts`): R1-2 loads the Inspector's scripts on
+  map pages only, and the frame page had relied on `frames.js` coming from every page (`viewer.js` and
+  `inspector.js` read it when they load), so it no longer opened. `templates/frame.html` loads it; Jest's
+  `pages.test.js` checks that each template, and `main.js`'s map scripts, load what their scripts read from
+  `window`, before them. Never in a release (v1.1.0 is older).
 - **Thanks in the README** (the user, 2026-11-07, `new.md`: "Create a thank you section in the README and list all
   known projects and developers that made this plugin possible."). A "Thanks" section near the end of `README.md`
   (and `docs/index.md` linking to it). What the plugin is built on, found in its code: **WebODM** and
