@@ -90,7 +90,8 @@
     "Measuring the frame…" (`frame.js` `measure`) and the mosaic viewer's readout and frames under the pointer
     (`viewer.js` `readout`, `select`, the histogram) have no handler for a request that never reached the server.
     Fix: `core.unreachable`, as the other calls have.
-  Decided (the user, 2026-11-07): all eight fixed; DJI Thermal Task converts two photos at a time.
+  Decided (the user, 2026-11-07): all eight fixed; DJI Thermal Task converts two photos at a time; R1-9 to R1-13
+  all fixed.
   Built, `r1-fixes`: R1-1 and R1-2 `inspector.js` `create` (`loadDisplay`: never on a public map; on a map without a
   thermal layer only once the project's mosaics turn out not empty), `datasets.visible(user, project)` used by
   `InspectorMosaics`; R1-3 `main.js` `DjiThermalMapScripts` (the five scripts added in order on the map's
