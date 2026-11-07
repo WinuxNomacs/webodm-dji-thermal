@@ -3,7 +3,7 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R1. A review before the public release** (the user, 2026-11-07, from `new.md`): "Review the plugin code for
+- **R1. A review before the public release** (Done 2026-11-07; the user, 2026-11-07, from `new.md`): "Review the plugin code for
   possible breaking points, performance improvements, and reduction of possible negative webodm ux impacts. This
   plugin will soon be released to the world so it's important to refine any points where the experience could
   breakdown before they do." Builds on the walk-through for bugs and hangs and the UX review (2026-11-02, Done),
@@ -75,7 +75,11 @@
   walked on each poll (a few thousand `stat`s, small beside the analysis no longer sent). Tests: Jest
   (`inspector.test.js` the preferences only where there are temperatures; `main.test.js` the scripts in order;
   `analyzer.test.js` the poll spared the analysis, `pollDelay`), Django (`test_analyzer`: a thumbnail not kept,
-  a dataset deleted though its jobs can't be canceled, the analysis read once and the poll's stamp).
+  a dataset deleted though its jobs can't be canceled, the analysis read once and the poll's stamp). 208 Django
+  tests on 4.0.0 and 3.3.2 (1 skipped), Jest 291. Live on :8002 (read only, but a task made public for the public
+  map's check and made private again): the dashboard loads `units.js` and `main.js` only; a thermal map loads the
+  five scripts in order and the Inspector opens; an anonymous public map asks no `display`, no 4xx; the dataset
+  poll 110 KB → 11 KB ("Thermal - 9/18/2026", 211 frames); the thermal folders' files as before.
 - **R2. The code made easy to extend** (the user, 2026-11-07, from `new.md`): "This plugin's codebase is meant to be
   extensible to make it as simple as possible for other developers to add their own WebODM DJI Thermal Analyzer
   modifications. Review the code structure and refactor as needed to make the code as accessible as possible for
