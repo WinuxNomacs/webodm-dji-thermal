@@ -3,6 +3,24 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **A workset's frames drawn in its palette** (the user, 2026-11-07: "why is it when a thermal task is created to
+  convert the color palette to ironred (for example) that the source frames still show up in their original palette
+  after conversion?"). Why: the workset's palette goes only into the files it writes (its pseudo and rjpeg outputs:
+  the task's images, the downloads); every picture of a frame in the Analyzer is the dataset's source R-JPEG, drawn
+  in the user's preferred DJI palette, else as shot (its embedded picture) - the workset's Files table and detail
+  pane (`conversions.js` `thumbsUrl`, `resultDetailHtml`), the frame page's list (`frame.js` `thumbsUrl`). Only the
+  frame page's view falls back to the workset's (`frames_api.default_palette`: preferred, workset's, inferno).
+  **Design** (agreed with the user, 2026-11-07): inside a workset, its frames are drawn in the workset's palette when
+  it set one (a DJI palette, and a coloured output: pseudo or rjpeg), else the user's preferred DJI palette, else as
+  shot: one helper in `analyzer_core.js` used by the workset's Files table, its detail pane and the frame page's list
+  (the frames API returning the workset's palette). The dataset's Files tab keeps the preferred palette (no one
+  workset); the frames window in the mosaic viewer and the Inspector keeps drawing the frame as its layer is.
+  Tests: Jest (the helper, the Files table's and the frame list's URLs), `test_frames` (the palette returned).
+  README, `quickstart-worksets.md`; screenshots retaken if a frame shown changes colour.
+  **Decided** (the user, 2026-11-07): the frame page's own view (the big frame) starts in the same order, the
+  workset's palette first (`frames_api.default_palette`: the workset's DJI palette with a coloured output, then the
+  preferred, then inferno); a palette picked in its panel still applies and is saved as the preference, and the next
+  visit to that workset's frames opens in the workset's again.
 - **U2-4. Harmonize's alignment reused by the mosaics** (the user, 2026-11-02: in 1.0.0, the last known item before
   it). A harmonized workset aligns its frames twice: the conversion's `dtc.process(normalize=True)` runs
   dji-thermal-cli's `normalization()`, which builds a mosaic layout and aligns it (`mosaic._align`: 4 rounds of every
