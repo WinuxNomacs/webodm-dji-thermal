@@ -61,7 +61,7 @@ class Plugin(PluginBase):
     def include_js_files(self):
         # WebODM only turns these into URLs: versioned like the Analyzer's pages' (analyzer_pages.version)
         v = version(self.get_path("public"))
-        return [name + "?v=" + v for name in ['main.js', 'scale.js', 'recolour.js', 'regions.js', 'frames.js', 'inspector.js']]
+        return [name + "?v=" + v for name in ['units.js', 'main.js', 'scale.js', 'recolour.js', 'regions.js', 'frames.js', 'inspector.js']]
 
     def build_jsx_components(self):
         # WorksetProgress: in a task's panel (main.js); Leaflet: WebODM's own, for the mosaic viewer (see thermal/Leaflet.js)
@@ -128,6 +128,7 @@ class Plugin(PluginBase):
             MountPoint(CONVERSION + r'/frame/measurements/(?P<mid>[0-9a-f]{12})$', frames_api.WorksetFrameMeasurement.as_view()),
             MountPoint('preferences$', analyzer_api.Preferences.as_view()),
             MountPoint('display$', analyzer_api.Display.as_view()),
+            MountPoint('unit$', analyzer_api.Unit.as_view()),
         ]
 
 

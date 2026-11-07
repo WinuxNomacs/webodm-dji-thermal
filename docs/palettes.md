@@ -35,9 +35,17 @@ another palette there). A workset left on "Each image's own" shows them in your 
 
 ## The temperature unit
 
-Temperatures are shown in °C or °F, whatever unit an image holds. It's WebODM's own units setting: the
-Metric/Imperial selector on WebODM's map, kept in your browser. Imperial shows °F; metric shows °C. Changing it in
-the DJI Thermal Analyzer's preferences or on the map changes it in both.
+Temperatures are shown in °C or °F, whatever unit an image holds. Pick it in the **°C / °F menu** at the top of
+every WebODM page, beside your user icon (or in the DJI Thermal Analyzer's preferences): it's kept with your WebODM
+account, so it follows you to any browser.
+
+It's linked to WebODM's own units (the Metric/Imperial selector on WebODM's map, kept in each browser): °F is
+imperial, °C metric. Picking °F also switches WebODM to imperial lengths, and switching WebODM's units picks the
+matching temperature unit. Opening WebODM in another browser sets its units to your choice.
+
+Until you pick one, you get the default an administrator set on the **DJI Thermal** page under **Administration**
+(°C unless they changed it), or the units this browser was already set to. Anyone viewing a public map without
+logging in sees the administrator's default.
 
 The images themselves don't change: the DJI Thermal Task's are in °C, and a workset's TIFFs are in the unit set in its
 Measurement section.

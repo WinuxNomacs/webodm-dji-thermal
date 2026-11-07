@@ -65,8 +65,10 @@
         });
     }
 
-    // WebODM's units (its unit_system, kept in the browser): one setting with the Analyzer's
+    // The temperature unit (units.js: the user's, linked to WebODM's units; an anonymous viewer's default), else
+    // WebODM's units (its unit_system, kept in the browser)
     function userUnit() {
+        if (root.DjiThermalUnits && root.DjiThermalUnits.current) return root.DjiThermalUnits.current();
         var system;
         try { system = root.localStorage && root.localStorage.getItem("unit_system"); } catch (e) { system = null; }
         return system === "imperial" ? "F" : "C";
@@ -2138,6 +2140,7 @@
         drawIsotherms();
         if (plugins && plugins.Map && plugins.Map.onHandleClick) plugins.Map.onHandleClick(onClick);
         doc.addEventListener("onUnitSystemChanged", onUnits);
+        doc.addEventListener("djiThermalUnitChanged", onUnits);
 
         // The user's palette and whether the legend is shown, from the Analyzer's preferences (shown when they can't
         // be read)

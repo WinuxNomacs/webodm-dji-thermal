@@ -5,6 +5,24 @@
 <h3><i class="fa fa-thermometer-half"></i> {% trans 'DJI Thermal' %}</h3>
 
 <div class="panel panel-default">
+    <div class="panel-heading"><strong>{% trans 'Temperature unit' %}</strong></div>
+    <div class="panel-body">
+        <form method="post" class="form-inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="unit">
+            <div class="form-group">
+                <label for="dji-thermal-default-unit" style="margin-right: 6px">{% trans 'Default' %}</label>
+                <select name="default_unit" class="form-control" id="dji-thermal-default-unit">
+                    {% for key, name in units %}<option value="{{ key }}"{% if key == default_unit %} selected{% endif %}>{{ name }}</option>{% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary" id="dji-thermal-default-unit-save"><i class="fa fa-save"></i> {% trans 'Save' %}</button>
+        </form>
+        <p class="help-block">{% trans "Temperatures are shown in it to users who haven't chosen a unit (in the °C/°F menu at the top of every page) and to anyone viewing a public map. A user's own choice also sets WebODM's metric or imperial units in their browser." %}</p>
+    </div>
+</div>
+
+<div class="panel panel-default">
     <div class="panel-heading"><strong>{% trans 'What computes the temperatures' %}</strong></div>
     <div class="panel-body">
         {% if status.problem %}

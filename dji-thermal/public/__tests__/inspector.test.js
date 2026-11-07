@@ -118,6 +118,17 @@ describe("the Thermal Inspector", () => {
         expect(inspector.readoutHtml({valid: false, reason: "excluded"}, "C")).toContain("Outside the task&#39;s crop");
     });
 
+    it("shows temperatures in the unit units.js gives (an anonymous viewer's default) over WebODM's", () => {
+        window.localStorage.setItem("unit_system", "imperial");
+        window.DjiThermalUnits = {current: () => "C"};
+        try {
+            expect(inspector.formatTemp(21.5)).toBe("21.50 °C");
+        } finally {
+            delete window.DjiThermalUnits;
+        }
+        expect(inspector.formatTemp(21.5)).toBe("70.70 °F");
+    });
+
     it("changes a tile URL's colour map, keeping its other parameters", () => {
         const url = inspector.withColorMap(TILES, "jet");
         expect(inspector.colorMapOf(url)).toBe("jet");

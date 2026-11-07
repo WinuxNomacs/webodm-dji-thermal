@@ -136,9 +136,12 @@ analysis and worksets at a glance (how many worksets, or how many of them are re
 
 **Preferences** (the gear beside the DJI Thermal Analyzer's heading):
 
-- **Temperature unit**: °C or °F, used throughout the Analyzer and the DJI Thermal Task whatever unit an image or
-  workset holds. It is WebODM's own units setting (the Metric/Imperial selector on its map, kept in your browser):
-  changing it in either place changes it in both, °F with imperial lengths.
+- **Temperature unit**: °C or °F, used throughout the Analyzer, the Thermal Inspector and the DJI Thermal Task
+  whatever unit an image or workset holds; the same as the **°C / °F menu** at the top of every WebODM page, beside
+  the user icon, kept for your WebODM account. It's linked to WebODM's units (the Metric/Imperial selector on its
+  map, kept in each browser): °F with imperial lengths, °C with metric; changing one changes the other, and your
+  choice sets WebODM's units in any browser you open. Until you pick one: the administrator's default (the DJI Thermal
+  page under Administration; °C unless set), or this browser's WebODM units if they were set.
 - **Palette**, kept for your WebODM account: one of DJI's palettes or of WebODM's colour maps, and also the palette
   chosen on a mosaic's temperature tab. The mosaics' temperature tabs open in it (DJI's where the frames hold it).
   A DJI palette is also where new worksets start (unless your saved defaults have a palette of their own) and how
@@ -447,7 +450,8 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   new tab. Elsewhere a click in Hover is still WebODM's (its popup).
 
 Temperatures are read from the orthophoto or mosaic on the server (the plugin's own API, for those who can view the
-task or project) and shown in WebODM's units (°F when imperial), the same setting as the Analyzer's.
+task or project) and shown in your temperature unit (the °C / °F menu at the top of the page), the same setting as
+the Analyzer's; anyone viewing a public map without logging in sees the administrator's default.
 
 ## The converted images
 
@@ -458,6 +462,12 @@ altitudes, capture time, camera and gimbal angles, RTK accuracy), and is marked 
 outputs do (namespace `urn:dji-thermal-cli:xmp:1.0`): `Distance`, `DistanceSource` (`rangefinder`, `embedded` or
 `option`), `Emissivity`, `Humidity`, `ReflectedTemperatureC`, `AmbientTemperatureC` and `Software`. The photos
 themselves are not kept.
+
+## The default temperature unit
+
+The **DJI Thermal** page, under **Administration** in WebODM's menu (for superusers), sets the temperature unit (°C
+or °F) for users who haven't picked one in the °C / °F menu at the top of every page, and for anyone viewing a public
+map without logging in: °C until it's set.
 
 ## DJI's own Thermal SDK
 

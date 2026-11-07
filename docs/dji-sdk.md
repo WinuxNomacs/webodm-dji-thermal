@@ -9,7 +9,9 @@ Analyzer when used in this WebODM environment.**
 
 ## The DJI Thermal page
 
-**Administration > DJI Thermal**, in WebODM's menu (superusers only), shows which of the two is in use.
+**Administration > DJI Thermal**, in WebODM's menu (superusers only), shows which of the two is in use. It also
+sets the **default temperature unit** (°C or °F) for users who haven't picked one in the °C / °F menu at the top of
+the page, and for anyone viewing a public map: see [Palettes and units](palettes.md).
 
 ![The DJI Thermal page](images/dji-sdk.png)
 

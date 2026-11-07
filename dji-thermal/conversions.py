@@ -759,10 +759,13 @@ def forget_preferences(user):
     preferences_store(user).del_key(PREFERENCES_KEY)
 
 
-# The user's display preferences: the palette temperatures are drawn in throughout the UI and on WebODM's map (None:
-# each picture's own where the frames hold one, else WebODM's default), one of DJI's or of WebODM's colour maps. The
-# unit is WebODM's own (its unit_system, kept in the browser); a unit saved here before it was is handed to the page
-# once ('unit') to become WebODM's, then dropped by the page saving the preferences again.
+# The user's display preferences: the unit temperatures are shown in (°C or °F, linked to WebODM's metric and imperial
+# units in each browser; None: not chosen, the administrator's default, else °C) and the palette they are drawn in
+# throughout the UI and on WebODM's map (None: each picture's own where the frames hold one, else WebODM's default),
+# one of DJI's or of WebODM's colour maps.
+
+DISPLAY_UNITS = ('C', 'F')
+DEFAULT_UNIT_KEY = 'default_unit'
 
 COLORMAPS = ('inferno', 'magma', 'plasma', 'viridis', 'hot', 'jet', 'rainbow', 'gray', 'gray_r')   # WebODM's
 
@@ -776,11 +779,27 @@ def saved_display(user):
     return saved if isinstance(saved, dict) else {}
 
 
+def default_unit():
+    """The unit an administrator chose for users who haven't chosen one (C or F), else C"""
+    from app.plugins.data_store import GlobalDataStore
+    unit = GlobalDataStore(converter.PLUGIN_NAME).get_string(DEFAULT_UNIT_KEY, 'C')
+    return unit if unit in DISPLAY_UNITS else 'C'
+
+
+def set_default_unit(unit):
+    """:raises ValueError: not C or F"""
+    from app.plugins.data_store import GlobalDataStore
+    if unit not in DISPLAY_UNITS:
+        raise ValueError("Not a unit temperatures are shown in: {}".format(unit))
+    GlobalDataStore(converter.PLUGIN_NAME).set_string(DEFAULT_UNIT_KEY, unit)
+
+
 def display(user):
-    """{'unit': a unit saved before (C, F or K) or None, 'palette': one of display_palettes() or None, 'legend':
-    whether the Thermal Inspector shows the legend on WebODM's map (shown unless hidden)}"""
+    """{'unit': the unit the user chose (C or F) or None, 'default_unit': the administrator's (default_unit),
+    'palette': one of display_palettes() or None, 'legend': whether the Thermal Inspector shows the legend on
+    WebODM's map (shown unless hidden)}"""
     saved = saved_display(user)
-    return {'unit': saved.get('unit') if saved.get('unit') in UNITS else None,
+    return {'unit': saved.get('unit') if saved.get('unit') in DISPLAY_UNITS else None, 'default_unit': default_unit(),
             'palette': saved.get('palette') if saved.get('palette') in display_palettes() else None,
             'legend': saved.get('legend') is not False}
 
@@ -790,6 +809,10 @@ def parse_display(raw):
     valid; those not sent are left out"""
     raw = raw if isinstance(raw, dict) else {}
     out, errors = {}, {}
+    if 'unit' in raw:
+        out['unit'] = None if blank(raw.get('unit')) else raw.get('unit')
+        if out['unit'] is not None and out['unit'] not in DISPLAY_UNITS:
+            errors['unit'] = "Must be C or F"
     if 'palette' in raw:
         palette = raw.get('palette')
         out['palette'] = None if blank(palette) else palette
@@ -803,7 +826,7 @@ def parse_display(raw):
 
 
 def save_display(user, value):
-    """The preferences sent saved over those saved before; a unit saved before is dropped"""
-    saved = {k: v for k, v in saved_display(user).items() if k != 'unit'}
+    """The preferences sent saved over those saved before"""
+    saved = saved_display(user)
     saved.update(value)
     preferences_store(user).set_json(DISPLAY_KEY, saved)
