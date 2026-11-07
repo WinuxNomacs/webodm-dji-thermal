@@ -20,6 +20,41 @@
   Fixes then on branches grouped by area, each with its test and a live check. Open: which findings are fixed
   before the release (proposed: every breaking point and everything on WebODM's own pages; performance where the
   fix is small).
+  **Findings** (the code read 2026-11-07; each still to confirm on the dev stack before it is fixed):
+  - **R1-1. A public map's 403** (WebODM's own pages): the Thermal Inspector is set up on every 2D map, public ones
+    too, and asks `GET display` (`inspector.js` `create`), which answers only logged-in users (`Display` is a
+    `DatasetView`, `IsAuthenticated`): an anonymous viewer of any public map, thermal or not, gets a 403 in the
+    console, the same error `units.js` had. Fix: on a public map (`projectOf` already knows), not asked; the
+    legend shown and the task's palette kept, as when the request fails.
+  - **R1-2. Two requests on every map, thermal or not** (WebODM's own pages): `GET display` and
+    `GET projects/<id>/inspector/mosaics`, which reads every dataset of every project the user can view and keeps
+    the map's project's in Python (`InspectorMosaics`, `datasets.visible`): slow on a server with many projects.
+    Fix: the datasets filtered by the project in the query; the Inspector's requests made only when the map has a
+    thermal layer or its project has datasets (one cheap query), else none.
+  - **R1-3. Five map scripts on every WebODM page** (performance, WebODM's own pages): `include_js_files` loads
+    `scale.js`, `recolour.js`, `regions.js`, `frames.js` and `inspector.js` (about 3,700 lines) on the dashboard,
+    Administration and every other page, though only the 2D map uses them. Fix, if WebODM's loader allows it: they
+    become dependencies of the map's `willAddControls` (as `inspector.css` is), loaded on map pages only; to check
+    that SystemJS runs them as plain scripts.
+  - **R1-4. DJI Thermal Task can hold all of a small server's web workers** (WebODM's own pages): each photo is
+    converted inside the request (`api.TaskConvert`), three at a time (`upload.js` `CONCURRENCY`); WebODM starts
+    2 × CPUs + 1 web workers, so on a one-CPU server one upload keeps all three busy and every other page waits for
+    the upload to finish. Fix: two at a time (still overlapping upload and conversion); to measure how long a photo
+    takes to convert.
+  - **R1-5. A thumbnail asked for twice at once can fail** (breaking point): `palette_thumbnail` writes the cached
+    picture to `<name>.part`, the same name for every request, then renames it; two requests for the same
+    thumbnail (two tabs, two users) write one file together, and the second's rename or `os.remove` raises a 500
+    (on Windows, the file held open too). Fix: a `.part` name of its own per request, as `write_json` has.
+  - **R1-6. Deleting a task depends on the plugin** (breaking point): `task_removing`, WebODM's signal before any
+    task is deleted, cancels a dataset's jobs and unlinks its tasks; an error there (a file it can't write) would
+    stop WebODM deleting the task. Celery's `revoke` with the broker down may also wait for it (to check). Fix: the
+    handler's errors logged, never raised.
+  - **R1-7. The analysis read again for each thumbnail** (performance): every thumbnail and file request reads the
+    dataset's `analysis.json` (about 400 bytes a frame: 2 MB for 5,000 frames) to check the file is the dataset's,
+    and the detail pane's large ones read it twice; the Files tab asks for one thumbnail per row. Fix: the parsed
+    file kept in memory by its path, size and time (a few entries).
+  Still to read: the pages' handling of a failed request (a stopped server, a 500), the worker's jobs on a large
+  dataset (memory), disk full during a conversion, and native Windows.
 - **R2. The code made easy to extend** (the user, 2026-11-07, from `new.md`): "This plugin's codebase is meant to be
   extensible to make it as simple as possible for other developers to add their own WebODM DJI Thermal Analyzer
   modifications. Review the code structure and refactor as needed to make the code as accessible as possible for
