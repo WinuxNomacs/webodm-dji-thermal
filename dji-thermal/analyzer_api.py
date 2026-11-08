@@ -93,6 +93,8 @@ def summary(task, user):
         'progress': job.get('progress') or 0,
         # 'summary' once the files are checked, while the coverage and the plan are worked out
         'stage': job.get('stage') or '',
+        # Queued while WebODM's worker doesn't answer (see datasets.check_stale)
+        'waiting': datasets.waiting(job),
         'error': job.get('error') or '',
         'file_count': len(images),
         'image_bytes': sum(size for _, size in images),
@@ -169,6 +171,7 @@ def conversion_summary(task, cid):
         'status': job['status'],
         'progress': job.get('progress') or 0,
         'stage': job.get('stage') or {},
+        'waiting': datasets.waiting(job),
         'error': job.get('error') or '',
         # The images by result (worked out again for results kept before they were counted so)
         **conversions.counts(r.get('files') or []),
@@ -179,6 +182,7 @@ def conversion_summary(task, cid):
         'mosaic_status': mosaic_job['status'] if mosaic_job['status'] != 'new' else '',
         'mosaic_progress': mosaic_job.get('progress') or 0,
         'mosaic_stage': mosaic_job.get('stage') or {},
+        'mosaic_waiting': datasets.waiting(mosaic_job),
         'mosaic_error': mosaic_job.get('error') or '',
         'mosaic_files': mosaics.files(task, cid),
         'mosaics': mosaics.summary(task, cid, built),
@@ -207,6 +211,7 @@ def conversion_detail(task, cid):
     out['figures'] = frames.figures(task, cid)
     out['figures_status'] = figures_job['status'] if figures_job['status'] != 'new' else ''
     out['figures_progress'] = figures_job.get('progress') or 0
+    out['figures_waiting'] = datasets.waiting(figures_job)
     out['figures_error'] = figures_job.get('error') or ''
     return out
 

@@ -29,6 +29,7 @@ import logging
 import os
 import shutil
 import threading
+import time
 import uuid
 from contextlib import contextmanager
 
@@ -53,8 +54,12 @@ MAX_FOLDER_DEPTH = 4                # subfolders kept from an uploaded folder (e
 
 STATUSES = ('new', 'analyzing', 'ready', 'failed', 'canceled')
 
-HEARTBEAT_SECONDS = 60              # how often a running job writes its heartbeat (run_job)
-STALE_SECONDS = 5 * 60              # a started job silent this long lost its worker (check_stale)
+HEARTBEAT_SECONDS = 2               # how often a running job writes its heartbeat (run_job)
+LATE_SECONDS = 5                    # a heartbeat this late, or a job not started this long, has the server ask
+                                    # WebODM's worker whether it has the job (check_stale)
+STALE_SECONDS = 5 * 60              # where a busy worker may not answer: a started job silent this long lost its worker
+ASK_SECONDS = 0.8                   # how long the server waits for the worker's answer
+ASKED_SECONDS = 3                   # an answer is kept this long (the pages poll every 2 or 3 seconds)
 
 logger = logging.getLogger('app.logger')
 
@@ -324,25 +329,70 @@ def job_gone(celery_task_id):
         return False
 
 
-def silent(state):
-    """A job that started in the worker, but whose heartbeat stopped: the worker stopped with it (restarted,
-    crashed), which Celery never reports. A job waiting in the queue has no heartbeat, and is never silent."""
-    beat = state.get('heartbeat_at')
-    if not beat:
-        return False
+def age(state, key):
+    """How long ago a job's state time key was, in seconds, or None without one"""
     try:
-        age = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(beat)
+        return (datetime.datetime.now(datetime.timezone.utc) -
+                datetime.datetime.fromisoformat(state.get(key) or '')).total_seconds()
     except (TypeError, ValueError):
-        return False
-    return age.total_seconds() > STALE_SECONDS
+        return None
+
+
+_asked = {}
+
+
+def worker_has(celery_task_id):
+    """
+    Whether WebODM's worker has a job (running it, or holding it to run next), as it answers within ASK_SECONDS; kept
+    ASKED_SECONDS.
+    :return: True, False when the workers answered without it (a job not started yet may be queued behind others), or
+        None when none answered (none running, or the broker unreachable)
+    """
+    t = time.monotonic()
+    found = _asked.get(celery_task_id)
+    if found and t - found[0] < ASKED_SECONDS:
+        return found[1]
+    try:
+        from worker.celery import app
+        replies = app.control.inspect(timeout=ASK_SECONDS).query_task(celery_task_id)
+    except Exception:  # noqa: BLE001 - the broker unreachable: no answer
+        replies = None
+    has = any(celery_task_id in (r or {}) for r in replies.values()) if replies else None
+    for k in [k for k, (at, _) in _asked.items() if t - at >= ASKED_SECONDS]:
+        _asked.pop(k, None)
+    _asked[celery_task_id] = (t, has)
+    return has
+
+
+def waiting(state):
+    """A job not started yet while no worker answered (see check_stale): it runs once WebODM's worker does"""
+    return bool(state.get('waiting')) and not state.get('heartbeat_at')
 
 
 def check_stale(task, rel=JOB_FILE, running='analyzing', what='analysis'):
-    """A job that is gone (the worker stopped, or the job failed) is not left running forever"""
+    """
+    A job that is gone is not left running: failed once Celery says so, or its heartbeat is LATE_SECONDS late (its
+    worker stopped, restarted or crashed, which Celery never reports) and WebODM's worker doesn't have it, or none
+    answers (where a busy worker may not answer, once the job is silent for STALE_SECONDS). A job not started yet has no
+    heartbeat: one queued while no worker answers is marked waiting, never failed.
+    """
     state = job(task, rel)
-    if state['status'] == running and (silent(state) or job_gone(state.get('celery_task_id'))):
-        update_job(task, if_run=state.get('run_id'), rel=rel, status='failed', progress=0, run_id='',
+    if state['status'] != running:
+        return task
+    celery_task_id = state.get('celery_task_id')
+    beat = age(state, 'heartbeat_at')
+    gone = job_gone(celery_task_id)
+    if not gone and beat is not None and beat > LATE_SECONDS and celery_task_id:
+        has = worker_has(celery_task_id)
+        # True: still running, its heartbeat held up (the dataset's lock held long, a busy worker)
+        gone = has is False or (has is None and (portable.BUSY_WORKER_ANSWERS or beat > STALE_SECONDS))
+    if gone:
+        update_job(task, if_run=state.get('run_id'), rel=rel, status='failed', progress=0, run_id='', waiting=False,
                    error="The {} job stopped before it finished".format(what))
+    elif beat is None and celery_task_id and (age(state, 'started_at') or 0) > LATE_SECONDS:
+        unanswered = portable.BUSY_WORKER_ANSWERS and worker_has(celery_task_id) is None
+        if unanswered != bool(state.get('waiting')):
+            update_job(task, if_run=state.get('run_id'), rel=rel, waiting=unanswered)
     return task
 
 
@@ -423,7 +473,7 @@ def run_job(module, function, *args, rel=None):
 
 
 def beat(task, run_id, rel, stop):
-    """A running job's heartbeat (see silent), until it ends or is no longer the job's run"""
+    """A running job's heartbeat (see check_stale), until it ends or is no longer the job's run"""
     try:
         while update_job(task, if_run=run_id, rel=rel, heartbeat_at=now()) and not stop.wait(HEARTBEAT_SECONDS):
             pass
@@ -439,7 +489,7 @@ def start_job(task, module, function, *args, rel=JOB_FILE, running='analyzing', 
     from app.plugins.worker import run_function_async
     run_id = uuid.uuid4().hex
     update_job(task, rel=rel, status=running, progress=0, error='', run_id=run_id, started_at=now(),
-               celery_task_id='', heartbeat_at='', **fields)
+               celery_task_id='', heartbeat_at='', waiting=False, **fields)
     module = __name__.rsplit('.', 1)[0] + '.' + module
     try:
         celery_task_id = run_function_async(run_job, module, function, str(task.pk), run_id, *args, rel=rel).task_id

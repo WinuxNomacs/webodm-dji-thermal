@@ -1747,6 +1747,22 @@ describe("a dataset's conversions", () => {
         expect(toggle().getAttribute("aria-expanded")).toBe("false");
     });
 
+    it("says a job waits for WebODM's worker while none answers", async () => {
+        const waiting = "Waiting for WebODM&#39;s worker, which isn&#39;t running";
+        const base = "/api/plugins/dji-thermal/datasets/5/conversions/";
+        expect(conversions.listHtml([Object.assign({}, CONVERSION, {status: "converting", waiting: true})], true, base, null)).toContain(waiting);
+        expect(conversions.listHtml([Object.assign({}, CONVERSION, {status: "converting"})], true, base, null)).not.toContain(waiting);
+        expect(conversions.mosaicHtml(Object.assign({}, CONVERSION, {mosaic_status: "building", mosaic_waiting: true}))).toContain(waiting);
+        expect(conversions.resultsHtml(Object.assign({}, CONVERSION, {figures_status: "measuring", figures_waiting: true, results: {files: [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []}]}}), "/x/"))
+            .toContain(waiting);
+        expect(viewer.statusHtml({status: "ready", mosaic_status: "building", mosaic_waiting: true}).text).toContain(waiting);
+        expect(datasets.datasetRow(Object.assign({}, DATASET, {status: "analyzing", waiting: true}), "/p/")).toContain(waiting);
+        document.body.innerHTML = page('dataset.html');
+        dataset.init(document, server({"/api/plugins/dji-thermal/datasets/5": Object.assign({}, DATASET, {status: "analyzing", waiting: true, analysis: {}})}));
+        await ticks();
+        expect(document.getElementById("ta-status").textContent).toContain("Waiting for WebODM's worker, which isn't running");
+    });
+
     it("lists the conversions with their downloads, and each one's files", () => {
         const base = "/api/plugins/dji-thermal/datasets/5/conversions/";
         const running = Object.assign({}, CONVERSION, {id: 10, name: "Run", status: "converting", progress: 0.3});

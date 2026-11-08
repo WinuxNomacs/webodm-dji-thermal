@@ -72,9 +72,15 @@ again once WebODM answers.
 
 **"The … job stopped before it finished"**
 
-WebODM's worker stopped while running it, for example when WebODM restarted or its worker crashed. A job the worker
-has started and stopped hearing from for five minutes is marked so; a job still waiting its turn behind others is
-not. Start it again.
+WebODM's worker stopped while running it, for example when WebODM restarted or its worker crashed. A running job
+tells the plugin it's alive every 2 seconds; one silent for 5 seconds that WebODM's worker no longer has, or with no
+worker answering, is marked so at the page's next update (on WebODM's native Windows install, where a busy worker may
+not answer, once silent for five minutes). A job still waiting its turn behind others is not. Start it again.
+
+**"Waiting for WebODM's worker, which isn't running"**
+
+The job is queued, but WebODM's worker doesn't answer: it isn't running, or its message broker (Redis) is down. The
+job starts once the worker does; restart WebODM if it doesn't come back.
 
 **"The job could not be started (…). Try again in a moment."**
 

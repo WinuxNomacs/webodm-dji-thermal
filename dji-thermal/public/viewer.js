@@ -270,7 +270,7 @@
         if (v.mosaic_status === "building") {
             var pct = Math.round((v.mosaic_progress || 0) * 100);
             return {text: '<div class="progress"><div class="progress-bar progress-bar-striped active" style="width: ' + Math.max(pct, 3) +
-                '%;"></div></div> ' + esc(core.mosaicLabel({stage: v.mosaic_stage})) +
+                '%;"></div></div> ' + esc(core.mosaicLabel({stage: v.mosaic_stage, waiting: v.mosaic_waiting})) +
                 ((v.tabs || []).length ? esc(" The mosaics shown are those built before, until the new ones are built.") : ""), cls: ""};
         }
         var before = (v.tabs || []).length ? " The mosaics shown are those built before." : "";
