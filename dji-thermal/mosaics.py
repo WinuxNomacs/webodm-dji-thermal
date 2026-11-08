@@ -17,7 +17,10 @@ The viewer's source frame window reads the mosaic's JSON sidecar: its frame tabl
 offset) and frame models (dji-thermal-cli's FrameModels: where each frame saw a point).
     mosaic-job.json                the build's status, progress, stage, error and run id
     mosaics.json                   what was built (see build)
-    mosaic-frames/                 while building, for a workset with frames removed: the frames it keeps (links)
+    mosaics-new/                   while building: the new mosaics/ and viewer/ files, and for a workset with frames
+                                   removed mosaic-frames/ (links to the frames it keeps); they replace those built
+                                   before only once all are built (see replace), so a build that fails or is canceled
+                                   leaves the mosaics as they were
 """
 
 import dataclasses
@@ -30,7 +33,7 @@ import shutil
 import time
 from pathlib import Path
 
-from . import conversions, converter, datasets, intensify, measurements, webodm_versions
+from . import conversions, converter, datasets, intensify, measurements, portable, webodm_versions
 from .analysis import PROGRESS_INTERVAL, Canceled, clean
 
 # The mosaics built: (kind, normalized)
@@ -73,6 +76,8 @@ NO_ADJUST = {'gamma': 1.0, 'equalize': False, 'sharpen': 0.0}
 KEPT_FILES = (measurements.FILE, measurements.FRAMES_FILE)
 # While a workset with frames removed builds its mosaics: links to the frames it keeps, as the dataset holds them
 FRAMES_DIR = "mosaic-frames"
+# Where a build writes, laid out as the conversion's folder, until it replaces the mosaics built before
+STAGING_DIR = 'mosaics-new'
 PREVIEW_FILE = 'mosaic_preview.png'
 # What the workset's Mosaics table shows of a mosaic, as the build keeps it (where it is left out)
 SUMMARY_KEYS = ('frames', 'oblique', 'unusable', 'width', 'height', 'gsd_m', 'normalization', 'report')
@@ -207,6 +212,25 @@ def remove(task, cid):
         pass
 
 
+def discard(task, cid):
+    """What a build that didn't finish wrote"""
+    shutil.rmtree(path(task, cid, STAGING_DIR), ignore_errors=True)
+
+
+def replace(task, cid):
+    """The mosaics built (in STAGING_DIR) in place of those built before, but the measurements saved on them and on
+    the frames; with the dataset locked, as the build's result is kept"""
+    remove(task, cid)
+    staged = path(task, cid, STAGING_DIR)
+    os.replace(os.path.join(staged, MOSAICS_DIR), path(task, cid, MOSAICS_DIR))
+    viewer = path(task, cid, VIEWER_DIR)
+    os.makedirs(viewer, exist_ok=True)
+    for name in os.listdir(os.path.join(staged, VIEWER_DIR)):
+        if name not in KEPT_FILES:
+            portable.replace(os.path.join(staged, VIEWER_DIR, name), os.path.join(viewer, name))
+    discard(task, cid)
+
+
 def files(task, cid):
     """The mosaics' files to download, as <kind>/<file>"""
     out = []
@@ -272,16 +296,16 @@ def kept_frames(root, jpegs, removed, frames_dir):
 
 def build(task, cid, write_progress):
     """
-    Builds a conversion's mosaics into its folder (see result).
+    Builds a conversion's mosaics into STAGING_DIR, laid out as its folder (see result and replace).
     :raises Canceled: the run is no longer wanted (checked at each progress write); MosaicError when no mosaic can be
         made, and whatever else goes wrong
     """
     conversions = conversions_module()
     dtc = converter.library()
-    root, out_dir = datasets.images_path(task), path(task, cid)
+    root, out_dir = datasets.images_path(task), path(task, cid, STAGING_DIR)
     if not datasets.image_files(task):
         raise RuntimeError("The dataset has no images")
-    remove(task, cid)
+    discard(task, cid)
     os.makedirs(os.path.join(out_dir, VIEWER_DIR), exist_ok=True)
 
     options = conversions.record(task, cid).get('settings') or conversions.DEFAULTS
@@ -304,7 +328,7 @@ def build(task, cid, write_progress):
             pass
     if removed:
         # Only the frames the workset keeps (see conversions.remove_frames): removed once built, or by remove
-        root = path(task, cid, FRAMES_DIR)
+        root = os.path.join(out_dir, FRAMES_DIR)
         jpegs = kept_frames(datasets.images_path(task), jpegs, removed, root)
     datasets.write_json(os.path.join(out_dir, VIEWER_DIR, PALETTES_FILE), dji_palettes(jpegs))
 
@@ -350,7 +374,7 @@ def build(task, cid, write_progress):
                            report=trimmed(m.report))
     kinds[INTENSIFY] = intensified(reports['harmonized'].mosaic, Path(out_dir, VIEWER_DIR, INTENSIFY + '.tif'),
                                    args['compression'], unit, out_dir)
-    shutil.rmtree(path(task, cid, FRAMES_DIR), ignore_errors=True)
+    shutil.rmtree(os.path.join(out_dir, FRAMES_DIR), ignore_errors=True)
     return clean({'kinds': kinds, 'frames': frames, 'unit': unit, 'stripped': stripped,
                   'built_at': datasets.now()})
 
@@ -398,18 +422,20 @@ def make(task_id, run_id, cid):
     try:
         built = build(task, cid, write_progress)
     except Canceled:
-        remove(task, cid)
+        discard(task, cid)
         conversions.left_behind(task, cid)
         return {'canceled': True}
     except Exception as e:  # noqa: BLE001 - shown on the conversion
-        # Nothing of a failed build is kept: it is not shown, and would only count toward the quota
-        remove(task, cid)
+        # Nothing of a failed build is kept: it is not shown, and would only count toward the quota; the mosaics built
+        # before stay
+        discard(task, cid)
         datasets.update_job(task, if_run=run_id, rel=job_rel, status='failed', error=str(e) or type(e).__name__,
                             progress=0, stage={}, run_id='', finished_at=datasets.now())
         conversions.left_behind(task, cid)
         return {'error': str(e)}
-    if not datasets.finish_job(task, run_id, built, rel=job_rel, result_rel=rel(cid, RESULT_FILE), stage={}):
-        remove(task, cid)
+    if not datasets.finish_job(task, run_id, built, rel=job_rel, result_rel=rel(cid, RESULT_FILE),
+                               then=lambda: replace(task, cid), stage={}):
+        discard(task, cid)
         conversions.left_behind(task, cid)
         return {'canceled': True}
     datasets.update_size(task)
@@ -424,7 +450,7 @@ def start(task, cid):
 
 
 def cancel(task, cid):
-    """A build stops at its next progress write; nothing of it is kept"""
+    """A build stops at its next progress write; nothing of it is kept (the mosaics built before stay)"""
     try:
         with datasets.locked(task):
             state = job(task, cid)
@@ -438,7 +464,11 @@ def cancel(task, cid):
 
 
 def check_stale(task, cid):
-    return datasets.check_stale(task, rel(cid, JOB_FILE), 'building', 'mosaic')
+    datasets.check_stale(task, rel(cid, JOB_FILE), 'building', 'mosaic')
+    # A build that stopped without a word (its worker stopped) leaves what it wrote, counted toward the quota
+    if os.path.isdir(path(task, cid, STAGING_DIR)) and job(task, cid)['status'] != 'building':
+        discard(task, cid)
+    return task
 
 
 # The viewer

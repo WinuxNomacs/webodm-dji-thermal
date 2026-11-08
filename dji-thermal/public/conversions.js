@@ -409,17 +409,18 @@
             '%;"></div></div><div class="text-muted">' + esc(text) + "</div>";
     }
 
-    // A conversion's mosaics as its card shows them: being built, failed or canceled, or built with frames removed since
-    // (built ones: its main action; canChange: they can be built again from here)
+    // A conversion's mosaics as its card shows them: being built, failed or canceled (those built before kept), or built
+    // with frames removed since (built ones: its main action; canChange: they can be built again from here)
     function mosaicHtml(c, canChange) {
         if (c.mosaic_status === "building") {
             return '<div class="progress"><div class="progress-bar progress-bar-striped active" style="width: ' +
                 Math.round((c.mosaic_progress || 0) * 100) + '%;"></div></div><div class="text-muted">' +
                 esc(core.mosaicLabel({stage: c.mosaic_stage})) + "</div>";
         }
-        if (c.mosaic_status === "failed") return '<div class="text-danger">The mosaics failed: ' + esc(c.mosaic_error) + "</div>";
-        if (c.mosaic_status === "canceled") return '<div class="text-muted">Building the mosaics was canceled.</div>';
-        if (c.mosaic_status === "ready" && c.mosaic_outdated) {
+        var before = (c.mosaics || []).length ? " The mosaics built before are kept." : "";
+        if (c.mosaic_status === "failed") return '<div class="text-danger">The mosaics failed: ' + esc(c.mosaic_error + (before && !/[.!?]$/.test(c.mosaic_error) ? "." : "") + before) + "</div>";
+        if (c.mosaic_status === "canceled") return '<div class="text-muted">Building the mosaics was canceled.' + esc(before) + "</div>";
+        if (c.mosaic_outdated && !(c.mosaic_status === "building")) {
             return '<div class="text-warning ta-mosaic-status"><i class="fa fa-exclamation-triangle"></i> The mosaics were built with frames since removed.' +
                 (canChange ? ' <button type="button" class="btn btn-default btn-xs" data-act="mosaics" title="Build the mosaics again, of the frames the workset keeps">' +
                     '<i class="fa fa-th"></i> Build again</button>' : "") + "</div>";
@@ -552,7 +553,8 @@
         var download = c.file_count && !busy ? base + c.id + "/download" : null;
         var main = "", items = [];
         var mainCls = "btn btn-default btn-xs";
-        var view = viewer && c.mosaic_status === "ready";
+        // Built: shown while they are built again, and after that fails or is canceled
+        var built = (c.mosaics || []).length > 0, view = viewer && built;
         if (busy || building) {
             if (canChange) main = busy ? button("cancel", "stop", "Cancel", "Stop converting", mainCls) :
                 button("cancel", "stop", "Cancel mosaics", "Stop building the mosaics", mainCls);
@@ -574,7 +576,7 @@
         if (view && !building && c.project_map) items.push(link(mapUrl(c), "globe", "Open on WebODM's map"));
         if (ready || busy) items.push(button("use", "copy", "Copy settings to form", USE_TITLE));
         if (createTask) {
-            items.push(button("mosaics", "th", c.mosaic_status === "ready" ? "Build mosaics again" : "Build mosaics",
+            items.push(button("mosaics", "th", built ? "Build mosaics again" : "Build mosaics",
                 "Place the converted frames side by side, as converted and harmonized"));
             if (!taskless) items.push(task());
             items.push(button("parent", "file-import", "Use for parent task",
@@ -1248,7 +1250,7 @@
                 (paths.length === 1 ? "Its files are deleted, with the measurements saved on it. New tasks and mosaics leave it out; " :
                     "Their files are deleted, with the measurements saved on them. New tasks and mosaics leave them out; ") +
                     "the tasks made before keep their images."];
-            if (c.mosaic_status === "ready") text.push("The mosaics stay as they were built until you build them again.");
+            if ((c.mosaics || []).length) text.push("The mosaics stay as they were built until you build them again.");
             text.push("This cannot be undone.");
             return core.ask(doc, "Remove from workset", text, "Remove", "danger").then(function (yes) {
                 return yes && send(base + id + "/remove", "POST", {frames: paths});

@@ -294,15 +294,18 @@ def update_job(task, if_run=None, rel=JOB_FILE, **fields):
     return True
 
 
-def finish_job(task, run_id, result, rel=JOB_FILE, result_rel=ANALYSIS_FILE, **fields):
+def finish_job(task, run_id, result, rel=JOB_FILE, result_rel=ANALYSIS_FILE, then=None, **fields):
     """
     A job's result kept (in result_rel), and its state ready with fields, if it is still the job's run.
+    :param then: called first, with the dataset locked, once the run is known to be the job's (its files put in place)
     :return: whether it was
     """
     try:
         with locked(task):
             if job(task, rel).get('run_id') != run_id or not os.path.exists(data_path(task, rel)):
                 return False
+            if then is not None:
+                then()
             write_json(data_path(task, result_rel), result)
             write_json(data_path(task, rel), dict({'status': 'ready', 'progress': 1.0, 'error': '',
                                                    'finished_at': now()}, **fields))

@@ -2076,7 +2076,7 @@ describe("a dataset's conversions", () => {
         const C9 = "/api/plugins/dji-thermal/datasets/5/conversions/9";
         const files = [{path: "a_T.JPG", ok: true, outputs: ["a.tiff"], notes: []}, {path: "b_T.JPG", ok: true, outputs: ["b.tiff"], notes: []},
             {path: "c_T.JPG", ok: true, outputs: ["c.tiff"], notes: []}];
-        const before = Object.assign({}, CONVERSION, {mosaic_status: "ready", mosaic_files: ["harmonized/mosaic.tif"]});
+        const before = Object.assign({}, CONVERSION, {mosaic_status: "ready", mosaic_files: ["harmonized/mosaic.tif"], mosaics: [{kind: "harmonized"}]});
         const after = Object.assign({}, before, {converted: 1, removed: 2, mosaic_outdated: true});
         const fetchFn = server({
             [URL5]: [Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [before]}), Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [after]})],
@@ -2104,7 +2104,7 @@ describe("a dataset's conversions", () => {
         await ticks();
         const sent = fetchFn.mock.calls.find(c => c[0] === C9 + "/remove");
         expect(JSON.parse(sent[1].body)).toEqual({frames: ["a_T.JPG", "b_T.JPG"]});
-        expect([...list.querySelectorAll(".ta-results tbody tr")].map(tr => tr.getAttribute("data-path"))).toEqual(["c_T.JPG"]);
+        expect([...list.querySelectorAll(".ta-results tbody tr[data-path]")].map(tr => tr.getAttribute("data-path"))).toEqual(["c_T.JPG"]);
         expect(pane().hidden).toBe(true);
         expect(list.querySelector(".ta-conversion-figures").textContent).toMatch(/^1 converted · 1 skipped · 2 removed · /);
         expect(list.querySelector(".ta-mosaic-status").textContent).toContain("built with frames since removed");
@@ -2168,10 +2168,25 @@ describe("a conversion's mosaics on the dataset page", () => {
         expect(conversions.mosaicHtml(CONVERSION)).toBe("");
     });
 
+    it("keeps offering a workset's mosaics while they are built again, and after that fails or is canceled", () => {
+        const viewerUrl = "/plugins/dji-thermal/dataset/5/conversion/9";
+        const el = document.createElement("div");
+        ["building", "failed", "canceled"].forEach(st => {
+            const c = Object.assign({}, CONVERSION, {mosaic_status: st, mosaic_error: "No frames", mosaics: [{kind: "harmonized"}]});
+            el.innerHTML = conversions.actionsHtml(c, true, C9.replace(/9$/, ""), null, viewerUrl);
+            expect(el.querySelector('a[href="' + viewerUrl + '"]')).not.toBeNull();
+            if (st !== "building") {
+                expect(conversions.mosaicHtml(c)).toContain((st === "failed" ? "No frames." : "canceled.") + " The mosaics built before are kept.");
+                expect(el.querySelector('[data-act="mosaics"]').textContent).toContain("Build mosaics again");
+            }
+        });
+        expect(conversions.mosaicHtml(Object.assign({}, CONVERSION, {mosaic_status: "failed"}))).not.toContain("built before");
+    });
+
     it("links a conversion with mosaics to its viewer, and offers to build them", () => {
         const viewerUrl = "/plugins/dji-thermal/dataset/5/conversion/9";
         const el = document.createElement("div");
-        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready"}), true, C9.replace(/9$/, ""), null, viewerUrl);
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready", mosaics: [{kind: "harmonized"}]}), true, C9.replace(/9$/, ""), null, viewerUrl);
         expect(el.firstChild.textContent).toContain("View mosaics");
         expect(el.firstChild.getAttribute("href")).toBe(viewerUrl);
         expect(el.querySelector(".dropdown-menu").textContent).toContain("Download all");
@@ -2192,19 +2207,19 @@ describe("a conversion's mosaics on the dataset page", () => {
         expect(el.querySelector('a[href="' + viewerUrl + '"]').textContent).toContain("Mosaics");
 
         // In no task yet, Create task, the next step, is the primary action beside them
-        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready"}), true, C9.replace(/9$/, ""), null, viewerUrl, true);
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready", mosaics: [{kind: "harmonized"}]}), true, C9.replace(/9$/, ""), null, viewerUrl, true);
         expect(el.querySelector('[data-act="task"]').className).toContain("btn-primary");
         expect(el.firstChild.className).not.toContain("btn-primary");
 
         // Who cannot change the dataset can look, not build
-        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready"}), false, C9.replace(/9$/, ""), null, viewerUrl);
+        el.innerHTML = conversions.actionsHtml(Object.assign({}, CONVERSION, {mosaic_status: "ready", mosaics: [{kind: "harmonized"}]}), false, C9.replace(/9$/, ""), null, viewerUrl);
         expect(el.firstChild.textContent).toContain("View mosaics");
         expect(el.querySelector('[data-act="mosaics"]')).toBe(null);
     });
 
     it("links a workset's mosaics to WebODM's map of its project, only when the project has a map", () => {
         const el = document.createElement("div");
-        const ready = Object.assign({}, CONVERSION, {mosaic_status: "ready", dataset: "d-1", id: "abc123", project: 4});
+        const ready = Object.assign({}, CONVERSION, {mosaic_status: "ready", mosaics: [{kind: "harmonized"}], dataset: "d-1", id: "abc123", project: 4});
         el.innerHTML = conversions.actionsHtml(Object.assign({}, ready, {project_map: true}), false, C9.replace(/9$/, ""), null, "/viewer");
         const link = [...el.querySelectorAll(".dropdown-menu a")].find(a => a.textContent.includes("Open on WebODM's map"));
         expect(link.getAttribute("href")).toBe("/map/project/4/?dt-mosaic=d-1%2Fabc123");
@@ -2220,7 +2235,7 @@ describe("a conversion's mosaics on the dataset page", () => {
         const d = mosaic => Object.assign({}, DATASET, {analysis: ANALYSIS, defaults: DEFAULTS,
             conversions: [Object.assign({}, CONVERSION, mosaic)]});
         const fetchFn = server({
-            [URL5]: [d({mosaic_status: ""}), d({mosaic_status: "building", mosaic_progress: 0.5}), d({mosaic_status: "ready"})],
+            [URL5]: [d({mosaic_status: ""}), d({mosaic_status: "building", mosaic_progress: 0.5}), d({mosaic_status: "ready", mosaics: [{kind: "harmonized"}]})],
             ["POST " + C9 + "/mosaics"]: Object.assign({}, CONVERSION, {mosaic_status: "building"})
         });
         dataset.init(document, fetchFn);
@@ -2522,7 +2537,7 @@ describe("the mosaic viewer", () => {
     const INFERNO = Array.from({length: 256}, (_, i) => ((i << 24) | (0 << 16) | ((255 - i) << 8) | 255) >>> 0);
     const VIEWER = Object.assign({}, CONVERSION, {
         dataset_name: "Roof", unit: "C", flown: ["2026:10:12 18:29:50", "2026:10:12 18:30:10"], built_at: "2026-10-18T11:05:00Z",
-        stripped: false, frames: ["a_T.JPG", "b_T.JPG"], mosaic_status: "ready", can_change: true,
+        stripped: false, frames: ["a_T.JPG", "b_T.JPG"], mosaic_status: "ready", can_change: true, mosaics: [{kind: "harmonized"}],
         tabs: [tab("as_converted", "as_converted", TEMPS), tab("harmonized", "harmonized", TEMPS),
                tab("source_frame", "as_converted", TEMPS), tab("view_angle", "as_converted", {min: 0, max: 14, percentiles: [1, 12]})],
         kinds: {
@@ -3162,7 +3177,14 @@ describe("the mosaic viewer", () => {
         expect(viewer.statusHtml({status: "ready", mosaic_status: "failed", mosaic_error: "No <frames>"}).text).toContain("No &lt;frames&gt;");
         expect(viewer.statusHtml({status: "ready", mosaic_status: "canceled"}).text).toContain("canceled");
         expect(viewer.statusHtml({status: "failed", mosaic_status: ""}).text).toContain("were not converted");
-        expect(viewer.statusHtml({status: "ready", mosaic_status: "ready"}).text).toBe("");
+        expect(viewer.statusHtml({status: "ready", mosaic_status: "ready"}).text).toBe("This workset has no mosaics.");
+        expect(viewer.statusHtml({status: "ready", mosaic_status: "ready", tabs: [{tab: "harmonized"}]}).text).toBe("");
+        // Built again: those built before are shown while it builds, and once it fails or is canceled
+        const before = {status: "ready", tabs: [{tab: "harmonized"}]};
+        expect(viewer.statusHtml(Object.assign({mosaic_status: "building"}, before)).text).toContain("The mosaics shown are those built before");
+        expect(viewer.statusHtml(Object.assign({mosaic_status: "failed", mosaic_error: "No frames"}, before)).text).toContain("No frames. The mosaics shown are those built before.");
+        expect(viewer.statusHtml(Object.assign({mosaic_status: "canceled"}, before)).text).toContain("canceled. The mosaics shown are those built before.");
+        expect(viewer.statusHtml({status: "ready", mosaic_status: "canceled"}).text).not.toContain("built before");
     });
 });
 

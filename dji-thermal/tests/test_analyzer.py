@@ -926,7 +926,7 @@ class TestMosaics(AnalyzerTestCase):
         datasets.update_job(task, rel=mosaics.rel(cid, mosaics.JOB_FILE), run_id="run")
 
         def build(task, cid, write_progress):
-            os.makedirs(mosaics.path(task, cid, mosaics.MOSAICS_DIR, "harmonized"))
+            os.makedirs(mosaics.path(task, cid, mosaics.STAGING_DIR, mosaics.MOSAICS_DIR, "harmonized"))
             raise RuntimeError("No frame could be placed")
 
         with mock.patch.object(mosaics, "build", build):
@@ -935,6 +935,7 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual((d["mosaic_status"], d["mosaic_error"]), ("failed", "No frame could be placed"))
         self.assertEqual((d["mosaic_files"], d["tabs"]), ([], []))
         self.assertFalse(os.path.exists(mosaics.path(task, cid, mosaics.MOSAICS_DIR)))
+        self.assertFalse(os.path.exists(mosaics.path(task, cid, mosaics.STAGING_DIR)))
         self.assertEqual(self.client.get(self.url(task, cid, "/harmonized/tiles/20/1/1.png")).status_code,
                          status.HTTP_404_NOT_FOUND)
 
@@ -961,13 +962,76 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual((res.data["status"], res.data["mosaic_status"]), ("ready", "canceled"))
 
         def build(task, cid, write_progress):
-            os.makedirs(mosaics.path(task, cid, mosaics.MOSAICS_DIR, "harmonized"))
+            os.makedirs(mosaics.path(task, cid, mosaics.STAGING_DIR, mosaics.MOSAICS_DIR, "harmonized"))
             write_progress(0.5, now=True)
 
         with mock.patch.object(mosaics, "build", build):
             self.assertEqual(mosaics.make(str(task.id), "run", cid), {"canceled": True})
         self.assertFalse(os.path.exists(mosaics.path(task, cid, mosaics.MOSAICS_DIR)))
+        self.assertFalse(os.path.exists(mosaics.path(task, cid, mosaics.STAGING_DIR)))
         self.assertEqual(mosaics.job(task, cid)["status"], "canceled")
+
+    def test_mosaics_built_again_replace_those_built_before_only_once_built(self):
+        task, cid = self.converted()
+        saved = measurements.workset_path(task, cid)
+        measurements.add(task, saved, {"name": "Hot spot"}, self.user)
+
+        def staged(name, text):
+            def build(task, cid, write_progress):
+                out = mosaics.path(task, cid, mosaics.STAGING_DIR)
+                for d in (os.path.join(mosaics.MOSAICS_DIR, "harmonized"), mosaics.VIEWER_DIR):
+                    os.makedirs(os.path.join(out, d), exist_ok=True)
+                for f in (os.path.join(mosaics.MOSAICS_DIR, "harmonized", "mosaic_temp_C.tif"),
+                          os.path.join(mosaics.VIEWER_DIR, "harmonized.tif")):
+                    with open(os.path.join(out, f), "w") as w:
+                        w.write(text)
+                write_progress(0.5, now=True)
+                if text == "fails":
+                    raise RuntimeError("No frame could be placed")
+                return {"kinds": {"harmonized": {"raster": "viewer/harmonized.tif"}}, "frames": [name],
+                        "unit": "C", "built_at": text}
+            return build
+
+        def run(build):
+            with mock.patch.object(datasets, "start_job"):
+                mosaics.start(task, cid)
+            datasets.update_job(task, rel=mosaics.rel(cid, mosaics.JOB_FILE), run_id="run")
+            with mock.patch.object(mosaics, "build", build):
+                return mosaics.make(str(task.id), "run", cid)
+
+        def shown():
+            with open(mosaics.path(task, cid, mosaics.VIEWER_DIR, "harmonized.tif")) as f, \
+                    open(mosaics.path(task, cid, mosaics.MOSAICS_DIR, "harmonized", "mosaic_temp_C.tif")) as g:
+                return f.read(), g.read(), mosaics.result(task, cid)["built_at"]
+
+        self.assertEqual(run(staged("a_T.jpg", "first")), {"mosaics": ["harmonized"]})
+        self.assertEqual(shown(), ("first", "first", "first"))
+        # Built again: failed, then canceled while it builds, the mosaics built before stay, and nothing of the build
+        self.assertEqual(run(staged("a_T.jpg", "fails")), {"error": "No frame could be placed"})
+        self.assertEqual(shown(), ("first", "first", "first"))
+        self.assertEqual(mosaics.job(task, cid)["status"], "failed")
+        build = staged("a_T.jpg", "second")
+
+        def canceled(task, cid, write_progress):
+            self.client.post("{}/{}/conversions/{}/cancel".format(API, task.id, cid))
+            return build(task, cid, write_progress)
+
+        self.assertEqual(run(canceled), {"canceled": True})
+        self.assertEqual(shown(), ("first", "first", "first"))
+        self.assertFalse(os.path.exists(mosaics.path(task, cid, mosaics.STAGING_DIR)))
+        # While a build runs, the viewer reads the mosaics built before; once built, the new ones, the measurements kept
+        datasets.update_job(task, rel=mosaics.rel(cid, mosaics.JOB_FILE), status="building", run_id="run",
+                            heartbeat_at=datasets.now())
+        self.assertEqual(self.client.get(self.url(task, cid)).data["built_at"], "first")
+        self.assertEqual(run(build), {"mosaics": ["harmonized"]})
+        self.assertEqual(shown(), ("second", "second", "second"))
+        self.assertEqual(mosaics.job(task, cid)["status"], "ready")
+        self.assertFalse(os.path.exists(mosaics.path(task, cid, mosaics.STAGING_DIR)))
+        self.assertEqual([m["name"] for m in measurements.listed(saved)], ["Hot spot"])
+        # What a build left when its worker stopped is removed once it is known to have stopped
+        os.makedirs(mosaics.path(task, cid, mosaics.STAGING_DIR, mosaics.MOSAICS_DIR))
+        mosaics.check_stale(task, cid)
+        self.assertFalse(os.path.exists(mosaics.path(task, cid, mosaics.STAGING_DIR)))
 
     def test_a_mosaic_job_that_is_gone_is_marked_failed(self):
         task, cid = self.converted()
