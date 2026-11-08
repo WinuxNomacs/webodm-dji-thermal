@@ -1,5 +1,5 @@
 # GitHub Pages (Settings > Pages: deploy from the main branch, /docs folder): GitHub builds these Markdown pages
 # with its own Jekyll, no workflow of this repository's
-title: DJI Thermal plugin for WebODM
+title: DJI Thermal Analyzer plugin for WebODM
 description: Temperature maps from DJI radiometric thermal photos, in WebODM
 theme: jekyll-theme-primer

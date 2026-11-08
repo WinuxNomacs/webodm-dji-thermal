@@ -1,6 +1,6 @@
 ---
 name: docs
-description: Update the DJI Thermal plugin's documentation (docs/) and retake its screenshots with dev/screenshots.js, checking none shows where a flight was. Use after any change to what a user sees, before merging it.
+description: Update the DJI Thermal Analyzer plugin's documentation (docs/) and retake its screenshots with dev/screenshots.js, checking none shows where a flight was. Use after any change to what a user sees, before merging it.
 ---
 
 # The documentation

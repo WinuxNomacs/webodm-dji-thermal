@@ -9,7 +9,7 @@ Both have been checked end to end: Docker on Linux, and the native installer on 
 
 ## From WebODM's plugin list
 
-Once the plugin is in WebODM's plugin directory: **Administration > Plugins**, find **DJI Thermal** and install it.
+Once the plugin is in WebODM's plugin directory: **Administration > Plugins**, find **DJI Thermal Analyzer** and install it.
 
 ## From a release
 

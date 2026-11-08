@@ -1,6 +1,6 @@
 ---
 name: release-check
-description: Check a release of the DJI Thermal plugin before merging its release/X.Y.Z branch - build the zip, install it in WebODM through Administration > Plugins as a user would, and check it live.
+description: Check a release of the DJI Thermal Analyzer plugin before merging its release/X.Y.Z branch - build the zip, install it in WebODM through Administration > Plugins as a user would, and check it live.
 ---
 
 # Release check

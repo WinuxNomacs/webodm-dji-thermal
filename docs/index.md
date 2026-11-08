@@ -1,8 +1,8 @@
-# DJI Thermal plugin for WebODM
+# DJI Thermal Analyzer plugin for WebODM
 
 [![The Thermal Inspector on a thermal orthophoto in WebODM: a pinned point, a measured region and an isotherm](images/splash.png)](images/splash-source.png)
 
-The DJI Thermal plugin turns the radiometric thermal photos of a DJI drone (R-JPEGs) into temperature maps in
+The DJI Thermal Analyzer plugin turns the radiometric thermal photos of a DJI drone (R-JPEGs) into temperature maps in
 [WebODM](https://github.com/WebODM/WebODM). It adds three things to WebODM:
 
 - **DJI Thermal Task**, a button on each project of the dashboard. It's the quick way: the photos are converted into
