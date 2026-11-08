@@ -3,7 +3,32 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- Nothing planned: new requests go in `new.md`.
+- **R4. Intensify: a mosaic tab of each pixel's difference from its surroundings** (the user, 2026-11-08, in the
+  session): "would it make sense to offer an \"Intensify\" option that actually makes temperature variances more
+  distinct across the images? Example: I have a mosaic of a roof made from 10 images. Around pipe seams there's a
+  temperature delta variance that's roughly 2-3 degrees cooler than the surrounding roof due to air seepage", then
+  "Let's start by just adding it as a tab to view next Harmonized view tab." Builds on the mosaic viewer's tabs
+  (`mosaics.TABS`, `viewer.js` `TAB_LABELS`, `analyzer_api` mosaic info), its tiles and value tiles, readings and
+  frame page, and the display adjustments (`colouring.py`: range, gamma, equalize, sharpen, isotherm), which stay as
+  they are. Neither normalizing nor harmonizing evens out a local difference (one number per frame), and the display
+  adjustments can't follow a roof's gradients and slopes with one range; this can.
+  Proposed:
+  1. **What it shows**: the harmonized mosaic less its local background, each pixel's median over a neighbourhood
+     wider than a seam and narrower than a slope (in metres, from the mosaic's ground resolution): gradients, slopes
+     and the sun's side go to about 0, a seam 2-3 °C cooler than the roof beside it shows -2 to -3. A difference,
+     in the mosaic's unit (°F: ×1.8, no offset).
+  2. **Built with the mosaics**, in the worker, as a third raster beside the two (`viewer/intensified.tif`), so its
+     range, histogram (equalize), readings and tiles work as the others' do; numpy only (the median over coarse
+     blocks, interpolated: a median filter that wide is slow, and WebODM's scipy isn't the plugin's to rely on).
+  3. **The tab**: "Intensify", after "Harmonized" in the mosaic viewer; its own palette and range (not shared with
+     the temperature tabs, which share theirs), the range symmetric about 0 by default; a hint saying what it shows
+     and that its numbers are differences, not temperatures. A reading shows both: "28.4 °C, -2.6 °C from its
+     surroundings". Its isotherm works on the differences ("below -1.5"). The frame page opened from it shows the
+     frame's differences the same way (the frame's own harmonized temperatures less their background).
+  4. Not in this phase: the Thermal Inspector's map, the downloads, a size changed live on the tab.
+  Open: the neighbourhood (proposed: fixed at 2 m for now, in the hint); a palette for differences (proposed: a
+  blue-white-red one added, the tab's default: WebODM's colour maps and DJI's palettes have none centred on a
+  value); mosaics built before (proposed: the tab appears after "Build mosaics again", nothing built on its own).
 
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
