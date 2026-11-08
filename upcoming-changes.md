@@ -4,6 +4,9 @@
 
 **Up next**
 - Nothing planned: the release waits for the user.
+- **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
+  release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
+  macOS"); Apple Silicon was checked without a Mac.
 
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
