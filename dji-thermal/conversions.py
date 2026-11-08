@@ -306,24 +306,27 @@ def flight_medians(root, jpegs):
     return tuple(float(statistics.median(v)) if v else None for v in values.values())
 
 
-def compact(report, root, out_dir, version="", thermal=None):
+def compact(report, root, out_dir, version="", thermal=None, damaged=None):
     """What a conversion keeps of dji-thermal-cli's process report: {files, converted, oblique, not_thermal, skipped,
     normalization, version}; thermal: the thermal JPEGs, when known (the others marked not_thermal: dji-thermal-cli
-    reports one above the pitch limit as oblique, before it looks for thermal data)"""
+    reports one above the pitch limit as oblique, before it looks for thermal data), but those damaged ({JPEG: why},
+    as the dataset's analysis says), skipped with that reason"""
     files = []
     offsets = report.normalization.offsets_c if report.normalization is not None else {}
+    damaged = damaged or {}
     for r in report.results:
+        why = damaged.get(r.src) if not r.ok and not (r.reason or "").startswith('oblique') else None
         files.append({
             'path': relative(r.src, root),
             'ok': bool(r.ok),
-            'reason': r.reason or "",
+            'reason': why or r.reason or "",
             'outputs': [relative(p, out_dir) for p in (r.outputs or [])],
             'notes': list(r.notes or []),
             'distance': r.distance,
             'distance_source': r.distance_source or "",
             # What normalizing subtracted from the frame (°C)
             'offset_c': offsets.get(r.src),
-            'not_thermal': thermal is not None and r.src not in thermal,
+            'not_thermal': thermal is not None and r.src not in thermal and r.src not in damaged,
         })
     files.sort(key=lambda f: f['path'])
     norm = None
@@ -349,15 +352,20 @@ def counts(files):
 
 
 def thermal_jpegs(dtc, jpegs):
-    """The thermal JPEGs among jpegs, as dji-thermal-cli tells them by their content"""
-    out = set()
+    """The thermal JPEGs among jpegs, as dji-thermal-cli tells them by their content, and those neither thermal nor
+    another camera's photo (damaged, cut short, unreadable, not a JPEG inside): ({JPEG}, {JPEG: why})"""
+    thermal, damaged = set(), {}
     for p in jpegs:
         try:
-            if dtc.classify(p).kind == 'thermal':
-                out.add(p)
-        except Exception:  # noqa: BLE001, S110 - not one it can read
-            pass
-    return out
+            status = dtc.classify(p)
+        except Exception as e:  # noqa: BLE001 - not one it can read
+            damaged[p] = str(e) or type(e).__name__
+            continue
+        if status.kind == 'thermal':
+            thermal.add(p)
+        elif status.kind != 'not_thermal':
+            damaged[p] = status.reason or status.kind
+    return thermal, damaged
 
 
 def frames_to_convert(dtc, thermal, settings):
@@ -661,7 +669,7 @@ def convert(task_id, run_id, cid):
         # RGB photos or the oblique frames, skipped at once. Harmonizing first compares the frames' overlaps, stage by
         # stage: the page shows the stage and how far its run of stages is while the progress is 0
         from .mosaics import stage_fraction
-        thermal = thermal_jpegs(dtc, dtc.scan(root).jpegs)
+        thermal, damaged = thermal_jpegs(dtc, dtc.scan(root).jpegs)
         frames = frames_to_convert(dtc, thermal, settings)
         total = max(1, len(frames))
         state = {'done': 0, 'written': time.time(), 'stage': None}
@@ -698,7 +706,7 @@ def convert(task_id, run_id, cid):
         report = dtc.process(root, out_dir, jobs=1, progress=progress, **args)
         if report.normalization is not None and report.normalization.alignment is not None:
             report.normalization.alignment.save(alignment)
-        result = compact(report, root, out_dir, dtc.__version__, thermal)
+        result = compact(report, root, out_dir, dtc.__version__, thermal, damaged)
         if medians is not None:
             result['normalization'] = {'ambient_c': medians[0], 'reflected_c': medians[1], 'offsets': False}
     except Canceled:
