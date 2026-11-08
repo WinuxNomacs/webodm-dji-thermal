@@ -145,6 +145,13 @@ class TestInspector(BootTestCase):
         self.assertEqual(self.client.get(self.url(self.task, "point"), {'lon': 'east'}).status_code,
                          status.HTTP_400_BAD_REQUEST)
 
+    def test_a_point_says_its_difference_from_the_median_of_the_pixels_within_about_2_m_that_have_data(self):
+        # Pixels of 0.5 m: 2 pixels either side. On a plane the median around a pixel is its own value
+        self.assertAlmostEqual(self.point(*lonlat(50, 40)).data['difference'], 0, places=4)
+        # Beside the edge without data, the window is cols 10 to 13 only: its median half a degree warmer
+        self.assertAlmostEqual(self.point(*lonlat(11, 40)).data['difference'], -0.5, places=4)
+        self.assertNotIn('difference', self.point(*lonlat(5, 40)).data)
+
     def test_a_point_outside_the_tasks_crop_is_excluded(self):
         self.crop(40, 30, 60, 50)
         self.assertTrue(self.point(*lonlat(50, 40)).data['valid'])

@@ -1018,6 +1018,12 @@ class TestMosaics(AnalyzerTestCase):
         self.assertTrue(p["valid"], p)
         self.assertEqual((p["temperature"], p["frame"]), (harmonized["temperature"], harmonized["frame"]))
         self.assertLess(abs(p["difference"]), 10)
+        # Under the cursor on Harmonized, the difference Intensify draws; on Mosaic the as converted mosaic's own,
+        # around the point; none on View angle
+        self.assertEqual(harmonized["difference"], p["difference"])
+        converted = self.client.get(self.url(task, cid, "/as_converted/point"), centre).data
+        self.assertLess(abs(converted["difference"]), 10)
+        self.assertNotIn("difference", self.client.get(self.url(task, cid, "/view_angle/point"), centre).data)
         t = web_mercator_tile(centre["lon"], centre["lat"], tab["maxzoom"])
         style = {"color_map": v["difference_palette"], "rescale": "-2,2", "equalize": 1, "isotherm": "below,-0.5"}
         tile = self.client.get(self.url(task, cid, "/intensify/tiles/{}/{}/{}.png".format(t.z, t.x, t.y)), style)
@@ -1055,6 +1061,12 @@ class TestMosaics(AnalyzerTestCase):
         # A mosaic smaller than the neighbourhood, and one pixel
         self.assertEqual(intensify.differences(np.full((3, 4), 7.0), 0.5).tolist(), np.zeros((3, 4)).tolist())
         self.assertTrue(np.isnan(intensify.differences(np.array([[np.nan]]), 0.1)).all())
+        # Under the cursor: a point less the median of a window about 2 m wide around it, what the array has of it
+        self.assertAlmostEqual(intensify.window_difference(roof, 151, 100, 0.05), -2.5, delta=0.1)
+        self.assertAlmostEqual(intensify.window_difference(roof, 60, 100, 0.05), 0, delta=0.05)
+        self.assertIsNone(intensify.window_difference(roof, 10, 10, 0.05))
+        self.assertEqual(intensify.half_window(0.05), 20)
+        self.assertEqual(intensify.half_window(5), 1)
 
     def test_a_flights_frames_make_mosaics_shown_on_a_map_and_downloaded(self):
         frames = flight_frames(6)

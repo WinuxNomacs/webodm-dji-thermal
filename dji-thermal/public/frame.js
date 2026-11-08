@@ -205,15 +205,40 @@
         return isNaN(v) ? null : v;
     }
 
-    // The values under the cursor (point: {x, y, inside}): as converted, and with the parameters changed beside it
-    function readoutHtml(point, tiles, unit) {
+    // A frame's value at a pixel less the median of the values around it, over size_m at pixel_m metres a pixel (the
+    // frame's info: about 2 m, as the mosaic viewer's), null where it has none or its ground resolution isn't known
+    function surroundingsAt(tile, x, y, info) {
+        var v = valueAt(tile, x, y);
+        if (v === null || !info || !(info.pixel_m > 0)) return null;
+        var half = Math.max(1, Math.round((info.size_m || 2) / 2 / info.pixel_m)), col = Math.floor(x), row = Math.floor(y), around = [];
+        for (var r = Math.max(0, row - half); r <= Math.min(tile.height - 1, row + half); r++) {
+            for (var c = Math.max(0, col - half); c <= Math.min(tile.width - 1, col + half); c++) {
+                var a = tile.values[r * tile.width + c];
+                if (!isNaN(a)) around.push(a);
+            }
+        }
+        around.sort(function (p, q) { return p - q; });
+        var n = around.length, median = n % 2 ? around[(n - 1) / 2] : (around[n / 2 - 1] + around[n / 2]) / 2;
+        return v - median;
+    }
+
+    // The values under the cursor (point: {x, y, inside}): as converted, and with the parameters changed beside it;
+    // each one's difference from its surroundings (infos: the frames' figures, their ground resolution)
+    function readoutHtml(point, tiles, unit, infos) {
         if (!point) return '<span class="ta-message">' + READOUT_HINT + "</span>";
         if (!point.inside) return '<span class="ta-message">Outside the frame.</span>';
+        infos = infos || [];
+        var delta = function (i, label) {
+            var d = surroundingsAt(tiles[i], point.x, point.y, infos[i] || infos[0]);
+            if (d !== null) rows.push([label, core.formatDelta(d, unit, 2, true)]);
+        };
         var t = valueAt(tiles[0], point.x, point.y), rows = [["x, y", Math.floor(point.x) + ", " + Math.floor(point.y)],
             [tiles[1] ? "As converted" : "Temperature", t === null ? "no data" : core.formatTemp(t, unit)]];
+        delta(0, Viewer.DELTA_LABEL);
         if (tiles[1]) {
             var c = valueAt(tiles[1], point.x, point.y);
             rows.push(["Parameters changed", c === null ? "no data" : core.formatTemp(c, unit)]);
+            delta(1, Viewer.DELTA_LABEL + ", changed");
             if (c !== null && t !== null) rows.push(["Difference", core.formatDelta(c - t, unit, 2, true)]);
         }
         return '<table class="table table-condensed ta-viewer-values"><tbody>' + rows.map(function (r) {
@@ -476,7 +501,7 @@
             }
         }
 
-        function showReadout() { $("ta-frame-readout").innerHTML = readoutHtml(point, tiles, unit()); }
+        function showReadout() { $("ta-frame-readout").innerHTML = readoutHtml(point, tiles, unit(), infos); }
 
         function items() { return drawn[frame] || (drawn[frame] = []); }
         function limits() { return style ? isothermLimits(style.isotherm && style.isotherm.value, unit()) : null; }
@@ -907,7 +932,7 @@
 
     var api = {CHANGES: CHANGES, listFrames: listFrames, frameTag: frameTag, changesQuery: changesQuery, frameApiUrl: frameApiUrl,
                listHtml: listHtml, thumbsUrl: thumbsUrl, changeStarts: changeStarts, readChanges: readChanges, changesTyped: changesTyped,
-               newWorksetUrl: newWorksetUrl, paramsHtml: paramsHtml, infoHtml: infoHtml, valueAt: valueAt, readoutHtml: readoutHtml,
+               newWorksetUrl: newWorksetUrl, paramsHtml: paramsHtml, infoHtml: infoHtml, valueAt: valueAt, surroundingsAt: surroundingsAt, readoutHtml: readoutHtml,
                downloadHtml: downloadHtml, canvasOverlay: canvasOverlay, timeText: timeText, toPixels: toPixels, circlePixels: circlePixels,
                isothermLimits: isothermLimits, changesText: changesText, measureHtml: measureHtml, savedHtml: savedHtml, init: init};
     root.ThermalAnalyzerFrame = api;

@@ -4,6 +4,9 @@ slopes and the sun's side, wider than that, go to about 0; a seam or a leak narr
 the ground beside it. The mosaic viewer's Intensify tab (mosaics.py) shows the harmonized mosaic so, and its frames
 window the frames. numpy only: the medians are taken over windows SIZE_M wide every half of it, then interpolated
 between (a median filter that wide, pixel by pixel, is slow).
+
+Under the cursor (the mosaic viewer, the frame page, the Thermal Inspector), a point's difference from its
+surroundings is the median of a window about SIZE_M wide centred on it (raster_difference, window_difference).
 """
 
 import warnings
@@ -84,3 +87,48 @@ def _between(centres, at):
 def _bilinear(grid, y0, y1, fy, x0, x1, fx):
     rows = grid[y0] * (1 - fy)[:, None] + grid[y1] * fy[:, None]
     return rows[:, x0] * (1 - fx)[None, :] + rows[:, x1] * fx[None, :]
+
+
+def half_window(pixel_m, size_m=SIZE_M):
+    """The pixels either side of a point in a window about size_m wide, at pixel_m metres a pixel (1 at least)"""
+    return max(1, int(size_m / 2 / pixel_m + 0.5)) if pixel_m and pixel_m > 0 else 1
+
+
+def from_surroundings(value, around):
+    """value less the median of around's finite values (an array, the point's included), None when there are none"""
+    import numpy as np
+    around = np.asarray(around, dtype=np.float64)
+    around = around[np.isfinite(around)]
+    if value is None or not around.size:
+        return None
+    return float(value - np.median(around))
+
+
+def window_difference(values, row, col, pixel_m, size_m=SIZE_M):
+    """A pixel of an array (NaN where it has none) less the median of the window about size_m wide around it, None
+    when it has none"""
+    import numpy as np
+    values = np.asarray(values)
+    if not (0 <= row < values.shape[0] and 0 <= col < values.shape[1]) or not np.isfinite(values[row, col]):
+        return None
+    half = half_window(pixel_m, size_m)
+    window = values[max(0, row - half):row + half + 1, max(0, col - half):col + half + 1]
+    return from_surroundings(float(values[row, col]), window)
+
+
+def raster_difference(src, row, col, value, pixel_m, usable=None, size_m=SIZE_M):
+    """
+    value, a rasterio dataset's first band at (row, col), less the median of the window about size_m wide around it
+    (usable(window, data): the window's pixels that hold values, beside the finite ones); None when none do
+    """
+    import numpy as np
+    from rasterio.windows import Window
+    half = half_window(pixel_m, size_m)
+    r0, c0 = max(0, row - half), max(0, col - half)
+    r1, c1 = min(src.height, row + half + 1), min(src.width, col + half + 1)
+    if value is None or r1 <= r0 or c1 <= c0:
+        return None
+    window = Window(c0, r0, c1 - c0, r1 - r0)
+    data = src.read(1, window=window).astype(np.float64)
+    keep = np.isfinite(data) if usable is None else np.isfinite(data) & usable(window, data)
+    return from_surroundings(value, data[keep])

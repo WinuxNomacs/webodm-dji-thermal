@@ -10,7 +10,7 @@ import math
 import os
 import time
 
-from . import conversions, converter, datasets, inspector, mosaics
+from . import conversions, converter, datasets, inspector, intensify, mosaics
 
 # The parameters a frame can be measured again with (the temperatures in the workset's unit)
 CHANGES = ('distance', 'humidity', 'emissivity', 'reflected_temp', 'ambient_temp')
@@ -157,7 +157,8 @@ def measure(task, cid, rel, changes=None):
 def info(task, cid, rel, changes=None):
     """What the page shows of a frame (measure's, its values summed up): {frame, width, height, unit, params,
     recorded, distance_source, notes, offset, offset_known, changes, stats: {min, max, mean, percentiles, histogram
-    (the equalization's, colouring.value_histogram)} or None without values}"""
+    (the equalization's, colouring.value_histogram)} or None without values, pixel_m (pixel_size), size_m (the
+    neighbourhood the page measures a point's difference from its surroundings over: intensify.SIZE_M)}"""
     import numpy as np
 
     from . import colouring
@@ -171,7 +172,23 @@ def info(task, cid, rel, changes=None):
                  'percentiles': [float(p) for p in np.percentile(found, mosaics.PERCENTILES)],
                  'histogram': {'counts': counts.tolist(), 'edges': edges.tolist()}}
     return dict(m, frame=rel, width=int(values.shape[1]), height=int(values.shape[0]), unit=unit_of(task, cid),
-                recorded=recorded(task, rel), changes=changes or {}, stats=stats)
+                recorded=recorded(task, rel), changes=changes or {}, stats=stats,
+                pixel_m=pixel_size(frame_path(task, rel), values.shape, m['params'].get('distance')),
+                size_m=intensify.SIZE_M)
+
+
+def pixel_size(path, shape, distance):
+    """The ground width of a frame's pixel straight ahead (m): the distance it was measured at over its focal length
+    in pixels (dji-thermal-cli's read_pose, for the measured size: shape, rows by columns); None when either is
+    unknown"""
+    if not distance or distance <= 0:
+        return None
+    try:
+        with open(path, 'rb') as f:
+            pose, _why = converter.library().mosaic.read_pose(f.read(), (int(shape[1]), int(shape[0])))
+    except Exception:  # noqa: BLE001 - a frame without a pose has no ground resolution
+        return None
+    return float(distance) / pose.focal_px if pose is not None and pose.focal_px else None
 
 
 def values_png(task, cid, rel, changes=None):

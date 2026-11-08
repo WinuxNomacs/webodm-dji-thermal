@@ -90,6 +90,27 @@ describe("the frame page's helpers", () => {
         expect(el.textContent).toContain("no data");
         expect(frame.readoutHtml({inside: false}, [tile], "C")).toContain("Outside the frame");
     });
+
+    it("reads a pixel's difference from the median around it, over 2 m at the frame's ground resolution", () => {
+        // 5 x 3 pixels of 0.5 m: 2 m is 2 pixels either side; a cooler seam down the middle column
+        const values = Float32Array.from([20, 20, 17, 20, 21, 20, 20, 17, 20, 21, 20, NaN, 17, 20, 21]);
+        const tile = {width: 5, height: 3, values}, info = {pixel_m: 0.5, size_m: 2};
+        // The seam's pixel against all 14 pixels it has around it (median 20)
+        expect(frame.surroundingsAt(tile, 2.5, 1.5, info)).toBe(-3);
+        // A corner pixel against what the frame has of its window
+        expect(frame.surroundingsAt(tile, 4.5, 0.5, info)).toBe(1);
+        expect(frame.surroundingsAt(tile, 1.5, 2.5, info)).toBeNull();
+        expect(frame.surroundingsAt(tile, 2.5, 1.5, {pixel_m: null})).toBeNull();
+        const changed = {width: 5, height: 3, values: values.map(v => v + 1)};
+        const el = document.createElement("div");
+        el.innerHTML = frame.readoutHtml({x: 2.5, y: 1.5, inside: true}, [tile, null], "C", [info]);
+        expect(el.textContent).toContain("ΔT from surroundings-3.00 °C");
+        el.innerHTML = frame.readoutHtml({x: 2.5, y: 1.5, inside: true}, [tile, changed], "C", [info, info]);
+        expect(el.textContent).toContain("ΔT from surroundings, changed-3.00 °C");
+        expect(el.textContent).toContain("Difference+1.00 °C");
+        el.innerHTML = frame.readoutHtml({x: 2.5, y: 1.5, inside: true}, [tile, null], "C", [{pixel_m: null}]);
+        expect(el.textContent).not.toContain("ΔT");
+    });
 });
 
 describe("the frame page", () => {

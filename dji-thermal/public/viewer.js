@@ -15,6 +15,7 @@
     var POLL_MS = 2000;
     var HOVER_MS = 120;         // the readout asks for the point the cursor rests on, not every point it crosses
     var READOUT_HINT = "Move the cursor over the mosaic; a click keeps the values there and opens the frames that saw it.";
+    var DELTA_LABEL = "ΔT from surroundings";   // a point's temperature less the median around it (about 2 m)
     var TAB_LABELS = {as_converted: "Mosaic", harmonized: "Harmonized", intensify: "Intensify", source_frame: "Source frame",
                       view_angle: "View angle"};
     var TAB_HINTS = {
@@ -230,14 +231,17 @@
     }
 
     // The values under the cursor, or at the point a click kept (pinned), with the button that lets go of it
-    function readoutHtml(res, unit, pinned) {
+    function readoutHtml(res, unit, pinned, tab) {
         var follow = pinned ? followHtml() : "";
         if (!res || !res.valid) return '<span class="ta-message">' + (res && res.reason === "outside_raster" ?
             "Outside the mosaic." : "No data here.") + "</span>" + follow;
         var rows = [["Temperature", res.temperature === null || res.temperature === undefined ? "no data" : core.formatTemp(res.temperature, unit)]];
-        // On Intensify: the difference from the surroundings, then the harmonized mosaic's temperature
-        if (res.difference !== undefined) rows.unshift(["Difference", res.difference === null ? "no data" :
-            core.formatDelta(res.difference, unit, 2, true) + " from its surroundings"]);
+        // The temperature less its surroundings' (about 2 m around): on Intensify first, what it draws, then the
+        // harmonized mosaic's temperature; on the temperature tabs after the temperature
+        if (res.difference !== undefined) {
+            var delta = [DELTA_LABEL, res.difference === null ? "no data" : core.formatDelta(res.difference, unit, 2, true)];
+            if (isDifference(tab)) rows.unshift(delta); else rows.push(delta);
+        }
         if (res.frame !== null && res.frame !== undefined) rows.push(["Frame", res.frame]);
         if (res.frame_pixel) rows.push(["Frame pixel", "x " + res.frame_pixel[0] + ", y " + res.frame_pixel[1]]);
         if (res.view_angle !== null && res.view_angle !== undefined) rows.push(["View angle", core.formatNumber(res.view_angle, 1, "°")]);
@@ -490,7 +494,7 @@
             return fetchFn(base + "/mosaics/" + tab + "/point?lon=" + latlng.lng + "&lat=" + latlng.lat, {credentials: "same-origin"})
                 .then(core.readJson, core.unreachable).then(function (r) {
                     if (askedTab !== tab || n !== asked || kept !== pinned) return;
-                    $("ta-viewer-readout").innerHTML = r.ok ? readoutHtml(r.data, v.unit, !!pinned) : '<span class="text-danger">' +
+                    $("ta-viewer-readout").innerHTML = r.ok ? readoutHtml(r.data, v.unit, !!pinned, askedTab) : '<span class="text-danger">' +
                         esc(core.errorText(r.data, "Could not read the mosaic here.")) + "</span>" + (pinned ? followHtml() : "");
                 });
         }
@@ -720,7 +724,7 @@
                baseLayers: baseLayers, loadLeaflet: loadLeaflet, init: init, adjustQuery: adjustQuery, toneShares: toneShares,
                slidRange: slidRange, sliderPositions: sliderPositions, sliderGamma: sliderGamma, gammaSlider: gammaSlider,
                SLIDERS: SLIDERS, imageHtml: imageHtml, isothermParam: isothermParam, isothermHtml: isothermHtml,
-               bindControls: bindControls, isTemperature: isTemperature, isDifference: isDifference, inUnit: inUnit, shownTemp: shownTemp};
+               bindControls: bindControls, DELTA_LABEL: DELTA_LABEL, isTemperature: isTemperature, isDifference: isDifference, inUnit: inUnit, shownTemp: shownTemp};
     root.ThermalAnalyzerViewer = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});
