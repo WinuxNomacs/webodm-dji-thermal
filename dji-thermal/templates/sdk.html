@@ -31,7 +31,7 @@
 
         {% if status.source == 'builtin' %}
         <p id="dji-thermal-sdk-source">{% blocktrans with version=status.library_version sdk=status.port_sdk_version %}The built-in port of DJI's Thermal SDK v{{ sdk }}, in dji-thermal-cli {{ version }}: pure Python, with the same results as DJI's own SDK on DJI's sample images.{% endblocktrans %}</p>
-        {% else %}
+        {% elif status.source %}
         <p id="dji-thermal-sdk-source">{% blocktrans with version=status.info.sdk_version|default:"?" %}DJI's own Thermal SDK v{{ version }}.{% endblocktrans %}
             {% if status.source == 'deployment' %}
             {% blocktrans with folder=status.folder %}Set at deployment ({{ env }}={{ folder }}).{% endblocktrans %}

@@ -53,10 +53,19 @@ def target_dir():
     return deploy_dir() or uploaded_dir()
 
 
-def _has_library(folder):
-    from .converter import library
+def _library():
+    """dji-thermal-cli
+    :raises SdkError: it can't be loaded (its install failed): why, as the plugin logs it"""
+    from .converter import decoder_status, library
     try:
-        library().native.find_library(folder)
+        return library()
+    except Exception:  # noqa: BLE001 - whatever stops it loading is reported
+        raise SdkError(decoder_status()[1]) from None
+
+
+def _has_library(folder):
+    try:
+        _library().native.find_library(folder)
     except (FileNotFoundError, OSError):
         return False
     return True
@@ -106,17 +115,20 @@ def unsupported_machine():
 def status():
     """What the plugin's page shows: {'source': 'builtin', 'deployment' or 'upload', 'folder', 'info' (from the
     install: version, revisions, zip, when, by whom), 'problem', 'deploy_dir', 'writable', 'unsupported' (see
-    unsupported_machine)}"""
-    from .converter import library
-    dtc = library()
+    unsupported_machine)}; 'source' is None when dji-thermal-cli can't be loaded (the problem says why)"""
     result = {'source': 'builtin', 'folder': None, 'info': {}, 'problem': '', 'deploy_dir': deploy_dir(),
-              'library_version': dtc.__version__, 'port_sdk_version': dtc.native.SDK_VERSION}
+              'library_version': None, 'port_sdk_version': None}
+    try:
+        dtc = _library()
+        result.update(library_version=dtc.__version__, port_sdk_version=dtc.native.SDK_VERSION)
+    except SdkError as e:
+        result.update(source=None, problem=str(e))
     try:
         folder = current()
     except SdkError as e:
         result['problem'] = str(e)
         folder = None
-    if folder:
+    if folder and result['source']:
         result.update(source='deployment' if deploy_dir() else 'upload', folder=folder, info=read_info(folder))
     target = target_dir()
     probe = target if os.path.isdir(target) else os.path.dirname(target)
@@ -131,8 +143,7 @@ def check(folder=None):
     :return: {'library', 'sdk_version', 'api_revisions', 'measured'}
     :raises SdkError: with the reason
     """
-    from .converter import library
-    dtc = library()
+    dtc = _library()
     folder = folder or current()
     if not folder:
         raise SdkError("No DJI Thermal SDK is installed: temperatures come from the built-in port")
@@ -146,8 +157,7 @@ def check(folder=None):
 
 
 def _platform_dirs():
-    from .converter import library
-    osname, arch = library().native.bindings.platform_dirs()
+    osname, arch = _library().native.bindings.platform_dirs()
     return '{}/{}/'.format(osname, arch)
 
 
