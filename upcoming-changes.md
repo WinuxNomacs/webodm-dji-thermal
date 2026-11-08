@@ -75,10 +75,11 @@
   `spanRange`: ◀ narrows and ▶ widens the range by a tenth of its span, about its middle; Auto beside the fields).
   Proposed: one control for the three, five buttons in a cross between the range's two fields: ◀ narrow and ▶ widen
   as now, ▲ raise and ▼ lower (both ends moved by a tenth of the range's width, the width kept), Auto in the middle;
-  the docs (the viewer's, the frame page's and the Inspector's) and their screenshots updated. Open: none. Decided (the user, 2026-11-08): raise and lower "should never exceed the range of the image itself. Example:
-  an image has a range of 0-100F and the current span is set to 60-75F. As the user clicks Raise, it will never
-  exceed 100F just as clicking Lower will never lower it below 0": each step a tenth of the range's width, the last
-  only as far as the image's highest (lowest) temperature, the width kept.
+  the docs (the viewer's, the frame page's and the Inspector's) and their screenshots updated. Open: none. Decided
+  (the user, 2026-11-08): raise and lower "should never exceed the range of the image itself. Example: an image has a
+  range of 0-100F and the current span is set to 60-75F. As the user clicks Raise, it will never exceed 100F just as
+  clicking Lower will never lower it below 0": each step a tenth of the range's width, the last only as far as the
+  image's highest (lowest) temperature, the width kept.
 - **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
   the documentation as necessary so that it's information is accurate prior to release." Builds on everything
   since 1.1.0 (R1 to R6). Proposed: every page of `docs/` and the README read against the code
