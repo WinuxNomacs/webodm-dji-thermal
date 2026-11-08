@@ -269,8 +269,10 @@ over WebODM's base layers:
   changed: it is a view, not in the downloads nor the Thermal Inspector. Mosaics built before the plugin had it show
   it once built again (**Build again**);
 - the palette (the usual ones and the DJI palettes of the images; opening in your preferred one, if they hold it) and the
-  range, changed live, with the colour scale (its ends marked with the range's own values), **◀** and **▶** between
-  its two fields (narrowing or widening it by a tenth, about its middle) and **Auto** (the 2nd to 98th percentile);
+  range, changed live, with the colour scale (its ends marked with the range's own values), and a cross of buttons
+  between its two fields: **◀** and **▶** (narrowing or widening it by a tenth, about its middle), **▲** and **▼**
+  (raising or lowering it by a tenth of its width, never past the image's hottest or coldest temperature) and **Auto**
+  in the middle (the 2nd to 98th percentile);
 - how the image is drawn (**Image**): **Brightness** and **Contrast** (which move and narrow the range), **Gamma**,
   **Sharpening** (an unsharp mask), **Linear** or **Equalized** (the colours spread over the temperatures the whole
   mosaic has most of; temperatures and Intensify's differences only) and **Reset**, drawn into the tiles and the frames' pictures, with the colour
@@ -426,7 +428,8 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   in. WebODM's layer panel lists only its own colour maps; one it has that the Analyzer doesn't is drawn but not
   saved.
 - **Colour scale**: under Palette, the topmost thermal layer's palette over its range, the range in your unit (typed,
-  narrowed or widened by a tenth with **◀** and **▶** between its fields, or **Auto**: its 2nd to 98th percentile) and the layer's own coldest and hottest temperatures. It is the range
+  narrowed or widened by a tenth with **◀** and **▶** between its fields, raised or lowered by a tenth of its width with **▲** and **▼**
+  but never past the layer's hottest or coldest temperature, or **Auto** between them: its 2nd to 98th percentile) and the layer's own coldest and hottest temperatures. It is the range
   WebODM's layer panel sets, kept in step both ways (WebODM's panel shows a range set in the Inspector once the page
   is loaded again).
 - **Image**: the mosaic viewer's controls for how the topmost thermal layer is drawn: Brightness and Contrast (moving

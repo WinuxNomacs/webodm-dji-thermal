@@ -106,6 +106,14 @@
 .dt-inspector-scale-bar { margin-bottom: 4px; font-size: 11px; }
 .dt-inspector-range { display: flex; align-items: center; gap: 4px; }
 .dt-inspector-range input { flex: 0 0 64px; width: 64px; padding: 2px 4px; }
+/* The range's D-pad (scale.js spanButtonsHtml): ▲ above, ◀ Auto ▶ across, ▼ below */
+.dt-range-pad { display: grid; grid-template-columns: auto auto auto; grid-template-areas: ". raise ." "narrow middle wider" ". lower ."; gap: 1px; flex: 0 0 auto; }
+.dt-range-pad .btn { padding-top: 0; padding-bottom: 0; line-height: 1.4; }
+.dt-range-pad .dt-range-raise { grid-area: raise; }
+.dt-range-pad .dt-range-narrow { grid-area: narrow; }
+.dt-range-pad .dt-range-auto { grid-area: middle; }
+.dt-range-pad .dt-range-wider { grid-area: wider; }
+.dt-range-pad .dt-range-lower { grid-area: lower; }
 .dt-inspector-panel .ta-slider { display: grid; grid-template-columns: 70px minmax(0, 1fr) 2.6em; align-items: center; gap: 6px;
                                  margin: 2px 0; font-weight: normal; }
 .dt-inspector-panel .ta-slider input[type=range] { margin: 0; }

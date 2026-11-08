@@ -289,6 +289,14 @@
 .ta-viewer .ta-legend-caption{ font-size: 11px; margin-bottom: 2px; }
 .ta-viewer .ta-viewer-range{ display: flex; align-items: center; gap: 6px; }
 .ta-viewer .ta-viewer-range input{ flex: 1 1 64px; width: 64px; min-width: 0; }
+/* The range's D-pad (scale.js spanButtonsHtml): ▲ above, ◀ Auto ▶ across, ▼ below */
+.dt-range-pad { display: grid; grid-template-columns: auto auto auto; grid-template-areas: ". raise ." "narrow middle wider" ". lower ."; gap: 1px; flex: 0 0 auto; }
+.dt-range-pad .btn { padding-top: 0; padding-bottom: 0; line-height: 1.4; }
+.dt-range-pad .dt-range-raise { grid-area: raise; }
+.dt-range-pad .dt-range-narrow { grid-area: narrow; }
+.dt-range-pad .dt-range-auto { grid-area: middle; }
+.dt-range-pad .dt-range-wider { grid-area: wider; }
+.dt-range-pad .dt-range-lower { grid-area: lower; }
 .ta-viewer .ta-viewer-values{ margin-bottom: 4px; }
 .ta-viewer .ta-viewer-values th{ font-weight: normal; opacity: .7; white-space: nowrap; }
 .ta-viewer .ta-viewer-values td{ overflow-wrap: anywhere; }

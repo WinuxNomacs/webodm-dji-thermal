@@ -1371,6 +1371,21 @@ describe("the Thermal Inspector's colour scale and Image section", () => {
         expect([field(panel(), "range-min").value, field(panel(), "range-max").value]).toEqual(["14", "36"]);
         field(panel(), "range-narrow").querySelector("i").click();
         expect(inspector.rangeOf(layer._url)).toEqual([15.1, 34.9]);
+        // Raise and Lower move it by a tenth of its width, the width kept, never past the layer's highest and lowest
+        // temperatures (2.5 to 51.25 °C): the last step only as far as them
+        field(panel(), "range-min").value = "40";
+        change(field(panel(), "range-max"), "50");
+        field(panel(), "range-raise").click();
+        expect(inspector.rangeOf(layer._url)).toEqual([41, 51]);
+        field(panel(), "range-raise").querySelector("i").click();
+        expect(inspector.rangeOf(layer._url)).toEqual([41.25, 51.25]);
+        field(panel(), "range-raise").click();
+        expect(inspector.rangeOf(layer._url)).toEqual([41.25, 51.25]);
+        field(panel(), "range-min").value = "3";
+        change(field(panel(), "range-max"), "13");
+        field(panel(), "range-lower").click();
+        expect(inspector.rangeOf(layer._url)).toEqual([2.5, 12.5]);
+        expect([field(panel(), "range-min").value, field(panel(), "range-max").value]).toEqual(["2.5", "12.5"]);
         field(panel(), "range-min").value = "15";
         change(field(panel(), "range-max"), "35");
         change(field(panel(), "range-max"), "12");
