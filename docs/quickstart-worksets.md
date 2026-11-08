@@ -91,6 +91,12 @@ The tabs:
 - **Harmonized**: the frames made to agree on temperature. The camera drifts a little between its
   self-calibrations, so overlapping frames can read a degree or two apart; here each frame is shifted to match its
   neighbours.
+- **Intensify**: the harmonized mosaic, each pixel less the typical temperature around it (the median over about
+  2 m). A roof's slopes, its sunny side and its gradients drop to about 0, so a narrow cooler or warmer feature, such
+  as a seam letting air in, stands out wherever it is: blue below its surroundings, red above, in its own palette
+  (blue-white-red) over a range centred on 0. Its numbers are differences, not temperatures; the readout gives the
+  difference and the harmonized temperature. Anything 2 m wide or more fades out. See
+  [Finding small differences](measurement.md#finding-small-differences-intensify).
 - **Source frame**: which frame each pixel comes from.
 - **View angle**: the angle each pixel was seen at.
 
@@ -101,7 +107,7 @@ cooler part of it (above 1) or the warmer part (below 1), **Sharpening** brings 
 colours over the temperatures the mosaic has most of, and **Reset** goes back to the Auto range with none of them.
 They only change how the image is drawn, never the temperatures, and the map follows them as they move: your browser
 colours the mosaic from its temperatures, so nothing waits on the server. An **Isotherm** (above, below or between
-temperatures) keeps the palette for the pixels in it and turns the rest grey. It shows the
+temperatures; on Intensify, differences) keeps the palette for the pixels in it and turns the rest grey. It shows the
 temperature, frame, frame pixel and view angle under the cursor, what dji-thermal-cli reports about the mosaic (seams,
 misalignment, frame offsets), and the files to download.
 

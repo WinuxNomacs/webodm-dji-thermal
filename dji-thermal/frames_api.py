@@ -21,8 +21,9 @@ measurements_path = measurements.frames_path
 
 
 def frame_palettes():
-    """[{key, label, color_map (encoded)}]: DJI's palettes, then WebODM's colour maps (the mosaic viewer's keys)"""
-    return mosaics.palette_list(converter.palette_luts())
+    """[{key, label, color_map (encoded)}]: DJI's palettes, then WebODM's colour maps (the mosaic viewer's keys); not
+    the viewer's palette for differences: the frame page shows temperatures, and keeps the palette chosen"""
+    return [p for p in mosaics.palette_list(converter.palette_luts()) if p.get('saved', True)]
 
 
 def default_palette(settings, preferred):

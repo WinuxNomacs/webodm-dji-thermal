@@ -7,6 +7,8 @@ Files, in the conversion's folder (see conversions):
     mosaics/<kind>/mosaic_temp_<unit>.tif (+ .json), mosaic_preview.png    as dji-thermal-cli writes them (downloads)
     viewer/<kind>.tif (+ .json)    a georeferenced copy for the map, only when the conversion strips the location (the
                                    downloads are then stripped); never downloaded
+    viewer/intensify.tif (+ .json) the harmonized mosaic as the Intensify tab shows it (see intensify): its first band
+                                   each pixel's difference from its surroundings, in the mosaic's unit; never downloaded
     viewer/palettes.json           DJI's palettes, read from one of the frames
     viewer/measurements.json, frame-measurements.json    the measurements saved on the mosaics and on the frames,
                                    kept when the mosaics are built again (see measurements)
@@ -28,14 +30,18 @@ import shutil
 import time
 from pathlib import Path
 
-from . import conversions, converter, datasets, measurements, webodm_versions
+from . import conversions, converter, datasets, intensify, measurements, webodm_versions
 from .analysis import PROGRESS_INTERVAL, Canceled, clean
 
 # The mosaics built: (kind, normalized)
 KINDS = (('as_converted', False), ('harmonized', True))
+# Built from the harmonized mosaic for the viewer alone (not a download): each pixel's difference from its surroundings
+INTENSIFY = 'intensify'
 # The viewer's tabs: (tab, kind whose file it reads, band)
-TABS = (('as_converted', 'as_converted', 1), ('harmonized', 'harmonized', 1),
+TABS = (('as_converted', 'as_converted', 1), ('harmonized', 'harmonized', 1), (INTENSIFY, INTENSIFY, 1),
         ('source_frame', 'as_converted', 2), ('view_angle', 'as_converted', 3))
+# The tabs whose first band is a difference of temperatures (in the mosaic's unit), not a temperature
+DIFFERENCE_TABS = (INTENSIFY,)
 MOSAICS_DIR = 'mosaics'
 VIEWER_DIR = 'viewer'
 PALETTES_FILE = 'palettes.json'
@@ -52,8 +58,11 @@ DEFAULT_MAX_PITCH = -80.0
 # Long per-pair or per-frame lists of the report, left out of what is kept (the JSON sidecar has them all)
 REPORT_DETAIL = ('pairs_detail', 'frames', 'per_frame')
 
-# The colour maps of WebODM's tiler offered beside DJI's palettes
-VIEWER_COLORMAPS = conversions.COLORMAPS
+# The colour maps of WebODM's tiler offered beside DJI's palettes, and the plugin's own for differences (centred on
+# white: blue below, red above), the Intensify tab's first palette; not a preference (conversions.display_palettes)
+DIFFERENCE_PALETTE = 'bwr'
+VIEWER_COLORMAPS = conversions.COLORMAPS + (DIFFERENCE_PALETTE,)
+PALETTE_LABELS = {DIFFERENCE_PALETTE: "blue-white-red"}
 DJI_PREFIX = 'dji_'
 SEAM_COLORS = ((0, 0, 0), (255, 255, 255))   # the source frame tab's lines: a pixel of each, either side of a seam
 TILE_SIZE = 256
@@ -339,9 +348,26 @@ def build(task, cid, write_progress):
                            palette=report.palette, preview_range_c=list(report.preview_range_c),
                            normalization=list(report.normalize_ambient_c) if report.normalize_ambient_c else None,
                            report=trimmed(m.report))
+    kinds[INTENSIFY] = intensified(reports['harmonized'].mosaic, Path(out_dir, VIEWER_DIR, INTENSIFY + '.tif'),
+                                   args['compression'], unit, out_dir)
     shutil.rmtree(path(task, cid, FRAMES_DIR), ignore_errors=True)
     return clean({'kinds': kinds, 'frames': frames, 'unit': unit, 'stripped': stripped,
                   'built_at': datasets.now()})
+
+
+def intensified(m, tif, compression, unit, out_dir):
+    """The Intensify tab's raster written from a mosaic (dji-thermal-cli's Mosaic, °C): its temperatures less their
+    surroundings (intensify.differences) in the mosaic's unit, its other bands and sidecar as they are; what the viewer
+    keeps of it"""
+    import numpy as np
+    dtc = converter.library()
+    celsius = np.asarray(m.temperature, dtype=np.float32)
+    celsius = np.where(celsius > low_value('C'), celsius, np.nan)
+    diff = intensify.differences(celsius, m.grid.gsd) * np.float32(1.8 if unit == 'F' else 1.0)
+    # Written as °C, which dji-thermal-cli keeps as it is: a difference is scaled into the unit, never shifted
+    tif, _ = dtc.mosaic.write(dataclasses.replace(m, temperature=diff), tif, compression, 'C', located=True)
+    return dict(raster_info(str(tif), unit), raster=os.path.relpath(str(tif), out_dir), of='harmonized',
+                gsd_m=m.grid.gsd, width=m.grid.width, height=m.grid.height, size_m=intensify.SIZE_M)
 
 
 def make(task_id, run_id, cid):
@@ -444,16 +470,18 @@ def palettes_of(task, cid):
 
 
 def palette_keys(dji):
-    """The viewers' palette keys: DJI's palettes (dji: their names) with DJI_PREFIX, then WebODM's colour maps"""
-    return [DJI_PREFIX + name for name in dji] + list(VIEWER_COLORMAPS)
+    """The Thermal Inspector's palette keys for the mosaics: DJI's palettes (dji: their names) with DJI_PREFIX, then
+    WebODM's colour maps"""
+    return [DJI_PREFIX + name for name in dji] + list(conversions.COLORMAPS)
 
 
 def palette_list(dji):
-    """The viewers' palettes, [{key, label, color_map (encoded)}]: DJI's (dji: {name: [[r, g, b] x 256]}), then
-    WebODM's colour maps. A palette added to either (dji-thermal-cli's PALETTES, conversions.COLORMAPS) is listed
-    by every viewer."""
+    """The viewers' palettes, [{key, label, color_map (encoded), saved (WebODM's: whether it can be the user's
+    palette)}]: DJI's (dji: {name: [[r, g, b] x 256]}), then WebODM's colour maps and the palette for differences. A
+    palette added to either (dji-thermal-cli's PALETTES, conversions.COLORMAPS) is listed by every viewer."""
     return ([{'key': DJI_PREFIX + name, 'label': "DJI " + name, 'color_map': encoded(lut)} for name, lut in dji.items()] +
-            [{'key': name, 'label': name, 'color_map': webodm_versions.colormap_encoded(name)} for name in VIEWER_COLORMAPS])
+            [{'key': name, 'label': PALETTE_LABELS.get(name, name), 'color_map': webodm_versions.colormap_encoded(name),
+              'saved': name != DIFFERENCE_PALETTE} for name in VIEWER_COLORMAPS])
 
 
 def viewer_palettes(task, cid):
@@ -510,7 +538,13 @@ def tab_kind(tab):
 
 def is_temperature(tab):
     """Whether a viewer tab shows temperatures (its raster's first band; the source frames are drawn over them)"""
-    return tab == 'source_frame' or any(name == tab and band == 1 for name, _kind, band in TABS)
+    return tab == 'source_frame' or (tab not in DIFFERENCE_TABS and any(name == tab and band == 1 for name, _kind, band in TABS))
+
+
+def in_unit(tab):
+    """Whether a viewer tab's values are in the mosaic's unit, temperatures or differences of them: those can be
+    equalized and drawn as isotherms"""
+    return is_temperature(tab) or tab in DIFFERENCE_TABS
 
 
 def temperatures(raster, unit):
@@ -541,7 +575,7 @@ def shares(task, cid, tab, low, high, adjust):
     from . import colouring
     curve = None
     if adjust['equalize']:
-        if not is_temperature(tab):
+        if not in_unit(tab):
             raise ValueError("Only temperatures can be equalized")
         curve = colouring.equalization(histogram(task, cid, tab), low, high)
     elif adjust['gamma'] == 1.0:
@@ -664,7 +698,8 @@ def palette_colors(cmap):
 def point(task, cid, tab, lon, lat):
     """
     A viewer tab's values at a point: {valid, temperature, frame, frame_index, view_angle, frame_pixel, unit, reason};
-    frame_pixel: the frame's pixel it was read from (column, row; none in a mosaic built before dji-thermal-cli 1.4.0)
+    frame_pixel: the frame's pixel it was read from (column, row; none in a mosaic built before dji-thermal-cli 1.4.0).
+    On a tab of differences (Intensify) also difference, its value there, and temperature the harmonized mosaic's.
     """
     import rasterio
     from rasterio.warp import transform
@@ -699,6 +734,8 @@ def point(task, cid, tab, lon, lat):
         if len(finite) == 5 and None not in finite[3:]:
             out['frame_pixel'] = [int(finite[3]), int(finite[4])]
     out['view_angle'] = angle
+    if tab in DIFFERENCE_TABS:
+        out['difference'], out['temperature'] = out['temperature'], point(task, cid, 'harmonized', lon, lat)['temperature']
     out['valid'] = out['temperature'] is not None or out['frame'] is not None
     if not out['valid']:
         out['reason'] = 'nodata'
@@ -772,7 +809,9 @@ def frame_values(task, cid, tab, index):
     """
     A frame as a viewer tab shows it: on View angle each pixel's angle from straight down, in degrees; otherwise its
     temperatures in the mosaic's unit as the tab's mosaic measured them (its recorded measurement, the workset's
-    replacements), the harmonized less the frame's offset. A float array (height, width), NaN where there is no data.
+    replacements), the harmonized less the frame's offset; on Intensify their differences from their surroundings
+    (intensify.differences, at the frame's own ground resolution). A float array (height, width), NaN where there is
+    no data.
     :raises LookupError: not a frame of the mosaic, or its file is gone
     :raises: the library's errors, for a frame it cannot measure
     """
@@ -811,6 +850,9 @@ def frame_values(task, cid, tab, index):
     if ((info.get('report') or {}).get('frame_offsets') or {}).get('normalized'):
         offset = row.get('temperature_offset_c') or 0.0
         values -= offset * (1.8 if unit == 'F' else 1.0)
+    if tab in DIFFERENCE_TABS:
+        model = models[index]
+        values = intensify.differences(values, model['height_m'] / model['focal_px']).astype(np.float64)
     return values
 
 

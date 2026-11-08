@@ -69,6 +69,29 @@ has the same two (the task's photos are then converted by a workset of its datas
   overlaps as a mosaic does. It takes longer, and frames that can't be placed (oblique, or without a position) keep
   their drift. Ticking it ticks Normalize. The WebODM plan recommends it for processing into a map.
 
+Neither changes how much warmer or cooler a spot is than the ground beside it in the same frame: Normalize changes
+the two values every pixel of a frame is measured with, and Harmonize shifts a whole frame by one number (the frame's
+offset, kept in its results). They change a frame's absolute temperatures, by up to its offset, to make the frames
+agree. So they suit comparing areas across a flight; to check a spot against a fixed limit (such as "above 80 °C"),
+read it in a workset with neither, where each frame is measured as it recorded.
+
+## Finding small differences: Intensify
+
+A small difference (a seam 2 to 3 °C cooler than the roof around it, from air getting in) can be hard to see on a
+roof whose slopes and sides are at different temperatures: no single colour range suits all of it. The mosaic
+viewer's **Intensify** tab shows the harmonized mosaic with each pixel's difference from its surroundings, the median
+of the pixels around it over about 2 m. What is wider than that (a slope, the sun's side, a gradient) drops to about
+0; what is narrower keeps its difference: the seam reads -2 to -3 wherever it is on the roof. In blue-white-red over
+a range centred on 0, cooler features show blue and warmer ones red, and an isotherm below -1.5 picks out every spot
+1.5 degrees cooler than its surroundings.
+
+![The mosaic viewer's Intensify tab](images/mosaic-intensify.png)
+
+It is a view: the temperatures, the TIFFs and the downloads stay as they are, and the readout gives both the
+difference and the harmonized temperature. Something as wide as the neighbourhood or wider (a whole wet patch several
+metres across) fades out, and the edge between two surfaces at different temperatures shows a band of each colour
+along it. Mosaics built before the plugin had it show it once built again.
+
 ## Trying other values on one frame
 
 The frame page's **Measure again** measures one frame with other values for the distance, humidity, emissivity,

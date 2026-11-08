@@ -3,7 +3,13 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- Nothing planned: new requests go in `new.md`.
+- **R5. Bug: on WebODM 4.0.0 the Thermal Inspector can't draw a thermal orthophoto in hot, rainbow or gray_r**
+  (found 2026-11-08 while building R4, in 1.1.0): with no Image adjustments, `inspector.js` `withPalette` sends a
+  WebODM colour map to WebODM's own tiles (`.../orthophoto/tiles/...?color_map=hot`), and 4.0.0's tiler no longer has
+  those three (the plugin carries them in `colormaps.json` for its own tiles only): WebODM answers 400 "Not a valid
+  color_map value" and the map shows nothing. 3.3.2 has them. Proposed fix: those three drawn by the plugin's
+  Inspector tiles, as DJI's palettes are (the `display` API names the colour maps WebODM's tiler lacks); a test, and
+  a check on both stacks.
 
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
@@ -12,6 +18,53 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R4. Intensify: a mosaic tab of each pixel's difference from its surroundings** (built 2026-11-08; the user, 2026-11-08, in the
+  session): "would it make sense to offer an \"Intensify\" option that actually makes temperature variances more
+  distinct across the images? Example: I have a mosaic of a roof made from 10 images. Around pipe seams there's a
+  temperature delta variance that's roughly 2-3 degrees cooler than the surrounding roof due to air seepage", then
+  "Let's start by just adding it as a tab to view next Harmonized view tab." Builds on the mosaic viewer's tabs
+  (`mosaics.TABS`, `viewer.js` `TAB_LABELS`, `analyzer_api` mosaic info), its tiles and value tiles, readings and
+  frame page, and the display adjustments (`colouring.py`: range, gamma, equalize, sharpen, isotherm), which stay as
+  they are. Neither normalizing nor harmonizing evens out a local difference (one number per frame), and the display
+  adjustments can't follow a roof's gradients and slopes with one range; this can.
+  Proposed:
+  1. **What it shows**: the harmonized mosaic less its local background, each pixel's median over a neighbourhood
+     wider than a seam and narrower than a slope (in metres, from the mosaic's ground resolution): gradients, slopes
+     and the sun's side go to about 0, a seam 2-3 °C cooler than the roof beside it shows -2 to -3. A difference,
+     in the mosaic's unit (°F: ×1.8, no offset).
+  2. **Built with the mosaics**, in the worker, as a third raster beside the two (`viewer/intensified.tif`), so its
+     range, histogram (equalize), readings and tiles work as the others' do; numpy only (the median over coarse
+     blocks, interpolated: a median filter that wide is slow, and WebODM's scipy isn't the plugin's to rely on).
+  3. **The tab**: "Intensify", after "Harmonized" in the mosaic viewer; its own palette and range (not shared with
+     the temperature tabs, which share theirs), the range symmetric about 0 by default; a hint saying what it shows
+     and that its numbers are differences, not temperatures. A reading shows both: "28.4 °C, -2.6 °C from its
+     surroundings". Its isotherm works on the differences ("below -1.5"). The frame page opened from it shows the
+     frame's differences the same way (the frame's own harmonized temperatures less their background).
+  4. Not in this phase: the Thermal Inspector's map, the downloads, a size changed live on the tab.
+  Open: the neighbourhood (proposed: fixed at 2 m for now, in the hint); a palette for differences (proposed: a
+  blue-white-red one added, the tab's default: WebODM's colour maps and DJI's palettes have none centred on a
+  value); mosaics built before (proposed: the tab appears after "Build mosaics again", nothing built on its own).
+  Decided (the user, 2026-11-08): the neighbourhood fixed at 2 m; a blue-white-red palette added, the tab's default
+  (offered on the other tabs too); mosaics built before get the tab after "Build mosaics again".
+  Built, `r4-intensify`: `intensify.py` (`differences`: the medians of windows 2 m wide every metre, interpolated
+  between, numpy only; a 5000x5000 mosaic in about 2 s); `mosaics.intensified` writes `viewer/intensify.tif` from the
+  harmonized mosaic in the build, kept as `kinds.intensify` (`of: harmonized`, `size_m`; not in `KINDS`: not a
+  download, nor in the workset's Mosaics table); `TABS` and `DIFFERENCE_TABS`, `in_unit` (equalize, isotherm,
+  histogram), `point` gives `difference` and the harmonized `temperature`, `frame_values` the frame's own differences
+  (at its ground resolution, `height_m / focal_px`): that is the frames window over the map; the frame page itself
+  shows temperatures and doesn't offer the palette. The palette `bwr` in `colormaps.json`, listed with `saved: false`
+  (not a preference: `display_palettes` refuses it, so the viewer doesn't send it), not in the Thermal Inspector's
+  list (`palette_keys`). `viewer.js`: `isDifference`, `inUnit`, values shown and typed with `convertDelta`, the range
+  symmetric about 0, the report the harmonized mosaic's. Tests: Jest 301 (the tab, its unit, palette, isotherm,
+  readout), Django 213 on 4.0.0 and 3.3.2 (1 skipped; the synthetic roof, and the tab on a flight's mosaics). Live on
+  :8002 with 40 frames of the M4T flight (its own project, removed after): the tab after Harmonized, its range
+  -2.7 to 2.7 °C, the readout "+2.13 °C from its surroundings" with the temperature, the frames window, an isotherm
+  below -1. Docs: the README, `quickstart-worksets.md`, `measurement.md` (what normalize and harmonize change, and
+  "Finding small differences: Intensify", with `mosaic-intensify.png`), `palettes.md`, `api.md`, `developing.md`; the
+  mosaic viewer's screenshots retaken (from the live check's dataset: the user's worksets have mosaics built
+  before).
+
+
 - **R3. A link to WebODM's community Discord in the README** (built 2026-11-08; the user, 2026-11-08, from `new.md`): "Add a link
   near the bottom of the README to Join the WebODM Community Discord: https://discord.gg/hYDk9f28J". Builds on the
   README's end (Developing, Thanks, License). Proposed: a short section of its own, "Community", between Developing

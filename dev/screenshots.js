@@ -184,6 +184,15 @@ const SHOTS = {
         await hoverMap(p);
         return p;
     },
+    "mosaic-intensify": async (p, env) => {
+        // Built with the mosaics since Intensify exists: a workset whose mosaics were built before has no such tab
+        await openViewer(p, env);
+        await p.click('#ta-viewer-tabs a[data-tab="intensify"]');
+        await p.waitForSelector("#ta-viewer-map .leaflet-tile-loaded", {timeout: 60000});
+        await p.waitForTimeout(2000);
+        await hoverMap(p);
+        return p;
+    },
     "mosaic-frames": async (p, env) => {
         await openViewer(p, env);
         const box = await p.locator("#ta-viewer-map").boundingBox();
