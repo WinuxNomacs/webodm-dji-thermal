@@ -3,7 +3,13 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- Nothing planned: new requests go in `new.md`.
+- **R3. A link to WebODM's community Discord in the README** (the user, 2026-11-08, from `new.md`): "Add a link
+  near the bottom of the README to Join the WebODM Community Discord: https://discord.gg/hYDk9f28J". Builds on the
+  README's end (Developing, Thanks, License). Proposed: a short section of its own, "Community", between Developing
+  and Thanks, with one line: "Questions, ideas or help with WebODM: [join the WebODM Community
+  Discord](https://discord.gg/hYDk9f28J)." No other page changes (the docs' index links the README).
+  Open: the invite (WebODM's docs, `commercial-providers.md`, use https://discord.gg/RxHPXCSMBS; two invites can
+  both lead to the same server, but one may expire); where it goes (proposed: its own section before Thanks).
 
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
