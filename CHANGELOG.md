@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.2.0 (2026-11-08)
+
+The plugin's name is now **DJI Thermal Analyzer** (its id and folder stay `dji-thermal`, so upgrading keeps its
+data). For WebODM 3.3.2 and 4.0.0, in Docker (Linux, Windows, macOS) or from its native Windows installer.
+
+**New**
+
+- **Intensify**, a mosaic viewer tab: the harmonized mosaic, each pixel less the median temperature within about
+  2 m, so a narrow cooler or warmer feature (a seam letting air in) stands out wherever it is, in a blue-white-red
+  palette centred on 0.
+- **ΔT from surroundings** under the cursor: how much warmer or cooler a point is than the median within about 2 m,
+  in the mosaic viewer, the frame page (with Measure again, for both measurements) and the Thermal Inspector.
+- **The temperature unit (°C or °F) in WebODM's header**, beside the user icon, kept for your WebODM account; an
+  administrator sets the default on the DJI Thermal page under Administration (°C unless set).
+- **The colour range's arrows as a D-pad**: ◀ and ▶ narrow or widen the range, ▲ and ▼ raise or lower it (never past
+  the hottest or coldest temperature), **Auto** in the middle.
+- **Large thumbnails in the frame page's list**, with a Thumbnails box to list the names only.
+- A workset's frames are drawn in the palette it chose (else yours), in its Files and on the frame page.
+- A Community section (WebODM's Discord) and a Thanks section in the README; a developers' guide
+  (`docs/developing.md`).
+
+**Fixed and made sturdier**
+
+- The Thermal Inspector's button shows only on maps with temperatures, not on the RGB maps of a project with
+  mosaics; its scripts load on map pages only.
+- A public map no longer asks for the user's preferences (refused for anonymous viewers).
+- A workset's frames open on the frame page before the dataset is analyzed.
+- Mosaics built again replace those built before only once built: if building them fails or is canceled, the
+  workset keeps the ones it had.
+- Images can't be added to a dataset while a workset converts or builds its mosaics (the page says why).
+- A damaged thermal frame is counted in a workset as skipped, with the reason, not as not thermal.
+- A job whose worker stopped fails within seconds; one queued while no worker runs says so.
+- The Administration page says why when dji-thermal-cli can't be loaded.
+- A full disk leaves no part of an image in a dataset, and says so; a large mosaic is never read whole.
+- The Analyzer's list says why it couldn't load; an upload refused with a reason stops and says it; the mosaic
+  viewer says when its readout never reached the server.
+- DJI Thermal Task converts two photos at a time, leaving a small server room for other pages; pages poll less
+  often in a background tab; cached pictures nobody has viewed for two weeks are deleted.
+- An error in the plugin's task-deletion hook no longer stops WebODM deleting a task; a thumbnail asked for twice
+  at once no longer fails.
+- The documentation reviewed against the plugin as it is, and its screenshots retaken.
+
 ## 1.1.0 (2026-11-05)
 
 **WebODM 4.0.0**, as well as 3.3.2, in Docker (Linux, Windows, macOS) or from its native Windows installer.

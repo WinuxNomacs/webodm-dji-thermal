@@ -2,7 +2,7 @@
 	"name": "DJI Thermal Analyzer",
 	"webodmMinVersion": "3.3.2",
 	"description": "Turns DJI radiometric thermal photos (R-JPEG) into temperature maps: a DJI Thermal Task button, a DJI Thermal Analyzer to check, convert and mosaic a flight before processing it, and a Thermal Inspector to measure temperatures on WebODM's map.",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"author": "Winux Nomacs",
 	"repository": "https://github.com/WinuxNomacs/webodm-dji-thermal",
 	"tags": ["thermal", "dji"],
