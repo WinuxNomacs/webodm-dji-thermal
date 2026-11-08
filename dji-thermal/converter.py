@@ -194,7 +194,8 @@ def settings(values=None):
     distance = 'lrf' if distance is None or distance == '' else distance
     if distance not in DISTANCES:
         distance = number('distance')
-    return library().Settings(distance=distance, unit=unit, sdk=sdk.current(),
+    folder = sdk.current()      # first: dji-thermal-cli that can't be loaded is an SdkError, with the reason
+    return library().Settings(distance=distance, unit=unit, sdk=folder,
                               **{name: number(name) for name in MEASUREMENT_FIELDS})
 
 

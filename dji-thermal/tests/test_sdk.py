@@ -212,6 +212,21 @@ class TestPage(SdkTestCase):
     def test_the_page_needs_a_login(self):
         self.assertEqual(Client().get(PAGE_URL).status_code, 302)
 
+    def test_the_page_says_why_when_dji_thermal_cli_cannot_be_loaded(self):
+        # Its install failed (a server without internet access): the page, where the administrator looks, says so
+        client = self.client_for("testsuperuser")
+        with mock.patch.object(converter, "library", side_effect=ImportError("No module named 'dji_thermal_cli'")):
+            res = client.get(PAGE_URL)
+            self.assertContains(res, "dji-thermal-cli cannot be loaded (No module named")
+            self.assertNotContains(res, "The built-in port of DJI")
+            self.assertContains(client.post(PAGE_URL, {"action": "check"}, follow=True), "dji-thermal-cli cannot be loaded")
+            with open(self.make_zip(["tsdk-core/lib/readme.txt"]), "rb") as f:
+                self.assertContains(client.post(PAGE_URL, {"action": "upload", "sdk_zip": f}, follow=True),
+                                    "dji-thermal-cli cannot be loaded")
+            # A photo uploaded is refused with the reason, not a server error
+            with self.assertRaises(sdk.SdkError):
+                converter.settings({})
+
 
 @skip_without_sdk_zip()
 class TestDjisSdk(SdkTestCase):
