@@ -44,6 +44,7 @@ correction = importlib.import_module("coreplugins.dji-thermal.correction")
 measurements = importlib.import_module("coreplugins.dji-thermal.measurements")
 analyzer_api = importlib.import_module("coreplugins.dji-thermal.analyzer_api")
 intensify = importlib.import_module("coreplugins.dji-thermal.intensify")
+inspector_api = importlib.import_module("coreplugins.dji-thermal.inspector_api")
 portable = importlib.import_module("coreplugins.dji-thermal.portable")
 
 API = "/api/plugins/dji-thermal/datasets"
@@ -551,6 +552,18 @@ class TestConversionSettings(AnalyzerTestCase):
         self.client.delete(url)
         self.assertFalse(self.client.get(url).data["saved"])
 
+
+    def test_the_display_names_the_colour_maps_webodms_tiler_lacks_and_the_inspector_draws_them(self):
+        from app.api.tiler import get_colormap_encoded_values
+        own = self.client.get("/api/plugins/dji-thermal/display").data["own_colormaps"]
+        for name in conversions.COLORMAPS:
+            try:
+                get_colormap_encoded_values(name)
+                lacks = False
+            except Exception:  # noqa: BLE001 - rio-tiler refuses a name it doesn't have
+                lacks = True
+            self.assertEqual(name in own, lacks, name)
+            self.assertEqual(len(inspector_api.palette_colors(name)), 256, name)
 
     def test_a_user_saves_their_palette_of_djis_or_webodms_and_the_pages_get_it(self):
         url = "/api/plugins/dji-thermal/display"

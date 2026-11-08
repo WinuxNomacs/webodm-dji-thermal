@@ -150,6 +150,16 @@ describe("the Thermal Inspector", () => {
         expect(inspector.paletteOf(back)).toBe("jet");
     });
 
+    it("draws the colour maps WebODM's tiler lacks with the plugin's tiles, the others with WebODM's", () => {
+        const display = {...DISPLAY, colormaps: ["inferno", "hot", "jet"], own_colormaps: ["hot"]};
+        const hot = inspector.withPalette(TILES, "hot", display);
+        expect(hot).toBe("/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/tiles/{z}/{x}/{y}.png" +
+                         "?formula=Celsius&bands=L&rescale=10,40&palette=hot");
+        expect(inspector.paletteOf(hot)).toBe("hot");
+        expect(inspector.withPalette(hot, "jet", display)).toBe(TILES.replace("color_map=magma&", "") + "&color_map=jet");
+        expect(inspector.withPalette(TILES, "hot", DISPLAY)).toBe(TILES.replace("color_map=magma&", "") + "&color_map=hot");
+    });
+
     it("lists the palettes as the Analyzer does: DJI's, then WebODM's", () => {
         expect(inspector.paletteOptions(DISPLAY)).toEqual([["ironred", "DJI ironred"], ["inferno", "inferno"],
                                                            ["magma", "magma"], ["jet", "jet"]]);

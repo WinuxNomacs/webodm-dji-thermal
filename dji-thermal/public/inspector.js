@@ -315,10 +315,12 @@
     function colorMapOf(url) { return paramOf(url, "color_map"); }
 
     // A thermal layer's tile URL in a palette, drawn with adjustments (the Image section's): drawn by the plugin's
-    // tiles in one of DJI's (display.palettes) or with adjustments, else by WebODM's; the range, size and crop kept
+    // tiles in one of DJI's (display.palettes), in a colour map WebODM's tiler lacks (display.own_colormaps: 4.0.0's
+    // hot, rainbow and gray_r) or with adjustments, else by WebODM's; the range, size and crop kept
     function withPalette(url, name, display, adjust) {
         var a = adjust || {};
-        if (((display && display.palettes) || []).indexOf(name) !== -1 || Scale.adjusted(adjust)) {
+        var own = ((display && display.palettes) || []).concat((display && display.own_colormaps) || []);
+        if (own.indexOf(name) !== -1 || Scale.adjusted(adjust)) {
             url = url.replace(WEBODM_TILES, API + "projects/$1/inspector/tiles/");
             url = withParam(withParam(url, "color_map", ""), "palette", name);
             url = withParam(url, "gamma", a.gamma && a.gamma !== 1 ? String(a.gamma) : "");

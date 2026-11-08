@@ -73,6 +73,22 @@ def colormap_encoded(name):
     return get_colormap_encoded_values(name)
 
 
+def tiler_lacks(names):
+    """Of names (WebODM's colour maps), those WebODM's own tiler doesn't have (4.0.0's: hot, rainbow, gray_r), in
+    order: the Thermal Inspector draws a thermal orthophoto in those with the plugin's tiles"""
+    return [name for name in names if not _tiler_has(name)]
+
+
+@cache
+def _tiler_has(name):
+    from app.api.tiler import get_colormap_encoded_values
+    try:
+        get_colormap_encoded_values(name)
+    except Exception:  # noqa: BLE001 - rio-tiler refuses a name it doesn't have
+        return False
+    return True
+
+
 def colormap(name):
     """A WebODM colour map as rio-tiler's colormap.get gives it: {index: (r, g, b, a)} (colormap_encoded's)"""
     return {i: ((c >> 24) & 255, (c >> 16) & 255, (c >> 8) & 255, c & 255) for i, c in enumerate(colormap_encoded(name))}
