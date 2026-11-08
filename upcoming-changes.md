@@ -3,6 +3,37 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **R9. The range's arrows as a D-pad** (the user, 2026-11-08, in `new.md`): "Regarding the temperature range/scale
+  control arrows. Replace them with a 5 button D-Pad style arrangement with Auto button moved into the center button's
+  place. The Left arrow button Narrows the range as the current narrow button functions now, same for the Expand/right
+  arrow button used for expanding the range. The Top/up arrow button becomes the "Raise" range button, which every
+  time it's clicked both the minimum and maximum temperatures increase by 10% until the maximum level of the range is
+  reached. Inversely the Bottom/down arrow button becomes the "Lower" range button, which every time it's clicked both
+  the minimum and maximum temperatures lower by 10% until the minimum level of the range is reached." Builds on the
+  range control the mosaic viewer, the frame page and the Thermal Inspector share (`scale.js` `spanButtonsHtml`,
+  `spanRange`: ◀ narrows and ▶ widens the range by a tenth of its span, about its middle; Auto beside the fields).
+  Proposed: one control for the three, five buttons in a cross between the range's two fields: ◀ narrow and ▶ widen
+  as now, ▲ raise and ▼ lower (both ends moved by a tenth of the range's width, the width kept), Auto in the middle;
+  the docs (the viewer's, the frame page's and the Inspector's) and their screenshots updated. Open: none. Decided
+  (the user, 2026-11-08): raise and lower "should never exceed the range of the image itself. Example: an image has a
+  range of 0-100F and the current span is set to 60-75F. As the user clicks Raise, it will never exceed 100F just as
+  clicking Lower will never lower it below 0": each step a tenth of the range's width, the last only as far as the
+  image's highest (lowest) temperature, the width kept.
+- **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
+  the documentation as necessary so that it's information is accurate prior to release." Builds on everything
+  since 1.1.0 (R1 to R6). Proposed: every page of `docs/` and the README read against the code
+  as it is (what each page, panel, button and setting says it does, the API reference, the developers' guide's
+  map), corrected where it's wrong or out of date, and the screenshots checked against the UI (retaken where they
+  differ, none showing a place, coordinates or a serial number). No release prepared: that waits for the user.
+  Open: none (the inspector.png retake waits on a neutral task name, as noted in R6).
+
+**Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
+
+**Done**
 - **R8. The code reviewed for breaking points before the release** (the user, 2026-11-08, in the session): "Similar
   to R7, prior to release plan to review the plugin code for potential breaking points that could have a negative
   impact on the user experience". Builds on everything since 1.1.0 (R1 to R6). Proposed: the plugin's Python and
@@ -63,38 +94,27 @@
   3. and 4. As proposed.
   5. "Is it possible to have a reasonable timeout on the cache?": a cached picture is marked used each time it's
      sent, and those unused for 14 days are deleted when the dataset's pictures are next drawn.
-  No release prepared. Open: none.
-- **R9. The range's arrows as a D-pad** (the user, 2026-11-08, in `new.md`): "Regarding the temperature range/scale
-  control arrows. Replace them with a 5 button D-Pad style arrangement with Auto button moved into the center button's
-  place. The Left arrow button Narrows the range as the current narrow button functions now, same for the Expand/right
-  arrow button used for expanding the range. The Top/up arrow button becomes the "Raise" range button, which every
-  time it's clicked both the minimum and maximum temperatures increase by 10% until the maximum level of the range is
-  reached. Inversely the Bottom/down arrow button becomes the "Lower" range button, which every time it's clicked both
-  the minimum and maximum temperatures lower by 10% until the minimum level of the range is reached." Builds on the
-  range control the mosaic viewer, the frame page and the Thermal Inspector share (`scale.js` `spanButtonsHtml`,
-  `spanRange`: ◀ narrows and ▶ widens the range by a tenth of its span, about its middle; Auto beside the fields).
-  Proposed: one control for the three, five buttons in a cross between the range's two fields: ◀ narrow and ▶ widen
-  as now, ▲ raise and ▼ lower (both ends moved by a tenth of the range's width, the width kept), Auto in the middle;
-  the docs (the viewer's, the frame page's and the Inspector's) and their screenshots updated. Open: none. Decided
-  (the user, 2026-11-08): raise and lower "should never exceed the range of the image itself. Example: an image has a
-  range of 0-100F and the current span is set to 60-75F. As the user clicks Raise, it will never exceed 100F just as
-  clicking Lower will never lower it below 0": each step a tenth of the range's width, the last only as far as the
-  image's highest (lowest) temperature, the width kept.
-- **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
-  the documentation as necessary so that it's information is accurate prior to release." Builds on everything
-  since 1.1.0 (R1 to R6). Proposed: every page of `docs/` and the README read against the code
-  as it is (what each page, panel, button and setting says it does, the API reference, the developers' guide's
-  map), corrected where it's wrong or out of date, and the screenshots checked against the UI (retaken where they
-  differ, none showing a place, coordinates or a serial number). No release prepared: that waits for the user.
-  Open: none (the inspector.png retake waits on a neutral task name, as noted in R6).
-
-**Later**
-- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
-  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
-
-**Done**
+  Built and merged (2026-11-08), each on its own branch with tests, the full suites run on both stacks, and checked
+  live on the 3.3.2 dev stack (started and stopped for it, what the checks made deleted after):
+  1. `mosaics.py` `STAGING_DIR`, `replace`, `discard` (a build writes `mosaics-new/`, moved in place by
+     `datasets.finish_job`'s `then` with the dataset locked); the dataset page's workset card and the viewer show the
+     mosaics built before while building again and after a failed or canceled build (`conversions.js`, `viewer.js`).
+     `test_analyzer` `test_mosaics_built_again_replace_those_built_before_only_once_built`. Live: a rebuild canceled
+     half way kept the first mosaics, a finished one replaced them.
+  2. `datasets.py` `HEARTBEAT_SECONDS` 2, `LATE_SECONDS`, `worker_has` (Celery's `query_task`, 0.8 s, kept 3 s),
+     `check_stale`, `waiting`; `portable.BUSY_WORKER_ANSWERS` (WebODM's native Windows install runs its worker with
+     eventlet, which a busy job holds up: there no answer still waits `STALE_SECONDS`); the pages' "Waiting for
+     WebODM's worker, which isn't running" (`analyzer_core.js` `WAITING`). `test_analyzer`
+     `test_a_started_analysis_whose_heartbeat_stopped_...`, `test_the_worker_is_asked_once_in_a_while_...`. Live: the
+     worker stopped mid-build, the job showed failed about 6 seconds later; restarted, 3 seconds after the check began;
+     a job queued while it was stopped showed waiting, then ran once it started.
+  3. `conversions.py` `thermal_jpegs` (thermal and damaged), `compact`'s `damaged`. `test_analyzer`
+     `test_a_conversions_progress_counts_only_the_frames_it_converts` (a frame cut short).
+  4. `conversions.py` `busy` (shared with removing images), `analyzer_api.py` `DatasetUpload`; `dataset.js` disables
+     Add images with the reason. `test_analyzer` `test_images_are_added_to_a_dataset_only_while_no_workset_...`.
+  5. `analyzer_api.py` `sweep` (`UNUSED_SECONDS`, once a day), `palette_thumbnail` marks a picture used as it's sent.
+     `test_analyzer` `test_cached_pictures_unused_for_two_weeks_are_deleted_when_pictures_are_next_drawn`.
+  Not checked on the native Windows install (its worker's no-answer case keeps the old wait). No release prepared.
 - **R5. Bug: on WebODM 4.0.0 the Thermal Inspector can't draw a thermal orthophoto in hot, rainbow or gray_r**
   (found 2026-11-08 while building R4, in 1.1.0): with no Image adjustments, `inspector.js` `withPalette` sends a
   WebODM colour map to WebODM's own tiles (`.../orthophoto/tiles/...?color_map=hot`), and 4.0.0's tiler no longer has
