@@ -124,7 +124,7 @@ see the plan's value.
 **The Files tab's thumbnails take a while the first time**
 
 The thermal thumbnails are drawn from each frame's temperatures, on the server, in your palette. They're kept with
-the dataset, so the next views are quick.
+the dataset, so the next views are quick; those nobody has viewed for two weeks are deleted (drawn again if viewed).
 
 ## Thermal Inspector
 

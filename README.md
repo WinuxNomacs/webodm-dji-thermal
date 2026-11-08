@@ -146,7 +146,8 @@ analysis and worksets at a glance (how many worksets, or how many of them are re
   chosen on a mosaic's temperature tab. The mosaics' temperature tabs open in it (DJI's where the frames hold it).
   A DJI palette is also where new worksets start (unless your saved defaults have a palette of their own) and how
   the Files tab's thumbnails of thermal frames are drawn, from their temperatures, on the server (the first view of
-  a large dataset takes a while; they are kept with the dataset). By default each image's own.
+  a large dataset takes a while; they are kept with the dataset until unviewed for two weeks). By default each
+  image's own.
 - **Thermal Inspector › Legend on the map**, kept for your WebODM account: whether the Thermal Inspector shows its
   legend on WebODM's map (shown by default).
 
