@@ -41,7 +41,8 @@ Give the workset a name if you like, then press **Create Workset**. It's convert
 with its progress and a **Cancel** button. A harmonized workset first compares the frames' overlaps: its label shows
 the stage ("Harmonizing 3/4") and the bar how far the stages are. Then the bar counts the frames converted ("12 of 42
 frames converted"), not the RGB photos or the oblique frames, which are skipped at once. While its mosaics are built,
-the label reads "Building mosaics" and **Cancel mosaics** stops them.
+the label reads "Building mosaics" and **Cancel mosaics** stops them. Mosaics built again replace those built before
+only once they're built: until then, and if building them fails or is canceled, the workset keeps the ones it had.
 
 ## 2. The workset
 

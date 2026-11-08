@@ -264,18 +264,20 @@
         }).join("") + "</tbody></table>" + (files ? '<ul class="ta-viewer-files">' + files + "</ul>" : "");
     }
 
-    // The status line above the map: the mosaics being built, failed, canceled or not built
+    // The status line above the map: the mosaics being built, failed, canceled (those built before still shown) or not built
     function statusHtml(v) {
         if (v.status === "converting") return {text: "The images are being converted: the mosaics are built next, if asked for.", cls: "text-muted"};
         if (v.mosaic_status === "building") {
             var pct = Math.round((v.mosaic_progress || 0) * 100);
             return {text: '<div class="progress"><div class="progress-bar progress-bar-striped active" style="width: ' + Math.max(pct, 3) +
-                '%;"></div></div> ' + esc(core.mosaicLabel({stage: v.mosaic_stage})), cls: ""};
+                '%;"></div></div> ' + esc(core.mosaicLabel({stage: v.mosaic_stage})) +
+                ((v.tabs || []).length ? esc(" The mosaics shown are those built before, until the new ones are built.") : ""), cls: ""};
         }
-        if (v.mosaic_status === "failed") return {text: '<i class="fa fa-exclamation-triangle"></i> The mosaics failed: ' + esc(v.mosaic_error), cls: "text-danger"};
-        if (v.mosaic_status === "canceled") return {text: "Building the mosaics was canceled.", cls: "text-muted"};
+        var before = (v.tabs || []).length ? " The mosaics shown are those built before." : "";
+        if (v.mosaic_status === "failed") return {text: '<i class="fa fa-exclamation-triangle"></i> The mosaics failed: ' + esc(v.mosaic_error + (before && !/[.!?]$/.test(v.mosaic_error) ? "." : "") + before), cls: "text-danger"};
+        if (v.mosaic_status === "canceled") return {text: "Building the mosaics was canceled." + before, cls: "text-muted"};
         if (v.status !== "ready") return {text: "The images were not converted: there is nothing to make mosaics of.", cls: "text-muted"};
-        if (v.mosaic_status !== "ready") return {text: "This workset has no mosaics.", cls: "text-muted"};
+        if (!before) return {text: "This workset has no mosaics.", cls: "text-muted"};
         return {text: "", cls: ""};
     }
 
@@ -609,9 +611,10 @@
             status(statusHtml(v));
             var busy = v.status === "converting" || v.mosaic_status === "building";
             $("ta-viewer-build").hidden = !v.can_change || busy || v.status !== "ready";
-            $("ta-viewer-build").innerHTML = '<i class="fa fa-th"></i> ' + (v.mosaic_status === "ready" ? "Build again" : "Build mosaics");
+            // Built: shown while they are built again, and after that fails or is canceled
+            var ready = (v.tabs || []).length > 0;
+            $("ta-viewer-build").innerHTML = '<i class="fa fa-th"></i> ' + (ready ? "Build again" : "Build mosaics");
             $("ta-viewer-cancel").hidden = !v.can_change || !busy;
-            var ready = v.mosaic_status === "ready" && (v.tabs || []).length;
             $("ta-viewer-main").hidden = !ready;
             $("ta-viewer-webodm-map").hidden = !ready || busy || !v.project_map;
             if (timer) root.clearTimeout(timer);

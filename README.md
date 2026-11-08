@@ -233,8 +233,8 @@ its **Mosaics** below them once built (a table like the Files', closed at first 
 preview, frames, size, ground sample distance and temperature range, and beside it a pane with the preview at its
 own size, its files to download, what dji-thermal-cli reports about it and **View mosaic**; Ctrl/Cmd-click selects
 both, to download their files as one zip),
-**Download all** (a zip), and in its menu **Copy settings to form**, **Build mosaics** (again), **Open on WebODM's
-map**, **Use for parent task**, **Rename** and **Delete**. Beside the table, a detail pane shows the image
+**Download all** (a zip), and in its menu **Copy settings to form**, **Build mosaics** (again: the new mosaics replace
+the old only once built, so a build that fails or is canceled keeps them), **Open on WebODM's map**, **Use for parent task**, **Rename** and **Delete**. Beside the table, a detail pane shows the image
 under the mouse, or the one clicked: the frame at its own size, all it was measured with, and its downloads (the
 workset's files, its temperatures as CSV or a float TIFF, and Open frame). Ctrl/Cmd-click or Shift-click selects
 several, to download their files as one zip. **Remove from workset**, in the pane, takes the image (or those
