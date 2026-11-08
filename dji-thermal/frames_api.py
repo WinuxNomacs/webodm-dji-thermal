@@ -95,7 +95,7 @@ class WorksetFrameValues(DatasetView):
         """
         task = get_conversion(request, pk, cid)
         rel, changes = query(request.query_params)
-        found = measured(lambda: frames.frame_path(task, rel))
+        found = measured(lambda: frames.frame_path(task, rel, cid))
         version = [VALUES_VERSION, sorted(changes.items()), rel]
         for p in (found, conversions.path(task, cid, conversions.RECORD_FILE),
                   conversions.path(task, cid, conversions.RESULTS_FILE)):
