@@ -3,6 +3,26 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **R8. The code reviewed for breaking points before the release** (the user, 2026-11-08, in the session): "Similar
+  to R7, prior to release plan to review the plugin code for potential breaking points that could have a negative
+  impact on the user experience". Builds on everything since 1.1.0 (R1 to R6). Proposed: the plugin's Python and
+  scripts read for where a user would hit an error, a hang, a blank page or lost work, area by area (the task
+  button and upload, the Analyzer's datasets, worksets and their background jobs, mosaics, the frame page, the
+  mosaic viewer, the Inspector, the Administration page, installing and upgrading), looking for:
+  - unexpected input: no GPS, no thermal frames, non-DJI or corrupt photos, one photo, mixed cameras, very large
+    flights;
+  - interrupted or concurrent work: a worker restarted mid-job, a job cancelled, two users or tabs changing one
+    workset, a task deleted under a dataset;
+  - files and folders: missing, read-only or full, data written by an older version of the plugin;
+  - the browser: unhandled errors and rejected requests, a failed request leaving a page stuck;
+  - permissions and sharing, and what differs on WebODM 3.3.2 / 4.0.0 and on Windows.
+  Decided (the user, 2026-11-08):
+  - Each clear bug is fixed first, on its own branch, with a test. The judgement calls (limits, wording, trade-offs)
+    are written up here, ranked, for the user to choose.
+  - R8 comes before R7, so the docs are reviewed once, after its fixes.
+  - Failures are triggered live (a worker stopped mid-job, a missing file, a corrupt photo, a full or read-only
+    folder) on a separate stack Claude starts and stops, with copies of the data; :8002 and its data stay untouched.
+  No release prepared. Open: none.
 - **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
   the documentation as necessary so that it's information is accurate prior to release." Builds on everything
   since 1.1.0 (R1 to R6). Proposed: every page of `docs/` and the README read against the code
