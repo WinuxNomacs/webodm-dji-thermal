@@ -169,8 +169,9 @@ viewer also has its own palette for differences, `bwr` (`DIFFERENCE_PALETTE` in 
   `palette_keys` give it to the viewers, and the `display` API gives it to the Preferences dialog and the Inspector.
   If either WebODM version's tiler lacks it (4.0.0's has fewer), add its 256 colours (`RRGGBBAA`, index 0 to 255) to
   `colormaps.json`, as for `hot`, `rainbow` and `gray_r`: `webodm_versions.colormap_encoded` reads that file first.
-  Check it on a thermal orthophoto in the Inspector in both stacks, since WebODM's own layer keeps the name in its
-  tile URL.
+  Check it on a thermal orthophoto in the Inspector in both stacks. The Inspector colours the orthophoto in the
+  browser from its values tiles; the name only rides in the layer's tile URL, which WebODM's layer panel reads but
+  nothing fetches.
 - **A DJI palette**: palettes come from dji-thermal-cli's `PALETTES` and the colour tables in the photos. Add it
   there first, release it, then pin the new version in `requirements.txt`.
 
