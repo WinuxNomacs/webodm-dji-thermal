@@ -51,9 +51,11 @@ the camera recorded 5 m and the drone flew at 20 m.
 
 ## Temperature unit
 
-The unit of the values you type: Celsius, Fahrenheit or Kelvin. The DJI Thermal Task's images are always in degrees
-Celsius. In the Workset Creation Settings, **Unit of the files** sets the unit of a workset's temperature TIFFs
-separately.
+In the DJI Thermal Task panel, **Temperature unit** is the unit of the values you type: Celsius, Fahrenheit or
+Kelvin. The task's images are always in degrees Celsius. The Workset Creation Settings take temperatures in your
+unit, °C or °F (see [Palettes and units](palettes.md)). Their **Unit of the files**, in the Measurement section, is
+the unit of the workset's mosaics and of the frame page's temperature downloads; the frames' temperature TIFFs are in
+the units ticked in Outputs.
 
 ## Normalize and harmonize
 

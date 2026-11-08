@@ -24,8 +24,9 @@ The settings are in sections, in the order of the work:
   [Measurement settings](measurement.md)).
 - **Outputs**: which files to write (temperature TIFFs in °C, °F or K, colour PNGs, 16-bit grey, DJI R-JPEGs and
   others), their compression, and whether to build mosaics.
-- **Measurement**: the values the temperatures are computed with. Left empty, each photo keeps its recorded value;
-  the recorded median shows under each field. See [Measurement settings](measurement.md).
+- **Measurement**: the values the temperatures are computed with, in your unit. Left empty, each photo keeps its
+  recorded value; the recorded median shows under each field. **Unit of the files** sets the mosaics' unit and the
+  frame page's downloads'. See [Measurement settings](measurement.md).
 - **Colours**, once a colour or 16-bit grey output is ticked: the palette and colour range of those pictures.
 - **Adjustments**: gimbal angle overrides, temperatures above or below a threshold replaced, and the location and
   identifiers stripped from the outputs.
@@ -65,6 +66,7 @@ gives), and its size.
   first time its Files are opened, which takes a few seconds.
 
 ![A workset's Files, the detail pane on the image under the mouse](images/workset-files.png)
+
 - **Mosaics**, below Files once the workset's mosaics are built, is a table like the Files': a row for the mosaic
   as converted and one for the harmonized, with its preview, the frames it was built from, its size, its ground sample
   distance and its lowest and highest temperature. The detail pane beside it shows the mosaic under the mouse, or the
@@ -75,6 +77,7 @@ gives), and its size.
   **Download all**'s zip has the mosaics too.
 
 ![A workset's Mosaics, the harmonized mosaic selected](images/workset-mosaics.png)
+
 - The **⋯** menu has **Download all** (a zip), **Open on WebODM's map** (once the mosaics are built), **Copy
   settings to form**, **Build mosaics** (**Build mosaics again** once built), **Create task** (once the workset is
   in a task), **Use for parent task**, **Rename** and **Delete**.

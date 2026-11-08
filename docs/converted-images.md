@@ -23,6 +23,7 @@ Its XMP also records how it was measured, as dji-thermal-cli's own outputs do (n
 | `ReflectedTemperatureC` | the reflected temperature used, in °C |
 | `AmbientTemperatureC` | the ambient temperature used, in °C |
 | `Software` | what measured it: dji-thermal-cli's built-in port or DJI's own SDK |
+| `NormalizationOffsetC` | a harmonized frame's drift, in °C, subtracted from its temperatures so it agrees with its neighbours (absent when none was) |
 
 ## A workset's files
 

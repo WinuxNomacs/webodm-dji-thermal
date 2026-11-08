@@ -48,5 +48,5 @@ Until you pick one, you get the default an administrator set on the **DJI Therma
 (°C unless they changed it), or the units this browser was already set to. Anyone viewing a public map without
 logging in sees the administrator's default.
 
-The images themselves don't change: the DJI Thermal Task's are in °C, and a workset's TIFFs are in the unit set in its
-Measurement section.
+The images themselves don't change: the DJI Thermal Task's are in °C, a workset's frames' TIFFs in the units ticked in
+its Outputs, and its mosaics in its Measurement section's **Unit of the files**.
