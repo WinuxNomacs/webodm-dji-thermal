@@ -52,7 +52,18 @@
   Not tested live: a full or read-only folder (WebODM's containers run as root, which ignores permissions); in the
   code, an upload to a full disk is answered "The server's disk is full", and a conversion fails each frame with the
   system's reason.
-  No release prepared. Open: which judgement calls to build.
+  Decided (the user, 2026-11-08): build all five, as R8's second part:
+  1. As proposed: the mosaics built beside the old ones, which are replaced only once the new are built.
+  2. "The user should be made aware of failure in under a second where ever possible that's not extreme or impactful
+     to do so": a job's heartbeat every 2 seconds; a beat about 5 seconds late has the server ask WebODM's worker
+     (under a second) whether it still runs the job, failing it at once when it doesn't or no worker answers (the
+     page shows it at its next poll, every 2 to 3 seconds); a job queued while no worker runs is shown "Waiting for
+     WebODM's worker, which isn't running" (not failed: it runs once one starts). Under a second end to end would
+     take beats several times a second and risk failing a busy job: not done.
+  3. and 4. As proposed.
+  5. "Is it possible to have a reasonable timeout on the cache?": a cached picture is marked used each time it's
+     sent, and those unused for 14 days are deleted when the dataset's pictures are next drawn.
+  No release prepared. Open: none.
 - **R9. The range's arrows as a D-pad** (the user, 2026-11-08, in `new.md`): "Regarding the temperature range/scale
   control arrows. Replace them with a 5 button D-Pad style arrangement with Auto button moved into the center button's
   place. The Left arrow button Narrows the range as the current narrow button functions now, same for the Expand/right
@@ -64,10 +75,10 @@
   `spanRange`: ◀ narrows and ▶ widens the range by a tenth of its span, about its middle; Auto beside the fields).
   Proposed: one control for the three, five buttons in a cross between the range's two fields: ◀ narrow and ▶ widen
   as now, ▲ raise and ▼ lower (both ends moved by a tenth of the range's width, the width kept), Auto in the middle;
-  the docs (the viewer's, the frame page's and the Inspector's) and their screenshots updated. Open:
-  - Raise and lower stop at what: the layer's highest and lowest temperatures (the last step moving only as far as
-    that), or the ends of the Auto range, or no limit?
-  - "10%" read as a tenth of the range's width (as narrowing and widening), not of the temperatures themselves.
+  the docs (the viewer's, the frame page's and the Inspector's) and their screenshots updated. Open: none. Decided (the user, 2026-11-08): raise and lower "should never exceed the range of the image itself. Example:
+  an image has a range of 0-100F and the current span is set to 60-75F. As the user clicks Raise, it will never
+  exceed 100F just as clicking Lower will never lower it below 0": each step a tenth of the range's width, the last
+  only as far as the image's highest (lowest) temperature, the width kept.
 - **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
   the documentation as necessary so that it's information is accurate prior to release." Builds on everything
   since 1.1.0 (R1 to R6). Proposed: every page of `docs/` and the README read against the code
