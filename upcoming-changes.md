@@ -3,7 +3,7 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- Nothing planned: the release waits for the user.
+- Nothing planned.
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
@@ -15,6 +15,23 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **Release 1.2.0** — 2026-11-08, `release/1.2.0` (the user: "It's time for the release"): the plugin named DJI
+  Thermal Analyzer, and everything since 1.1.0 (R1 to R9, the header unit, the frame list's thumbnails, a workset's
+  palette, the Inspector's button on thermal maps only); manifest 1.2.0, `CHANGELOG.md` (README has no version).
+  Tests: Ruff, ESLint, Jest 307, Django 225 with `app.tests.test_plugins` on 4.0.0 and 3.3.2 (`skipped=1`). Zip:
+  `dist/dji-thermal-1.2.0.zip` (`public/build` built against 4.0.0), sha256
+  `b197bed419ed9f63c85b8fbda7991cd55e0abf958b0406821e11d20356759316`. Release check (the user chose to leave :8002
+  alone, and no macOS testing): installed through Administration > Plugins on Docker 3.3.2 (:8003, recreated
+  without the mount, then restored) and native Windows 4.0.0 (`C:\WebODM`, through the reverse tunnel), pip
+  installing each one's numpy and Pillow (1.26.2 and 11.3.0; 2.5.4 and 13.0.0), no webpack. On each, the M4T
+  flight's 40 thermal frames and 3 RGB photos: a DJI Thermal Task processed (3.3.2: 321 s, 9.1 to 31.3 °C; Windows:
+  243 s, 8.5 to 45.4 °C, the maximum above every frame's 32.8 °C, so ODX's blending of a few pixels on Windows,
+  the Auto range the same as on Docker), the Inspector reading it (D-pad, ΔT from surroundings); a dataset analyzed,
+  a harmonized workset with mosaics (40 converted, 3 not thermal), the viewer (Intensify, the readout, a point's
+  frames), the frame page, and a task from the workset processed (3.3.2: 272 s, 8.5 to 31.1 °C; Windows: 188 s, 8.6
+  to 31.6 °C). No console errors but 3.3.2's dev livereload (port 35729). Each check's project deleted (its tasks
+  removed first: a dataset is a partial task), the plugin removed (on Windows without a restart), the tunnel
+  stopped. The user tags `v1.2.0`, attaches the zip and updates WebODM-Plugins' `directory.json`.
 - **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
   the documentation as necessary so that it's information is accurate prior to release." Builds on everything
   since 1.1.0 (R1 to R6). Proposed: every page of `docs/` and the README read against the code
