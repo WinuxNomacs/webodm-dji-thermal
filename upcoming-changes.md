@@ -29,6 +29,8 @@
   Open: the neighbourhood (proposed: fixed at 2 m for now, in the hint); a palette for differences (proposed: a
   blue-white-red one added, the tab's default: WebODM's colour maps and DJI's palettes have none centred on a
   value); mosaics built before (proposed: the tab appears after "Build mosaics again", nothing built on its own).
+  Decided (the user, 2026-11-08): the neighbourhood fixed at 2 m; a blue-white-red palette added, the tab's default
+  (offered on the other tabs too); mosaics built before get the tab after "Build mosaics again".
 
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
