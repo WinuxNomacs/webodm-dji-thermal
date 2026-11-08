@@ -3,6 +3,21 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
+  the documentation as necessary so that it's information is accurate prior to release." Builds on everything
+  since 1.1.0 (R1 to R6). Proposed: every page of `docs/` and the README read against the code
+  as it is (what each page, panel, button and setting says it does, the API reference, the developers' guide's
+  map), corrected where it's wrong or out of date, and the screenshots checked against the UI (retaken where they
+  differ, none showing a place, coordinates or a serial number). No release prepared: that waits for the user.
+  Open: none (inspector.png was retaken in R9; mosaic-intensify.png waits on a workset with an Intensify mosaic).
+
+**Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
+
+**Done**
 - **R9. The range's arrows as a D-pad** (the user, 2026-11-08, in `new.md`): "Regarding the temperature range/scale
   control arrows. Replace them with a 5 button D-Pad style arrangement with Auto button moved into the center button's
   place. The Left arrow button Narrows the range as the current narrow button functions now, same for the Expand/right
@@ -18,22 +33,14 @@
   (the user, 2026-11-08): raise and lower "should never exceed the range of the image itself. Example: an image has a
   range of 0-100F and the current span is set to 60-75F. As the user clicks Raise, it will never exceed 100F just as
   clicking Lower will never lower it below 0": each step a tenth of the range's width, the last only as far as the
-  image's highest (lowest) temperature, the width kept.
-- **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
-  the documentation as necessary so that it's information is accurate prior to release." Builds on everything
-  since 1.1.0 (R1 to R6). Proposed: every page of `docs/` and the README read against the code
-  as it is (what each page, panel, button and setting says it does, the API reference, the developers' guide's
-  map), corrected where it's wrong or out of date, and the screenshots checked against the UI (retaken where they
-  differ, none showing a place, coordinates or a serial number). No release prepared: that waits for the user.
-  Open: none (the inspector.png retake waits on a neutral task name, as noted in R6).
-
-**Later**
-- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
-  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
-
-**Done**
+  image's highest (lowest) temperature, the width kept. Built (2026-11-08): `scale.js` `shiftRange` (a tenth of the width, clamped to the image's extent; none when the
+  range is already past it) and `spanButtonsHtml` (the cross, Auto's title and disabled given by the caller, laid out
+  by `.dt-range-pad` in `analyzer.css` and `inspector.css`); `viewer.js` (the viewer and the frame page, the tab's
+  stats as the extent) and `inspector.js` (`layerExtent`). Tests: Jest in `analyzer.test.js`, `frame.test.js` and
+  `inspector.test.js`. Docs: quickstart-inspector, quickstart-worksets, README, developing.md; screenshots retaken
+  (inspector.png at last on the neutrally named "Roof Sample" task; inspector-mosaics in a taller window). Left:
+  mosaic-intensify.png still shows the old arrows (no workset on the dev server has an Intensify mosaic; retake once
+  one is built).
 - **R8. The code reviewed for breaking points before the release** (the user, 2026-11-08, in the session): "Similar
   to R7, prior to release plan to review the plugin code for potential breaking points that could have a negative
   impact on the user experience". Builds on everything since 1.1.0 (R1 to R6). Proposed: the plugin's Python and
