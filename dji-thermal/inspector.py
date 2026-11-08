@@ -7,7 +7,7 @@ workset's mosaics laid on the map read them alike (raster_region, raster_isother
 import math
 
 from . import correction as correcting
-from . import webodm_versions
+from . import intensify, webodm_versions
 
 THERMAL_BAND = 'lwir'
 REGION_MAX_SIZE = 4096        # pixels along the longer side; a larger region is read downsampled
@@ -55,8 +55,9 @@ def _measured(values, unit):
 
 
 def point(task, lon, lat):
-    """The temperature at a point (lon/lat): {coordinates, valid, temperature, reason}, reason 'excluded' (outside the
-    crop), 'outside_raster' or 'nodata' when there is none"""
+    """The temperature at a point (lon/lat): {coordinates, valid, temperature, difference, reason}, reason 'excluded'
+    (outside the crop), 'outside_raster' or 'nodata' when there is none; difference: the temperature less its
+    surroundings' (intensify.raster_difference, the crop's pixels only)"""
     import rasterio
     from rasterio.warp import transform
 
@@ -82,11 +83,30 @@ def point(task, lon, lat):
         window = Window(col, row, 1, 1)
         value = float(src.read(1, window=window)[0, 0])
         valid = bool(_valid(src, window)[0, 0]) and math.isfinite(value)
+        if valid:
+            crs = src.crs
+            metre = crs.linear_units_factor[1] if crs.is_projected else DEGREE_M
+            out['difference'] = intensify.raster_difference(src, row, col, value, abs(src.res[0]) * metre,
+                                                            lambda w, data: _usable(src, w, data.shape, crop))
     if not valid:
         out['reason'] = 'nodata'
         return out
     out.update(valid=True, temperature=value)
     return out
+
+
+def _usable(src, window, out_shape, crop=None):
+    """Where the orthophoto has data in a window (_valid), within crop (a shapes.Shape, lon/lat) when given"""
+    from rasterio.features import geometry_mask
+    from rasterio.warp import transform_geom
+
+    from . import shapes
+    usable = _valid(src, window)
+    if crop is not None:
+        polygons = _polygons(shapes.shape(transform_geom('EPSG:4326', src.crs, _polygons(crop))))
+        usable &= geometry_mask([polygons], out_shape=out_shape, transform=src.window_transform(window), invert=True,
+                                all_touched=True) if polygons else False
+    return usable
 
 
 def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS, isotherm=None, correction=None):

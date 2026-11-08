@@ -720,7 +720,10 @@
         if (!r) return '<span class="text-muted">Move the cursor over a thermal layer.' + (frames ? " Click it to see the frames that saw the point." : "") + "</span>";
         if (r.error) return '<span class="text-danger">' + escapeHtml(r.error) + "</span>";
         if (!r.valid) return '<span class="text-muted">' + escapeHtml(REASONS[r.reason] || "No temperature here") + "</span>";
-        return '<span class="dt-inspector-temp">' + escapeHtml(formatTemp(r.temperature, unit)) + "</span>";
+        // The temperature less its surroundings' (about 2 m around), as the mosaic viewer's Under the cursor says it
+        var d = typeof r.difference === "number" ? ' <span class="dt-inspector-delta">ΔT from surroundings ' +
+            escapeHtml(formatSigned(r.difference, unit)) + "</span>" : "";
+        return '<span class="dt-inspector-temp">' + escapeHtml(formatTemp(r.temperature, unit)) + "</span>" + d;
     }
 
     // state: the panel's (its pins, form, what can be saved and the corrected temperatures)
@@ -1598,7 +1601,9 @@
                 if (!r.ok) return {error: (r.data && (r.data.error || r.data.detail)) || "Could not read the temperature"};
                 if (t.mosaic) {
                     var c = typeof r.data.temperature === "number" ? toCelsius(r.data.temperature, t.mosaic.unit) : null;
-                    return assign({}, r.data, {temperature: c, valid: c !== null, reason: c !== null ? null : r.data.reason || "nodata"});
+                    // A difference in °C: scaled, never shifted
+                    var d = typeof r.data.difference === "number" ? (t.mosaic.unit === "F" ? r.data.difference / 1.8 : r.data.difference) : null;
+                    return assign({}, r.data, {temperature: c, difference: d, valid: c !== null, reason: c !== null ? null : r.data.reason || "nodata"});
                 }
                 return r.data;
             }, function () { return {error: "Could not read the temperature"}; });
@@ -1618,7 +1623,9 @@
                 query(t, e.latlng).then(function (r) {
                     if (mine !== seq || !state.open) return;
                     var fix = fixFor(t);
-                    state.readout = fix && r && r.valid ? assign({}, r, {temperature: corrected(r.temperature, fix)}) : r;
+                    // Corrected, the point and its surroundings alike
+                    state.readout = fix && r && r.valid ? assign({}, r, {temperature: corrected(r.temperature, fix),
+                        difference: typeof r.difference === "number" ? corrected(r.temperature, fix) - corrected(r.temperature - r.difference, fix) : r.difference}) : r;
                     renderReadout();
                     var text = r && r.valid ? formatTemp(r.temperature) : "";
                     cursor.textContent = text;

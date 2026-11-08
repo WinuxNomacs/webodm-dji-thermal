@@ -2629,6 +2629,10 @@ describe("the mosaic viewer", () => {
         expect(el.textContent).toContain("a_T.JPG");
         expect(el.textContent).toContain("3.2°");
         expect(el.textContent).not.toContain("Frame pixel");
+        expect(el.textContent).not.toContain("ΔT");
+        // On a temperature tab, the temperature less its surroundings' after it, in the user's unit, scaled
+        el.innerHTML = viewer.readoutHtml({valid: true, temperature: 20, difference: -1.5, frame: "a_T.JPG"}, "C", false, "harmonized");
+        expect(el.textContent).toContain("Temperature68.00 °FΔT from surroundings-2.70 °F");
         el.innerHTML = viewer.readoutHtml({valid: true, temperature: 20, frame: "a_T.JPG", view_angle: 3.21, frame_pixel: [353, 256]}, "C");
         expect(el.textContent).toContain("Frame pixel");
         expect(el.textContent).toContain("x 353, y 256");
@@ -2804,7 +2808,8 @@ describe("the mosaic viewer", () => {
         L.maps[0].fire("mousemove", {latlng: {lng: 10.0005, lat: 45.0005}});
         jest.advanceTimersByTime(200);
         await ticks();
-        expect($("ta-viewer-readout").textContent).toContain("Difference-4.50 °F from its surroundings");
+        expect($("ta-viewer-readout").textContent).toContain("ΔT from surroundings-4.50 °F");
+        expect($("ta-viewer-readout").textContent.indexOf("ΔT")).toBeLessThan($("ta-viewer-readout").textContent.indexOf("Temperature"));
         expect($("ta-viewer-readout").textContent).toContain("Temperature86.00 °F");
     });
 

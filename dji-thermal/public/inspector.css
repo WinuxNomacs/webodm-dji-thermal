@@ -25,6 +25,7 @@
 .leaflet-bar.dt-inspector .dt-inspector-head a.dt-inspector-close { line-height: 1; }
 .dt-inspector-readout { min-height: 22px; margin-bottom: 6px; }
 .dt-inspector-temp { font-size: 16px; font-weight: bold; }
+.dt-inspector-delta { display: block; color: #555; }
 .dt-inspector-label { display: block; font-weight: normal; margin-bottom: 6px; }
 .dt-inspector-section { border-top: 1px solid #ddd; padding-top: 6px; }
 .dt-inspector-pins { margin: 4px 0; }

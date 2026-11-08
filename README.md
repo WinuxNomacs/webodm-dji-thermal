@@ -278,7 +278,9 @@ over WebODM's base layers:
   without them;
 - an **Isotherm** on the temperature tabs and Intensify (above, below or between temperatures, or differences): its pixels keep the palette and the
   rest turns grey, on the map and in the frames' pictures;
-- the temperature, frame, frame pixel and view angle under the cursor;
+- the temperature, frame, frame pixel and view angle under the cursor, with **ΔT from surroundings** on the
+  temperature tabs: the temperature less the median of the pixels within about 2 m around it (on Harmonized the
+  value Intensify draws), so a spot cooler or warmer than the ground beside it reads as such whatever the range;
 - a click on the map keeps those values at that point, marked, until **Follow the cursor** (or Esc), and opens a
   window over the map with the **frames that saw that point** (the mosaic's own first, the
   others in turn with the arrows), each drawn in the tab's palette and range (on View angle, the angle each of its
@@ -304,7 +306,9 @@ its detail pane: the frame page of the newest workset that converted):
 - the frame, zoomed and moved like a map, coloured in your browser from its temperatures (opening in the workset's
   palette, else yours) with the mosaic viewer's palette, range, **Image** and **Isotherm** controls (Equalized from the frame's own histogram), following them as
   they move;
-- the temperature of the pixel under the cursor;
+- the temperature of the pixel under the cursor, and its **ΔT from surroundings** (the median of the frame's pixels
+  within about 2 m around it, from the distance it was measured at and its camera's focal length; for both
+  measurements with Measure again);
 - **Measure**: the Thermal Inspector's tools in the frame's pixels: a pin (a pixel's temperature), a line (a strip 1
   pixel either side of it, with its profile; hovering the profile marks its point), a rectangle, a circle or a
   polygon (the statistics, the surroundings, a ring 3 to 10 pixels wide, and ΔT, the isotherm's share and a
@@ -377,7 +381,9 @@ On WebODM's 2D map of a task whose orthophoto holds temperatures (a single therm
 DJI Thermal Task's images or a workset's), a thermometer button opens the Thermal Inspector. It isn't on maps of RGB
 orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, with a workset mosaic laid on it:
 
-- **Hover**: the temperature under the cursor, beside it and in the panel; outside the task's crop, outside the
+- **Hover**: the temperature under the cursor, beside it and in the panel, with its **ΔT from surroundings** in the
+  panel (the temperature less the median of the orthophoto's pixels within about 2 m around it, inside the crop;
+  with Manual Corrections, the point and its surroundings both corrected); outside the task's crop, outside the
   orthophoto and where it has no data it says so.
 - **Pin**: a click pins the point with its temperature, labelled P1, P2…, shown on the map instead of WebODM's
   popup. The pins are listed in the panel (click one to go to it), can be hidden and shown together, removed, and
