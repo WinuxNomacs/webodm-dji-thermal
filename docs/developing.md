@@ -27,6 +27,7 @@ Everything the plugin ships is in `dji-thermal/` (the plugin's id, and the relea
 | `analysis.py` | The analysis job: dji-thermal-cli's check and WebODM plan over a dataset's photos. |
 | `conversions.py` | Worksets: their settings (checked in `parse_settings`), the conversion job (`convert`), the outputs' names, the palettes (`palettes()`, `COLORMAPS`), and each user's saved defaults and display preferences. |
 | `mosaics.py` | A workset's mosaics: the build job (`make`), and what the mosaic viewer reads (tiles, values, palettes). |
+| `intensify.py` | Each pixel's difference from its surroundings (the median over about 2 m), for the mosaic viewer's Intensify tab. |
 | `colouring.py` | How tiles and frames are drawn: range, tone curve, equalization, sharpening, isotherm. |
 | `frames.py`, `frames_api.py` | The frame page: one frame as the workset measured it, or measured again with other values. |
 | `conversion_tasks.py` | A WebODM task made from a workset's temperature TIFFs. |
@@ -160,7 +161,9 @@ Each recipe lists every place a change touches. If you find another one, add it 
 ### A palette
 
 Palettes are DJI's (from dji-thermal-cli) and WebODM's colour maps (from WebODM's tiler). Every palette list (the
-Preferences dialog, the mosaic viewer, the frame page and the Thermal Inspector) is built from these two.
+Preferences dialog, the mosaic viewer, the frame page and the Thermal Inspector) is built from these two. The mosaic
+viewer also has its own palette for differences, `bwr` (`DIFFERENCE_PALETTE` in `mosaics.py`, its colours in
+`colormaps.json`), listed with `saved: false` because it can't be a user's palette.
 
 - **One of WebODM's colour maps**: add its name to `COLORMAPS` in `conversions.py`. `mosaics.palette_list` and
   `palette_keys` give it to the viewers, and the `display` API gives it to the Preferences dialog and the Inspector.
@@ -189,7 +192,11 @@ the downloads and the frame removal all see it.
 
 A new tab in the mosaic viewer (another band of the mosaic dji-thermal-cli writes) goes in `TABS` in `mosaics.py`.
 Its label and hint go in `TAB_LABELS` and `TAB_HINTS` in `viewer.js`. If it can be laid on WebODM's map, it also
-goes in `MAP_TABS` in `inspector_api.py` and `MOSAIC_TABS` in `inspector.js`.
+goes in `MAP_TABS` in `inspector_api.py` and `MOSAIC_TABS` in `inspector.js`. A tab made from a mosaic rather than
+read from it (as Intensify is, from the harmonized one) is written in `mosaics.build` beside the others' files in
+`viewer/` (see `mosaics.intensified`) with its own entry in the built `kinds`, which isn't in `KINDS` (not a
+download). A tab whose values are differences of temperatures goes in `DIFFERENCE_TABS` too, and is shown with
+`isDifference` in `viewer.js`: scaled into the user's unit, never shifted.
 
 ### A measuring tool
 

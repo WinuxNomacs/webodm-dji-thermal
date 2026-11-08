@@ -255,19 +255,28 @@ workset has done that while converting, so its mosaics are placed as Harmonize a
 (the mosaic's report says so), unless frames were removed from the workset since. **View mosaics** shows them on a map
 over WebODM's base layers:
 
-- a tab for each mosaic (**Mosaic**, as converted, and **Harmonized**), **Source frame** (the mosaic with a black and
-  white line where one frame meets the next) and **View angle** (the angle each pixel was seen at);
+- a tab for each mosaic (**Mosaic**, as converted, and **Harmonized**), **Intensify** (below), **Source frame** (the
+  mosaic with a black and white line where one frame meets the next) and **View angle** (the angle each pixel was seen
+  at);
+- **Intensify**: the harmonized mosaic, each pixel less the typical temperature around it (the median over about 2 m).
+  Slopes, the sun's side and gradients across a roof drop to about 0, so a narrow cooler or warmer feature (a seam
+  letting air in, a leak) stands out wherever it is, in its own palette, blue-white-red (blue below its
+  surroundings, red above), over a range centred on 0. Its numbers are differences, not temperatures, in your unit:
+  the readout gives the difference and the harmonized temperature, its isotherm takes differences (e.g. below -1.5),
+  and its frames are the frames' own differences. Anything 2 m wide or more fades out. The temperatures are not
+  changed: it is a view, not in the downloads nor the Thermal Inspector. Mosaics built before the plugin had it show
+  it once built again (**Build again**);
 - the palette (the usual ones and the DJI palettes of the images; opening in your preferred one, if they hold it) and the
   range, changed live, with the colour scale (its ends marked with the range's own values), **◀** and **▶** between
   its two fields (narrowing or widening it by a tenth, about its middle) and **Auto** (the 2nd to 98th percentile);
 - how the image is drawn (**Image**): **Brightness** and **Contrast** (which move and narrow the range), **Gamma**,
   **Sharpening** (an unsharp mask), **Linear** or **Equalized** (the colours spread over the temperatures the whole
-  mosaic has most of; temperatures only) and **Reset**, drawn into the tiles and the frames' pictures, with the colour
+  mosaic has most of; temperatures and Intensify's differences only) and **Reset**, drawn into the tiles and the frames' pictures, with the colour
   scale drawn to match; the temperatures stay as they are. The map follows the sliders, the range and the isotherm as
   they change, with no waiting: the browser colours each tile from its temperatures, which the server sends once (the
   frames' pictures are drawn again once a slider is let go of). The temperature tabs share them, and each visit starts
   without them;
-- an **Isotherm** on the temperature tabs (above, below or between temperatures): its pixels keep the palette and the
+- an **Isotherm** on the temperature tabs and Intensify (above, below or between temperatures, or differences): its pixels keep the palette and the
   rest turns grey, on the map and in the frames' pictures;
 - the temperature, frame, frame pixel and view angle under the cursor;
 - a click on the map keeps those values at that point, marked, until **Follow the cursor** (or Esc), and opens a

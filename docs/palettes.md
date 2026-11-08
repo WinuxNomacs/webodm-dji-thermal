@@ -16,7 +16,8 @@ It's used:
   workset's frames (its Files, the frame page) are drawn in the workset's own palette when it chose one;
 - in the DJI Thermal Task panel, where the palette the task's map opens in starts on yours (else on the one the
   photos were shot in);
-- in the mosaic viewer, where its temperature tabs open in it;
+- in the mosaic viewer, where its temperature tabs open in it (the Intensify tab opens in blue-white-red, a palette
+  of the mosaic viewer's own for differences, which isn't saved as yours);
 - on WebODM's map of a thermal task, where the Thermal Inspector draws DJI's palettes itself, over the range set in
   its colour scale or in WebODM's layer panel (the same range). Its Image section, as the mosaic viewer's, changes
   how the colours are shared out over that range.

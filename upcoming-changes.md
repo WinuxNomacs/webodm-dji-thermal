@@ -3,7 +3,22 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R4. Intensify: a mosaic tab of each pixel's difference from its surroundings** (the user, 2026-11-08, in the
+- **R5. Bug: on WebODM 4.0.0 the Thermal Inspector can't draw a thermal orthophoto in hot, rainbow or gray_r**
+  (found 2026-11-08 while building R4, in 1.1.0): with no Image adjustments, `inspector.js` `withPalette` sends a
+  WebODM colour map to WebODM's own tiles (`.../orthophoto/tiles/...?color_map=hot`), and 4.0.0's tiler no longer has
+  those three (the plugin carries them in `colormaps.json` for its own tiles only): WebODM answers 400 "Not a valid
+  color_map value" and the map shows nothing. 3.3.2 has them. Proposed fix: those three drawn by the plugin's
+  Inspector tiles, as DJI's palettes are (the `display` API names the colour maps WebODM's tiler lacks); a test, and
+  a check on both stacks.
+
+**Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
+
+**Done**
+- **R4. Intensify: a mosaic tab of each pixel's difference from its surroundings** (built 2026-11-08; the user, 2026-11-08, in the
   session): "would it make sense to offer an \"Intensify\" option that actually makes temperature variances more
   distinct across the images? Example: I have a mosaic of a roof made from 10 images. Around pipe seams there's a
   temperature delta variance that's roughly 2-3 degrees cooler than the surrounding roof due to air seepage", then
@@ -31,14 +46,25 @@
   value); mosaics built before (proposed: the tab appears after "Build mosaics again", nothing built on its own).
   Decided (the user, 2026-11-08): the neighbourhood fixed at 2 m; a blue-white-red palette added, the tab's default
   (offered on the other tabs too); mosaics built before get the tab after "Build mosaics again".
+  Built, `r4-intensify`: `intensify.py` (`differences`: the medians of windows 2 m wide every metre, interpolated
+  between, numpy only; a 5000x5000 mosaic in about 2 s); `mosaics.intensified` writes `viewer/intensify.tif` from the
+  harmonized mosaic in the build, kept as `kinds.intensify` (`of: harmonized`, `size_m`; not in `KINDS`: not a
+  download, nor in the workset's Mosaics table); `TABS` and `DIFFERENCE_TABS`, `in_unit` (equalize, isotherm,
+  histogram), `point` gives `difference` and the harmonized `temperature`, `frame_values` the frame's own differences
+  (at its ground resolution, `height_m / focal_px`): that is the frames window over the map; the frame page itself
+  shows temperatures and doesn't offer the palette. The palette `bwr` in `colormaps.json`, listed with `saved: false`
+  (not a preference: `display_palettes` refuses it, so the viewer doesn't send it), not in the Thermal Inspector's
+  list (`palette_keys`). `viewer.js`: `isDifference`, `inUnit`, values shown and typed with `convertDelta`, the range
+  symmetric about 0, the report the harmonized mosaic's. Tests: Jest 301 (the tab, its unit, palette, isotherm,
+  readout), Django 213 on 4.0.0 and 3.3.2 (1 skipped; the synthetic roof, and the tab on a flight's mosaics). Live on
+  :8002 with 40 frames of the M4T flight (its own project, removed after): the tab after Harmonized, its range
+  -2.7 to 2.7 °C, the readout "+2.13 °C from its surroundings" with the temperature, the frames window, an isotherm
+  below -1. Docs: the README, `quickstart-worksets.md`, `measurement.md` (what normalize and harmonize change, and
+  "Finding small differences: Intensify", with `mosaic-intensify.png`), `palettes.md`, `api.md`, `developing.md`; the
+  mosaic viewer's screenshots retaken (from the live check's dataset: the user's worksets have mosaics built
+  before).
 
-**Later**
-- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
-  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
 
-**Done**
 - **R3. A link to WebODM's community Discord in the README** (built 2026-11-08; the user, 2026-11-08, from `new.md`): "Add a link
   near the bottom of the README to Join the WebODM Community Discord: https://discord.gg/hYDk9f28J". Builds on the
   README's end (Developing, Thanks, License). Proposed: a short section of its own, "Community", between Developing
