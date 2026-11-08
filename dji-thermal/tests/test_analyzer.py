@@ -616,12 +616,19 @@ class TestConversions(AnalyzerTestCase):
     def test_a_conversions_progress_counts_only_the_frames_it_converts(self):
         frames = flight_frames(3)
         task = self.create()
+        # A thermal frame cut short, as a copy that stopped half way
+        with open(frames[0], "rb") as f:
+            cut = io.BytesIO(f.read()[:200000])
+        cut.name = "DJI_0099_T.JPG"
         with contextlib.ExitStack() as stack:
-            self.upload(task, [stack.enter_context(open(f, "rb")) for f in frames] + [jpeg("DJI_0001_V.JPG")])
+            self.upload(task, [stack.enter_context(open(f, "rb")) for f in frames] + [jpeg("DJI_0001_V.JPG"), cut])
         root = datasets.images_path(task)
         dtc = converter.library()
-        thermal = conversions.thermal_jpegs(dtc, dtc.scan(root).jpegs)
+        thermal, damaged = conversions.thermal_jpegs(dtc, dtc.scan(root).jpegs)
         self.assertEqual(sorted(p.name for p in thermal), sorted(os.path.basename(f) for f in frames))
+        self.assertEqual([p.name for p in damaged], ["DJI_0099_T.JPG"])
+        why = dtc.classify(os.path.join(root, "DJI_0099_T.JPG")).reason
+        self.assertEqual(list(damaged.values()), [why])
         self.assertEqual(conversions.frames_to_convert(dtc, thermal, {}), thermal)
         # Above the pitch limit, set for all of them, none is converted; at or below it, all are
         self.assertEqual(conversions.frames_to_convert(dtc, thermal, {"max_pitch": -80, "gimbal_pitch": -45}), set())
@@ -631,11 +638,15 @@ class TestConversions(AnalyzerTestCase):
             res = self.convert(task, {"outputs": ["temp_c:tiff"], "mosaics": False})
         written = [c.kwargs["frames"] for c in update.call_args_list if c.kwargs.get("frames")]
         self.assertEqual((written[0], written[-1]), ({"done": 0, "total": 3}, {"done": 3, "total": 3}))
+        # The frame cut short is skipped, with the reason the dataset's analysis gives, not counted as not thermal
         self.assertEqual([res.data[k] for k in ("status", "converted", "oblique", "not_thermal", "skipped")],
-                         ["ready", 3, 0, 1, 0])
-        # All above the pitch limit: the RGB photo is still counted as not thermal, not as oblique
+                         ["ready", 3, 0, 1, 1])
+        self.assertEqual([(f["reason"], bool(f.get("not_thermal"))) for f in res.data["results"]["files"]
+                          if f["path"] == "DJI_0099_T.JPG"], [(why, False)])
+        # All above the pitch limit: the RGB photo is still counted as not thermal, not as oblique; the frame cut short
+        # is left out as oblique, as the others
         res = self.convert(task, {"outputs": ["temp_c:tiff"], "mosaics": False, "max_pitch": -80, "gimbal_pitch": -45})
-        self.assertEqual([res.data[k] for k in ("converted", "oblique", "not_thermal")], [0, 3, 1])
+        self.assertEqual([res.data[k] for k in ("converted", "oblique", "not_thermal", "skipped")], [0, 4, 1, 0])
 
     def test_a_conversion_is_renamed_and_deleted_with_its_files(self):
         task = self.create()

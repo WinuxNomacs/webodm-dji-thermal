@@ -47,7 +47,8 @@ only once they're built: until then, and if building them fails or is canceled, 
 ## 2. The workset
 
 Each workset is listed with the settings it changed, how many images it converted, left out as oblique, found not
-thermal (the RGB photos) and skipped (those that failed), and its size.
+thermal (the RGB photos) and skipped (those that failed, and those damaged, with the reason the dataset's Files tab
+gives), and its size.
 
 ![A converted workset](images/workset.png)
 
