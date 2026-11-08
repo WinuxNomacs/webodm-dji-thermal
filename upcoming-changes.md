@@ -22,7 +22,37 @@
   - R8 comes before R7, so the docs are reviewed once, after its fixes.
   - Failures are triggered live (a worker stopped mid-job, a missing file, a corrupt photo, a full or read-only
     folder) on a separate stack Claude starts and stops, with copies of the data; :8002 and its data stay untouched.
-  No release prepared. Open: none.
+  Reviewed (2026-11-08): the Python read whole, the browser scripts for their failed requests and polling (each page
+  says a failed request and polls again, less often); live on the 3.3.2 dev stack (:8003, started and stopped for it,
+  its R8 datasets deleted after) with copies of the test flight: the worker restarted mid-build, a rebuild canceled,
+  a truncated R-JPEG, a file that isn't a JPEG and an RGB photo in a dataset, 217 frames harmonized with mosaics
+  (4.5 minutes, the worker under 800 MB).
+  Fixed and merged, each with a test:
+  - The frame page listed no frames for a workset converted before its dataset was analyzed (or of images added
+    since), and its Files pane's Open frame and temperature downloads answered "Not a thermal frame of this dataset"
+    (`frames.py` `thermal_rows`; `test_frames`).
+  - With dji-thermal-cli not installed (its install failed, a server offline), Administration > DJI Thermal answered
+    a server error, as did its Check and Upload and each photo DJI Thermal Task sent; they now say why (`sdk.py`
+    `_library`, `status`; `test_sdk` TestPage).
+  Judgement calls, most harmful first, for the user to choose:
+  1. **Build mosaics again deletes the old mosaics first**: canceled or failed, it leaves the workset without any (the
+     viewer, its Mosaics table and the map's overlays) until built again. Checked live. Could build beside them and
+     replace them only once built.
+  2. **A job whose worker stopped** (restarted, crashed) shows as running for 5 minutes before "The ... job stopped
+     before it finished" (checked live; WebODM's worker doesn't take it up again), and one queued while no worker
+     runs shows 0% for as long as that lasts. Could shorten the wait (the heartbeat is every minute) and say "waiting
+     for WebODM's worker" for a job not started after a while.
+  3. **A damaged thermal frame** (cut short) is counted in a workset under "found not thermal (the RGB photos)", with
+     dji-thermal-cli's "no DJI thermal data found (not an R-JPEG)", where the dataset's Files tab says "Damaged".
+     Could count it as skipped, with the analysis' reason.
+  4. **Images can be added to a dataset while a workset converts** (removing them is refused then): the workset may
+     or may not convert them. Could refuse adding while converting, as removing is.
+  5. **The Files tab's cached pictures** (each palette and size viewed) are kept until their image is removed, and
+     count toward the owner's quota. Could keep only the latest palettes.
+  Not tested live: a full or read-only folder (WebODM's containers run as root, which ignores permissions); in the
+  code, an upload to a full disk is answered "The server's disk is full", and a conversion fails each frame with the
+  system's reason.
+  No release prepared. Open: which judgement calls to build.
 - **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
   the documentation as necessary so that it's information is accurate prior to release." Builds on everything
   since 1.1.0 (R1 to R6). Proposed: every page of `docs/` and the README read against the code
