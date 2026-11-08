@@ -10,6 +10,7 @@
   color_map value" and the map shows nothing. 3.3.2 has them. Proposed fix: those three drawn by the plugin's
   Inspector tiles, as DJI's palettes are (the `display` API names the colour maps WebODM's tiler lacks); a test, and
   a check on both stacks.
+
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
