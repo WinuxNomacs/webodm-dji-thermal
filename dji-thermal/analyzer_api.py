@@ -16,6 +16,7 @@ import glob
 import hashlib
 import io
 import os
+import time
 import uuid
 from contextlib import contextmanager
 
@@ -42,6 +43,10 @@ LARGE_SIZE = (1280, 1280)      # the Files tab's detail pane (?size=large): a fr
 LIST_SIZE = (320, 320)         # the frame page's list (?size=list), shown about 260 pixels wide
 SIZES = {'large': LARGE_SIZE, 'list': LIST_SIZE}
 THUMBNAILS_DIR = 'thumbnails'
+# A cached picture not sent for this long is deleted, looked for at most once a day, when one is drawn (see sweep)
+UNUSED_SECONDS = 14 * 24 * 3600
+SWEEP_SECONDS = 24 * 3600
+SWEPT_FILE = 'swept'
 OVER_QUOTA = "The project's owner is over their storage quota: free some space first"
 DISK_FULL = "The server's disk is full: free some space, then try again"
 
@@ -472,10 +477,40 @@ def remove_thumbnails(task, key):
             pass
 
 
+def sweep(task, now=None):
+    """The dataset's cached pictures not sent for UNUSED_SECONDS deleted (each is marked used as it is sent), at most
+    once every SWEEP_SECONDS"""
+    root = datasets.data_path(task, THUMBNAILS_DIR)
+    now = time.time() if now is None else now
+    swept = os.path.join(root, SWEPT_FILE)
+    try:
+        if now - os.path.getmtime(swept) < SWEEP_SECONDS:
+            return
+    except OSError:
+        pass
+    removed = False
+    for cached in glob.glob(os.path.join(glob.escape(root), '*', '*')):
+        try:
+            if os.path.getmtime(cached) < now - UNUSED_SECONDS:
+                os.remove(cached)
+                removed = True
+        except OSError:
+            pass
+    try:
+        os.makedirs(root, exist_ok=True)
+        with open(swept, 'a'):
+            pass
+        os.utime(swept, (now, now))
+    except OSError:
+        pass
+    if removed:
+        datasets.update_size(task)
+
+
 def palette_thumbnail(task, path, palette, size=THUMBNAIL_SIZE):
     """A thermal frame's thumbnail (up to size) in a DJI palette, as JPEG bytes, kept in the dataset's
-    thumbnails/<palette>/ by the file's path, size and time; None when the frame cannot be drawn (its embedded picture
-    is shown instead)"""
+    thumbnails/<palette>/ by the file's path, size and time until unused for UNUSED_SECONDS (see sweep); None when the
+    frame cannot be drawn (its embedded picture is shown instead)"""
     key = thumbnail_key(path)
     if key is None:
         return None
@@ -484,9 +519,16 @@ def palette_thumbnail(task, path, palette, size=THUMBNAIL_SIZE):
     cached = datasets.data_path(task, THUMBNAILS_DIR, palette, key + '.jpg')
     try:
         with open(cached, 'rb') as f:
-            return f.read()
+            data = f.read()
     except OSError:
         pass
+    else:
+        try:
+            os.utime(cached)        # used: kept another UNUSED_SECONDS
+        except OSError:
+            pass
+        return data
+    sweep(task)
     try:
         im = converter.palette_picture(path, palette)
     except Exception:  # noqa: BLE001 - any frame the library cannot draw falls back to its embedded picture

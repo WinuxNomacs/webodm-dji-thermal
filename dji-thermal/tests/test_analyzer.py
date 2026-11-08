@@ -14,6 +14,7 @@ import math
 import os
 import shutil
 import threading
+import time
 import zipfile
 from unittest import mock
 
@@ -1481,6 +1482,37 @@ class TestRemovingFrames(AnalyzerTestCase):
         self.upload(task, [jpeg("d_T.jpg")])
         self.assertEqual(self.remove_files(task, ["d_T.jpg"]).status_code, status.HTTP_200_OK)
         self.assertEqual(conversions.removed_paths(task, cid), {"a_T.jpg"})
+
+    def test_cached_pictures_unused_for_two_weeks_are_deleted_when_pictures_are_next_drawn(self):
+        task = self.create()
+        self.upload(task, [jpeg("a_T.jpg"), jpeg("b_T.jpg")])
+        root = datasets.images_path(task)
+        cache = datasets.data_path(task, analyzer_api.THUMBNAILS_DIR)
+        now = time.time()
+        day = 24 * 3600
+
+        def cached(name):
+            return os.path.join(cache, "iron", analyzer_api.thumbnail_key(os.path.join(root, name)) + ".jpg")
+
+        os.makedirs(os.path.join(cache, "iron"))
+        for name in ("a_T.jpg", "b_T.jpg"):
+            with open(cached(name), "wb") as f:
+                f.write(name.encode())
+            os.utime(cached(name), (now - 15 * day, now - 15 * day))
+        # Sent: marked used, kept
+        self.assertEqual(analyzer_api.palette_thumbnail(task, os.path.join(root, "a_T.jpg"), "iron"), b"a_T.jpg")
+        self.assertGreater(os.path.getmtime(cached("a_T.jpg")), now - day)
+        # Another drawn: those unused for two weeks deleted
+        with mock.patch.object(converter, "palette_picture", return_value=Image.new("RGB", (8, 6))):
+            self.assertTrue(analyzer_api.palette_thumbnail(task, os.path.join(root, "a_T.jpg"), "rainbow"))
+        self.assertEqual((os.path.exists(cached("a_T.jpg")), os.path.exists(cached("b_T.jpg"))), (True, False))
+        self.assertTrue(os.path.exists(os.path.join(cache, "rainbow", os.path.basename(cached("a_T.jpg")))))
+        # Looked for at most once a day
+        os.utime(cached("a_T.jpg"), (now - 15 * day, now - 15 * day))
+        analyzer_api.sweep(task, now + 3600)
+        self.assertTrue(os.path.exists(cached("a_T.jpg")))
+        analyzer_api.sweep(task, now + day + 1)
+        self.assertFalse(os.path.exists(cached("a_T.jpg")))
 
     def test_files_are_removed_from_a_dataset_only_by_who_can_change_it_while_nothing_runs(self):
         task, cid = self.converted()
