@@ -10,6 +10,13 @@
   color_map value" and the map shows nothing. 3.3.2 has them. Proposed fix: those three drawn by the plugin's
   Inspector tiles, as DJI's palettes are (the `display` API names the colour maps WebODM's tiler lacks); a test, and
   a check on both stacks.
+- **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
+  the documentation as necessary so that it's information is accurate prior to release." Builds on everything
+  since 1.1.0 (R1 to R6, and R5 once fixed). Proposed: every page of `docs/` and the README read against the code
+  as it is (what each page, panel, button and setting says it does, the API reference, the developers' guide's
+  map), corrected where it's wrong or out of date, and the screenshots checked against the UI (retaken where they
+  differ, none showing a place, coordinates or a serial number). No release prepared: that waits for the user.
+  Open: none (the inspector.png retake waits on a neutral task name, as noted in R6).
 
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
