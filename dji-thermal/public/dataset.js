@@ -637,7 +637,7 @@
             if (d.status === "analyzing") {
                 var pct = Math.round((d.progress || 0) * 100);
                 status('<div class="progress"><div class="progress-bar progress-bar-striped active" style="width: ' + pct + '%;">' +
-                    pct + "%</div></div> " + (d.stage === "summary" ? "Analyzing: working out the flight's coverage and the WebODM plan…" :
+                    pct + "%</div></div> " + (d.waiting ? esc(core.WAITING) : d.stage === "summary" ? "Analyzing: working out the flight's coverage and the WebODM plan…" :
                     "Analyzing " + d.file_count + " file(s)…"));
             } else if (d.status === "failed") {
                 status('<i class="fa fa-exclamation-triangle"></i> The analysis failed: ' + esc(d.error), "text-danger");

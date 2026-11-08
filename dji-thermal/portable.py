@@ -16,6 +16,10 @@ except ImportError:  # Windows
 # How long replace() waits for another process to close the file it replaces (Windows)
 REPLACE_TRIES = 20
 REPLACE_WAIT = 0.05
+# Whether WebODM's worker answers while it runs a job: its Linux workers (Docker) are processes whose parent answers;
+# its native Windows install runs them as eventlet green threads, which a job busy computing holds up, heartbeat and
+# answers alike (see datasets.check_stale)
+BUSY_WORKER_ANSWERS = os.name != 'nt'
 
 
 @contextmanager

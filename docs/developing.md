@@ -84,9 +84,13 @@ Take a dataset's analysis:
    `datasets` and `conversions` read from the dataset's JSON records.
 3. Analyze sends `POST .../analyze`. The view calls `datasets.start_analysis`, which writes a new run id to the job
    file and hands `analysis.analyze` to WebODM's worker (`start_job`, with WebODM's `run_function_async`).
-4. In the worker, `run_job` imports the plugin's module and runs the function. The job writes its progress to the
-   job file only while the file still has its run id, so cancelling or starting again stops it at its next write.
-5. The page polls `GET .../datasets/<id>` and shows the job's progress and, once done, the analysis.
+4. In the worker, `run_job` imports the plugin's module and runs the function, with a heartbeat thread (`beat`,
+   every 2 seconds). The job writes its progress to the job file only while the file still has its run id, so
+   cancelling or starting again stops it at its next write.
+5. The page polls `GET .../datasets/<id>` and shows the job's progress and, once done, the analysis. Each poll checks
+   the job (`check_stale`): a heartbeat 5 seconds late has it ask WebODM's worker whether it still has the job
+   (`worker_has`, Celery's `query_task`, cached a few seconds), failing it when not; a job not started is marked
+   `waiting` while no worker answers.
 
 Conversions (`conversions.convert`), mosaics (`mosaics.make`) and the frame page's figures (`frames.measure_all`)
 run the same way.

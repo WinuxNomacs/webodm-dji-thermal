@@ -555,8 +555,12 @@
             (s.round ? " (round " + s.round + "/" + s.rounds + ")" : "") + ", " + s.done + "/" + s.total + " " + s.unit;
     }
 
-    // A conversion's mosaics being built (both from one layout) and their stage
+    // A job queued while WebODM's worker doesn't answer (the job's "waiting"): it runs once the worker does
+    var WAITING = "Waiting for WebODM's worker, which isn't running";
+
+    // A conversion's mosaics being built (both from one layout) and their stage, or waiting for the worker
     function mosaicLabel(c) {
+        if (c.waiting) return WAITING;
         var stage = stageText(c.stage);
         return "Building the mosaics" + (stage ? ": " + stage : "") + "…";
     }
@@ -623,7 +627,7 @@
         batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName,
         preferences: preferences, setPreferences: setPreferences, editPreferences: editPreferences, bindPreferences: bindPreferences,
         setUserUnit: setUserUnit, savePalette: savePalette, paletteOptions: paletteOptions, sortRows: sortRows,
-        optionHtml: optionHtml, mosaicReportRows: mosaicReportRows
+        optionHtml: optionHtml, mosaicReportRows: mosaicReportRows, WAITING: WAITING
     };
     root.ThermalAnalyzerCore = api;
     if (root.document && root.fetch) {

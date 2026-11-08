@@ -22,7 +22,7 @@
     }
 
     function statusCell(d) {
-        var label = core.escapeHtml(core.statusLabel(d));
+        var label = core.escapeHtml(d.waiting ? core.WAITING : core.statusLabel(d));
         if (d.status === "analyzing") {
             var pct = Math.round((d.progress || 0) * 100);
             return '<div class="progress ta-row-progress" title="' + label + '"><div class="progress-bar progress-bar-striped active" style="width: ' +

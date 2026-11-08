@@ -44,6 +44,7 @@ correction = importlib.import_module("coreplugins.dji-thermal.correction")
 measurements = importlib.import_module("coreplugins.dji-thermal.measurements")
 analyzer_api = importlib.import_module("coreplugins.dji-thermal.analyzer_api")
 intensify = importlib.import_module("coreplugins.dji-thermal.intensify")
+portable = importlib.import_module("coreplugins.dji-thermal.portable")
 
 API = "/api/plugins/dji-thermal/datasets"
 
@@ -311,19 +312,67 @@ class TestAnalysis(AnalyzerTestCase):
 
     def test_a_started_analysis_whose_heartbeat_stopped_is_marked_failed_but_a_queued_one_keeps_waiting(self):
         task = self.create()
-        long_ago = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)).isoformat()
+        url = "{}/{}".format(API, task.id)
+
+        def ago(seconds):
+            return (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=seconds)).isoformat()
+
+        def get(has):
+            with mock.patch.object(datasets, "worker_has", return_value=has) as asked:
+                return self.client.get(url).data, asked
+
         with mock.patch.object(datasets, "job_gone", return_value=False):
             # Waiting in the queue behind other jobs: no heartbeat yet, however long ago it was started
-            datasets.update_job(task, status="analyzing", run_id="run", started_at=long_ago, heartbeat_at="")
-            self.assertEqual(self.client.get("{}/{}".format(API, task.id)).data["status"], "analyzing")
-            # Running, its worker writing a heartbeat
-            datasets.update_job(task, heartbeat_at=datasets.now())
-            self.assertEqual(self.client.get("{}/{}".format(API, task.id)).data["status"], "analyzing")
-            # Its worker restarted mid-job: Celery still says PENDING, the heartbeat stopped
-            datasets.update_job(task, heartbeat_at=long_ago)
-            d = self.client.get("{}/{}".format(API, task.id)).data
-        self.assertEqual(d["status"], "failed")
-        self.assertIn("stopped before it finished", d["error"])
+            datasets.update_job(task, status="analyzing", run_id="run", started_at=ago(600), heartbeat_at="",
+                                celery_task_id="c1")
+            d, _ = get(False)
+            self.assertEqual((d["status"], d["waiting"]), ("analyzing", False))
+            # No worker answers: waiting for one, not failed; once it answers, no longer
+            d, _ = get(None)
+            self.assertEqual((d["status"], d["waiting"]), ("analyzing", True))
+            d, _ = get(False)
+            self.assertEqual((d["status"], d["waiting"]), ("analyzing", False))
+            # Just started: not asked
+            datasets.update_job(task, started_at=ago(1))
+            d, asked = get(None)
+            self.assertEqual((d["status"], d["waiting"], asked.called), ("analyzing", False, False))
+            # Running, its heartbeat on time: not asked
+            datasets.update_job(task, started_at=ago(600), heartbeat_at=ago(1), waiting=True)
+            d, asked = get(None)
+            self.assertEqual((d["status"], d["waiting"], asked.called), ("analyzing", False, False))
+            # Its heartbeat late, but the worker runs it (its beat held up): still running
+            datasets.update_job(task, heartbeat_at=ago(10))
+            d, asked = get(True)
+            self.assertEqual((d["status"], asked.call_args.args), ("analyzing", ("c1",)))
+            # Where a busy worker may not answer (Windows), no answer fails it only once silent for minutes
+            with mock.patch.object(portable, "BUSY_WORKER_ANSWERS", False):
+                self.assertEqual(get(None)[0]["status"], "analyzing")
+                datasets.update_job(task, heartbeat_at=ago(datasets.STALE_SECONDS + 1))
+                self.assertEqual(get(True)[0]["status"], "analyzing")
+                datasets.update_job(task, heartbeat_at=ago(10))
+            # Its worker stopped (restarted, crashed): Celery still says PENDING, the worker doesn't have it
+            d, _ = get(False)
+            self.assertEqual(d["status"], "failed")
+            self.assertIn("stopped before it finished", d["error"])
+            # Or no worker answers at all
+            datasets.update_job(task, status="analyzing", run_id="run", heartbeat_at=ago(10))
+            self.assertEqual(get(None)[0]["status"], "failed")
+
+    def test_the_worker_is_asked_once_in_a_while_whether_it_has_a_job(self):
+        from worker.celery import app
+        datasets._asked.clear()
+        answers = [{"celery@a": {}, "celery@b": {"c1": ["active", {}]}}, {"celery@a": {}}, None]
+        with mock.patch.object(app.control, "inspect") as inspect:
+            inspect.return_value.query_task.side_effect = answers
+            self.assertTrue(datasets.worker_has("c1"))
+            self.assertTrue(datasets.worker_has("c1"))     # kept
+            self.assertFalse(datasets.worker_has("c2"))
+            self.assertEqual(inspect.call_args.kwargs, {"timeout": datasets.ASK_SECONDS})
+            self.assertIsNone(datasets.worker_has("c3"))
+            inspect.return_value.query_task.side_effect = ConnectionError("broker unreachable")
+            self.assertIsNone(datasets.worker_has("c4"))
+            self.assertEqual(inspect.return_value.query_task.call_count, 4)
+        datasets._asked.clear()
 
     def test_a_running_job_writes_its_heartbeat_only_while_it_is_the_jobs_run(self):
         task = self.create()
@@ -334,7 +383,7 @@ class TestAnalysis(AnalyzerTestCase):
         self.assertEqual(datasets.job(task)["heartbeat_at"], "")
         datasets.beat(task, "run", datasets.JOB_FILE, stop)
         self.assertTrue(datasets.job(task)["heartbeat_at"])
-        self.assertFalse(datasets.silent(datasets.job(task)))
+        self.assertLess(datasets.age(datasets.job(task), "heartbeat_at"), datasets.LATE_SECONDS)
 
     @skip_without("DJI_THERMAL_FLIGHT_DIR")
     def test_a_flights_frames_are_analyzed_with_the_webodm_plan(self):

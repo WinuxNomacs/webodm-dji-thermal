@@ -400,7 +400,7 @@
     // and what it is doing
     function convertingHtml(c) {
         var stage = c.stage || {}, frames = c.frames || {}, settings = c.settings || {};
-        var text = stage.stage ? "Harmonizing: " + core.stageText(stage) + "…" :
+        var text = c.waiting ? core.WAITING : stage.stage ? "Harmonizing: " + core.stageText(stage) + "…" :
             frames.done ? frames.done + " of " + frames.total + " frames converted" :
             harmonizes(settings) ? "Harmonizing: comparing the frames' overlaps…" :
             settings.normalize ? "Normalizing: reading the frames' recorded temperatures…" : "Starting…";
@@ -415,7 +415,7 @@
         if (c.mosaic_status === "building") {
             return '<div class="progress"><div class="progress-bar progress-bar-striped active" style="width: ' +
                 Math.round((c.mosaic_progress || 0) * 100) + '%;"></div></div><div class="text-muted">' +
-                esc(core.mosaicLabel({stage: c.mosaic_stage})) + "</div>";
+                esc(core.mosaicLabel({stage: c.mosaic_stage, waiting: c.mosaic_waiting})) + "</div>";
         }
         var before = (c.mosaics || []).length ? " The mosaics built before are kept." : "";
         if (c.mosaic_status === "failed") return '<div class="text-danger">The mosaics failed: ' + esc(c.mosaic_error + (before && !/[.!?]$/.test(c.mosaic_error) ? "." : "") + before) + "</div>";
@@ -738,6 +738,7 @@
 
     // How far measuring the frames' figures is, above the table ("" once they are)
     function figuresHtml(c) {
+        if (c.figures_status === "measuring" && c.figures_waiting) return '<p class="text-muted ta-figures-progress">' + esc(core.WAITING) + "</p>";
         if (c.figures_status === "measuring") {
             return '<p class="text-muted ta-figures-progress"><i class="fa fa-circle-notch fa-spin"></i> Measuring the frames for the table: ' +
                 Math.round((c.figures_progress || 0) * 100) + "%…</p>";
