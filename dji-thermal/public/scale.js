@@ -113,14 +113,31 @@
         return [round(range[0] - step), round(range[1] + step)];
     }
 
-    // The buttons between the range's fields that narrow and widen it (spanRange); field(name) gives each one's
-    // attributes (narrow, wider), size its Bootstrap button size
-    function spanButtonsHtml(field, size) {
-        var button = function (name, icon, title) {
-            return '<button type="button" class="btn btn-default ' + size + '" ' + field(name) + ' title="' + title + '" aria-label="' + title +
-                '"><i class="fa fa-caret-' + icon + '"></i></button>';
+    // The range raised (by 1) or lowered (by -1) by a tenth of its width, the width kept, never past the image's
+    // highest (lowest) temperature (extent: [lowest, highest], in the range's unit; or null): the last step only as far
+    // as it, none when the range is already past it
+    function shiftRange(range, by, extent) {
+        var step = (range[1] - range[0]) / 10 * by;
+        if (extent && by > 0) step = Math.max(0, Math.min(step, extent[1] - range[1]));
+        if (extent && by < 0) step = Math.min(0, Math.max(step, extent[0] - range[0]));
+        var round = function (x) { return Math.round(x * 100) / 100; };
+        return [round(range[0] + step), round(range[1] + step)];
+    }
+
+    // The D-pad between the range's fields: ◀ narrows and ▶ widens the range (spanRange), ▲ raises and ▼ lowers it
+    // (shiftRange), Auto in the middle. field(name) gives each one's attributes (narrow, wider, raise, lower, auto),
+    // size its Bootstrap button size, auto Auto's title and whether it is disabled ({title, disabled})
+    function spanButtonsHtml(field, size, auto) {
+        var button = function (name, label, title, more) {
+            return '<button type="button" class="btn btn-default ' + size + ' dt-range-' + name + '" ' + field(name) + ' title="' + title +
+                '"' + (more || "") + ">" + label + "</button>";
         };
-        return button("narrow", "left", "Narrow the range") + button("wider", "right", "Widen the range");
+        var arrow = function (name, icon, title) {
+            return button(name, '<i class="fa fa-caret-' + icon + '"></i>', title, ' aria-label="' + title + '"');
+        };
+        return '<div class="dt-range-pad">' + arrow("raise", "up", "Raise the range") + arrow("narrow", "left", "Narrow the range") +
+            button("auto", "Auto", auto.title, auto.disabled ? " disabled" : "") + arrow("wider", "right", "Widen the range") +
+            arrow("lower", "down", "Lower the range") + "</div>";
     }
 
     // Where the sliders sit for a range (within their ends)
@@ -164,7 +181,7 @@
 
     var api = {colorCss: colorCss, paletteCss: paletteCss, gradientCss: gradientCss, scaleTicks: scaleTicks, rangeTicks: rangeTicks,
                SLIDERS: SLIDERS, defaultAdjust: defaultAdjust, adjusted: adjusted, adjustQuery: adjustQuery, toneShares: toneShares,
-               adjustShares: adjustShares, slidRange: slidRange, spanRange: spanRange, spanButtonsHtml: spanButtonsHtml, sliderPositions: sliderPositions, sliderGamma: sliderGamma,
+               adjustShares: adjustShares, slidRange: slidRange, spanRange: spanRange, shiftRange: shiftRange, spanButtonsHtml: spanButtonsHtml, sliderPositions: sliderPositions, sliderGamma: sliderGamma,
                gammaSlider: gammaSlider, imageControlsHtml: imageControlsHtml};
     root.ThermalScale = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

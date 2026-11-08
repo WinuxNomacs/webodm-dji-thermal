@@ -183,10 +183,10 @@
                                                                            styleShares(style)) + "</div>";
         out += '<div class="ta-viewer-range">' +
             '<input type="number" step="0.1" class="form-control input-sm" id="ta-viewer-min" value="' + shown(style.range[0]) + '" title="Minimum">' +
-            scale.spanButtonsHtml(function (name) { return 'id="ta-viewer-' + name + '"'; }, "btn-sm") +
+            scale.spanButtonsHtml(function (name) { return 'id="ta-viewer-' + name + '"'; }, "btn-sm",
+                                  {title: "The 2nd to 98th percentile of this " + wholeName(tab.tab)}) +
             '<input type="number" step="0.1" class="form-control input-sm" id="ta-viewer-max" value="' + shown(style.range[1]) + '" title="Maximum">' +
-            "<span>" + esc(symbol) + "</span>" +
-            '<button type="button" class="btn btn-default btn-sm" id="ta-viewer-auto" title="The 2nd to 98th percentile of this ' + wholeName(tab.tab) + '">Auto</button></div>';
+            "<span>" + esc(symbol) + "</span></div>";
         out += '<div class="ta-viewer-range-error text-danger" id="ta-viewer-range-error"></div>';
         var s = tab.stats;
         if (s) out += '<div class="ta-message">This ' + wholeName(tab.tab) + ": " +
@@ -380,11 +380,16 @@
             o.recolour();
         });
 
-        // The arrows: the range narrowed or widened, as a range typed is
+        // The arrows: the range narrowed or widened, raised or lowered (within the tab's lowest and highest values), as
+        // a range typed is
         o.el.addEventListener("click", function (e) {
             var b = e.target.closest ? e.target.closest("button") : null;
-            if (!b || (b.id !== "ta-viewer-narrow" && b.id !== "ta-viewer-wider")) return;
-            o.style().range = scale.spanRange(o.style().range, b.id === "ta-viewer-wider" ? 1 : -1);
+            var arrow = b && /^ta-viewer-(narrow|wider|raise|lower)$/.exec(b.id);
+            if (!arrow) return;
+            var range = o.style().range, s = o.current().stats;
+            var extent = s && typeof s.min === "number" && typeof s.max === "number" ? [s.min, s.max] : null;
+            o.style().range = arrow[1] === "narrow" || arrow[1] === "wider" ? scale.spanRange(range, arrow[1] === "wider" ? 1 : -1)
+                : scale.shiftRange(range, arrow[1] === "raise" ? 1 : -1, extent);
             $("ta-viewer-range-error").textContent = "";
             showRange();
             o.restyle();

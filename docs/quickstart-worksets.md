@@ -102,8 +102,9 @@ The tabs:
 - **Source frame**: which frame each pixel comes from.
 - **View angle**: the angle each pixel was seen at.
 
-The panel on the right sets the palette and the colour range (**◀** and **▶** between its fields narrow or widen it
-by a tenth; **Auto** uses the 2nd to 98th percentile), and under
+The panel on the right sets the palette and the colour range (with the cross of buttons between its fields, **◀**
+and **▶** narrow or widen it by a tenth, **▲** and **▼** raise or lower it by a tenth of its width but never past the
+mosaic's hottest or coldest temperature, and **Auto**, in the middle, uses the 2nd to 98th percentile), and under
 **Image** how the image is drawn: **Brightness** and **Contrast** move and narrow the range, **Gamma** brightens the
 cooler part of it (above 1) or the warmer part (below 1), **Sharpening** brings out edges, **Equalized** spreads the
 colours over the temperatures the mosaic has most of, and **Reset** goes back to the Auto range with none of them.

@@ -2770,8 +2770,19 @@ describe("the mosaic viewer", () => {
         expect($("ta-viewer-range-error").textContent).toBe("");
         click($("ta-viewer-narrow").querySelector("i"));
         expect(drawn(t).range).toEqual([0.5, 99.5]);
+        // Raise and Lower move it by a tenth of its width, never past the mosaic's highest and lowest temperatures
+        // (10.2 to 48.9 °C): past them already, it stays; the last step goes only as far as them
+        click($("ta-viewer-raise"));
+        expect(drawn(t).range).toEqual([0.5, 99.5]);
         click($("ta-viewer-auto"));
         expect(drawn(t).range.map(x => x.toFixed(1))).toEqual(["12.3", "40.1"]);
+        click($("ta-viewer-lower").querySelector("i"));
+        expect(drawn(t).range.map(x => x.toFixed(1))).toEqual(["10.2", "38.0"]);
+        click($("ta-viewer-lower"));
+        expect(drawn(t).range.map(x => x.toFixed(1))).toEqual(["10.2", "38.0"]);
+        click($("ta-viewer-raise"));
+        expect(drawn(t).range.map(x => x.toFixed(1))).toEqual(["13.0", "40.8"]);
+        click($("ta-viewer-auto"));
 
         // The view angles keep their own; the source frames are drawn over the temperatures, in their palette and range
         click($("ta-viewer-tabs").querySelector('[data-tab="view_angle"]'));

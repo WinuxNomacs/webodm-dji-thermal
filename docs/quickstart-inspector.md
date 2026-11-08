@@ -52,8 +52,10 @@ the next time you open the same task; to share one, save it (section 6).
 - **Palette**: the thermal layer's colours, from the same list as the DJI Thermal Analyzer's. It's your palette
   everywhere: choosing one here also sets it in the Analyzer.
 - **The colour scale**, under Palette: the palette over the range the layer is drawn with, with that range in two
-  boxes in your unit. Type a new minimum or maximum; **◀** and **▶**, between them, narrow or widen the range by a
-  tenth of it, about its middle; **Auto** sets the layer's 2nd to 98th percentile. "This
+  boxes in your unit. Type a new minimum or maximum, or use the cross of buttons between them: **◀** and **▶**
+  narrow or widen the range by a tenth of it, about its middle; **▲** and **▼** raise or lower it by a tenth of its
+  width, keeping the width, but never past the layer's hottest or coldest temperature; **Auto**, in the middle, sets
+  the layer's 2nd to 98th percentile. "This
   layer" gives its own coldest and hottest temperatures. The range is the same one WebODM's layer panel sets: a
   range set there shows here, and the map draws the one set here. WebODM's panel only shows its new value when the
   page is next loaded.

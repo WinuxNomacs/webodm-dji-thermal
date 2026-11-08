@@ -524,11 +524,10 @@
             '<div class="dt-inspector-scale-bar">' + (s.colors ? barHtml(s.colors, s.range, unit, state.isotherm, s.fix, s.shares) : "") + "</div>" +
             '<div class="dt-inspector-range">' +
             '<input type="number" step="0.1" class="form-control input-sm" data-act="range-min" value="' + shown(s.range[0]) + '" title="Minimum">' +
-            Scale.spanButtonsHtml(function (name) { return 'data-act="range-' + name + '"'; }, "btn-xs") +
+            Scale.spanButtonsHtml(function (name) { return 'data-act="range-' + name + '"'; }, "btn-xs",
+                                  {title: "The 2nd to 98th percentile of this layer", disabled: !s.auto}) +
             '<input type="number" step="0.1" class="form-control input-sm" data-act="range-max" value="' + shown(s.range[1]) + '" title="Maximum">' +
-            '<span class="text-muted">°' + unit + "</span>" +
-            '<button type="button" class="btn btn-default btn-xs" data-act="range-auto"' + (s.auto ? "" : " disabled") +
-            ' title="The 2nd to 98th percentile of this layer">Auto</button></div>' +
+            '<span class="text-muted">°' + unit + "</span></div>" +
             (state.rangeError ? '<div class="text-danger dt-inspector-hint">' + escapeHtml(state.rangeError) + "</div>" : "") +
             (s.extent ? '<div class="text-muted dt-inspector-hint">This layer: ' + escapeHtml(shown(s.extent[0]).toFixed(1)) + " to " +
                 escapeHtml(shown(s.extent[1]).toFixed(1)) + " °" + unit + "</div>" : "") + "</div>";
@@ -1933,9 +1932,11 @@
             var what = act && act.getAttribute("data-act");
             var mrow = e.target.closest("[data-mosaic]");
             if (mrow && (what === "mosaic-swipe" || what === "mosaic-zoom")) return onMosaicInput(mrow, what.slice("mosaic-".length));
-            if (what === "range-narrow" || what === "range-wider") {
-                var shown = topLayer();
-                if (shown) setLook(shown, Scale.spanRange(lookOf(shown).range, what === "range-wider" ? 1 : -1), lookOf(shown).adjust);
+            if (what === "range-narrow" || what === "range-wider" || what === "range-raise" || what === "range-lower") {
+                var shown = topLayer(), range = shown && lookOf(shown).range;
+                if (!range) return;
+                setLook(shown, what === "range-narrow" || what === "range-wider" ? Scale.spanRange(range, what === "range-wider" ? 1 : -1)
+                    : Scale.shiftRange(range, what === "range-raise" ? 1 : -1, layerExtent(shown)), lookOf(shown).adjust);
                 return;
             }
             if (what === "range-auto" || what === "image-reset") {

@@ -67,7 +67,7 @@ Keep the work in plain functions that take data and return HTML strings or value
 | `frame.js` | The frame page (it reuses the Inspector's statistics and forms). |
 | `inspector.js` | The Thermal Inspector on WebODM's map. |
 | `regions.js` | Drawing shapes on a Leaflet map, and the measuring tools' list (`TOOLS`). |
-| `scale.js`, `recolour.js`, `frames.js` | Shared by the mosaic viewer and the Inspector: colour scales and the Image controls, tiles coloured in the browser, and the window of the frames that saw a point. |
+| `scale.js`, `recolour.js`, `frames.js` | Shared by the mosaic viewer and the Inspector: colour scales, the range's D-pad and the Image controls, tiles coloured in the browser, and the window of the frames that saw a point. |
 | `picture_viewer.js` | The full-page picture viewer. |
 | `thermal/` | DJI Thermal Task's panel and the project page's workset progress: JSX and ES modules, built by WebODM's webpack into `public/build/` (untracked). |
 
