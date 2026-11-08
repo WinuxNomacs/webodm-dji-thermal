@@ -42,6 +42,7 @@ conversion_tasks = importlib.import_module("coreplugins.dji-thermal.conversion_t
 correction = importlib.import_module("coreplugins.dji-thermal.correction")
 measurements = importlib.import_module("coreplugins.dji-thermal.measurements")
 analyzer_api = importlib.import_module("coreplugins.dji-thermal.analyzer_api")
+intensify = importlib.import_module("coreplugins.dji-thermal.intensify")
 
 API = "/api/plugins/dji-thermal/datasets"
 
@@ -1000,6 +1001,61 @@ class TestMosaics(AnalyzerTestCase):
         self.assertNotIn("saved_alignment_used", mosaics.result(task, plain)["kinds"]["harmonized"]["report"]["alignment"])
 
     @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def check_intensify(self, task, cid, v, centre, first, here):
+        """The Intensify tab of a flight's mosaics: differences about 0, drawn, read and equalized as a temperature tab's,
+        with the harmonized temperature beside the difference; not a download, nor a tab measured as temperatures"""
+        import numpy as np
+        tab = next(t for t in v["tabs"] if t["tab"] == "intensify")
+        stats = tab["stats"]
+        self.assertLess(stats["percentiles"][0], 0)
+        self.assertGreater(stats["percentiles"][1], 0)
+        self.assertLess(max(abs(x) for x in stats["percentiles"]), 5)
+        self.assertEqual(v["kinds"]["intensify"]["of"], "harmonized")
+        self.assertNotIn("intensify", {s["kind"] for s in mosaics.summary(task, cid)})
+        self.assertFalse(any(f.startswith("intensify/") for f in mosaics.files(task, cid)))
+        p = self.client.get(self.url(task, cid, "/intensify/point"), centre).data
+        harmonized = self.client.get(self.url(task, cid, "/harmonized/point"), centre).data
+        self.assertTrue(p["valid"], p)
+        self.assertEqual((p["temperature"], p["frame"]), (harmonized["temperature"], harmonized["frame"]))
+        self.assertLess(abs(p["difference"]), 10)
+        t = web_mercator_tile(centre["lon"], centre["lat"], tab["maxzoom"])
+        style = {"color_map": v["difference_palette"], "rescale": "-2,2", "equalize": 1, "isotherm": "below,-0.5"}
+        tile = self.client.get(self.url(task, cid, "/intensify/tiles/{}/{}/{}.png".format(t.z, t.x, t.y)), style)
+        self.assertEqual((tile.status_code, tile["Content-Type"]), (status.HTTP_200_OK, "image/png"))
+        self.assertEqual(self.client.get(self.url(task, cid, "/intensify/histogram")).status_code, status.HTTP_200_OK)
+        # The frames window: the frame's own differences from their surroundings, about 0 too
+        values = mosaics.frame_values(task, cid, "intensify", first["index"])
+        self.assertTrue(np.isfinite(values[here]))
+        self.assertLess(abs(float(np.nanmedian(values))), 0.5)
+        image = self.client.get(self.url(task, cid, "/intensify/frames/{}.png".format(first["index"])), style)
+        self.assertEqual((image.status_code, image["Content-Type"]), (status.HTTP_200_OK, "image/png"))
+        # The Thermal Inspector measures and paints temperatures, not differences
+        square = {"type": "Polygon", "coordinates": [[[centre["lon"], centre["lat"]], [centre["lon"] + 1e-5, centre["lat"]],
+                                                      [centre["lon"] + 1e-5, centre["lat"] + 1e-5], [centre["lon"], centre["lat"]]]]}
+        self.assertEqual(self.client.post(self.url(task, cid, "/intensify/region"), {"geometry": square}, format="json").status_code,
+                         status.HTTP_400_BAD_REQUEST)
+
+    def test_intensify_keeps_a_narrow_cooler_seam_and_takes_away_gradients_and_slopes(self):
+        import numpy as np
+        y, x = np.mgrid[0:300, 0:500]
+        roof = (20 + 0.02 * x + 0.01 * y).astype(np.float32)        # warmer to the east and the south
+        roof[:, 250:] += 6                                          # the sunny slope
+        roof[150:153, 20:480] -= 2.5                                # a seam 15 cm wide, 2.5 °C cooler
+        roof[:30, :40] = np.nan                                     # no frame there
+        d = intensify.differences(roof, 0.05)                       # 5 cm a pixel: 2 m is 40 pixels
+        self.assertAlmostEqual(float(np.median(d[151, 40:220])), -2.5, delta=0.1)
+        self.assertAlmostEqual(float(np.median(d[151, 280:460])), -2.5, delta=0.1)
+        self.assertLess(float(np.max(np.abs(d[60, 40:220]))), 0.05)
+        self.assertLess(float(np.max(np.abs(d[60, 280:460]))), 0.05)
+        self.assertTrue(np.isnan(d[:30, :40]).all())
+        self.assertFalse(np.isnan(d[30:]).any())
+        # In °F, the same difference scaled: a median shifts with the values, and scales with them
+        f = intensify.differences(roof * 1.8 + 32, 0.05)
+        self.assertTrue(np.allclose(f[30:], d[30:] * 1.8, atol=1e-3))
+        # A mosaic smaller than the neighbourhood, and one pixel
+        self.assertEqual(intensify.differences(np.full((3, 4), 7.0), 0.5).tolist(), np.zeros((3, 4)).tolist())
+        self.assertTrue(np.isnan(intensify.differences(np.array([[np.nan]]), 0.1)).all())
+
     def test_a_flights_frames_make_mosaics_shown_on_a_map_and_downloaded(self):
         frames = flight_frames(6)
         task = self.create()
@@ -1012,9 +1068,10 @@ class TestMosaics(AnalyzerTestCase):
         size = Task.objects.get(pk=task.id).size
         v = self.client.get(self.url(task, cid)).data
         self.assertEqual((v["status"], v["mosaic_status"]), ("ready", "ready"), v["mosaic_error"] or v["error"])
-        self.assertEqual([t["tab"] for t in v["tabs"]], ["as_converted", "harmonized", "source_frame", "view_angle"])
-        self.assertEqual(set(v["kinds"]), {"as_converted", "harmonized"})
+        self.assertEqual([t["tab"] for t in v["tabs"]], ["as_converted", "harmonized", "intensify", "source_frame", "view_angle"])
+        self.assertEqual(set(v["kinds"]), {"as_converted", "harmonized", "intensify"})
         self.assertIn(v["default_palette"], [p["key"] for p in v["palettes"]])
+        self.assertIn(v["difference_palette"], [p["key"] for p in v["palettes"]])
         self.assertEqual(len(v["flown"]), 2)
         self.assertGreaterEqual(Task.objects.get(pk=task.id).size, size)
 
@@ -1127,6 +1184,7 @@ class TestMosaics(AnalyzerTestCase):
                                  ("view_angle", "view_angle", 0.2)):
             want = self.client.get(self.url(task, cid, "/{}/point".format(name)), centre).data[key]
             self.assertAlmostEqual(mosaics.frame_values(task, cid, name, first["index"])[here], want, delta=delta, msg=name)
+        self.check_intensify(task, cid, v, centre, first, here)
         image = self.client.get(self.url(task, cid, "/harmonized/frames/{}.png".format(first["index"])),
                                 {"color_map": "inferno", "rescale": "{},{}".format(lo, hi)})
         self.assertEqual((image.status_code, image["Content-Type"]), (status.HTTP_200_OK, "image/png"))

@@ -62,7 +62,8 @@ def _own_colormaps():
 def colormap_encoded(name):
     """
     A WebODM colour map's colours as its tiler gives them (0xRRGGBBAA integers): hot, rainbow and gray_r from the
-    plugin's copy (colormaps.json: WebODM 4.0.0's tiler no longer has them), the others from WebODM's tiler
+    plugin's copy (colormaps.json: WebODM 4.0.0's tiler no longer has them), with the plugin's own bwr, the others from
+    WebODM's tiler
     :raises Exception: a name it doesn't have (rio-tiler's InvalidColorMapName)
     """
     own = _own_colormaps().get(name)

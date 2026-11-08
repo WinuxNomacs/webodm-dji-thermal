@@ -1,5 +1,6 @@
 // A conversion's mosaics on a map (viewer.html), over WebODM's base layers: a tab per mosaic (as converted, harmonized,
-// and the as-converted mosaic's source frames, over its temperatures, and view angles), its palette and range changed live through the tile
+// Intensify: the harmonized one's differences from their surroundings, and the as-converted mosaic's source frames,
+// over its temperatures, and view angles), its palette and range changed live through the tile
 // URL with its colour scale, the values under the cursor, the frames that saw a point clicked (in a window over the
 // map, drawn as the tab draws the mosaic), and what dji-thermal-cli reports about the mosaic. Leaflet is
 // WebODM's own, from the plugin's build (thermal/Leaflet.js).
@@ -14,7 +15,7 @@
     var POLL_MS = 2000;
     var HOVER_MS = 120;         // the readout asks for the point the cursor rests on, not every point it crosses
     var READOUT_HINT = "Move the cursor over the mosaic; a click keeps the values there and opens the frames that saw it.";
-    var TAB_LABELS = {as_converted: "Mosaic", harmonized: "Harmonized", source_frame: "Source frame",
+    var TAB_LABELS = {as_converted: "Mosaic", harmonized: "Harmonized", intensify: "Intensify", source_frame: "Source frame",
                       view_angle: "View angle"};
     var TAB_HINTS = {
         as_converted: "Each pixel is one frame's own temperature, as the frames were converted.",
@@ -23,6 +24,10 @@
             "uses the same ambient and reflected temperature, and each is shifted to match its neighbours where they " +
             "overlap. Compared with the Mosaic tab: no seams or patches from drift; the temperatures may sit slightly " +
             "higher or lower overall.",
+        intensify: "Intensify: each pixel of the harmonized mosaic less the typical temperature around it (the median " +
+            "over about 2 m). Slopes, the sun's side and gradients across the roof drop to about 0, so a narrow cooler " +
+            "or warmer feature, such as a seam or a leak, stands out wherever it is: blue below its surroundings, red " +
+            "above. The numbers are differences, not temperatures; anything 2 m wide or more fades out.",
         source_frame: "Where each frame was placed: the mosaic, with a line where one frame meets the next (each pixel " +
             "comes from the frame that saw it closest to straight down).",
         view_angle: "How far from straight down each pixel was seen, in degrees.",
@@ -38,20 +43,22 @@
     var ISOTHERM_MODES = [["", "None"], ["above", "Above"], ["below", "Below"], ["between", "Between"]];
 
     // An isotherm typed (mode, and its temperatures in the user's unit) as the server takes it, in the mosaic's unit
-    // ("above,T", "below,T", "between,A,B"; "" for none): {value} or {error} (from dji-thermal-ui's isothermParam)
-    function isothermParam(mode, a, b, unit) {
+    // ("above,T", "below,T", "between,A,B"; "" for none): {value} or {error} (from dji-thermal-ui's isothermParam);
+    // tab: on a tab of differences, the values typed are differences
+    function isothermParam(mode, a, b, unit, tab) {
         if (!mode) return {value: ""};
         var x = parseFloat(a), y = parseFloat(b);
+        var typed = function (t) { return typedValue(tab || "frame", t, unit); };
         if (isNaN(x)) return {error: "The isotherm needs a temperature"};
-        if (mode !== "between") return {value: mode + "," + typedTemp(x, unit)};
+        if (mode !== "between") return {value: mode + "," + typed(x)};
         if (isNaN(y)) return {error: "The isotherm needs two temperatures"};
         if (!(y > x)) return {error: "The second temperature must be above the first"};
-        return {value: "between," + typedTemp(x, unit) + "," + typedTemp(y, unit)};
+        return {value: "between," + typed(x) + "," + typed(y)};
     }
 
-    // The isotherm of a style as a query, on the temperature tabs
+    // The isotherm of a style as a query, on the tabs of temperatures and their differences
     function isothermQuery(tab, style) {
-        return isTemperature(tab) && style.isotherm && style.isotherm.value ? "&isotherm=" + encodeURIComponent(style.isotherm.value) : "";
+        return inUnit(tab) && style.isotherm && style.isotherm.value ? "&isotherm=" + encodeURIComponent(style.isotherm.value) : "";
     }
 
     // The legend's shares as the image is drawn: the server's curve with equalization, else gamma's, else none (linear)
@@ -59,6 +66,10 @@
 
     // The source frames are shown over the as-converted temperatures; the frame page shows one frame's
     function isTemperature(tab) { return tab === "as_converted" || tab === "harmonized" || tab === "source_frame" || tab === "frame"; }
+    // Intensify shows differences of temperatures (each pixel less its surroundings), in the mosaic's unit
+    function isDifference(tab) { return tab === "intensify"; }
+    // Temperatures or their differences: shown in the user's unit, equalized, drawn as isotherms
+    function inUnit(tab) { return isTemperature(tab) || isDifference(tab); }
 
     // What a tab shows, in the controls' words
     function wholeName(tab) { return tab === "frame" ? "frame" : "mosaic"; }
@@ -70,14 +81,29 @@
     function shownTemp(x, unit) { return Math.round(core.convertTemp(x, unit) * 100) / 100; }
     function typedTemp(x, unit) { return Math.round(core.convertTemp(x, core.userUnit(), unit) * 10000) / 10000; }
 
-    // A tab's starting range: its 2nd to 98th percentile, rounded outwards to a tenth; for a temperature, rounded in
-    // the user's unit and kept in the mosaic's
+    // A tab's value in the mosaic's unit as the user sees it (exact: a temperature's, a difference's in the user's unit,
+    // scaled and not shifted), and one typed back in the mosaic's unit (rounded)
+    function exactValue(tab, x, unit) {
+        return isTemperature(tab) ? core.convertTemp(x, unit) : isDifference(tab) ? core.convertDelta(x, unit) : Number(x);
+    }
+    function shownValue(tab, x, unit) { return inUnit(tab) ? Math.round(exactValue(tab, x, unit) * 100) / 100 : x; }
+    function typedValue(tab, x, unit) {
+        if (isTemperature(tab)) return typedTemp(x, unit);
+        return isDifference(tab) ? Math.round(core.convertDelta(x, core.userUnit(), unit) * 10000) / 10000 : x;
+    }
+
+    // A tab's starting range: its 2nd to 98th percentile, rounded outwards to a tenth (a difference's symmetric about 0,
+    // so that the palette's middle is no difference); for a temperature, rounded in the user's unit and kept in the
+    // mosaic's
     function defaultRange(tab, unit) {
         var p = tab && tab.stats && tab.stats.percentiles;
         if (!p || p.length < 2) return [0, 1];
-        var temperature = isTemperature(tab.tab);
-        var shown = temperature ? function (x) { return core.convertTemp(x, unit); } : Number;
-        var kept = temperature ? function (x) { return typedTemp(x, unit); } : Number;
+        var shown = function (x) { return exactValue(tab.tab, x, unit); };
+        var kept = function (x) { return typedValue(tab.tab, x, unit); };
+        if (isDifference(tab.tab)) {
+            var m = Math.max(0.1, Math.ceil(Math.max(Math.abs(shown(p[0])), Math.abs(shown(p[1]))) * 10) / 10);
+            return [kept(-m), kept(m)];
+        }
         var lo = Math.floor(shown(p[0]) * 10) / 10, hi = Math.ceil(shown(p[1]) * 10) / 10;
         return hi > lo ? [kept(lo), kept(hi)] : [kept(lo), kept(lo + 1)];
     }
@@ -87,12 +113,12 @@
         var lo = parseFloat(minText), hi = parseFloat(maxText);
         if (isNaN(lo) || isNaN(hi)) return {error: "The range needs a minimum and a maximum"};
         if (!(hi > lo)) return {error: "The maximum must be above the minimum"};
-        return {range: isTemperature(tab) ? [typedTemp(lo, unit), typedTemp(hi, unit)] : [lo, hi]};
+        return {range: [typedValue(tab, lo, unit), typedValue(tab, hi, unit)]};
     }
 
-    // A tab's range as shown: a temperature's in the user's unit
+    // A tab's range as shown: a temperature's (or a difference's) in the user's unit
     function shownRange(tab, range, unit) {
-        return isTemperature(tab) ? range.map(function (x) { return core.convertTemp(x, unit); }) : range.slice();
+        return range.map(function (x) { return exactValue(tab, x, unit); });
     }
 
     // A colour scale: the palette's gradient (along shares: how the image is drawn) over the range shown ([lo, hi]),
@@ -144,9 +170,9 @@
     // The tab's palette, colour scale and range
     function controlsHtml(tab, style, palettes, unit) {
         var out = '<p class="ta-viewer-hint">' + esc(TAB_HINTS[tab.tab] || "") + "</p>";
-        var temperature = isTemperature(tab.tab);
+        var temperature = inUnit(tab.tab);
         var symbol = temperature ? core.unitSymbol(core.userUnit()) : "°";
-        var shown = function (x) { return temperature ? shownTemp(x, unit) : x; };
+        var shown = function (x) { return shownValue(tab.tab, x, unit); };
         var current = palettes.filter(function (p) { return p.key === style.palette; })[0];
         out += '<div class="form-group"><label for="ta-viewer-palette">Palette</label><select class="form-control input-sm" id="ta-viewer-palette">' +
             palettes.map(function (p) {
@@ -163,13 +189,13 @@
         out += '<div class="ta-viewer-range-error text-danger" id="ta-viewer-range-error"></div>';
         var s = tab.stats;
         if (s) out += '<div class="ta-message">This ' + wholeName(tab.tab) + ": " +
-            core.formatNumber(temperature ? core.convertTemp(s.min, unit) : s.min, 1) + " to " +
-            core.formatNumber(temperature ? core.convertTemp(s.max, unit) : s.max, 1, " " + symbol) + "</div>";
-        return out + imageHtml(tab, style, unit) + (temperature ? isothermHtml(style) : "");
+            core.formatNumber(exactValue(tab.tab, s.min, unit), 1) + " to " +
+            core.formatNumber(exactValue(tab.tab, s.max, unit), 1, " " + symbol) + "</div>";
+        return out + imageHtml(tab, style, unit) + (temperature ? isothermHtml(style, isDifference(tab.tab)) : "");
     }
 
     // The isotherm: its temperatures keep the palette, the rest is grey (as dji-thermal-ui's)
-    function isothermHtml(style) {
+    function isothermHtml(style, difference) {
         var iso = style.isotherm || {mode: "", a: "", b: ""}, mode = iso.mode;
         return '<details class="ta-section" open data-section="isotherm"><summary><h5>Isotherm</h5></summary>' +
             '<div class="ta-viewer-isotherm"><select class="form-control input-sm" id="ta-viewer-iso-mode" aria-label="Isotherm">' +
@@ -182,17 +208,19 @@
             (mode === "between" ? "" : " hidden") + ' value="' + esc(iso.b) + '">' +
             '<span id="ta-viewer-iso-unit"' + (mode ? "" : " hidden") + ">" + esc(core.unitSymbol(core.userUnit())) + "</span></div>" +
             '<div class="text-danger" id="ta-viewer-iso-error"></div>' +
-            '<p class="ta-message" id="ta-viewer-iso-hint"' + (mode ? "" : " hidden") + ">Its pixels keep the palette, the rest is grey.</p></details>";
+            '<p class="ta-message" id="ta-viewer-iso-hint"' + (mode ? "" : " hidden") + ">Its pixels keep the palette, the rest is grey." +
+            (difference ? " Its values are differences from the surroundings (e.g. below -1.5)." : "") + "</p></details>";
     }
 
     // How the image is drawn: brightness and contrast move the range, gamma and the tone curve share out the colours,
     // sharpening brings out edges
     function imageHtml(tab, style, unit) {
-        var temperature = isTemperature(tab.tab);
+        var temperature = inUnit(tab.tab);
         return '<details class="ta-section" open data-section="image"><summary><h5>Image</h5></summary>' +
             scale.imageControlsHtml(style.adjust, sliderPositions(defaultRange(tab, unit), style.range),
                                     {field: function (name) { return 'id="ta-viewer-' + name + '"'; }, equalize: temperature, whole: wholeName(tab.tab)}) +
-            '<p class="ta-message">How the image is drawn: the ' + (temperature ? "temperatures" : "values") + " stay as they are.</p></details>";
+            '<p class="ta-message">How the image is drawn: the ' + (isDifference(tab.tab) ? "differences" : temperature ? "temperatures" : "values") +
+            " stay as they are.</p></details>";
     }
 
     // The button that lets go of the point a click kept
@@ -207,6 +235,9 @@
         if (!res || !res.valid) return '<span class="ta-message">' + (res && res.reason === "outside_raster" ?
             "Outside the mosaic." : "No data here.") + "</span>" + follow;
         var rows = [["Temperature", res.temperature === null || res.temperature === undefined ? "no data" : core.formatTemp(res.temperature, unit)]];
+        // On Intensify: the difference from the surroundings, then the harmonized mosaic's temperature
+        if (res.difference !== undefined) rows.unshift(["Difference", res.difference === null ? "no data" :
+            core.formatDelta(res.difference, unit, 2, true) + " from its surroundings"]);
         if (res.frame !== null && res.frame !== undefined) rows.push(["Frame", res.frame]);
         if (res.frame_pixel) rows.push(["Frame pixel", "x " + res.frame_pixel[0] + ", y " + res.frame_pixel[1]]);
         if (res.view_angle !== null && res.view_angle !== undefined) rows.push(["View angle", core.formatNumber(res.view_angle, 1, "°")]);
@@ -268,10 +299,10 @@
 
         // The range boxes and the brightness and contrast sliders, as the range is
         function showRange() {
-            var r = o.style().range, temperature = isTemperature(o.current().tab);
+            var r = o.style().range, tab = o.current().tab;
             var at = sliderPositions(defaultRange(o.current(), o.unit()), r);
-            $("ta-viewer-min").value = temperature ? shownTemp(r[0], o.unit()) : r[0];
-            $("ta-viewer-max").value = temperature ? shownTemp(r[1], o.unit()) : r[1];
+            $("ta-viewer-min").value = shownValue(tab, r[0], o.unit());
+            $("ta-viewer-max").value = shownValue(tab, r[1], o.unit());
             $("ta-viewer-brightness").value = at.brightness;
             $("ta-viewer-contrast").value = at.contrast;
         }
@@ -284,7 +315,7 @@
             iso.b = $("ta-viewer-iso-b").value;
             $("ta-viewer-iso-a").hidden = $("ta-viewer-iso-unit").hidden = $("ta-viewer-iso-hint").hidden = !mode;
             $("ta-viewer-iso-b").hidden = mode !== "between";
-            var r = isothermParam(mode, iso.a, iso.b, o.unit());
+            var r = isothermParam(mode, iso.a, iso.b, o.unit(), o.current().tab);
             // Not an error yet while a temperature is still to be typed
             $("ta-viewer-iso-error").textContent = r.error && (iso.a !== "" || mode === "between" && iso.b !== "") ? r.error : "";
             if (r.error || r.value === iso.value) return;
@@ -299,9 +330,9 @@
                 s.range = slidRange(defaultRange(o.current(), o.unit()), parseFloat($("ta-viewer-brightness").value) || 0,
                                     parseFloat($("ta-viewer-contrast").value) || 0);
                 $("ta-viewer-range-error").textContent = "";
-                var temperature = isTemperature(o.current().tab);
-                $("ta-viewer-min").value = temperature ? shownTemp(s.range[0], o.unit()) : s.range[0];
-                $("ta-viewer-max").value = temperature ? shownTemp(s.range[1], o.unit()) : s.range[1];
+                var tab = o.current().tab;
+                $("ta-viewer-min").value = shownValue(tab, s.range[0], o.unit());
+                $("ta-viewer-max").value = shownValue(tab, s.range[1], o.unit());
             } else if (name === "gamma") {
                 s.adjust.gamma = sliderGamma(input.value);
                 $("ta-viewer-gamma-value").textContent = s.adjust.gamma.toFixed(2);
@@ -390,7 +421,8 @@
         // The tab's palette and range, those of its group (the temperature tabs share theirs)
         function style() {
             var g = styleGroup(tab);
-            if (!styles[g]) styles[g] = {palette: isTemperature(tab) ? v.default_palette : "inferno", range: defaultRange(current(), v.unit),
+            var first = isTemperature(tab) ? v.default_palette : isDifference(tab) && v.difference_palette || "inferno";
+            if (!styles[g]) styles[g] = {palette: first, range: defaultRange(current(), v.unit),
                                          adjust: defaultAdjust(), curve: null, isotherm: {mode: "", a: "", b: "", value: ""}};
             return styles[g];
         }
@@ -400,7 +432,7 @@
         var histograms = {};
         function loadCurve() {
             var s = style(), askedTab = tab, h = histograms[tab];
-            if (!s.adjust.equalize || !isTemperature(tab)) return;
+            if (!s.adjust.equalize || !inUnit(tab)) return;
             if (h && !h.then) {
                 s.curve = Recolour.curveShares(s.range[0], s.range[1], s.adjust, Recolour.equalization(h, s.range[0], s.range[1]));
                 return;
@@ -420,7 +452,7 @@
             var s = style(), p = (v.palettes || []).filter(function (x) { return x.key === s.palette; })[0];
             if (!p) return null;
             return {palette: s.palette, colors: p.color_map, range: s.range, shares: styleShares(s), sharpen: s.adjust.sharpen,
-                    isotherm: isTemperature(tab) ? Recolour.isothermRange(s.isotherm && s.isotherm.value) : null, seams: tab === "source_frame"};
+                    isotherm: inUnit(tab) ? Recolour.isothermRange(s.isotherm && s.isotherm.value) : null, seams: tab === "source_frame"};
         }
 
         function showScale() {
@@ -542,7 +574,9 @@
             $("ta-viewer-tabs").innerHTML = tabsHtml(v.tabs, tab);
             loadCurve();
             $("ta-viewer-controls").innerHTML = controlsHtml(t, style(), v.palettes || [], v.unit);
-            $("ta-viewer-report").innerHTML = reportHtml(v.kinds[t.kind], t.kind, base);
+            // Intensify's report is the harmonized mosaic's, which it is made from
+            var kind = (v.kinds[t.kind] || {}).of || t.kind;
+            $("ta-viewer-report").innerHTML = reportHtml(v.kinds[kind], kind, base);
             $("ta-viewer-readout").innerHTML = '<span class="ta-message">' + esc(READOUT_HINT) + "</span>";
             return ensureMap().then(function () {
                 showLayer();
@@ -648,9 +682,11 @@
 
         bindControls({doc: doc, el: $("ta-viewer-controls"), current: current, style: style, unit: function () { return v.unit; },
                       palettes: function () { return v.palettes || []; }, recolour: recolour, restyle: restyle,
-                      // A temperature palette is the user's, everywhere (DJI's keys carry the viewer's prefix)
+                      // A temperature palette is the user's, everywhere (DJI's keys carry the viewer's prefix); the
+                      // palette for differences is the viewers' own, not one to keep
                       onPalette: function (key) {
-                          if (isTemperature(tab)) core.savePalette(fetchFn, page.getAttribute("data-api"), csrf, key.replace(/^dji_/, "")).catch(function () {});
+                          var p = (v.palettes || []).filter(function (x) { return x.key === key; })[0];
+                          if (isTemperature(tab) && (!p || p.saved !== false)) core.savePalette(fetchFn, page.getAttribute("data-api"), csrf, key.replace(/^dji_/, "")).catch(function () {});
                       }});
 
         $("ta-viewer-readout").addEventListener("click", function (e) {
@@ -684,7 +720,7 @@
                baseLayers: baseLayers, loadLeaflet: loadLeaflet, init: init, adjustQuery: adjustQuery, toneShares: toneShares,
                slidRange: slidRange, sliderPositions: sliderPositions, sliderGamma: sliderGamma, gammaSlider: gammaSlider,
                SLIDERS: SLIDERS, imageHtml: imageHtml, isothermParam: isothermParam, isothermHtml: isothermHtml,
-               bindControls: bindControls, isTemperature: isTemperature, shownTemp: shownTemp};
+               bindControls: bindControls, isTemperature: isTemperature, isDifference: isDifference, inUnit: inUnit, shownTemp: shownTemp};
     root.ThermalAnalyzerViewer = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

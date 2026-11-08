@@ -2744,6 +2744,70 @@ describe("the mosaic viewer", () => {
         expect(L.maps.length).toBe(1);
     });
 
+    it("shows Intensify after Harmonized: differences in the user's unit, about 0, in its own palette and range", async () => {
+        window.localStorage.setItem("unit_system", "imperial");
+        const L = fakeLeaflet();
+        const BWR = INFERNO.slice().reverse();
+        const v = Object.assign({}, VIEWER, {
+            tabs: [VIEWER.tabs[0], VIEWER.tabs[1], tab("intensify", "intensify", {min: -3.4, max: 1.2, percentiles: [-1.04, 0.62]}),
+                   VIEWER.tabs[2], VIEWER.tabs[3]],
+            kinds: Object.assign({}, VIEWER.kinds, {intensify: {of: "harmonized", gsd_m: 0.021, size_m: 2}}),
+            palettes: VIEWER.palettes.concat([{key: "bwr", label: "blue-white-red", color_map: BWR, saved: false}]),
+            difference_palette: "bwr"
+        });
+        const fetchFn = server({[C9 + "/mosaics"]: v,
+                                [C9 + "/mosaics/intensify/point?lon=10.0005&lat=45.0005"]: {valid: true, difference: -2.5, temperature: 30, frame: "b_T.JPG"},
+                                "PUT /api/plugins/dji-thermal/display": (u, o) => jsonResponse(Object.assign({unit: null}, JSON.parse(o.body)))});
+        await start(fetchFn, L);
+        await ticks();
+        expect([...$("ta-viewer-tabs").querySelectorAll("a")].map(a => a.textContent))
+            .toEqual(["Mosaic", "Harmonized", "Intensify", "Source frame", "View angle"]);
+        click($("ta-viewer-tabs").querySelector('[data-tab="intensify"]'));
+        await ticks();
+        const t = L.tiles[L.tiles.length - 1];
+        expect(valuesOf(t)).toContain("/mosaics/intensify/values/");
+        // Its own palette, blue-white-red, and a range symmetric about 0: -1.04 °C is -1.872 °F, so ±1.9 °F, kept in °C
+        expect(drawn(t)).toMatchObject({palette: "bwr", colors: BWR});
+        expect(drawn(t).range.map(x => x.toFixed(4))).toEqual(["-1.0556", "1.0556"]);
+        expect([$("ta-viewer-min").value, $("ta-viewer-max").value]).toEqual(["-1.9", "1.9"]);
+        expect($("ta-viewer-controls").textContent).toContain("differences, not temperatures");
+        expect($("ta-viewer-controls").textContent).toContain("This mosaic: -6.1 to 2.2 °F");
+        // A difference typed in °F is scaled into the mosaic's °C, never shifted
+        $("ta-viewer-min").value = "-9";
+        $("ta-viewer-max").value = "9";
+        change($("ta-viewer-max"));
+        expect(drawn(t).range).toEqual([-5, 5]);
+        // Its isotherm takes differences too
+        $("ta-viewer-iso-mode").value = "below";
+        change($("ta-viewer-iso-mode"));
+        $("ta-viewer-iso-a").value = "-2.7";
+        change($("ta-viewer-iso-a"));
+        expect(drawn(t).isotherm[1]).toBe(-1.5);
+        // Its palette is not the user's: not saved
+        $("ta-viewer-palette").value = "inferno";
+        change($("ta-viewer-palette"));
+        $("ta-viewer-palette").value = "bwr";
+        change($("ta-viewer-palette"));
+        expect(fetchFn.mock.calls.filter(c => c[1] && c[1].method === "PUT")).toEqual([]);
+        // The report is the harmonized mosaic's, which it is made from
+        expect($("ta-viewer-report").innerHTML).toContain("mosaic=harmonized%2Freport.json");
+        // The temperature tabs keep their own palette and range
+        click($("ta-viewer-tabs").querySelector('[data-tab="harmonized"]'));
+        await ticks();
+        expect(drawn(L.tiles[L.tiles.length - 1])).toMatchObject({palette: "dji_ironred"});
+        click($("ta-viewer-tabs").querySelector('[data-tab="intensify"]'));
+        await ticks();
+        expect(drawn(L.tiles[L.tiles.length - 1])).toMatchObject({palette: "bwr", range: [-5, 5]});
+
+        // The difference under the cursor, then the harmonized temperature
+        jest.useFakeTimers();
+        L.maps[0].fire("mousemove", {latlng: {lng: 10.0005, lat: 45.0005}});
+        jest.advanceTimersByTime(200);
+        await ticks();
+        expect($("ta-viewer-readout").textContent).toContain("Difference-4.50 °F from its surroundings");
+        expect($("ta-viewer-readout").textContent).toContain("Temperature86.00 °F");
+    });
+
     it("builds missing mosaics and follows them until they are built", async () => {
         jest.useFakeTimers();
         const none = Object.assign({}, CONVERSION, {mosaic_status: "", can_change: true, tabs: [], kinds: {}, dataset_name: "Roof"});
@@ -2981,6 +3045,9 @@ describe("the mosaic viewer", () => {
         expect(viewer.isothermParam("above", "", "", "C").error).toMatch(/needs a temperature/);
         expect(viewer.isothermParam("between", "50", "", "C").error).toMatch(/needs two temperatures/);
         expect(viewer.isothermParam("between", "68", "50", "C").error).toMatch(/above the first/);
+        // On Intensify, the values typed are differences: scaled into the mosaic's unit, never shifted
+        expect(viewer.isothermParam("below", "-2.7", "", "C", "intensify")).toEqual({value: "below,-1.5"});
+        expect(viewer.isothermParam("above", "104", "", "C", "harmonized")).toEqual({value: "above,40"});
     });
 
     it("draws the image as the Image section says: the sliders, Equalized, Reset, and the frames' pictures too", async () => {

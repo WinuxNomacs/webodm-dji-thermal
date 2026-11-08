@@ -782,7 +782,7 @@ def viewer(task, cid, user):
         'flown': [times[0], times[-1]] if times else [], 'built_at': built.get('built_at'),
         'stripped': bool(built.get('stripped')), 'frames': built.get('frames') or [], 'tabs': tabs,
         'kinds': {kind: {key: v for key, v in k.items() if key != 'raster'} for kind, k in kinds.items()},
-        'palettes': palettes,
+        'palettes': palettes, 'difference_palette': mosaics.DIFFERENCE_PALETTE,
         'default_palette': mosaics.default_palette(task, cid, settings, conversions.display(user)['palette']) if kinds else None,
         'can_change': user.has_perm('change_project', task.project),
     })
@@ -858,13 +858,13 @@ def mosaic_style(request, task, cid, tab):
 
 
 def mosaic_isotherm(request, tab):
-    """A viewer request's isotherm (colouring.parse_isotherm), only on temperatures"""
+    """A viewer request's isotherm (colouring.parse_isotherm), only on temperatures and their differences"""
     from . import colouring
     try:
         isotherm = colouring.parse_isotherm(request.query_params.get('isotherm'))
     except ValueError as e:
         raise ValidationError({'error': str(e)}) from None
-    if isotherm and not mosaics.is_temperature(tab):
+    if isotherm and not mosaics.in_unit(tab):
         raise ValidationError({'isotherm': "Only temperatures have an isotherm"})
     return isotherm
 
@@ -881,13 +881,13 @@ def mosaic_range(request):
 
 
 def mosaic_adjust(request, tab):
-    """A viewer request's adjustments (colouring.parse_adjust), equalize only on temperatures"""
+    """A viewer request's adjustments (colouring.parse_adjust), equalize only on temperatures and their differences"""
     from . import colouring
     try:
         adjust = colouring.parse_adjust(request.query_params)
     except ValueError as e:
         raise ValidationError({'error': str(e)}) from None
-    if adjust['equalize'] and not mosaics.is_temperature(tab):
+    if adjust['equalize'] and not mosaics.in_unit(tab):
         raise ValidationError({'equalize': "Only temperatures can be equalized"})
     return adjust
 
@@ -907,10 +907,11 @@ class MosaicValues(DatasetView):
 
 class MosaicHistogram(DatasetView):
     def get(self, request, pk, cid, tab):
-        """A temperature tab's histogram (in its unit), for the browser's equalization (inspector_api.histogram_response)"""
+        """A temperature tab's histogram (in its unit; Intensify's of its differences), for the browser's equalization
+        (inspector_api.histogram_response)"""
         task = get_conversion(request, pk, cid)
         tab_raster(task, cid, tab)
-        if not mosaics.is_temperature(tab):
+        if not mosaics.in_unit(tab):
             raise ValidationError({'equalize': "Only temperatures can be equalized"})
         return inspector_api.histogram_response(mosaics.histogram(task, cid, tab))
 
