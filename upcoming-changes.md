@@ -53,6 +53,21 @@
   code, an upload to a full disk is answered "The server's disk is full", and a conversion fails each frame with the
   system's reason.
   No release prepared. Open: which judgement calls to build.
+- **R9. The range's arrows as a D-pad** (the user, 2026-11-08, in `new.md`): "Regarding the temperature range/scale
+  control arrows. Replace them with a 5 button D-Pad style arrangement with Auto button moved into the center button's
+  place. The Left arrow button Narrows the range as the current narrow button functions now, same for the Expand/right
+  arrow button used for expanding the range. The Top/up arrow button becomes the "Raise" range button, which every
+  time it's clicked both the minimum and maximum temperatures increase by 10% until the maximum level of the range is
+  reached. Inversely the Bottom/down arrow button becomes the "Lower" range button, which every time it's clicked both
+  the minimum and maximum temperatures lower by 10% until the minimum level of the range is reached." Builds on the
+  range control the mosaic viewer, the frame page and the Thermal Inspector share (`scale.js` `spanButtonsHtml`,
+  `spanRange`: ◀ narrows and ▶ widens the range by a tenth of its span, about its middle; Auto beside the fields).
+  Proposed: one control for the three, five buttons in a cross between the range's two fields: ◀ narrow and ▶ widen
+  as now, ▲ raise and ▼ lower (both ends moved by a tenth of the range's width, the width kept), Auto in the middle;
+  the docs (the viewer's, the frame page's and the Inspector's) and their screenshots updated. Open:
+  - Raise and lower stop at what: the layer's highest and lowest temperatures (the last step moving only as far as
+    that), or the ends of the Auto range, or no limit?
+  - "10%" read as a tenth of the range's width (as narrowing and widening), not of the temperatures themselves.
 - **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
   the documentation as necessary so that it's information is accurate prior to release." Builds on everything
   since 1.1.0 (R1 to R6). Proposed: every page of `docs/` and the README read against the code
