@@ -495,6 +495,20 @@ def remove_frames(task, cid, frames, user):
     return len(gone)
 
 
+def busy(task):
+    """Why a dataset's images can't change now, its worksets reading them: "Wait for <workset> to ..." (to which the
+    caller adds "before ..."), or "" when they can"""
+    from . import mosaics
+    for cid in ids(task):
+        check_stale(task, cid)
+        name = record(task, cid).get('name') or cid
+        if job(task, cid)['status'] == 'converting':
+            return "Wait for {} to finish converting, or cancel it,".format(name)
+        if mosaics.job(task, cid)['status'] == 'building':
+            return "Wait for {}'s mosaics to be built, or cancel them,".format(name)
+    return ""
+
+
 def remove_images(task, paths, user):
     """
     Images deleted from a dataset: from each converted conversion that has them too (see remove_frames), then from the
@@ -503,20 +517,18 @@ def remove_images(task, paths, user):
     :raises NotRemoved: the dataset is being analyzed, a conversion converting or building its mosaics, none of paths
         is one of its images, or a conversion would be left without a converted frame
     """
-    from . import mosaics
     if datasets.job(task)['status'] == 'analyzing':
         raise NotRemoved("Wait for the analysis to finish, or cancel it, before removing files")
     images = {rel.replace(os.sep, '/') for rel, _ in datasets.image_files(task)}
     gone = sorted(set(paths) & images)
     if not gone:
         raise NotRemoved("None of these files is in the dataset")
+    waiting = busy(task)
+    if waiting:
+        raise NotRemoved(waiting + " before removing files")
     affected = []
     for cid in ids(task):
         name = record(task, cid).get('name') or cid
-        if job(task, cid)['status'] == 'converting':
-            raise NotRemoved("Wait for {} to finish converting, or cancel it, before removing files".format(name))
-        if mosaics.job(task, cid)['status'] == 'building':
-            raise NotRemoved("Wait for {}'s mosaics to be built, or cancel them, before removing files".format(name))
         if job(task, cid)['status'] != 'ready':
             continue
         files = results(task, cid).get('files') or []

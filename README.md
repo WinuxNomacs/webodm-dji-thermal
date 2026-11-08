@@ -194,7 +194,8 @@ Then:
 - **Worksets**: see below.
 
 **Add images**, **Analyze again**, **Rename** and **Delete** are on the dataset's page, with a link icon beside its
-name to copy a link to it; adding images marks the analysis out of date until it is run again.
+name to copy a link to it; adding images marks the analysis out of date until it is run again (it waits, as removing
+them does, while a workset converts or builds its mosaics).
 
 ### Worksets
 

@@ -287,6 +287,10 @@ class DatasetUpload(DatasetView):
         task = get_dataset(request, pk, 'change_project')
         if datasets.job(task)['status'] == 'analyzing':
             raise ValidationError({'error': "Wait for the analysis to finish, or cancel it, before adding images"})
+        # A workset converting (or building its mosaics) reads the images: it might or might not take those added
+        waiting = conversions.busy(task)
+        if waiting:
+            raise ValidationError({'error': waiting + " before adding images"})
         if datasets.over_quota(task):
             raise ValidationError({'error': OVER_QUOTA})
 

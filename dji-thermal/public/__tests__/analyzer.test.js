@@ -1213,6 +1213,23 @@ describe("a dataset's page", () => {
         expect(document.getElementById("ta-status").innerHTML).toContain("width: 80%");
     });
 
+    it("adds no images while a workset converts or builds its mosaics, and says why", async () => {
+        jest.useFakeTimers();
+        const d = c => Object.assign({}, DATASET, {analysis: ANALYSIS, conversions: [Object.assign({}, CONVERSION, c)]});
+        dataset.init(document, server({"/api/plugins/dji-thermal/datasets/5": [d({status: "converting"}), d({mosaic_status: "building"}), d({})]}));
+        await ticks();
+        const add = document.getElementById("ta-add");
+        expect([add.hidden, add.classList.contains("disabled"), document.getElementById("ta-add-files").disabled]).toEqual([false, true, true]);
+        expect(add.title).toBe("Wait for Nadir to finish converting, or cancel it, before adding images");
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect(add.title).toBe("Wait for Nadir's mosaics to be built, or cancel it, before adding images");
+        jest.runOnlyPendingTimers();
+        await ticks();
+        expect([add.classList.contains("disabled"), document.getElementById("ta-add-files").disabled, add.title])
+            .toEqual([false, false, "Add images to this dataset"]);
+    });
+
     it("loads the dataset, switches tabs and polls while it is analyzed", async () => {
         jest.useFakeTimers();
         const analyzing = Object.assign({}, DATASET, {status: "analyzing", progress: 0.4, analysis: {}, analyzed: false});
@@ -1242,6 +1259,8 @@ describe("a dataset's page", () => {
         expect(document.querySelector("#ta-tabs li a").getAttribute("data-tab")).toBe("convert");
         expect(document.getElementById("ta-cancel").hidden).toBe(true);
         expect(document.getElementById("ta-add").hidden).toBe(false);
+        expect(document.getElementById("ta-add").classList.contains("disabled")).toBe(false);
+        expect(document.getElementById("ta-add-files").disabled).toBe(false);
         expect(document.getElementById("ta-problems-count").textContent).toBe("1");
         expect(document.getElementById("ta-sharing").hidden).toBe(false);
 

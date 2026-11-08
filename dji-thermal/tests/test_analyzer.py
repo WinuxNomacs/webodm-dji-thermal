@@ -1512,6 +1512,26 @@ class TestRemovingFrames(AnalyzerTestCase):
         self.assertEqual(len(datasets.image_files(task)), 3)
         self.assertEqual(len(conversions.output_files(task, cid)), 3)
 
+    def test_images_are_added_to_a_dataset_only_while_no_workset_converts_or_builds_its_mosaics(self):
+        task, cid = self.converted()
+        with mock.patch.object(datasets, "job_gone", return_value=False):
+            datasets.update_job(task, rel=conversions.rel(cid, "job.json"), status="converting")
+            res = self.upload(task, [jpeg("d_T.jpg")])
+            self.assertEqual((res.status_code, res.data["error"]), (status.HTTP_400_BAD_REQUEST,
+                             "Wait for Nadir to finish converting, or cancel it, before adding images"))
+            datasets.update_job(task, rel=conversions.rel(cid, "job.json"), status="ready")
+            datasets.write_json(mosaics.path(task, cid, mosaics.JOB_FILE), {"status": "building"})
+            res = self.upload(task, [jpeg("d_T.jpg")])
+            self.assertEqual(res.data["error"],
+                             "Wait for Nadir's mosaics to be built, or cancel them, before adding images")
+            self.assertEqual(len(datasets.image_files(task)), 3)
+            datasets.write_json(mosaics.path(task, cid, mosaics.JOB_FILE), {"status": "ready"})
+            self.assertEqual(self.upload(task, [jpeg("d_T.jpg")]).data["saved"], 1)
+        # A job whose worker stopped doesn't hold the dataset
+        datasets.update_job(task, rel=conversions.rel(cid, "job.json"), status="converting", celery_task_id="gone")
+        with mock.patch.object(datasets, "job_gone", return_value=True):
+            self.assertEqual(self.upload(task, [jpeg("e_T.jpg")]).data["saved"], 1)
+
     def test_the_mosaics_of_a_workset_with_frames_removed_are_built_of_links_to_the_frames_it_keeps(self):
         root = os.path.join(self.create().task_path(), "scratch")
         frames = [os.path.join(root, "images", p) for p in ("a_T.jpg", os.path.join("east", "b_T.jpg"), "c_T.jpg")]

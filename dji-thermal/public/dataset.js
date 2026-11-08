@@ -298,7 +298,7 @@
             '><i class="fa fa-trash"></i> ' + (n === 1 ? "Remove from dataset" : "Remove " + n + " from dataset") + "</button></div>";
     }
 
-    // Why files can't be removed from a dataset now ("" when they can): an analysis or a workset running
+    // Why files can't be removed from (or added to) a dataset now ("" when they can): an analysis or a workset running
     function removeBusy(d) {
         if (d.status === "analyzing") return "Wait for the analysis to finish, or cancel it";
         var c = (d.conversions || []).filter(function (x) { return x.status === "converting" || x.mosaic_status === "building"; })[0];
@@ -677,6 +677,11 @@
                 (d.created_by ? " · created by " + esc(d.created_by) : "") + " · " + esc(core.formatDate(d.created_at));
             var analyzing = d.status === "analyzing";
             $("ta-add").hidden = !d.can_change || analyzing || uploading;
+            // A workset converting, or building its mosaics, reads the images: none added until it's done
+            var waiting = d.can_change ? removeBusy(d) : "";
+            $("ta-add").classList.toggle("disabled", !!waiting);
+            $("ta-add").title = waiting ? waiting + ", before adding images" : "Add images to this dataset";
+            $("ta-add-files").disabled = !!waiting;
             $("ta-analyze").hidden = !d.can_change || analyzing || uploading;
             $("ta-analyze").innerHTML = d.analyzed ? '<i class="fa fa-sync"></i> Analyze again' : '<i class="fa fa-play"></i> Analyze';
             $("ta-cancel").hidden = !d.can_change || !analyzing;
