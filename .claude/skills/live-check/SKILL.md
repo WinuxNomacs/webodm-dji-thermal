@@ -27,6 +27,13 @@ Keep it read only unless the check must write:
 - Downloads saved to the scratchpad, checked, then deleted.
 - `onUnitSystemChanged` is a `CustomEvent` with the unit system as `detail`: dispatch it so, or WebODM's own
   components throw.
+- A checkout, stash or edit in `dji-thermal/` reloads the dev server (the plugin is mounted live): wait for
+  `/login/` to answer 200 before the check, or a page load can fail with `ERR_CONNECTION_RESET`.
+- Register `page.on('request' | 'response' | 'console')` listeners before the first `goto`, or the page's first
+  requests are missed.
+- To tell whether a failure is one the user sees, log what the page itself requests (every `/api/` response and its
+  status), rather than requesting a URL by hand: the mosaic viewer, the frame page and the Inspector colour their
+  tiles in the browser from value tiles, so a colour map's name in a layer's URL may never be fetched.
 
 ## What to check
 
