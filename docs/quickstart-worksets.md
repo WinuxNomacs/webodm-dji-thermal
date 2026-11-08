@@ -108,7 +108,8 @@ colours over the temperatures the mosaic has most of, and **Reset** goes back to
 They only change how the image is drawn, never the temperatures, and the map follows them as they move: your browser
 colours the mosaic from its temperatures, so nothing waits on the server. An **Isotherm** (above, below or between
 temperatures; on Intensify, differences) keeps the palette for the pixels in it and turns the rest grey. It shows the
-temperature, frame, frame pixel and view angle under the cursor, what dji-thermal-cli reports about the mosaic (seams,
+temperature, frame, frame pixel and view angle under the cursor (and on the temperature tabs its **ΔT from
+surroundings**: how much warmer or cooler it is than the median within about 2 m), what dji-thermal-cli reports about the mosaic (seams,
 misalignment, frame offsets), and the files to download.
 
 Click the map to keep the values at that point (**Follow the cursor**, or Esc, lets go of it) and to see **every frame
@@ -138,7 +139,8 @@ who can view the project.
 **Measure again** shows the frame's distance, humidity, emissivity, reflected and ambient temperature: as the camera
 recorded them, as the frame was measured with them, and fields to change them. Change one and press **Measure
 again** (or Enter): dji-thermal-cli measures the frame again, exactly as a workset with those settings would, and
-shows it beside the first, with both temperatures and their difference under the cursor. Pins and regions are
+shows it beside the first, with both temperatures and their difference under the cursor. Under the cursor also gives
+each one's **ΔT from surroundings**: the pixel less the median of the frame's pixels within about 2 m around it. Pins and regions are
 measured with the new values too.
 
 ![The frame measured again with another emissivity, beside the frame as converted](images/frame-measure-again.png)

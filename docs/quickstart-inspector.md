@@ -19,7 +19,8 @@ button is only on maps with temperatures: a thermal orthophoto, or a workset mos
 The top of the panel (the buttons, the temperature, Palette and the colour scale) stays in view while the sections
 below it scroll. The panel's buttons choose what a click on the map does:
 
-- **Hover**: the temperature under the cursor, beside it and in the panel.
+- **Hover**: the temperature under the cursor, beside it and in the panel, with its **ΔT from surroundings** (the
+  temperature less the median of the pixels within about 2 m around it) in the panel.
 - **Pin**: a click pins the point with its temperature (P1, P2…). The pins are listed in the panel; click one to go
   to it.
 - **Rectangle**, **circle** and **polygon**: draw a region (R1, R2…). For a rectangle or circle, press and drag. For

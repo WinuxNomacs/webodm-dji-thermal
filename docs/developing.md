@@ -27,7 +27,7 @@ Everything the plugin ships is in `dji-thermal/` (the plugin's id, and the relea
 | `analysis.py` | The analysis job: dji-thermal-cli's check and WebODM plan over a dataset's photos. |
 | `conversions.py` | Worksets: their settings (checked in `parse_settings`), the conversion job (`convert`), the outputs' names, the palettes (`palettes()`, `COLORMAPS`), and each user's saved defaults and display preferences. |
 | `mosaics.py` | A workset's mosaics: the build job (`make`), and what the mosaic viewer reads (tiles, values, palettes). |
-| `intensify.py` | Each pixel's difference from its surroundings (the median over about 2 m), for the mosaic viewer's Intensify tab. |
+| `intensify.py` | Each pixel's difference from its surroundings (the median over about 2 m): the mosaic viewer's Intensify tab, and the ΔT from surroundings under the cursor (the viewer, the Thermal Inspector; the frame page works it out in `frame.js`). |
 | `colouring.py` | How tiles and frames are drawn: range, tone curve, equalization, sharpening, isotherm. |
 | `frames.py`, `frames_api.py` | The frame page: one frame as the workset measured it, or measured again with other values. |
 | `conversion_tasks.py` | A WebODM task made from a workset's temperature TIFFs. |

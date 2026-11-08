@@ -10,7 +10,14 @@
   color_map value" and the map shows nothing. 3.3.2 has them. Proposed fix: those three drawn by the plugin's
   Inspector tiles, as DJI's palettes are (the `display` API names the colour maps WebODM's tiler lacks); a test, and
   a check on both stacks.
-- **R6. The difference from the surroundings under the cursor, on every page with Under the cursor** (the user,
+**Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
+
+**Done**
+- **R6. The difference from the surroundings under the cursor, on every page with Under the cursor** (built 2026-11-08; the user,
   2026-11-08, in the session): "Add the temperature Difference feature for Under the Cursor to the rest of the pages
   with the same control". Builds on R4: the mosaic viewer's Intensify tab shows, under the cursor, "Difference
   +2.13 °C from its surroundings" beside the temperature. The pages with an Under the cursor section are the mosaic
@@ -29,14 +36,25 @@
   Open: the row's name on every page (proposed: "Surroundings", e.g. "-2.60 °C", Intensify's row renamed alike);
   whether the Thermal Inspector's Hover readout on WebODM's map gets it too (it has no Under the cursor section;
   proposed: not now).
+  Decided (the user, 2026-11-08): the row is "Delta T from Surroundings" (written "ΔT from surroundings", as the
+  Inspector's regions write ΔT), Intensify's row renamed alike; the Thermal Inspector's Hover reading gets it too
+  (thermal orthophotos and the workset mosaics laid on the map).
+  Built, `r6-surroundings-readout`: `intensify.raster_difference` and `window_difference` (a point less the median of
+  a window about 2 m wide around it); `mosaics.point` gives `difference` on Mosaic and Source frame (the as converted
+  mosaic, around the point) and Harmonized (Intensify's value when built, else alike: mosaics built before R4 have it
+  too); `inspector.point` on a thermal orthophoto (its pixels with data inside the crop); `frames.info` sends `pixel_m`
+  (the measurement distance over dji-thermal-cli's `read_pose` focal length in pixels) and `size_m`, and `frame.js`
+  `surroundingsAt` works it out from the frame's values, for both measurements with Measure again ("ΔT from
+  surroundings, changed"). The Inspector shows it under the temperature in the panel (a mosaic's scaled to °C; with
+  Manual Corrections, `corrected(t) - corrected(t - ΔT)`), not in the label beside the cursor. Tests: Jest 303, Django
+  214 on 4.0.0 and 3.3.2 (1 skipped). Live on :8002, read only, on the user's HomerunObliqueII task and dataset:
+  "+0.60 °C" on Mosaic, "+0.89 °C" on Harmonized (as Intensify would: its mosaics were built before), none on View
+  angle; a point request in about 70 ms; the frame page "+0.49 °C"; the Inspector "52.52 °C ΔT from surroundings
+  +1.97 °C". Docs: the README, `quickstart-worksets.md`, `quickstart-inspector.md`, `measurement.md`, `api.md`,
+  `developing.md`; `frame-page.png` retaken. `inspector.png` kept as it was: retaken, its title showed the task's name
+  (HomerunObliqueII), which the docs' shots never show; to retake once the task has a neutral name.
 
-**Later**
-- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
-  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
 
-**Done**
 - **R4. Intensify: a mosaic tab of each pixel's difference from its surroundings** (built 2026-11-08; the user, 2026-11-08, in the
   session): "would it make sense to offer an \"Intensify\" option that actually makes temperature variances more
   distinct across the images? Example: I have a mosaic of a roof made from 10 images. Around pipe seams there's a
