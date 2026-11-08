@@ -3,13 +3,7 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
-  the documentation as necessary so that it's information is accurate prior to release." Builds on everything
-  since 1.1.0 (R1 to R6). Proposed: every page of `docs/` and the README read against the code
-  as it is (what each page, panel, button and setting says it does, the API reference, the developers' guide's
-  map), corrected where it's wrong or out of date, and the screenshots checked against the UI (retaken where they
-  differ, none showing a place, coordinates or a serial number). No release prepared: that waits for the user.
-  Open: none (inspector.png was retaken in R9; mosaic-intensify.png waits on a workset with an Intensify mosaic).
+- Nothing planned: the release waits for the user.
 
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
@@ -18,6 +12,20 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
+  the documentation as necessary so that it's information is accurate prior to release." Builds on everything
+  since 1.1.0 (R1 to R6). Proposed: every page of `docs/` and the README read against the code
+  as it is (what each page, panel, button and setting says it does, the API reference, the developers' guide's
+  map), corrected where it's wrong or out of date, and the screenshots checked against the UI (retaken where they
+  differ, none showing a place, coordinates or a serial number). No release prepared: that waits for the user.
+  Built (2026-11-08): every page read against the code (the routes and their methods, the labels, the messages,
+  the figures quoted, the developers' guide's names). Corrected: **Unit of the files** sets the mosaics' unit and the
+  frame page's downloads', not every TIFF's (the form's help in `conversions.js`, measurement.md, palettes.md,
+  quickstart-worksets, README); troubleshooting gained the Administration page's "dji-thermal-cli cannot be loaded" and
+  images refused while a workset converts; converted-images gained `NormalizationOffsetC`; developing.md's Convert
+  tab is the Worksets tab. The eleven screenshots older than the last UI changes retaken (seven changed). Open:
+  mosaic-intensify.png still shows the range's old arrows, until a workset on the dev server has an Intensify
+  mosaic (building one writes the user's data).
 - **R9. The range's arrows as a D-pad** (the user, 2026-11-08, in `new.md`): "Regarding the temperature range/scale
   control arrows. Replace them with a 5 button D-Pad style arrangement with Auto button moved into the center button's
   place. The Left arrow button Narrows the range as the current narrow button functions now, same for the Expand/right
