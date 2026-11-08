@@ -291,3 +291,37 @@ class TestFramePage(AnalyzerTestCase):
         stranger = self.client_for("stranger")
         self.assertEqual(stranger.get(self.url(task, cid, "frames")).status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(self.client.get(self.url(task, cid, "frames")).data["frames"], [])
+
+    @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def test_a_workset_converted_before_the_dataset_was_analyzed_has_its_frames_on_the_frame_page(self):
+        found = flight_frames(2)
+        task = self.create()
+        with contextlib.ExitStack() as stack:
+            self.upload(task, [stack.enter_context(open(f, "rb")) for f in found])
+        res = self.client.post("{}/{}/conversions".format(API, task.id),
+                               {"name": "Early", "settings": {"outputs": ["temp_c:tiff"], "mosaics": False}}, format="json")
+        cid = res.data["id"]
+        self.assertEqual(res.data["status"], "ready", res.data["error"])
+        self.assertEqual(datasets.analysis(task), {})
+
+        # Listed by name, without the analysis' times and pitches
+        page = self.client.get(self.url(task, cid, "frames")).data
+        self.assertEqual(len(page["frames"]), 2)
+        self.assertTrue(all(f["converted"] for f in page["frames"]))
+        rel = page["frames"][0]["path"]
+        # Measured, with what the camera recorded read from the frame itself; its values, a region and its downloads
+        info = self.client.get(self.url(task, cid, "frame"), {"frame": rel})
+        self.assertEqual(info.status_code, status.HTTP_200_OK, info.data)
+        self.assertIsNotNone(info.data["recorded"]["emissivity"])
+        self.assertEqual(self.client.get(self.url(task, cid, "frame/values"), {"frame": rel}).status_code,
+                         status.HTTP_200_OK)
+        region = self.client.post(self.url(task, cid, "frame/region"),
+                                  {"frame": rel, "geometry": square(10, 10, 20, 20)}, format="json")
+        self.assertTrue(region.data["valid"])
+        for kind in ("csv", "tiff"):
+            self.assertEqual(self.client.get(self.url(task, cid, "frame/download"),
+                                             {"frame": rel, "kind": kind}).status_code, status.HTTP_200_OK)
+        # Only the frames it converted: still none of another dataset's, nor a path outside it
+        for other in ("../" + rel, "nope.jpg"):
+            self.assertEqual(self.client.get(self.url(task, cid, "frame"), {"frame": other}).status_code,
+                             status.HTTP_400_BAD_REQUEST)

@@ -27,9 +27,16 @@ class FrameError(ValueError):
     """What is asked can't be measured (the message is for the user)"""
 
 
-def thermal_rows(task):
-    """The dataset's thermal frames as its analysis lists them"""
-    return [r for r in datasets.analysis(task).get('files') or [] if r.get('kind') == 'thermal']
+def thermal_rows(task, cid=None):
+    """The dataset's thermal frames as its analysis lists them; with a workset (cid), also those it converted that the
+    analysis doesn't list, by their path alone: a workset converted before the dataset was analyzed, or of images added
+    since"""
+    rows = [r for r in datasets.analysis(task).get('files') or [] if r.get('kind') == 'thermal']
+    if cid:
+        known = {r.get('path') for r in rows}
+        rows += [{'path': f['path'], 'kind': 'thermal'} for f in conversions.results(task, cid).get('files') or []
+                 if f.get('ok') and f.get('path') and f['path'] not in known]
+    return rows
 
 
 def frame_list(task, cid):
@@ -41,24 +48,35 @@ def frame_list(task, cid):
     in_mosaic = {name: i for i, name in enumerate(mosaics.result(task, cid).get('frames') or [])}
     rows = [{'path': r['path'], 'time': r.get('time') or "", 'pitch': r.get('pitch'),
              'converted': bool((converted.get(r['path']) or {}).get('ok')), 'mosaic': in_mosaic.get(r['path'])}
-            for r in thermal_rows(task)]
+            for r in thermal_rows(task, cid)]
     return sorted(rows, key=lambda r: (not r['time'], r['time'], r['path']))
 
 
-def recorded(task, rel):
-    """What the camera recorded of a frame's parameters (the analysis' row): {distance, lrf, humidity, emissivity,
-    reflection (°C), ambient (°C)}"""
-    row = next((r for r in thermal_rows(task) if r.get('path') == rel), {})
-    return {k: row.get(k) for k in ('distance', 'lrf', 'humidity', 'emissivity', 'reflection', 'ambient')}
+RECORDED = ('distance', 'lrf', 'humidity', 'emissivity', 'reflection', 'ambient')
 
 
-def frame_path(task, rel):
-    """The full path of one of the dataset's thermal frames
+def recorded(task, rel, cid=None):
+    """What the camera recorded of a frame's parameters (the analysis' row, else read from the frame; see thermal_rows):
+    {distance, lrf, humidity, emissivity, reflection (°C), ambient (°C)}"""
+    row = next((r for r in thermal_rows(task) if r.get('path') == rel), None)
+    if row is None:
+        try:
+            found = converter.describe(frame_path(task, rel, cid))['recorded']
+        except Exception:  # noqa: BLE001 - a frame it can't read records nothing
+            found = {}
+        row = {'distance': found.get('distance'), 'humidity': found.get('humidity'),
+               'emissivity': found.get('emissivity'), 'reflection': found.get('reflected_temp'),
+               'ambient': found.get('ambient_temp')}
+    return {k: row.get(k) for k in RECORDED}
+
+
+def frame_path(task, rel, cid=None):
+    """The full path of one of the dataset's thermal frames (with a workset, those it converted too: thermal_rows)
     :raises FrameError: not one, or gone"""
     from django.core.exceptions import SuspiciousFileOperation
 
     from app.security import path_traversal_check
-    if not rel or rel not in {r['path'] for r in thermal_rows(task)}:
+    if not rel or rel not in {r['path'] for r in thermal_rows(task, cid)}:
         raise FrameError("Not a thermal frame of this dataset")
     root = datasets.images_path(task)
     try:
@@ -143,7 +161,7 @@ def measure(task, cid, rel, changes=None):
     params (what the SDK measured with, °C), distance_source, notes, offset, offset_known}
     :raises FrameError: not a frame, or one dji-thermal-cli can't measure
     """
-    found = frame_path(task, rel)
+    found = frame_path(task, rel, cid)
     settings, unit = frame_settings(task, cid, changes), unit_of(task, cid)
     try:
         values, params, source, notes = _measured(found, os.stat(found).st_mtime_ns, settings, unit)
@@ -172,8 +190,8 @@ def info(task, cid, rel, changes=None):
                  'percentiles': [float(p) for p in np.percentile(found, mosaics.PERCENTILES)],
                  'histogram': {'counts': counts.tolist(), 'edges': edges.tolist()}}
     return dict(m, frame=rel, width=int(values.shape[1]), height=int(values.shape[0]), unit=unit_of(task, cid),
-                recorded=recorded(task, rel), changes=changes or {}, stats=stats,
-                pixel_m=pixel_size(frame_path(task, rel), values.shape, m['params'].get('distance')),
+                recorded=recorded(task, rel, cid), changes=changes or {}, stats=stats,
+                pixel_m=pixel_size(frame_path(task, rel, cid), values.shape, m['params'].get('distance')),
                 size_m=intensify.SIZE_M)
 
 
