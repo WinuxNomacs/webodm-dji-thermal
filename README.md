@@ -506,6 +506,10 @@ is kept), how to run WebODM 4.0.0 and 3.3.2 with the plugin mounted (`dev/webodm
 the usual additions: a palette, a workset output, a measuring tool, a section in the Thermal Inspector's panel, an
 API route and a page.
 
+## Community
+
+Questions, ideas or help with WebODM: [join the WebODM Community Discord](https://discord.gg/RxHPXCSMBS).
+
 ## Thanks
 
 This plugin stands on the work of these projects and the people behind them:

@@ -12,6 +12,17 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R3. A link to WebODM's community Discord in the README** (built 2026-11-08; the user, 2026-11-08, from `new.md`): "Add a link
+  near the bottom of the README to Join the WebODM Community Discord: https://discord.gg/hYDk9f28J". Builds on the
+  README's end (Developing, Thanks, License). Proposed: a short section of its own, "Community", between Developing
+  and Thanks, with one line: "Questions, ideas or help with WebODM: [join the WebODM Community
+  Discord](https://discord.gg/hYDk9f28J)." No other page changes (the docs' index links the README).
+  Open: the invite (WebODM's docs, `commercial-providers.md`, use https://discord.gg/RxHPXCSMBS; two invites can
+  both lead to the same server, but one may expire); where it goes (proposed: its own section before Thanks).
+  Decided (the user, 2026-11-08): WebODM's invite, https://discord.gg/RxHPXCSMBS, as its docs use; a section of its
+  own before Thanks.
+  Built, `r3-community-link`: the README's "Community" section, between Developing and Thanks.
+
 - **R2. The code made easy to extend** (built 2026-11-07; the user, 2026-11-07, from `new.md`): "This plugin's codebase is meant to be
   extensible to make it as simple as possible for other developers to add their own WebODM DJI Thermal Analyzer
   modifications. Review the code structure and refactor as needed to make the code as accessible as possible for
