@@ -57,7 +57,7 @@ settings, palettes, installing, DJI's SDK), troubleshooting and the plugin's API
 WebODM 3.3.2 or later (4.0.0 included), in Docker (Linux, Windows, macOS) or from its native Windows installer;
 checked on both.
 
-- **From WebODM's plugin list**: Administration > Plugins, find DJI Thermal, install it.
+- **From WebODM's plugin list**: Administration > Plugins, find DJI Thermal Analyzer, install it.
 - **From a release**: download `dji-thermal-X.Y.Z.zip` from this repository's
   [releases](https://github.com/WinuxNomacs/webodm-dji-thermal/releases) (its sha256 is given there), then
   Administration > Plugins > **Load Plugin (.zip)**. The zip holds the plugin's scripts built, so WebODM needs no

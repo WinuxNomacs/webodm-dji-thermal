@@ -1,6 +1,6 @@
 ---
 name: test
-description: Run the DJI Thermal plugin's checks (Ruff, ESLint, Jest, Django tests in the dev container) before committing or merging.
+description: Run the DJI Thermal Analyzer plugin's checks (Ruff, ESLint, Jest, Django tests in the dev container) before committing or merging.
 ---
 
 # Tests and checks

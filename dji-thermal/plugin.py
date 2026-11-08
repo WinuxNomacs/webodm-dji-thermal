@@ -41,7 +41,7 @@ class Plugin(PluginBase):
         if ok:
             logger.info("DJI Thermal: {}".format(message))
         else:
-            logger.warning("DJI Thermal plugin enabled, but {}".format(message))
+            logger.warning("DJI Thermal Analyzer plugin enabled, but {}".format(message))
 
     def main_menu(self):
         return [Menu(_("DJI Thermal Analyzer"), self.public_url(""), "fa fa-thermometer-half fa-fw")]

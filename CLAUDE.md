@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-What Claude needs to know to work on the DJI Thermal plugin for WebODM. General working rules (branches, phases,
+What Claude needs to know to work on the DJI Thermal Analyzer plugin for WebODM. General working rules (branches, phases,
 testing) live in the user's own CLAUDE.md; this file holds what is specific to this repository. It is committed
 and may be public: nothing private, nothing true only on one machine. Keep it short; edit in place.
 
