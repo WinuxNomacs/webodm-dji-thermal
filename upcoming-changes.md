@@ -10,6 +10,25 @@
   color_map value" and the map shows nothing. 3.3.2 has them. Proposed fix: those three drawn by the plugin's
   Inspector tiles, as DJI's palettes are (the `display` API names the colour maps WebODM's tiler lacks); a test, and
   a check on both stacks.
+- **R6. The difference from the surroundings under the cursor, on every page with Under the cursor** (the user,
+  2026-11-08, in the session): "Add the temperature Difference feature for Under the Cursor to the rest of the pages
+  with the same control". Builds on R4: the mosaic viewer's Intensify tab shows, under the cursor, "Difference
+  +2.13 °C from its surroundings" beside the temperature. The pages with an Under the cursor section are the mosaic
+  viewer (`viewer.html`: its other tabs show the temperature, frame, frame pixel and view angle) and the frame page
+  (`frame.html`: the temperature, and with Measure again "As converted", "Parameters changed" and their
+  "Difference").
+  Proposed:
+  1. **The mosaic viewer**: on Mosaic, Harmonized and Source frame, the same row as on Intensify: the pixel's
+     difference from the median of the pixels around it over 2 m. Harmonized reads it from Intensify's raster (the
+     same number as on Intensify); Mosaic and Source frame from the as converted mosaic, around the point (the
+     server's `point`, a window about 2 m wide read around it). Not on View angle (not temperatures).
+  2. **The frame page**: the same row for the frame (and for the frame with the parameters changed, when shown),
+     worked out in the browser from the frame's values it already has, over 2 m at the frame's ground resolution
+     (sent with the frame).
+  3. The row's name: the frame page already has a "Difference" row (parameters changed less as converted).
+  Open: the row's name on every page (proposed: "Surroundings", e.g. "-2.60 °C", Intensify's row renamed alike);
+  whether the Thermal Inspector's Hover readout on WebODM's map gets it too (it has no Under the cursor section;
+  proposed: not now).
 
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
