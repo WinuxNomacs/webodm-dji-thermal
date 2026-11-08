@@ -221,7 +221,8 @@ The sections, in the order of the work:
 - **Outputs**: temperature TIFFs in °C, °F or K, pseudo-colour PNGs, gray16, raw counts, DJI R-JPEGs and the others
   dji-thermal-cli writes, their compression, and whether to build the mosaics.
 - **Measurement**: each parameter, with the flight's recorded median beside it (left empty, each image keeps its
-  own), and the unit of the files.
+  own), in your unit, and the unit of the files (the mosaics' and the frame page's downloads'; each frame's TIFFs are
+  in the units ticked in Outputs).
 - **Colours**, shown once a colour or 16-bit grey output is ticked: the palette and colour range of the pictures.
 - **Adjustments**: gimbal overrides, temperatures above or below a threshold replaced, the location stripped.
 

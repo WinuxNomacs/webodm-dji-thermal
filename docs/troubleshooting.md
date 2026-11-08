@@ -52,9 +52,10 @@ built scripts (see [Installing](installing.md)), and reload the page.
 A dataset's photos and worksets count toward the project owner's storage quota. Delete worksets or datasets you
 no longer need, or ask an administrator to raise the quota.
 
-**"Wait for the analysis to finish, or cancel it, before adding images"**
+**"Wait for the analysis to finish, or cancel it, before adding images"** (or **"Wait for … to finish converting"**, **"Wait for …'s mosaics to be built"**)
 
-Images can't be added while the dataset is being analyzed.
+Images can't be added while the dataset is analyzed or one of its worksets converts or builds its mosaics, which
+read the images. Wait for it, or cancel it, then add them.
 
 **"Add images to the dataset first"** / **"The images must be converted first"**
 
@@ -150,6 +151,12 @@ The point or region has no temperature to read there: the task's crop leaves it 
 orthophoto, or the orthophoto has no data there.
 
 ## DJI's own Thermal SDK
+
+**"dji-thermal-cli cannot be loaded (…): DJI thermal images cannot be converted"**, on the DJI Thermal page
+
+The plugin's requirements didn't install, or not for this WebODM's Python. WebODM's log says why, often that there
+was no internet connection when WebODM first loaded the plugin. Put that right, then restart WebODM, which installs
+them again.
 
 **"Not a zip file DJI's Thermal SDK can be read from"**, **"This is not DJI's Thermal SDK: the zip has no …"**
 

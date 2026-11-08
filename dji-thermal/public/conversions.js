@@ -103,7 +103,7 @@
             }).join("") + distance +
             field("Unit of the files", '<select class="form-control input-sm" name="unit">' + ["C", "F", "K"].map(function (k) {
                 return '<option value="' + k + '"' + (k === unit ? " selected" : "") + ">" + UNIT_LABELS[k] + "</option>";
-            }).join("") + "</select>", "What the temperature TIFFs are written in. The temperatures here are in yours (" + esc(u) + ").");
+            }).join("") + "</select>", "The unit of the mosaics' temperature TIFFs and of the frame page's temperature downloads; the frames' TIFFs are in the units ticked in Outputs. The temperatures here are in yours (" + esc(u) + ").");
 
         var own = rec.palettes || [];
         var ownText = own.length === 1 ? " (" + own[0][0] + ")" : own.length ? " (" + own.map(function (p) { return p[0] + " on " + p[1]; }).join(", ") + ")" : "";

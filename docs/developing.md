@@ -62,7 +62,7 @@ Keep the work in plain functions that take data and return HTML strings or value
 | --- | --- |
 | `main.js`, `units.js` | Loaded on every WebODM page (`include_js_files`): DJI Thermal Task's button, the task panel's buttons, the Administration link, loading the Inspector on map pages; the temperature unit. Keep them small. They run on every page of WebODM. |
 | `analyzer_core.js` | What the Analyzer's pages share: formatting, statuses, uploads in batches, reading the server's answers (`readJson`, `errorText`, `unreachable`), the dialog. |
-| `datasets.js`, `dataset.js`, `conversions.js` | The datasets list, a dataset's page, and its Convert tab (the worksets). |
+| `datasets.js`, `dataset.js`, `conversions.js` | The datasets list, a dataset's page, and its Worksets tab. |
 | `viewer.js` | The mosaic viewer. |
 | `frame.js` | The frame page (it reuses the Inspector's statistics and forms). |
 | `inspector.js` | The Thermal Inspector on WebODM's map. |
@@ -101,7 +101,7 @@ run the same way.
   `images/`), and its worksets under `thermal/conversions/<id>/` (settings, job, results, `output/`, mosaics). It
   counts toward the project owner's quota and is deleted with the task. The docstrings of `datasets.py`,
   `conversions.py`, `mosaics.py` and `measurements.py` list every file.
-- **A user's preferences** (the unit, the palette, the Convert form's defaults): WebODM's `UserDataStore`
+- **A user's preferences** (the unit, the palette, the Workset Creation Settings' saved defaults): WebODM's `UserDataStore`
   (`conversions.preferences_store`).
 - **The administrator's default unit**: WebODM's `GlobalDataStore` (`conversions.default_unit`).
 - **DJI's own SDK**: the plugin's persistent folder (`sdk.py`).
@@ -181,7 +181,7 @@ viewer also has its own palette for differences, `bwr` (`DIFFERENCE_PALETTE` in 
 
 ### A workset output
 
-A workset's outputs are dji-thermal-cli's products (`temp_c:tiff`, `pseudo:png`, …): the Convert form lists
+A workset's outputs are dji-thermal-cli's products (`temp_c:tiff`, `pseudo:png`, …): the Workset Creation Settings list
 whatever `converter.library().outputs.PRODUCTS` has (`conversions.products()`), and `parse_settings` accepts any of
 them.
 
