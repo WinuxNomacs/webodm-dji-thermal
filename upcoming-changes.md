@@ -3,16 +3,9 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R5. Bug: on WebODM 4.0.0 the Thermal Inspector can't draw a thermal orthophoto in hot, rainbow or gray_r**
-  (found 2026-11-08 while building R4, in 1.1.0): with no Image adjustments, `inspector.js` `withPalette` sends a
-  WebODM colour map to WebODM's own tiles (`.../orthophoto/tiles/...?color_map=hot`), and 4.0.0's tiler no longer has
-  those three (the plugin carries them in `colormaps.json` for its own tiles only): WebODM answers 400 "Not a valid
-  color_map value" and the map shows nothing. 3.3.2 has them. Proposed fix: those three drawn by the plugin's
-  Inspector tiles, as DJI's palettes are (the `display` API names the colour maps WebODM's tiler lacks); a test, and
-  a check on both stacks.
 - **R7. The documentation reviewed before the release** (the user, 2026-11-08, in `new.md`): "Review and update
   the documentation as necessary so that it's information is accurate prior to release." Builds on everything
-  since 1.1.0 (R1 to R6, and R5 once fixed). Proposed: every page of `docs/` and the README read against the code
+  since 1.1.0 (R1 to R6). Proposed: every page of `docs/` and the README read against the code
   as it is (what each page, panel, button and setting says it does, the API reference, the developers' guide's
   map), corrected where it's wrong or out of date, and the screenshots checked against the UI (retaken where they
   differ, none showing a place, coordinates or a serial number). No release prepared: that waits for the user.
@@ -25,6 +18,20 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R5. Bug: on WebODM 4.0.0 the Thermal Inspector can't draw a thermal orthophoto in hot, rainbow or gray_r**
+  (found 2026-11-08 while building R4, in 1.1.0): with no Image adjustments, `inspector.js` `withPalette` sends a
+  WebODM colour map to WebODM's own tiles (`.../orthophoto/tiles/...?color_map=hot`), and 4.0.0's tiler no longer has
+  those three (the plugin carries them in `colormaps.json` for its own tiles only): WebODM answers 400 "Not a valid
+  color_map value" and the map shows nothing. 3.3.2 has them. Proposed fix: those three drawn by the plugin's
+  Inspector tiles, as DJI's palettes are (the `display` API names the colour maps WebODM's tiler lacks); a test, and
+  a check on both stacks.
+  Checked 2026-11-08: not a bug the user can see. The Inspector colours a thermal orthophoto in the browser from its
+  value tiles (`recolour.js`, `drawFromValues` in `inspector.js` `watch`), whatever its palette, so the layer's URL
+  with `color_map=hot` is never fetched: on 4.0.0, hot, rainbow and gray_r draw, chosen in the Inspector or saved as
+  the preference, and WebODM's layer panel makes no request that fails (headless, on `main` and on the fix). The
+  400 came only from asking WebODM for the tile directly. The fix (the display API's `own_colormaps`, the layer's
+  URL pointed at the plugin's tiles in them, a Jest and a Django test) is on branch `r5-inspector-colormaps`, not
+  merged.
 - **R6. The difference from the surroundings under the cursor, on every page with Under the cursor** (built 2026-11-08; the user,
   2026-11-08, in the session): "Add the temperature Difference feature for Under the Cursor to the rest of the pages
   with the same control". Builds on R4: the mosaic viewer's Intensify tab shows, under the cursor, "Difference
