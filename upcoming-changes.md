@@ -43,9 +43,9 @@
   frame page's downloads', not every TIFF's (the form's help in `conversions.js`, measurement.md, palettes.md,
   quickstart-worksets, README); troubleshooting gained the Administration page's "dji-thermal-cli cannot be loaded" and
   images refused while a workset converts; converted-images gained `NormalizationOffsetC`; developing.md's Convert
-  tab is the Worksets tab. The eleven screenshots older than the last UI changes retaken (seven changed). Open:
-  mosaic-intensify.png still shows the range's old arrows, until a workset on the dev server has an Intensify
-  mosaic (building one writes the user's data).
+  tab is the Worksets tab. The eleven screenshots older than the last UI changes retaken (seven changed). mosaic-intensify.png
+  retaken on 2026-11-09 with the D-pad, after the user had the mosaics of "default-normalize" built again (it then
+  had an Intensify mosaic).
 - **R9. The range's arrows as a D-pad** (the user, 2026-11-08, in `new.md`): "Regarding the temperature range/scale
   control arrows. Replace them with a 5 button D-Pad style arrangement with Auto button moved into the center button's
   place. The Left arrow button Narrows the range as the current narrow button functions now, same for the Expand/right
