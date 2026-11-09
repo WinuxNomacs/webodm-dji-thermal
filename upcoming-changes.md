@@ -162,8 +162,9 @@
   with `color_map=hot` is never fetched: on 4.0.0, hot, rainbow and gray_r draw, chosen in the Inspector or saved as
   the preference, and WebODM's layer panel makes no request that fails (headless, on `main` and on the fix). The
   400 came only from asking WebODM for the tile directly. The fix (the display API's `own_colormaps`, the layer's
-  URL pointed at the plugin's tiles in them, a Jest and a Django test) is on branch `r5-inspector-colormaps`, not
-  merged.
+  URL pointed at the plugin's tiles in them, a Jest and a Django test) was on branch `r5-inspector-colormaps`;
+  merged on 2026-11-09 for 1.2.1 as hardening (the user), as `r5-inspector-colormaps-2` from main (Django 226 on
+  4.0.0 and 3.3.2, Jest 308; `own_colormaps` is hot, rainbow, gray_r on 4.0.0, none on 3.3.2).
 - **R6. The difference from the surroundings under the cursor, on every page with Under the cursor** (built 2026-11-08; the user,
   2026-11-08, in the session): "Add the temperature Difference feature for Under the Cursor to the rest of the pages
   with the same control". Builds on R4: the mosaic viewer's Intensify tab shows, under the cursor, "Difference
