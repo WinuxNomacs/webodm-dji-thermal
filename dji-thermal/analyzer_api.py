@@ -36,7 +36,7 @@ from app.security import path_traversal_check
 from nodeodm import status_codes
 
 from . import (analysis, conversion_tasks, conversions, converter, correction, datasets, frames, inspector, inspector_api,
-               measurements, mosaics, portable)
+               measurements, mosaics, portable, webodm_versions)
 
 THUMBNAIL_SIZE = (96, 96)
 LARGE_SIZE = (1280, 1280)      # the Files tab's detail pane (?size=large): a frame at its own size, up to this
@@ -794,19 +794,24 @@ class Unit(APIView):
                          'default_unit': conversions.default_unit()})
 
 
+def display_response(user):
+    """The user's display preferences (see conversions.display), DJI's palettes, WebODM's colour maps and those of them
+    WebODM's tiler lacks (own_colormaps: the Thermal Inspector draws them with the plugin's tiles)"""
+    return dict(conversions.display(user), palettes=conversions.palettes(), colormaps=conversions.COLORMAPS,
+                own_colormaps=webodm_versions.tiler_lacks(conversions.COLORMAPS))
+
+
 class Display(DatasetView):
     def get(self, request):
         """The user's display preferences (see conversions.display), DJI's palettes and WebODM's colour maps"""
-        return Response(dict(conversions.display(request.user), palettes=conversions.palettes(),
-                             colormaps=conversions.COLORMAPS))
+        return Response(display_response(request.user))
 
     def put(self, request):
         value, errors = conversions.parse_display(request.data)
         if errors:
             raise ValidationError(errors)
         conversions.save_display(request.user, value)
-        return Response(dict(conversions.display(request.user), palettes=conversions.palettes(),
-                             colormaps=conversions.COLORMAPS))
+        return Response(display_response(request.user))
 
 
 def viewer(task, cid, user):
