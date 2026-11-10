@@ -113,9 +113,11 @@ cooler part of it (above 1) or the warmer part (below 1), **Sharpening** brings 
 colours over the temperatures the mosaic has most of, and **Reset** goes back to the Auto range with none of them.
 They only change how the image is drawn, never the temperatures, and the map follows them as they move: your browser
 colours the mosaic from its temperatures, so nothing waits on the server. An **Isotherm** (above, below or between
-temperatures; on Intensify, differences) keeps the palette for the pixels in it and turns the rest grey. It shows the
+temperatures; on Intensify, differences) keeps the palette for the pixels in it and turns the rest grey. Its **Pointer Info** gives the
 temperature, frame, frame pixel and view angle under the cursor (and on the temperature tabs its **ΔT from
-surroundings**: how much warmer or cooler it is than the median within about 2 m), what dji-thermal-cli reports about the mosaic (seams,
+surroundings**: how much warmer or cooler it is than the median within about 2 m); tick **Temperature On Pointer**
+under it to see the temperature beside the pointer too (kept with your preferences, for the frame page and the
+Thermal Inspector as well). The panel also shows what dji-thermal-cli reports about the mosaic (seams,
 misalignment, frame offsets), and the files to download.
 
 Click the map to keep the values at that point (**Follow the cursor**, or Esc, lets go of it) and to see **every frame
@@ -145,7 +147,7 @@ who can view the project.
 **Measure again** shows the frame's distance, humidity, emissivity, reflected and ambient temperature: as the camera
 recorded them, as the frame was measured with them, and fields to change them. Change one and press **Measure
 again** (or Enter): dji-thermal-cli measures the frame again, exactly as a workset with those settings would, and
-shows it beside the first, with both temperatures and their difference under the cursor. Under the cursor also gives
+shows it beside the first, with both temperatures and their difference in Pointer Info. Pointer Info also gives
 each one's **ΔT from surroundings**: the pixel less the median of the frame's pixels within about 2 m around it. Pins and regions are
 measured with the new values too.
 

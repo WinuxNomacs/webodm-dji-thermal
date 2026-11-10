@@ -817,11 +817,13 @@ def set_default_unit(unit):
 def display(user):
     """{'unit': the unit the user chose (C or F) or None, 'default_unit': the administrator's (default_unit),
     'palette': one of display_palettes() or None, 'legend': whether the Thermal Inspector shows the legend on
-    WebODM's map (shown unless hidden)}"""
+    WebODM's map (shown unless hidden), 'pointer_temperature': whether Temperature On Pointer is ticked, None until the
+    user first ticks or clears it (each page then has its own default: off, but on in the Thermal Inspector)}"""
     saved = saved_display(user)
     return {'unit': saved.get('unit') if saved.get('unit') in DISPLAY_UNITS else None, 'default_unit': default_unit(),
             'palette': saved.get('palette') if saved.get('palette') in display_palettes() else None,
-            'legend': saved.get('legend') is not False}
+            'legend': saved.get('legend') is not False,
+            'pointer_temperature': saved.get('pointer_temperature') if isinstance(saved.get('pointer_temperature'), bool) else None}
 
 
 def parse_display(raw):
@@ -842,6 +844,10 @@ def parse_display(raw):
         out['legend'] = raw.get('legend')
         if not isinstance(out['legend'], bool):
             errors['legend'] = "Must be true or false"
+    if 'pointer_temperature' in raw:
+        out['pointer_temperature'] = raw.get('pointer_temperature')
+        if not isinstance(out['pointer_temperature'], bool):
+            errors['pointer_temperature'] = "Must be true or false"
     return out, errors
 
 

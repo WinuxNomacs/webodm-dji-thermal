@@ -578,7 +578,8 @@ class TestConversionSettings(AnalyzerTestCase):
         self.assertEqual(self.client.get(url).data["palette"], "magma")
         self.assertEqual(self.client_for("testuser2").get(url).data["palette"], None)
         self.assertContains(self.client.get("/plugins/dji-thermal/"),
-                            '<script id="ta-display" type="application/json">{"unit": null, "default_unit": "C", "palette": "magma", "legend": true}')
+                            '<script id="ta-display" type="application/json">{"unit": null, "default_unit": "C", "palette": "magma", "legend": true, '
+                            '"pointer_temperature": null}')
         self.client.put(url, {"palette": None}, format="json")
         self.assertEqual(self.client.get(url).data["palette"], None)
 
@@ -619,6 +620,21 @@ class TestConversionSettings(AnalyzerTestCase):
         self.assertTrue(self.client_for("testuser2").get(url).data["legend"])
         self.client.put(url, {"legend": True}, format="json")
         self.assertEqual((self.client.get(url).data["palette"], self.client.get(url).data["legend"]), ("magma", True))
+
+    def test_temperature_on_pointer_is_unset_until_the_user_ticks_or_clears_it_then_kept_for_every_page(self):
+        url = "/api/plugins/dji-thermal/display"
+        # Unset: each page has its own default (off on the Analyzer's pages, on in the Thermal Inspector)
+        self.assertIsNone(self.client.get(url).data["pointer_temperature"])
+        self.assertIn("pointer_temperature", self.client.put(url, {"pointer_temperature": "yes"}, format="json").data)
+        self.assertIsNone(self.client.get(url).data["pointer_temperature"])
+        self.assertTrue(self.client.put(url, {"pointer_temperature": True}, format="json").data["pointer_temperature"])
+        # Saving the other preferences keeps it, and the pages are given it
+        self.client.put(url, {"palette": "magma", "legend": False}, format="json")
+        self.assertTrue(self.client.get(url).data["pointer_temperature"])
+        self.assertContains(self.client.get("/plugins/dji-thermal/"), '"pointer_temperature": true}')
+        self.assertFalse(self.client.put(url, {"pointer_temperature": False}, format="json").data["pointer_temperature"])
+        self.assertFalse(self.client.get(url).data["pointer_temperature"])
+        self.assertIsNone(self.client_for("testuser2").get(url).data["pointer_temperature"])
 
     def test_new_conversions_start_with_the_preferred_palette_unless_the_saved_defaults_have_one(self):
         url = "/api/plugins/dji-thermal/preferences"

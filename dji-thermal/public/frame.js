@@ -399,6 +399,12 @@
         var infos = [null, null], tiles = [null, null], changes = {}, typed = {}, changeError = null, withChanges = false;
         var style = null, L = null, maps = [null, null], canvases = [null, null], overlays = [null, null], fitted = false;
         var point = null, drawing = null, syncing = false, n = 0;
+        // Temperature On Pointer: each pane's temperature beside the pointer, as the user chose (off until they do)
+        var labels = [null, null];
+        var pointerOn = core.bindPointerTemperature(doc, fetchFn, page.getAttribute("data-api"), csrf, function (on) {
+            pointerOn = on;
+            if (!on) labels.forEach(function (l) { if (l) l.hide(); });
+        });
         // The tools: the one on, the shapes drawn on each frame (kept while the page is open), the one shown in full,
         // the measurements saved on the frame and the form naming one
         var tool = null, drawTool = null, drawn = {}, counts = {}, shownItem = null, saved = [], savedShown = null, form = null;
@@ -458,12 +464,16 @@
             if (maps[i]) return maps[i];
             var map = maps[i] = L.map($("ta-frame-map-" + i), {crs: L.CRS.Simple, minZoom: -4, maxZoom: 6, zoomSnap: 0.25,
                                                               attributionControl: false, keyboard: false});
+            labels[i] = core.pointerLabel(doc, $("ta-frame-map-" + i));
             map.on("mousemove", function (e) {
                 var x = e.latlng.lng, y = -e.latlng.lat, t = tiles[0];
                 point = {x: x, y: y, inside: !!t && x >= 0 && y >= 0 && x < t.width && y < t.height};
                 showReadout();
+                // The pane's own temperature there: as converted, or with the parameters changed
+                var value = pointerOn ? valueAt(tiles[i], x, y) : null;
+                labels[i].show(value === null ? "" : core.formatTemp(value, unit()), e.containerPoint);
             });
-            map.on("mouseout", function () { point = null; showReadout(); });
+            map.on("mouseout", function () { point = null; showReadout(); labels[i].hide(); });
             if (i === 0) {
                 map.on("click", function (e) {
                     if (tool === "pin") add("pin", {type: "Point", coordinates: [e.latlng.lng, -e.latlng.lat]}, null);

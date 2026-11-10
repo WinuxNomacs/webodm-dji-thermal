@@ -56,14 +56,18 @@
     var UNIT_SCALE = {C: 1, F: 1.8, K: 1};
     var UNIT_ZERO = {C: 0, F: 32, K: 273.15};   // 0 °C in each unit
 
-    // The user's display preferences ({unit, palette}, null for not chosen), as the page was given them
-    // (analyzer_pages.common, in #ta-display)
+    // The user's display preferences ({unit, palette, pointer_temperature}, null for not chosen), as the page was
+    // given them (analyzer_pages.common, in #ta-display)
     var display = readDisplay();
     function readDisplay() {
         var el = root.document && root.document.getElementById("ta-display");
         var p;
         try { p = el ? JSON.parse(el.textContent) : null; } catch (e) { p = null; }
-        return {unit: (p && p.unit) || null, palette: (p && p.palette) || null};
+        return displayOf(p);
+    }
+    function displayOf(p) {
+        return {unit: (p && p.unit) || null, palette: (p && p.palette) || null,
+                pointer_temperature: p && typeof p.pointer_temperature === "boolean" ? p.pointer_temperature : null};
     }
     function preferences() { return display; }
 
@@ -72,7 +76,7 @@
     function framesPalette(settings, preferred) {
         return (settings && settings.palette) || preferred || "";
     }
-    function setPreferences(p) { display = {unit: (p && p.unit) || null, palette: (p && p.palette) || null}; }
+    function setPreferences(p) { display = displayOf(p); }
 
     function unitOf(u) { return UNIT_SYMBOLS[u] ? u : "C"; }
     function userUnit() {
@@ -462,6 +466,48 @@
         return saveDisplay(fetchFn, api, csrf, {palette: palette || null});
     }
 
+    // Temperature On Pointer: the user's choice, or the page's own default until they make one (off on the Analyzer's
+    // pages, on in the Thermal Inspector)
+    function pointerTemperature(saved, fallback) {
+        return typeof saved === "boolean" ? saved : !!fallback;
+    }
+
+    // The box Temperature On Pointer under Pointer Info (#ta-pointer-temp): ticked as the user chose (off until
+    // they do), each change saved as their preference for every page (the Inspector's too) and passed to onChange
+    function bindPointerTemperature(doc, fetchFn, api, csrf, onChange) {
+        var box = doc.getElementById("ta-pointer-temp");
+        var on = pointerTemperature(preferences().pointer_temperature, false);
+        if (box) {
+            box.checked = on;
+            box.addEventListener("change", function () {
+                onChange(box.checked);
+                saveDisplay(fetchFn, api, csrf, {pointer_temperature: box.checked}).catch(function () {});
+            });
+        }
+        return on;
+    }
+
+    // The temperature beside the pointer on a map (container: its element): show(text, point) with the pointer's point
+    // in the container ({x, y}), none for no text (a pixel without a temperature); hide()
+    var POINTER_OFFSET = 14;
+    function pointerLabel(doc, container) {
+        var el = doc.createElement("div");
+        el.className = "ta-pointer-temp";
+        el.style.display = "none";
+        container.appendChild(el);
+        function hide() { el.style.display = "none"; }
+        return {
+            el: el, hide: hide,
+            show: function (text, point) {
+                if (!text || !point) return hide();
+                el.textContent = text;
+                el.style.left = (point.x + POINTER_OFFSET) + "px";
+                el.style.top = (point.y + POINTER_OFFSET) + "px";
+                el.style.display = "";
+            }
+        };
+    }
+
     // The palettes the preferences offer: DJI's, then WebODM's colour maps, as [value, label]
     function paletteOptions(data) {
         return (data.palettes || []).map(function (p) { return [p, "DJI " + p]; })
@@ -626,7 +672,8 @@
         formatTemp: formatTemp, formatDelta: formatDelta, stageText: stageText, mosaicLabel: mosaicLabel,
         batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName,
         preferences: preferences, setPreferences: setPreferences, editPreferences: editPreferences, bindPreferences: bindPreferences,
-        setUserUnit: setUserUnit, savePalette: savePalette, paletteOptions: paletteOptions, sortRows: sortRows,
+        setUserUnit: setUserUnit, savePalette: savePalette, saveDisplay: saveDisplay, pointerTemperature: pointerTemperature,
+        bindPointerTemperature: bindPointerTemperature, pointerLabel: pointerLabel, paletteOptions: paletteOptions, sortRows: sortRows,
         optionHtml: optionHtml, mosaicReportRows: mosaicReportRows, WAITING: WAITING
     };
     root.ThermalAnalyzerCore = api;

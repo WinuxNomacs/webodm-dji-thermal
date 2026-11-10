@@ -180,7 +180,9 @@ const SHOTS = {
         return p.locator("#ta-plan-preset-panel");
     },
     "mosaic-viewer": async (p, env) => {
+        // Temperature On Pointer ticked (not saved: the script stays read only), the temperature beside the pointer
         await openViewer(p, env);
+        await p.check("#ta-pointer-temp");
         await hoverMap(p);
         return p;
     },
@@ -202,9 +204,11 @@ const SHOTS = {
         return p;
     },
     "frame-page": async (p, env) => {
-        // A frame of the dataset's first workset, a rectangle measured on it, the cursor on the frame
+        // A frame of the dataset's first workset, a rectangle measured on it, the cursor on the frame with Temperature
+        // On Pointer ticked (not saved)
         await p.setViewportSize({width: SIZE.width, height: 1000});
         await openFrame(p, env);
+        await p.check("#ta-pointer-temp");
         const frame = await p.locator("#ta-frame-map-0").boundingBox();
         const at = (fx, fy) => [frame.x + frame.width * fx, frame.y + frame.height * fy];
         await p.click('[data-tool="rectangle"]');

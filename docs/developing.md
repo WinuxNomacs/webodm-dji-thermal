@@ -61,7 +61,7 @@ Keep the work in plain functions that take data and return HTML strings or value
 | Script | What it does |
 | --- | --- |
 | `main.js`, `units.js` | Loaded on every WebODM page (`include_js_files`): DJI Thermal Task's button, the task panel's buttons, the Administration link, loading the Inspector on map pages; the temperature unit. Keep them small. They run on every page of WebODM. |
-| `analyzer_core.js` | What the Analyzer's pages share: formatting, statuses, uploads in batches, reading the server's answers (`readJson`, `errorText`, `unreachable`), the dialog. |
+| `analyzer_core.js` | What the Analyzer's pages share: formatting, statuses, uploads in batches, reading the server's answers (`readJson`, `errorText`, `unreachable`), the dialog, and Pointer Info's Temperature On Pointer (`bindPointerTemperature`, `pointerLabel`) for the viewer and the frame page. |
 | `datasets.js`, `dataset.js`, `conversions.js` | The datasets list, a dataset's page, and its Worksets tab. |
 | `viewer.js` | The mosaic viewer. |
 | `frame.js` | The frame page (it reuses the Inspector's statistics and forms). |
@@ -101,7 +101,7 @@ run the same way.
   `images/`), and its worksets under `thermal/conversions/<id>/` (settings, job, results, `output/`, mosaics). It
   counts toward the project owner's quota and is deleted with the task. The docstrings of `datasets.py`,
   `conversions.py`, `mosaics.py` and `measurements.py` list every file.
-- **A user's preferences** (the unit, the palette, the Workset Creation Settings' saved defaults): WebODM's `UserDataStore`
+- **A user's preferences** (the unit, the palette, Temperature On Pointer, the Workset Creation Settings' saved defaults): WebODM's `UserDataStore`
   (`conversions.preferences_store`).
 - **The administrator's default unit**: WebODM's `GlobalDataStore` (`conversions.default_unit`).
 - **DJI's own SDK**: the plugin's persistent folder (`sdk.py`).

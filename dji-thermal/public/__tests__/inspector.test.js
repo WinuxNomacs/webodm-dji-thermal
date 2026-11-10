@@ -184,6 +184,53 @@ describe("the Thermal Inspector", () => {
         expect(map.el.querySelector(".dt-inspector-cursor").textContent).toBe("52.50 °C");
     });
 
+    it("shows the temperature beside the pointer under Pointer Info until Temperature On Pointer is cleared, saved for the user", async () => {
+        const map = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
+        const {ins, fetchFn, panel} = start(map, {[POINT]: {valid: true, temperature: 52.5},
+                                                  "PUT /api/plugins/dji-thermal/display": Object.assign({}, DISPLAY, {pointer_temperature: false})});
+        await ins.ready; await flush();
+        ins.open();
+        const box = () => panel().querySelector('[data-act="pointer-temperature"]'), label = map.el.querySelector(".dt-inspector-cursor");
+        const hover = async () => {
+            map.fire("mousemove", {latlng: {lat: 0.7, lng: 0.5}});
+            await new Promise(r => setTimeout(r, 100));
+            await flush(); await flush();
+        };
+        // On until the user clears it: the heading, then the box, then the readout
+        const head = panel().querySelector(".dt-inspector-pointer");
+        expect(head.querySelector("strong").textContent).toBe("Pointer Info");
+        expect(box().parentNode.textContent.trim()).toBe("Temperature On Pointer");
+        expect(box().checked).toBe(true);
+        expect(head.compareDocumentPosition(panel().querySelector(".dt-inspector-readout")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        await hover();
+        expect([label.textContent, label.style.display]).toEqual(["52.50 °C", ""]);
+
+        // Cleared: saved for the user (the Analyzer's pages too), the panel still reads the point, none beside the pointer
+        box().checked = false;
+        box().dispatchEvent(new Event("change", {bubbles: true}));
+        expect(label.style.display).toBe("none");
+        const put = fetchFn.mock.calls.filter(c => c[1] && c[1].method === "PUT");
+        expect(put.map(c => [c[0], JSON.parse(c[1].body)])).toEqual([["/api/plugins/dji-thermal/display", {pointer_temperature: false}]]);
+        await hover();
+        expect(panel().querySelector(".dt-inspector-readout").textContent).toContain("52.50 °C");
+        expect(label.style.display).toBe("none");
+        expect(box().checked).toBe(false);
+    });
+
+    it("leaves Temperature On Pointer cleared when the user cleared it", async () => {
+        const map = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
+        const {ins, panel} = start(map, {[POINT]: {valid: true, temperature: 52.5},
+                                         "GET /api/plugins/dji-thermal/display": Object.assign({}, DISPLAY, {pointer_temperature: false})});
+        await ins.ready; await flush();
+        ins.open();
+        expect(panel().querySelector('[data-act="pointer-temperature"]').checked).toBe(false);
+        map.fire("mousemove", {latlng: {lat: 0.7, lng: 0.5}});
+        await new Promise(r => setTimeout(r, 100));
+        await flush(); await flush();
+        expect(panel().querySelector(".dt-inspector-readout").textContent).toContain("52.50 °C");
+        expect(map.el.querySelector(".dt-inspector-cursor").style.display).toBe("none");
+    });
+
     it("pins points with their temperature, kept in the browser for the same tasks, and exports them", async () => {
         const map = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
         const {ins, plugins, panel} = start(map, {[POINT]: {valid: true, temperature: 30}});
@@ -647,6 +694,8 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         const want = model(30, 0.8, 21, 0.91, 21) - model(28, 0.8, 21, 0.91, 21);
         expect(panel().querySelector(".dt-inspector-delta").textContent).toBe("ΔT from surroundings +" + want.toFixed(2) + " °C");
         expect(want).not.toBeCloseTo(2, 2);
+        // Beside the pointer, the temperature the panel shows: corrected too
+        expect(map.getContainer().querySelector(".dt-inspector-cursor").textContent).toBe(model(30, 0.8, 21, 0.91, 21).toFixed(2) + " °C");
     });
 
     it("keeps Emissivity and Reflected under the scale, greyed with the layer's own values until Manual Corrections is ticked", async () => {
