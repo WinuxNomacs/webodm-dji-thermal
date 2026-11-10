@@ -2049,11 +2049,18 @@
         // Temperature On Pointer: the user's preference, for the Analyzer's pages too (never saved from a public map)
         function choosePointerTemperature(on) {
             state.pointerTemperature = on;
+            plainPointer();
             if (!on) cursor.style.display = "none";
             if (publicMap) return;
             fetchFn(API + "display", {method: "PUT", credentials: "same-origin",
                 headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken(doc)},
                 body: JSON.stringify({pointer_temperature: on})}).catch(function () {});
+        }
+
+        // With the panel open and Temperature On Pointer ticked, a plain arrow over the map instead of Leaflet's hand
+        // (inspector.css); Pin's and the drawing tools' crosshair, set on the map itself, still wins
+        function plainPointer() {
+            map.getContainer().classList.toggle("dt-pointer-plain", !!(state.open && state.pointerTemperature));
         }
 
         function onPanelChange(e) {
@@ -2073,6 +2080,7 @@
         function open() {
             state.open = true;
             container.classList.add("open");
+            plainPointer();
             render();
         }
 
@@ -2084,6 +2092,7 @@
             state.open = false;
             state.readout = null;
             container.classList.remove("open");
+            plainPointer();
             onOut();
             showButton();
             render();
@@ -2184,6 +2193,7 @@
                 state.legendVisible = !r.ok || r.data.legend !== false;
                 // On unless the user cleared it, here or on the Analyzer's pages
                 state.pointerTemperature = !r.ok || r.data.pointer_temperature !== false;
+                plainPointer();
                 if (!r.ok) return renderLegend();
                 state.display = r.data;
                 var preferred = r.data.palette;

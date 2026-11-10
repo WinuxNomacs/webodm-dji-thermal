@@ -2893,15 +2893,18 @@ describe("the mosaic viewer", () => {
         jest.useFakeTimers();
         expect(document.querySelector('[data-section="cursor"] h5').textContent).toBe("Pointer Info");
 
-        // Off until the user ticks it: the readout only
+        // Off until the user ticks it: the readout only, and Leaflet's hand over the map
         expect(box.checked).toBe(false);
+        const plain = () => $("ta-viewer-map").classList.contains("dt-pointer-plain");
+        expect(plain()).toBe(false);
         await hover(here, {x: 100, y: 50});
         expect(readout()).toContain("30.00 °C");
         expect(label().style.display).toBe("none");
 
-        // Ticked: saved for the user, and the temperature beside the pointer
+        // Ticked: saved for the user, a plain arrow over the map, and the temperature beside it
         box.checked = true;
         change(box);
+        expect(plain()).toBe(true);
         expect(fetchFn.mock.calls.filter(c => c[1] && c[1].method === "PUT").map(c => JSON.parse(c[1].body))).toEqual([{pointer_temperature: true}]);
         await hover(here, {x: 100, y: 50});
         expect([label().textContent, label().style.left, label().style.top, label().style.display]).toEqual(["30.00 °C", "114px", "64px", ""]);
@@ -2925,6 +2928,7 @@ describe("the mosaic viewer", () => {
         box.checked = false;
         change(box);
         expect(label().style.display).toBe("none");
+        expect(plain()).toBe(false);
         await ticks();
         expect(core.preferences().pointer_temperature).toBe(false);
         core.setPreferences(null);

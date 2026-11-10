@@ -116,7 +116,7 @@ colours the mosaic from its temperatures, so nothing waits on the server. An **I
 temperatures; on Intensify, differences) keeps the palette for the pixels in it and turns the rest grey. Its **Pointer Info** gives the
 temperature, frame, frame pixel and view angle under the cursor (and on the temperature tabs its **ΔT from
 surroundings**: how much warmer or cooler it is than the median within about 2 m); tick **Temperature On Pointer**
-under it to see the temperature beside the pointer too (kept with your preferences, for the frame page and the
+under it to see the temperature beside the pointer too, a plain arrow rather than the hand (kept with your preferences, for the frame page and the
 Thermal Inspector as well). The panel also shows what dji-thermal-cli reports about the mosaic (seams,
 misalignment, frame offsets), and the files to download.
 

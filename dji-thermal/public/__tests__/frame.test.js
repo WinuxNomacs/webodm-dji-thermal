@@ -320,8 +320,11 @@ describe("the frame page", () => {
         expect(box.checked).toBe(false);
         L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 0.5}, containerPoint: {x: 30, y: 40}});
         expect(label(0).style.display).toBe("none");
+        const plain = i => $("ta-frame-map-" + i).classList.contains("dt-pointer-plain");
+        expect([plain(0), plain(1)]).toEqual([false, false]);
         box.checked = true;
         box.dispatchEvent(new Event("change", {bubbles: true}));
+        expect([plain(0), plain(1)]).toEqual([true, true]);     // a plain arrow over both panes, not Leaflet's hand
         const put = server.calls.filter(c => c[1] && c[1].method === "PUT");
         expect(put.map(c => [c[0], JSON.parse(c[1].body)])).toEqual([["/api/plugins/dji-thermal/display", {pointer_temperature: true}]]);
         L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 0.5}, containerPoint: {x: 30, y: 40}});

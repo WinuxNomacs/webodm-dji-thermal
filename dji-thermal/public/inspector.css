@@ -24,6 +24,9 @@
 }
 .leaflet-bar.dt-inspector .dt-inspector-head a.dt-inspector-close { line-height: 1; }
 .dt-inspector-pointer { margin-top: 6px; }
+/* Temperature On Pointer: a plain arrow over the map instead of Leaflet's hand, but while dragging it; a tool's
+   crosshair (set on the map itself) still wins */
+body:not(.leaflet-dragging) .leaflet-container.dt-pointer-plain.leaflet-grab { cursor: default; }
 .dt-inspector-pointer label { display: block; font-weight: normal; margin: 2px 0 4px; }
 .dt-inspector-readout { min-height: 22px; margin-bottom: 6px; }
 .dt-inspector-temp { font-size: 16px; font-weight: bold; }
