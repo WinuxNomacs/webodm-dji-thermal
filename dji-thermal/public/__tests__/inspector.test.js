@@ -204,11 +204,14 @@ describe("the Thermal Inspector", () => {
         expect(head.compareDocumentPosition(panel().querySelector(".dt-inspector-readout")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         await hover();
         expect([label.textContent, label.style.display]).toEqual(["52.50 °C", ""]);
+        // A plain arrow over the map instead of Leaflet's hand, while the panel is open
+        expect(map.el.classList.contains("dt-pointer-plain")).toBe(true);
 
         // Cleared: saved for the user (the Analyzer's pages too), the panel still reads the point, none beside the pointer
         box().checked = false;
         box().dispatchEvent(new Event("change", {bubbles: true}));
         expect(label.style.display).toBe("none");
+        expect(map.el.classList.contains("dt-pointer-plain")).toBe(false);
         const put = fetchFn.mock.calls.filter(c => c[1] && c[1].method === "PUT");
         expect(put.map(c => [c[0], JSON.parse(c[1].body)])).toEqual([["/api/plugins/dji-thermal/display", {pointer_temperature: false}]]);
         await hover();
@@ -224,6 +227,7 @@ describe("the Thermal Inspector", () => {
         await ins.ready; await flush();
         ins.open();
         expect(panel().querySelector('[data-act="pointer-temperature"]').checked).toBe(false);
+        expect(map.el.classList.contains("dt-pointer-plain")).toBe(false);
         map.fire("mousemove", {latlng: {lat: 0.7, lng: 0.5}});
         await new Promise(r => setTimeout(r, 100));
         await flush(); await flush();

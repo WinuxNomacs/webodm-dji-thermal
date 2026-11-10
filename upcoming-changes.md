@@ -50,6 +50,13 @@
     README, quickstart-worksets, quickstart-inspector, measurement, developing.md; screenshots retaken (mosaic-viewer
     and frame-page with the box ticked, by `dev/screenshots.js`, unsaved; the six Inspector shots with its new
     heading). Django 222 on 4.0.0 and 3.3.2, Jest 312, ESLint, Ruff. Not saved from a public map (the Inspector's box still works there, for the visit).
+  - **The standard pointer** (the user, 2026-11-10, after R10): "When "Temperature on Pointer" is active, is it
+    possible for the pointer to just be a standard pointer instead of the hand pointer?" Built: while the box is ticked
+    (in the Inspector, with its panel open), class `dt-pointer-plain` on the map (`analyzer_core.js` `plainPointer`,
+    `inspector.js` `plainPointer`) gives a plain arrow (`analyzer.css`, `inspector.css`); the closed hand while
+    dragging, and Pin's and the drawing tools' crosshair (set on the map) still win. Jest 312 (the three R10 tests);
+    checked headless on :8002 (viewer, frame page, Inspector: grab, default, grabbing, crosshair as expected, every
+    save blocked); README and the two quickstarts. No Python changed, so no Django run.
 - **Release 1.2.0** — 2026-11-08, `release/1.2.0` (the user: "It's time for the release"): the plugin named DJI
   Thermal Analyzer, and everything since 1.1.0 (R1 to R9, the header unit, the frame list's thumbnails, a workset's
   palette, the Inspector's button on thermal maps only); manifest 1.2.0, `CHANGELOG.md` (README has no version).

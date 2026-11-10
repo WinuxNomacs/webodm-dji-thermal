@@ -287,7 +287,8 @@ over WebODM's base layers:
   temperature tabs: the temperature less the median of the pixels within about 2 m around it (on Harmonized the
   value Intensify draws), so a spot cooler or warmer than the ground beside it reads as such whatever the range;
   ticking **Temperature On Pointer** (off until you tick it, then kept with your preferences, as on the frame page
-  and in the Thermal Inspector) also shows the temperature in a small label beside the pointer, wherever there is one;
+  and in the Thermal Inspector) also shows the temperature in a small label beside the pointer, wherever there is one,
+  and makes the pointer a plain arrow over the map rather than the hand (still the hand while dragging);
 - a click on the map keeps those values at that point, marked, until **Follow the cursor** (or Esc), and opens a
   window over the map with the **frames that saw that point** (the mosaic's own first, the
   others in turn with the arrows), each drawn in the tab's palette and range (on View angle, the angle each of its

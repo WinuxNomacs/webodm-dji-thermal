@@ -487,6 +487,11 @@
         return on;
     }
 
+    // Over a map (its element) with Temperature On Pointer: a plain arrow instead of Leaflet's hand (analyzer.css)
+    function plainPointer(el, on) {
+        if (el) el.classList.toggle("dt-pointer-plain", !!on);
+    }
+
     // The temperature beside the pointer on a map (container: its element): show(text, point) with the pointer's point
     // in the container ({x, y}), none for no text (a pixel without a temperature); hide()
     var POINTER_OFFSET = 14;
@@ -673,7 +678,7 @@
         batchTimeout: batchTimeout, failedText: failedText, median: median, count: count, deleteText: deleteText, dialog: dialog, ask: ask, askName: askName,
         preferences: preferences, setPreferences: setPreferences, editPreferences: editPreferences, bindPreferences: bindPreferences,
         setUserUnit: setUserUnit, savePalette: savePalette, saveDisplay: saveDisplay, pointerTemperature: pointerTemperature,
-        bindPointerTemperature: bindPointerTemperature, pointerLabel: pointerLabel, paletteOptions: paletteOptions, sortRows: sortRows,
+        bindPointerTemperature: bindPointerTemperature, pointerLabel: pointerLabel, plainPointer: plainPointer, paletteOptions: paletteOptions, sortRows: sortRows,
         optionHtml: optionHtml, mosaicReportRows: mosaicReportRows, WAITING: WAITING
     };
     root.ThermalAnalyzerCore = api;

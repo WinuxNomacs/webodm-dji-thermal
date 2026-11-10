@@ -21,7 +21,7 @@ below it scroll. The panel's buttons choose what a click on the map does:
 
 - **Hover**: the temperature under the cursor, in the panel under **Pointer Info**, with its **ΔT from
   surroundings** (the temperature less the median of the pixels within about 2 m around it), and in a small label
-  beside the pointer. Clear **Temperature On Pointer** to hide the label: that choice is kept with your preferences,
+  beside the pointer, a plain arrow rather than the hand. Clear **Temperature On Pointer** to hide the label: that choice is kept with your preferences,
   and applies to the Analyzer's mosaic viewer and frame page too (where the label is off until you tick it).
 - **Pin**: a click pins the point with its temperature (P1, P2…). The pins are listed in the panel; click one to go
   to it.

@@ -424,9 +424,11 @@
         // Temperature On Pointer: the temperature beside the pointer, as the user chose (off until they do)
         var pointerOn = core.bindPointerTemperature(doc, fetchFn, page.getAttribute("data-api"), csrf, function (on) {
             pointerOn = on;
+            core.plainPointer($("ta-viewer-map"), on);
             if (!on && label) label.hide();
         });
         var label = null;
+        core.plainPointer($("ta-viewer-map"), pointerOn);
 
         function status(s) {
             $("ta-viewer-status").className = "ta-status" + (s.cls ? " " + s.cls : "");

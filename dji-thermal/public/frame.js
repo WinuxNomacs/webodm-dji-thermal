@@ -403,8 +403,11 @@
         var labels = [null, null];
         var pointerOn = core.bindPointerTemperature(doc, fetchFn, page.getAttribute("data-api"), csrf, function (on) {
             pointerOn = on;
+            plain();
             if (!on) labels.forEach(function (l) { if (l) l.hide(); });
         });
+        function plain() { [0, 1].forEach(function (i) { core.plainPointer($("ta-frame-map-" + i), pointerOn); }); }
+        plain();
         // The tools: the one on, the shapes drawn on each frame (kept while the page is open), the one shown in full,
         // the measurements saved on the frame and the form naming one
         var tool = null, drawTool = null, drawn = {}, counts = {}, shownItem = null, saved = [], savedShown = null, form = null;
