@@ -3,7 +3,19 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R10. Pointer Info, and the temperature beside the pointer** (the user, 2026-11-10, in `new.md`): "Would it be
+- Nothing planned.
+- **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
+  release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
+  macOS"); Apple Silicon was checked without a Mac.
+
+**Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
+
+**Done**
+- **R10. Pointer Info, and the temperature beside the pointer** (built 2026-11-10; the user, 2026-11-10, in `new.md`): "Would it be
   possible to add a feature as a checkbox directly under the "Under the cursor" section, named "Temperature On
   Pointer" that's disabled by default, though when enabled displays the current hovered pixel's temperature in a
   small popup near the pointer? If a pixel doesn't support or have a temperature it shouldn't appear at all." and
@@ -27,17 +39,17 @@
     measurement, index and developing.md where they name the section, and the screenshots showing it retaken.
   - **Decided** (the user, 2026-11-10): the checkbox on all three pages, the Inspector's on unless the user cleared
     it; kept in the user's display preferences. Open: none.
-- **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
-  release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
-  macOS"); Apple Silicon was checked without a Mac.
-
-**Later**
-- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
-  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
-
-**Done**
+  - **Built** (2026-11-10): `conversions.py` (`pointer_temperature` in `display` and `parse_display`);
+    `analyzer_core.js` (`pointerTemperature`, `bindPointerTemperature`, `pointerLabel`, `saveDisplay` exported);
+    `viewer.js` (the label from the hover readout's reply; while a click keeps the readout, a point hovered is asked
+    for the label only), `frame.js` (each pane's own value, read in the browser), the templates and `analyzer.css`;
+    `inspector.js` (the heading and the box in `panelHtml`, `choosePointerTemperature`, the label from
+    `state.readout`, so corrected) and `inspector.css`. Tests: Jest in `analyzer.test.js`, `frame.test.js` and
+    `inspector.test.js` (the corrected label checked to fail on the old line), Django
+    `test_temperature_on_pointer_is_unset_until_the_user_ticks_or_clears_it_then_kept_for_every_page`. Docs:
+    README, quickstart-worksets, quickstart-inspector, measurement, developing.md; screenshots retaken (mosaic-viewer
+    and frame-page with the box ticked, by `dev/screenshots.js`, unsaved; the six Inspector shots with its new
+    heading). Django 222 on 4.0.0 and 3.3.2, Jest 312, ESLint, Ruff. Not saved from a public map (the Inspector's box still works there, for the visit).
 - **Release 1.2.0** — 2026-11-08, `release/1.2.0` (the user: "It's time for the release"): the plugin named DJI
   Thermal Analyzer, and everything since 1.1.0 (R1 to R9, the header unit, the frame list's thumbnails, a workset's
   palette, the Inspector's button on thermal maps only); manifest 1.2.0, `CHANGELOG.md` (README has no version).
