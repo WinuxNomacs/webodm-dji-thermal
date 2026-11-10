@@ -3,7 +3,30 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- Nothing planned.
+- **R10. Pointer Info, and the temperature beside the pointer** (the user, 2026-11-10, in `new.md`): "Would it be
+  possible to add a feature as a checkbox directly under the "Under the cursor" section, named "Temperature On
+  Pointer" that's disabled by default, though when enabled displays the current hovered pixel's temperature in a
+  small popup near the pointer? If a pixel doesn't support or have a temperature it shouldn't appear at all." and
+  "Rename "Under the cursor" to "Pointer Info"".
+  Builds on the "Under the cursor" sections of the mosaic viewer and the frame page (`templates/viewer.html`,
+  `templates/frame.html`, `data-section="cursor"`), the Thermal Inspector's label beside the pointer (always shown
+  today in Hover: `dt-inspector-cursor`, `inspector.js` `onMove` and `onOut`, `inspector.css`), and the display
+  preferences (`conversions.py`, as `legend`).
+  - **Bug, fixed first**: with a correction set (emissivity, reflected temperature), the Inspector's label beside the
+    pointer shows the uncorrected temperature while its panel shows the corrected one (`onMove` writes
+    `r.temperature`, not `state.readout.temperature`).
+  - **Proposed**: "Under the cursor" renamed **Pointer Info** in the viewer's and the frame page's side panel; in the
+    Inspector's panel a Pointer Info heading above its readout. Directly under it on all three, a **Temperature On
+    Pointer** checkbox. A display preference `pointer_temperature` (true or false, refused otherwise, as `legend`):
+    unset until the box is first ticked or cleared, which then applies on every page; unset, the box is off on the
+    viewer and the frame page and on in the Inspector (as it shows its label today). The popup as the Inspector's
+    label: 14 px from the pointer, in the user's unit, corrected where a correction is set, hidden off the image or
+    where a pixel has no temperature; on the frame page each pane's own value (read in the browser, `frame.js`
+    `valueAt`), on the viewer with the hover readout (`viewer.js`). Tests: Jest (the box, the popup shown and hidden,
+    the preference), Django (the preference's check). Docs: README, quickstart-worksets, quickstart-inspector,
+    measurement, index and developing.md where they name the section, and the screenshots showing it retaken.
+  - **Decided** (the user, 2026-11-10): the checkbox on all three pages, the Inspector's on unless the user cleared
+    it; kept in the user's display preferences. Open: none.
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
