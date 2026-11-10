@@ -421,6 +421,12 @@
         var mapReady = null, pick = null, pickLayer = null;
         // The point a click kept the readout on (until "Follow the cursor" or Esc), and its marker
         var pinned = null, pinLayer = null;
+        // Temperature On Pointer: the temperature beside the pointer, as the user chose (off until they do)
+        var pointerOn = core.bindPointerTemperature(doc, fetchFn, page.getAttribute("data-api"), csrf, function (on) {
+            pointerOn = on;
+            if (!on && label) label.hide();
+        });
+        var label = null;
 
         function status(s) {
             $("ta-viewer-status").className = "ta-status" + (s.cls ? " " + s.cls : "");
@@ -480,12 +486,18 @@
                 bases.shown.addTo(map);
                 L.control.layers(bases.layers, {}, {position: "topright"}).addTo(map);
                 L.control.scale({imperial: false}).addTo(map);
+                label = core.pointerLabel(doc, $("ta-viewer-map"));
+                // The readout follows the pointer, unless a click kept it; the temperature beside the pointer always does
                 map.on("mousemove", function (e) {
                     if (hover) root.clearTimeout(hover);
-                    if (pinned) return;
-                    hover = root.setTimeout(function () { readout(e.latlng); }, HOVER_MS);
+                    if (pinned && !pointerOn) return;
+                    hover = root.setTimeout(function () { readout(e.latlng, e.containerPoint); }, HOVER_MS);
                 });
-                map.on("mouseout", function () { if (hover) root.clearTimeout(hover); });
+                map.on("mouseout", function () {
+                    if (hover) root.clearTimeout(hover);
+                    pointed++;
+                    label.hide();
+                });
                 map.on("click", function (e) { pin(e.latlng); });
                 pickLayer = L.layerGroup().addTo(map);
                 pinLayer = L.layerGroup().addTo(map);
@@ -494,13 +506,21 @@
             return mapReady;
         }
 
-        // The values at a point; a reply for a point the cursor has moved on from, or the readout let go of, is dropped
-        var asked = 0;
-        function readout(latlng) {
-            var askedTab = tab, n = ++asked, kept = pinned;
+        // The values at a point; a reply for a point the cursor has moved on from, or the readout let go of, is dropped.
+        // at: the pointer's point on the map (a point hovered), for the temperature beside it; while a click keeps the
+        // readout, a point hovered is asked for that temperature only
+        var asked = 0, pointed = 0;
+        function readout(latlng, at) {
+            var askedTab = tab, kept = pinned, panel = !(at && kept);
+            var n = panel ? ++asked : asked, p = at ? ++pointed : pointed;
             return fetchFn(base + "/mosaics/" + tab + "/point?lon=" + latlng.lng + "&lat=" + latlng.lat, {credentials: "same-origin"})
                 .then(core.readJson, core.unreachable).then(function (r) {
-                    if (askedTab !== tab || n !== asked || kept !== pinned) return;
+                    if (askedTab !== tab) return;
+                    if (at && p === pointed && label) {
+                        var d = r.ok && r.data && r.data.valid ? r.data.temperature : null;
+                        label.show(pointerOn && typeof d === "number" ? core.formatTemp(d, v.unit) : "", at);
+                    }
+                    if (!panel || n !== asked || kept !== pinned) return;
                     $("ta-viewer-readout").innerHTML = r.ok ? readoutHtml(r.data, v.unit, !!pinned, askedTab) : '<span class="text-danger">' +
                         esc(core.errorText(r.data, "Could not read the mosaic here.")) + "</span>" + (pinned ? followHtml() : "");
                 });
@@ -666,6 +686,7 @@
             if (!a) return;
             e.preventDefault();
             tab = a.getAttribute("data-tab");
+            if (label) label.hide();
             renderTab();
             var f = pick && pick.frames[pick.at];
             if (pick) select(pick.latlng, f && f.index);

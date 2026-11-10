@@ -312,6 +312,44 @@ describe("the frame page", () => {
         expect(history.replaceState).toHaveBeenLastCalledWith(null, "", "?frame=c_T.JPG&list=oblique");
     });
 
+    it("shows each pane's temperature beside the pointer once Temperature On Pointer is ticked, saved for the user, never where there is none", async () => {
+        const {server, L} = await start();
+        const box = $("ta-pointer-temp"), label = i => $("ta-frame-map-" + i).querySelector(".ta-pointer-temp");
+        expect(document.querySelector('[data-section="cursor"] h5').textContent).toBe("Pointer Info");
+        // Off until the user ticks it
+        expect(box.checked).toBe(false);
+        L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 0.5}, containerPoint: {x: 30, y: 40}});
+        expect(label(0).style.display).toBe("none");
+        box.checked = true;
+        box.dispatchEvent(new Event("change", {bubbles: true}));
+        const put = server.calls.filter(c => c[1] && c[1].method === "PUT");
+        expect(put.map(c => [c[0], JSON.parse(c[1].body)])).toEqual([["/api/plugins/dji-thermal/display", {pointer_temperature: true}]]);
+        L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 0.5}, containerPoint: {x: 30, y: 40}});
+        expect([label(0).textContent, label(0).style.left, label(0).style.top, label(0).style.display]).toEqual(["15.00 °C", "44px", "54px", ""]);
+        // The frame's second pixel has no temperature, and outside the frame there is none: no label
+        L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 1.5}, containerPoint: {x: 60, y: 40}});
+        expect(label(0).style.display).toBe("none");
+        L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 5}, containerPoint: {x: 200, y: 40}});
+        expect(label(0).style.display).toBe("none");
+
+        // With the parameters changed, each pane shows its own
+        const field = document.querySelector("#ta-frame-params input[name=emissivity]");
+        field.value = "0.8";
+        field.dispatchEvent(new Event("input", {bubbles: true}));
+        $("ta-frame-apply").click();
+        await settle();
+        L.maps[1].fire("mousemove", {latlng: {lat: -0.5, lng: 0.5}, containerPoint: {x: 30, y: 40}});
+        expect(label(1).textContent).toBe("16.50 °C");
+        L.maps[1].fire("mouseout");
+        expect(label(1).style.display).toBe("none");
+        // Cleared: none
+        L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 0.5}, containerPoint: {x: 30, y: 40}});
+        box.checked = false;
+        box.dispatchEvent(new Event("change", {bubbles: true}));
+        expect(label(0).style.display).toBe("none");
+        core.setPreferences(null);
+    });
+
     it("measures the frame again with the parameters changed beside it, the panes moving together, and clears them", async () => {
         const {server, L} = await start();
         const field = document.querySelector("#ta-frame-params input[name=emissivity]");

@@ -255,6 +255,11 @@
 .ta-viewer .ta-viewer-pip{ position: absolute; left: 10px; bottom: 30px; z-index: 1000; width: 300px; max-width: calc(100% - 20px);
     padding: 6px; background: #fff; color: #333; border-radius: 4px; box-shadow: 0 1px 6px rgba(0, 0, 0, .4); font-size: 12px; }
 .ta-viewer .ta-viewer-pip[hidden]{ display: none; }
+/* Pointer Info: Temperature On Pointer, its box and the temperature beside the pointer (as the Thermal Inspector's) */
+.ta-viewer .ta-pointer-check{ display: block; margin: 2px 0 6px; font-weight: normal; }
+.ta-viewer .ta-pointer-check input{ margin: 0 4px 0 0; vertical-align: -2px; }
+.ta-viewer .ta-pointer-temp{ position: absolute; z-index: 1000; pointer-events: none; padding: 1px 5px; border-radius: 3px;
+    background: rgba(0, 0, 0, .75); color: #fff; font-size: 12px; white-space: nowrap; }
 .ta-viewer .ta-viewer-panel{ flex: 0 0 300px; max-height: calc(100vh - 230px); overflow-y: auto; font-size: 13px; }
 .ta-viewer .ta-viewer-panel h5{ margin: 14px 0 6px; font-weight: bold; }
 .ta-viewer .ta-viewer-panel .ta-section{ margin-bottom: 0; }

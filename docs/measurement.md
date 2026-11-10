@@ -94,7 +94,7 @@ difference and the harmonized temperature. Something as wide as the neighbourhoo
 metres across) fades out, and the edge between two surfaces at different temperatures shows a band of each colour
 along it. Mosaics built before the plugin had it show it once built again.
 
-The same difference is under the cursor wherever a temperature is: **ΔT from surroundings** in the mosaic viewer's
+The same difference is under the cursor wherever a temperature is: **ΔT from surroundings** in Pointer Info, on the mosaic viewer's
 temperature tabs, on the frame page and in the Thermal Inspector's Hover reading, the point less the median of the
 pixels within about 2 m around it (the frame page works out a frame pixel's ground size from the distance it was
 measured at and the camera's focal length). It needs no Intensify mosaic, so it works on mosaics built before it too.

@@ -343,7 +343,7 @@ describe("the pages' dialog", () => {
         palette.value = "magma";
         legend.value = "hidden";
         click(button("Save"));
-        expect(await edited).toEqual({unit: "F", palette: "magma"});
+        expect(await edited).toEqual({unit: "F", palette: "magma", pointer_temperature: null});
         expect(saved).toEqual([{unit: "F", palette: "magma", legend: false}]);
         expect(fetchFn.mock.calls[1][1].headers["X-CSRFToken"]).toBe("tok");
         expect(window.localStorage.getItem("unit_system")).toBe("imperial");
@@ -2872,6 +2872,62 @@ describe("the mosaic viewer", () => {
         expect($("ta-viewer-readout").textContent).toContain("ΔT from surroundings-4.50 °F");
         expect($("ta-viewer-readout").textContent.indexOf("ΔT")).toBeLessThan($("ta-viewer-readout").textContent.indexOf("Temperature"));
         expect($("ta-viewer-readout").textContent).toContain("Temperature86.00 °F");
+    });
+
+    it("shows the temperature beside the pointer once Temperature On Pointer is ticked, saved for the user, never where there is none", async () => {
+        const L = fakeLeaflet();
+        const here = {lng: 10.0005, lat: 45.0005}, none = {lng: 10.0002, lat: 45.0002};
+        const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
+                                [C9 + "/mosaics/as_converted/point?lon=10.0005&lat=45.0005"]: {valid: true, temperature: 30, frame: "b_T.JPG"},
+                                [C9 + "/mosaics/as_converted/point?lon=10.0002&lat=45.0002"]: {valid: false, reason: "nodata"},
+                                "PUT /api/plugins/dji-thermal/display": (u, o) => jsonResponse(Object.assign({unit: null}, JSON.parse(o.body)))});
+        await start(fetchFn, L);
+        await ticks();
+        const map = L.maps[0], box = $("ta-pointer-temp"), readout = () => $("ta-viewer-readout").textContent;
+        const label = () => $("ta-viewer-map").querySelector(".ta-pointer-temp");
+        const hover = async (latlng, containerPoint) => {
+            map.fire("mousemove", {latlng, containerPoint});
+            jest.advanceTimersByTime(200);
+            await ticks();
+        };
+        jest.useFakeTimers();
+        expect(document.querySelector('[data-section="cursor"] h5').textContent).toBe("Pointer Info");
+
+        // Off until the user ticks it: the readout only
+        expect(box.checked).toBe(false);
+        await hover(here, {x: 100, y: 50});
+        expect(readout()).toContain("30.00 °C");
+        expect(label().style.display).toBe("none");
+
+        // Ticked: saved for the user, and the temperature beside the pointer
+        box.checked = true;
+        change(box);
+        expect(fetchFn.mock.calls.filter(c => c[1] && c[1].method === "PUT").map(c => JSON.parse(c[1].body))).toEqual([{pointer_temperature: true}]);
+        await hover(here, {x: 100, y: 50});
+        expect([label().textContent, label().style.left, label().style.top, label().style.display]).toEqual(["30.00 °C", "114px", "64px", ""]);
+        // A pixel without a temperature: none
+        await hover(none, {x: 40, y: 20});
+        expect(label().style.display).toBe("none");
+
+        // While a click keeps the readout on its point, the temperature beside the pointer still follows it
+        map.fire("click", {latlng: none});
+        await ticks();
+        expect(readout()).toContain("No data here.");
+        await hover(here, {x: 100, y: 50});
+        expect(label().textContent).toBe("30.00 °C");
+        expect(label().style.display).toBe("");
+        expect(readout()).toContain("No data here.");
+
+        // Leaving the map hides it, and so does clearing the box
+        map.fire("mouseout");
+        expect(label().style.display).toBe("none");
+        await hover(here, {x: 100, y: 50});
+        box.checked = false;
+        change(box);
+        expect(label().style.display).toBe("none");
+        await ticks();
+        expect(core.preferences().pointer_temperature).toBe(false);
+        core.setPreferences(null);
     });
 
     it("builds missing mosaics and follows them until they are built", async () => {

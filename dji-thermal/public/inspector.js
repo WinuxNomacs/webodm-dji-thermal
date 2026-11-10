@@ -910,6 +910,9 @@
             (state.mode === "polygon" ? '<div class="text-muted dt-inspector-hint">Click the corners; double-click or Enter finishes, Esc cancels.</div>' : "") +
             (state.mode === "line" ? '<div class="text-muted dt-inspector-hint">Click the line\'s points; double-click or Enter finishes, Esc cancels.</div>' : "") +
             (state.notice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.notice) + "</div>" : "") +
+            '<div class="dt-inspector-pointer"><strong>Pointer Info</strong>' +
+            '<label class="dt-inspector-check"><input type="checkbox" data-act="pointer-temperature"' + (state.pointerTemperature ? " checked" : "") +
+            "> Temperature On Pointer</label></div>" +
             '<div class="dt-inspector-readout">' + readoutHtml(state.readout, unit, state.frames) + "</div>" +
             (options.length ? '<label class="dt-inspector-label">Palette <select class="form-control input-sm" data-act="palette">' +
                 options.map(function (o) {
@@ -956,7 +959,7 @@
         var state = {open: false, mode: "hover", readout: null, pins: loadPins(storage, key), pinsVisible: true,
                      regions: regions, regionsVisible: true, shown: regions.length ? regions[regions.length - 1].id : null,
                      notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
-                     legendVisible: false, mosaics: null, laid: {}, frames: false, pick: null,
+                     legendVisible: false, pointerTemperature: true, mosaics: null, laid: {}, frames: false, pick: null,
                      correction: {on: false}, correctionNotice: "", sources: {}, onMap: [], savedVisible: true,
                      savedShown: null, form: null, savable: {}, scale: null, rangeError: ""};
         var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
@@ -1628,7 +1631,8 @@
                     state.readout = fix && r && r.valid ? assign({}, r, {temperature: corrected(r.temperature, fix),
                         difference: typeof r.difference === "number" ? corrected(r.temperature, fix) - corrected(r.temperature - r.difference, fix) : r.difference}) : r;
                     renderReadout();
-                    var text = r && r.valid ? formatTemp(r.temperature) : "";
+                    // The temperature the panel shows, corrected as it is
+                    var text = state.pointerTemperature && r && r.valid ? formatTemp(state.readout.temperature) : "";
                     cursor.textContent = text;
                     cursor.style.display = text ? "" : "none";
                     if (text) {
@@ -2042,9 +2046,20 @@
             doc.body.removeChild(a);
         }
 
+        // Temperature On Pointer: the user's preference, for the Analyzer's pages too (never saved from a public map)
+        function choosePointerTemperature(on) {
+            state.pointerTemperature = on;
+            if (!on) cursor.style.display = "none";
+            if (publicMap) return;
+            fetchFn(API + "display", {method: "PUT", credentials: "same-origin",
+                headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken(doc)},
+                body: JSON.stringify({pointer_temperature: on})}).catch(function () {});
+        }
+
         function onPanelChange(e) {
             var what = e.target.getAttribute("data-act") || "";
             if (what === "palette") choosePalette(e.target.value);
+            else if (what === "pointer-temperature") choosePointerTemperature(e.target.checked);
             else if (what.indexOf("isotherm-") === 0) isothermInput(what.slice("isotherm-".length), e.target.value);
             else if (what.indexOf("range-") === 0 || what.indexOf("image-") === 0) onScaleInput(what, e.target);
             else if (what.indexOf("correction-") === 0) {
@@ -2167,6 +2182,8 @@
             }
             return fetchFn(API + "display", {credentials: "same-origin"}).then(readJson).then(function (r) {
                 state.legendVisible = !r.ok || r.data.legend !== false;
+                // On unless the user cleared it, here or on the Analyzer's pages
+                state.pointerTemperature = !r.ok || r.data.pointer_temperature !== false;
                 if (!r.ok) return renderLegend();
                 state.display = r.data;
                 var preferred = r.data.palette;
