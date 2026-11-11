@@ -464,7 +464,9 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   over each thermal layer, hidden with it, within the task's crop; the legend marks the part painted. Kept in your
   browser for the same tasks; Off removes it.
 - **Mosaic Overlays**: the mosaics of the Analyzer's worksets in the project's datasets (for those who can view the
-  project; shown only when one has built mosaics), each with a tickbox that lays it on the map above WebODM's layers: **Mosaic**, **Harmonized** or **Source
+  project; shown only when one has built mosaics), last in the panel: a dropdown ("Mosaic Overlays: 1 of 5 shown")
+  opens their checklist, each tickbox laying one on the map above WebODM's layers, and the laid ones are listed below
+  it with their controls: **Mosaic**, **Harmonized** or **Source
   frame**, in your palette over its own 2nd to 98th percentile, with its opacity, **Swipe** (WebODM's own divider:
   the mosaic on the right, WebODM's layers on the left) and zoom to it. Hover, pins, regions, the isotherm and the
   legend read the topmost thermal layer, a mosaic or an orthophoto. They are the plugin's layers, not entries of

@@ -236,6 +236,10 @@ keeps.
 4. What it keeps per user and map goes in `localStorage`, under a key starting `dji-thermal-inspector:` (as the pins,
    always inside try/catch: storage can be missing). What is shared with the project goes to the server.
 5. Styles go in `inspector.css`, under `.dt-inspector-...`, so they never reach WebODM's own elements.
+
+A kind of layer laid on the map (Mosaic Overlays) is an `overlaysHtml` dropdown at the bottom of the panel instead:
+`{kind, title, open, items, controls}`, its tickboxes `data-act="<kind>-on"` in rows marked `data-<kind>`; the button
+(`overlays-toggle`) opens `state.overlaysOpen[kind]`.
 6. Test the HTML function and the behaviour in `inspector.test.js`.
 
 ### An API route

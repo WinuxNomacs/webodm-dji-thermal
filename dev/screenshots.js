@@ -371,11 +371,12 @@ const SHOTS = {
         // Taller, so that the panel shows the colour scale and the whole Mosaic Overlays section
         await p.setViewportSize({width: SIZE.width, height: SIZE.height + 80});
         await p.goto(env.url + "/map/project/" + d.project.id + "/?dt-mosaic=" + dataset + "/" + conversion.id + "/harmonized");
-        await p.waitForSelector(".dt-inspector-mosaic input:checked", {timeout: 30000});
+        await p.waitForSelector(".dt-inspector-overlay input:checked", {timeout: 30000});
         await p.click('[data-act="mosaic-swipe"]');
         await p.evaluate(() => {
-            const heading = Array.from(document.querySelectorAll(".dt-inspector-section > strong")).filter((s) => s.textContent === "Mosaic Overlays")[0];
-            if (heading) heading.parentNode.scrollIntoView({block: "end"});
+            // Mosaic Overlays, last in the panel: its button and the laid mosaic's controls below it
+            const section = document.querySelector(".dt-inspector-overlays");
+            if (section) section.scrollIntoView({block: "end"});
         });
         await p.waitForTimeout(3000);
         const map = await p.locator(".leaflet-container").first().boundingBox();
