@@ -175,8 +175,7 @@ def measure(task, cid, rel, changes=None):
 def info(task, cid, rel, changes=None):
     """What the page shows of a frame (measure's, its values summed up): {frame, width, height, unit, params,
     recorded, distance_source, notes, offset, offset_known, changes, stats: {min, max, mean, percentiles, histogram
-    (the equalization's, colouring.value_histogram)} or None without values, pixel_m (pixel_size: the page measures a
-    point's difference from its surroundings over the user's radius with it)}"""
+    (the equalization's, colouring.value_histogram)} or None without values}"""
     import numpy as np
 
     from . import colouring
@@ -190,22 +189,7 @@ def info(task, cid, rel, changes=None):
                  'percentiles': [float(p) for p in np.percentile(found, mosaics.PERCENTILES)],
                  'histogram': {'counts': counts.tolist(), 'edges': edges.tolist()}}
     return dict(m, frame=rel, width=int(values.shape[1]), height=int(values.shape[0]), unit=unit_of(task, cid),
-                recorded=recorded(task, rel, cid), changes=changes or {}, stats=stats,
-                pixel_m=pixel_size(frame_path(task, rel, cid), values.shape, m['params'].get('distance')))
-
-
-def pixel_size(path, shape, distance):
-    """The ground width of a frame's pixel straight ahead (m): the distance it was measured at over its focal length
-    in pixels (dji-thermal-cli's read_pose, for the measured size: shape, rows by columns); None when either is
-    unknown"""
-    if not distance or distance <= 0:
-        return None
-    try:
-        with open(path, 'rb') as f:
-            pose, _why = converter.library().mosaic.read_pose(f.read(), (int(shape[1]), int(shape[0])))
-    except Exception:  # noqa: BLE001 - a frame without a pose has no ground resolution
-        return None
-    return float(distance) / pose.focal_px if pose is not None and pose.focal_px else None
+                recorded=recorded(task, rel, cid), changes=changes or {}, stats=stats)
 
 
 def values_png(task, cid, rel, changes=None):
@@ -293,6 +277,26 @@ def region(values, geometry, percentiles=inspector.PERCENTILES, bins=inspector.H
     if kind == 'LineString':
         out['profile'] = _profile(shape, values)
     return out
+
+
+def delta(values, geometry):
+    """A ΔT drawn on a frame's values (a line of two points, in pixels): each spot its pixel's value, as a pin's
+    (inspector.delta), its length in pixels
+    :raises FrameError: not a line of two points"""
+    import numpy as np
+    ends = inspector.delta_ends(geometry)
+    if ends is None:
+        raise FrameError("A ΔT is a line of two spots")
+
+    def read(x, y):
+        row, col = math.floor(y), math.floor(x)
+        if not (0 <= row < values.shape[0] and 0 <= col < values.shape[1]):
+            return None, 'outside_raster'
+        v = float(values[row, col])
+        return (v, None) if np.isfinite(v) else (None, 'nodata')
+
+    return dict(inspector.delta([read(*e) for e in ends], math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1])),
+                pixel_size=1.0)
 
 
 def _profile(line, values):

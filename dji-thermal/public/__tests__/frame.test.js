@@ -90,34 +90,6 @@ describe("the frame page's helpers", () => {
         expect(el.textContent).toContain("no data");
         expect(frame.readoutHtml({inside: false}, [tile], "C")).toContain("Outside the frame");
     });
-
-    it("reads a pixel's difference from the median within the circle the user chose, at the frame's ground resolution", () => {
-        // 5 x 3 pixels of 0.5 m: a radius of 1 m is 2 pixels; a cooler seam down the middle column
-        const values = Float32Array.from([20, 20, 17, 20, 21, 20, 20, 17, 20, 21, 20, NaN, 17, 20, 21]);
-        const tile = {width: 5, height: 3, values}, info = {pixel_m: 0.5};
-        // The seam's pixel against the 10 pixels with values within 2 pixels of it (median 20), 1 m until chosen
-        expect(frame.surroundingsAt(tile, 2.5, 1.5, info, 1)).toBe(-3);
-        expect(frame.surroundingsAt(tile, 2.5, 1.5, info)).toBe(-3);
-        // Within 0.5 m (1 pixel), the pixels beside it and those above and below on the seam: the median is the seam's
-        expect(frame.surroundingsAt(tile, 2.5, 1.5, info, 0.5)).toBe(0);
-        // Never fewer than its neighbours, however small the radius
-        expect(frame.surroundingsAt(tile, 2.5, 1.5, info, 0.25)).toBe(0);
-        expect(frame.radiusPixels(info, 0.25)).toBe(1);
-        expect(frame.radiusPixels(info, 3)).toBe(6);
-        // A corner pixel against what the frame has of its circle: 17, 20, 21 and 20, 21 and 21 below (median 20.5)
-        expect(frame.surroundingsAt(tile, 4.5, 0.5, info, 1)).toBe(0.5);
-        expect(frame.surroundingsAt(tile, 1.5, 2.5, info)).toBeNull();
-        expect(frame.surroundingsAt(tile, 2.5, 1.5, {pixel_m: null})).toBeNull();
-        const changed = {width: 5, height: 3, values: values.map(v => v + 1)};
-        const el = document.createElement("div");
-        el.innerHTML = frame.readoutHtml({x: 2.5, y: 1.5, inside: true}, [tile, null], "C", [info]);
-        expect(el.textContent).toContain("ΔT from surroundings-3.00 °C");
-        el.innerHTML = frame.readoutHtml({x: 2.5, y: 1.5, inside: true}, [tile, changed], "C", [info, info]);
-        expect(el.textContent).toContain("ΔT from surroundings, changed-3.00 °C");
-        expect(el.textContent).toContain("Difference+1.00 °C");
-        el.innerHTML = frame.readoutHtml({x: 2.5, y: 1.5, inside: true}, [tile, null], "C", [{pixel_m: null}]);
-        expect(el.textContent).not.toContain("ΔT");
-    });
 });
 
 describe("the frame page", () => {
@@ -127,12 +99,14 @@ describe("the frame page", () => {
         const layer = extra => Object.assign({addTo(m) { (m.layers = m.layers || []).push(this); return this; }}, extra);
         L.layerGroup = () => layer({layers: [], clearLayers() { this.layers = []; }});
         L.circleMarker = (at, opts) => layer({marker: at, opts});
-        L.circle = (at, opts) => layer({circle: at, opts, setLatLng(p) { this.circle = p; }, setRadius(r) { this.opts.radius = r; }});
+        L.circle = (at, opts) => layer({circle: at, opts});
         L.polyline = (points, opts) => layer({line: points, opts});
         L.polygon = (points, opts) => layer({polygon: points, opts});
         L.map = (el, opts) => {
             const handlers = {};
-            const m = {el, opts, layers: [], center: [0, 0], zoom: 0, on(ev, f) { (handlers[ev] = handlers[ev] || []).push(f); return m; },
+            const toggle = () => ({enabled: () => true, enable() {}, disable() {}});
+            const m = {el, opts, layers: [], center: [0, 0], zoom: 0, dragging: toggle(), doubleClickZoom: toggle(),
+                       on(ev, f) { (handlers[ev] = handlers[ev] || []).push(f); return m; },
                        off() { return m; }, getContainer: () => el,
                        fire(ev, e) { (handlers[ev] || []).forEach(f => f(e)); }, fitBounds(b) { m.fitted = b; },
                        invalidateSize() {}, removeLayer(l) { m.layers = m.layers.filter(x => x !== l); },
@@ -159,6 +133,9 @@ describe("the frame page", () => {
             calls.push([url, opts]);
             const body = opts && opts.body ? JSON.parse(opts.body) : null;
             if (url === BASE + "/frames") return json(FRAMES);
+            if (url === BASE + "/frame/region" && body.shape === "delta") {
+                return json({valid: true, reason: null, first: 15, second: 17.25, delta_t: 2.25, reasons: [null, null], length: 5, pixel_size: 1});
+            }
             if (url === BASE + "/frame/region") {
                 const point = body.geometry.type === "Point";
                 return json({valid: true, reason: null, pixel_size: 1, statistics: {count: point ? 1 : 4, min: 15, max: 15, mean: point ? 15 : 16, std: 0,
@@ -167,7 +144,8 @@ describe("the frame page", () => {
             if (url.startsWith(BASE + "/frame/measurements")) {
                 if (opts && opts.method === "POST") {
                     const m = Object.assign({id: "aaaaaaaaaaa" + (saved.length + 1), created_by: "admin", created_at: "2026-11-01T10:00:00Z",
-                                             values: {valid: true, statistics: {count: 1, mean: 15}}}, body);
+                                             values: body.shape === "delta" ? {valid: true, first: 15, second: 17.25, delta_t: 2.25, length: 5} :
+                                                 {valid: true, statistics: {count: 1, mean: 15}}}, body);
                     saved.push(m);
                     return json(m, 201);
                 }
@@ -360,37 +338,6 @@ describe("the frame page", () => {
         core.setPreferences(null);
     });
 
-    it("draws Delta T From Surroundings' circle around the pointer in the frame's pixels, its radius the slider's, saved for the user", async () => {
-        INFO.pixel_m = 0.5;
-        try {
-            const {server, L} = await start();
-            const slider = () => $("ta-surroundings").querySelector('input[type="range"]'), circle = i => L.maps[i].layers.find(l => l.circle);
-            expect($("ta-surroundings").closest('[data-section="cursor"]')).not.toBeNull();
-            expect($("ta-surroundings").textContent).toBe("Delta T From Surroundings 1.00 m");
-            // 1 m at 0.5 m a pixel: 2 pixels, around the pointer
-            L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 0.5}, containerPoint: {x: 30, y: 40}});
-            expect([circle(0).circle, circle(0).opts.radius]).toEqual([{lat: -0.5, lng: 0.5}, 2]);
-            expect($("ta-frame-readout").textContent).toContain("ΔT from surroundings");
-            // Outside the frame, and off the map: none
-            L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 5}, containerPoint: {x: 200, y: 40}});
-            expect(circle(0)).toBeUndefined();
-            L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 0.5}, containerPoint: {x: 30, y: 40}});
-            L.maps[0].fire("mouseout");
-            expect(circle(0)).toBeUndefined();
-            // Moved to 3 m: 6 pixels, saved once let go
-            slider().value = "3";
-            slider().dispatchEvent(new Event("input", {bubbles: true}));
-            slider().dispatchEvent(new Event("change", {bubbles: true}));
-            L.maps[0].fire("mousemove", {latlng: {lat: -0.5, lng: 0.5}, containerPoint: {x: 30, y: 40}});
-            expect(circle(0).opts.radius).toBe(6);
-            const put = server.calls.filter(c => c[1] && c[1].method === "PUT");
-            expect(put.map(c => [c[0], JSON.parse(c[1].body)])).toEqual([["/api/plugins/dji-thermal/display", {surroundings_m: 3}]]);
-        } finally {
-            delete INFO.pixel_m;
-            core.setPreferences(null);
-        }
-    });
-
     it("measures the frame again with the parameters changed beside it, the panes moving together, and clears them", async () => {
         const {server, L} = await start();
         const field = document.querySelector("#ta-frame-params input[name=emissivity]");
@@ -500,6 +447,36 @@ describe("the frame page", () => {
         expect(document.querySelector("#ta-frame-measure [data-item]")).toBeNull();
         expect($("ta-frame-saved").textContent).toContain("Hot spot");
         expect($("ta-frame-saved").textContent).toContain("As converted. Saved by admin");
+    });
+
+    it("measures ΔT between two pixels clicked with ΔT, first of the tools, and saves it like the others", async () => {
+        const {server, L} = await start();
+        const tools = [...document.querySelectorAll("#ta-frame-measure [data-tool]")];
+        expect(tools.map(b => b.getAttribute("data-tool"))).toEqual(["delta", "pin", "line", "rectangle", "circle", "polygon"]);
+        expect(tools[0].textContent.trim()).toBe("ΔT");
+        tools[0].click();
+        expect($("ta-frame-measure").textContent).toContain("Click the first spot, then the second");
+        L.maps[0].fire("click", {latlng: {lat: -0.5, lng: 0.5}});
+        L.maps[0].fire("click", {latlng: {lat: -0.5, lng: 5.5}});
+        await settle();
+        const region = server.calls.filter(c => c[0] === BASE + "/frame/region").pop();
+        expect(JSON.parse(region[1].body)).toEqual({frame: "a_T.JPG", changes: {}, geometry: {type: "LineString", coordinates: [[0.5, 0.5], [5.5, 0.5]]},
+                                                    isotherm: null, shape: "delta"});
+        const text = $("ta-frame-measure").textContent;
+        ["D1", "+2.25 °C ΔT", "First spot15.00 °C", "Second spot17.25 °C", "ΔT+2.25 °C", "Distance5.0 px"].forEach(t => expect(text).toContain(t));
+        // Drawn on both panes: a line between the spots and a dot at each
+        const drawn = L.maps[0].layers.filter(l => l.clearLayers).pop().layers;
+        expect(drawn.filter(l => l.line).length).toBe(1);
+        expect(drawn.filter(l => l.marker).map(l => l.marker)).toEqual([[-0.5, 0.5], [-0.5, 5.5]]);
+        document.querySelector("[data-item] [data-act=save]").click();
+        document.querySelector("[data-form=name]").value = "Joint";
+        document.querySelector("[data-act=form-save]").click();
+        await settle();
+        const post = server.calls.filter(c => c[0] === BASE + "/frame/measurements" && c[1] && c[1].method === "POST").pop();
+        expect(JSON.parse(post[1].body)).toEqual(expect.objectContaining({name: "Joint", shape: "delta", geometry: {type: "LineString", coordinates: [[0.5, 0.5], [5.5, 0.5]]}}));
+        expect($("ta-frame-saved").textContent).toContain("Joint");
+        expect($("ta-frame-saved").textContent).toContain("+2.25 °C ΔT");
+        expect($("ta-frame-saved").textContent).toContain("Second spot17.25 °C");
     });
 
     it("measures the shapes again when the isotherm or the parameters change, the isotherm's limits in °C", async () => {

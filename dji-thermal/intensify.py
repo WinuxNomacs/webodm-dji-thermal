@@ -4,17 +4,11 @@ slopes and the sun's side, wider than that, go to about 0; a seam or a leak narr
 the ground beside it. The mosaic viewer's Intensify tab (mosaics.py) shows the harmonized mosaic so, and its frames
 window the frames. numpy only: the medians are taken over windows SIZE_M wide every half of it, then interpolated
 between (a median filter that wide, pixel by pixel, is slow).
-
-Under Pointer Info (the mosaic viewer, the frame page, the Thermal Inspector), a point's difference from its
-surroundings is the point less the median of the pixels within a circle around it, its radius the user's (RADIUS_M
-until they choose one; raster_difference, disc_difference).
 """
 
 import warnings
 
 SIZE_M = 2.0            # the neighbourhood: wider than a seam, narrower than a roof's slope
-RADIUS_M = 1.0          # Pointer Info's circle, until the user chooses another (about SIZE_M across)
-RADIUS_MIN, RADIUS_MAX = 0.25, 10.0
 STRIP_ROWS = 512        # the background interpolated this many rows at a time (a large mosaic is not copied whole)
 
 
@@ -90,71 +84,3 @@ def _between(centres, at):
 def _bilinear(grid, y0, y1, fy, x0, x1, fx):
     rows = grid[y0] * (1 - fy)[:, None] + grid[y1] * fy[:, None]
     return rows[:, x0] * (1 - fx)[None, :] + rows[:, x1] * fx[None, :]
-
-
-def parse_radius(raw):
-    """A circle's radius (m) as a request or a preference gives it, RADIUS_M when not given
-    :raises ValueError: not a number from RADIUS_MIN to RADIUS_MAX"""
-    import math
-    if raw is None or raw == '':
-        return RADIUS_M
-    try:
-        radius = float('nan') if isinstance(raw, bool) else float(raw)
-    except (TypeError, ValueError):
-        radius = float('nan')
-    if not (math.isfinite(radius) and RADIUS_MIN <= radius <= RADIUS_MAX):
-        raise ValueError("Must be from {:g} to {:g} m".format(RADIUS_MIN, RADIUS_MAX))
-    return radius
-
-
-def disc(pixel_m, radius_m=RADIUS_M):
-    """The pixels within radius_m of a pixel's centre, at pixel_m metres a pixel (its neighbours at least): a square
-    boolean array 2 * half + 1 pixels wide, the pixel at its centre, and half"""
-    import numpy as np
-    radius = max(1.0, radius_m / pixel_m) if pixel_m and pixel_m > 0 else 1.0
-    half = int(radius)
-    d = np.arange(-half, half + 1)
-    return d[:, None] ** 2 + d[None, :] ** 2 <= radius * radius, half
-
-
-def from_surroundings(value, around):
-    """value less the median of around's finite values (an array, the point's included), None when there are none"""
-    import numpy as np
-    around = np.asarray(around, dtype=np.float64)
-    around = around[np.isfinite(around)]
-    if value is None or not around.size:
-        return None
-    return float(value - np.median(around))
-
-
-def disc_difference(values, row, col, pixel_m, radius_m=RADIUS_M):
-    """A pixel of an array (NaN where it has none) less the median of the pixels within radius_m around it, None
-    when it has none"""
-    import numpy as np
-    values = np.asarray(values)
-    if not (0 <= row < values.shape[0] and 0 <= col < values.shape[1]) or not np.isfinite(values[row, col]):
-        return None
-    inside, half = disc(pixel_m, radius_m)
-    r0, c0 = max(0, row - half), max(0, col - half)
-    window = values[r0:row + half + 1, c0:col + half + 1]
-    mask = inside[r0 - row + half:r0 - row + half + window.shape[0], c0 - col + half:c0 - col + half + window.shape[1]]
-    return from_surroundings(float(values[row, col]), window[mask])
-
-
-def raster_difference(src, row, col, value, pixel_m, usable=None, radius_m=RADIUS_M):
-    """
-    value, a rasterio dataset's first band at (row, col), less the median of the pixels within radius_m around it
-    (usable(window, data): the window's pixels that hold values, beside the finite ones); None when none do
-    """
-    import numpy as np
-    from rasterio.windows import Window
-    inside, half = disc(pixel_m, radius_m)
-    r0, c0 = max(0, row - half), max(0, col - half)
-    r1, c1 = min(src.height, row + half + 1), min(src.width, col + half + 1)
-    if value is None or r1 <= r0 or c1 <= c0:
-        return None
-    window = Window(c0, r0, c1 - c0, r1 - r0)
-    data = src.read(1, window=window).astype(np.float64)
-    keep = np.isfinite(data) if usable is None else np.isfinite(data) & usable(window, data)
-    keep &= inside[r0 - row + half:r1 - row + half, c0 - col + half:c1 - col + half]
-    return from_surroundings(value, data[keep])

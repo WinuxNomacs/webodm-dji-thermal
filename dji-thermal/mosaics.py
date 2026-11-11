@@ -725,13 +725,11 @@ def palette_colors(cmap):
     return encoded([cmap[i] for i in range(256)])
 
 
-def point(task, cid, tab, lon, lat, surroundings=True, radius_m=intensify.RADIUS_M):
+def point(task, cid, tab, lon, lat):
     """
     A viewer tab's values at a point: {valid, temperature, frame, frame_index, view_angle, frame_pixel, unit, reason};
     frame_pixel: the frame's pixel it was read from (column, row; none in a mosaic built before dji-thermal-cli 1.4.0).
-    On a temperature tab with a temperature there (and surroundings), difference too: the temperature less the median
-    of the tab's mosaic within radius_m (intensify.raster_difference). On a tab of differences (Intensify), the
-    harmonized mosaic's temperature and difference so: what it draws is over intensify.SIZE_M, whatever radius_m.
+    On a tab of differences (Intensify) also difference, its value there, and temperature the harmonized mosaic's.
     """
     import rasterio
     from rasterio.warp import transform
@@ -755,11 +753,6 @@ def point(task, cid, tab, lon, lat, surroundings=True, radius_m=intensify.RADIUS
             out['reason'] = 'outside_raster'
             return out
         values = next(src.sample([(xs[0], ys[0])], indexes=(1, 2, 3, 4, 5) if src.count >= 5 else (1, 2, 3)))
-        first = float(values[0])
-        if surroundings and is_temperature(tab) and math.isfinite(first) and first > low_value(unit):
-            row, col = src.index(xs[0], ys[0])
-            out['difference'] = intensify.raster_difference(src, row, col, first, abs(src.res[0]),
-                                                            lambda _window, data: data > low_value(unit), radius_m=radius_m)
     finite = [v if math.isfinite(v) else None for v in (float(x) for x in values)]
     temperature, frame, angle = finite[:3]
     if temperature is not None and temperature > low_value(unit):
@@ -772,8 +765,7 @@ def point(task, cid, tab, lon, lat, surroundings=True, radius_m=intensify.RADIUS
             out['frame_pixel'] = [int(finite[3]), int(finite[4])]
     out['view_angle'] = angle
     if tab in DIFFERENCE_TABS:
-        harmonized = point(task, cid, 'harmonized', lon, lat, surroundings=surroundings, radius_m=radius_m)
-        out['temperature'], out['difference'] = harmonized['temperature'], harmonized.get('difference')
+        out['difference'], out['temperature'] = out['temperature'], point(task, cid, 'harmonized', lon, lat)['temperature']
     out['valid'] = out['temperature'] is not None or out['frame'] is not None
     if not out['valid']:
         out['reason'] = 'nodata'

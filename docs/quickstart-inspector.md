@@ -19,18 +19,21 @@ button is only on maps with temperatures: a thermal orthophoto, or a workset mos
 The top of the panel (the buttons, Pointer Info, Palette and the colour scale) stays in view while the sections
 below it scroll. The panel's buttons choose what a click on the map does:
 
-- **Hover**: the temperature under the cursor, in the panel under **Pointer Info**, with its **ΔT from
-  surroundings** (the temperature less the median of the pixels within the thin circle drawn around the pointer: the
-  **Delta T From Surroundings** slider under Pointer Info sets its radius, 1 m until you move it, and that choice is
-  kept with your preferences, for the Analyzer's pages too), and in a small label
+- **Hover**: the temperature under the cursor, in the panel under **Pointer Info**, and in a small label
   beside the pointer, a plain arrow rather than the hand. Clear **Temperature On Pointer** to hide the label: that choice is kept with your preferences,
   and applies to the Analyzer's mosaic viewer and frame page too (where the label is off until you tick it).
+- **ΔT**: click a first spot, then a second (D1, D2…). The panel gives each spot's temperature, the temperature of
+  its own pixel, and **ΔT**, the second's minus the first's: click the cold spot first and a warmer one second, and
+  ΔT is above zero. The map shows a thin line between them, labelled with the ΔT at the second spot. With Manual
+  Corrections on (section 2), both spots are corrected. Save it, rename it and delete it like a region.
 - **Pin**: a click pins the point with its temperature (P1, P2…). The pins are listed in the panel; click one to go
   to it.
 - **Rectangle**, **circle** and **polygon**: draw a region (R1, R2…). For a rectangle or circle, press and drag. For
   a polygon, click its corners, then double-click or press Enter to finish (Backspace removes the last corner, Esc
   cancels).
 - **Line**: click the line's points, then double-click or press Enter to finish (L1, L2…).
+
+![The Thermal Inspector, a ΔT between two spots of the orthophoto](images/inspector-delta.png)
 
 For each region, the panel shows the minimum, maximum, mean, median, standard deviation, 2nd and 98th percentiles,
 the number of pixels, the area and a histogram. The hottest and coldest pixels are marked on the map. It also shows:

@@ -22,7 +22,6 @@ from app.models import Project, Task
 from app.tests.classes import BootTestCase
 
 inspector = importlib.import_module("coreplugins.dji-thermal.inspector")
-intensify = importlib.import_module("coreplugins.dji-thermal.intensify")
 colouring = importlib.import_module("coreplugins.dji-thermal.colouring")
 converter = importlib.import_module("coreplugins.dji-thermal.converter")
 conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
@@ -145,39 +144,6 @@ class TestInspector(BootTestCase):
         self.assertEqual(self.point(0, 0).data['reason'], 'outside_raster')
         self.assertEqual(self.client.get(self.url(self.task, "point"), {'lon': 'east'}).status_code,
                          status.HTTP_400_BAD_REQUEST)
-
-    def test_a_point_says_its_difference_from_the_median_of_the_pixels_with_data_within_the_radius_asked_for(self):
-        def point(col, radius=None):
-            query = {'lon': lonlat(col, 40)[0], 'lat': lonlat(col, 40)[1]}
-            return self.client.get(self.url(self.task, "point"), dict(query, radius=radius) if radius is not None else query)
-        # On a plane the median within a circle around a pixel is its own value, however wide
-        self.assertAlmostEqual(point(50).data['difference'], 0, places=4)
-        self.assertAlmostEqual(point(50, 5).data['difference'], 0, places=4)
-        # Beside the edge without data, the circle holds more pixels warmer than it: the wider, the more (pixels of
-        # 0.5 m; 1 m until a radius is asked for)
-        self.assertAlmostEqual(point(11).data['difference'], -0.125, places=4)
-        self.assertAlmostEqual(point(11, 1).data['difference'], -0.125, places=4)
-        self.assertAlmostEqual(point(11, 3).data['difference'], -1.75, places=4)
-        # Never fewer than the pixels beside it, however small
-        self.assertAlmostEqual(point(11, 0.25).data['difference'], 0, places=4)
-        self.assertNotIn('difference', point(5).data)
-        for radius in ('wide', 0.1, 11):
-            res = point(50, radius)
-            self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST, radius)
-            self.assertIn('radius', res.data['error'])
-
-    def test_a_disc_holds_the_pixels_within_its_radius_and_the_pixels_beside_its_centre_at_least(self):
-        inside, half = intensify.disc(0.5, 1)
-        self.assertEqual(half, 2)
-        self.assertEqual(inside.astype(int).tolist(), [[0, 0, 1, 0, 0], [0, 1, 1, 1, 0], [1, 1, 1, 1, 1],
-                                                        [0, 1, 1, 1, 0], [0, 0, 1, 0, 0]])
-        self.assertEqual(intensify.disc(5, 1)[0].astype(int).tolist(), [[0, 1, 0], [1, 1, 1], [0, 1, 0]])
-        self.assertEqual(intensify.disc(None)[1], 1)
-        self.assertEqual(intensify.parse_radius(None), intensify.RADIUS_M)
-        self.assertEqual(intensify.parse_radius("2.5"), 2.5)
-        for bad in (True, "nan", "inf", "wide", 0.2, 10.5):
-            with self.assertRaises(ValueError):
-                intensify.parse_radius(bad)
 
     def test_a_point_outside_the_tasks_crop_is_excluded(self):
         self.crop(40, 30, 60, 50)
@@ -348,6 +314,55 @@ class TestInspector(BootTestCase):
         fixed = self.client.post(url, dict(pin, correction={'emissivity': 0.8, 'reflected': 10}), format="json").data
         self.assertAlmostEqual(fixed['values']['measured'], 60.0, places=4)
         self.assertAlmostEqual(fixed['values']['temperature'], corrected(60.0, (0.8, 10.0), (0.91, 21.0)), places=4)
+
+    def test_a_delta_t_reads_each_spot_as_its_pixel_and_gives_the_second_less_the_first(self):
+        def delta(*spots):
+            return {'type': 'LineString', 'coordinates': [list(lonlat(*s)) for s in spots]}
+        res = self.region(delta((50, 40), (30, 40)), shape='delta')
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        d = res.data
+        self.assertTrue(d['valid'])
+        self.assertAlmostEqual(d['first'], 60.0, places=4)
+        self.assertAlmostEqual(d['second'], 40.0, places=4)
+        self.assertAlmostEqual(d['delta_t'], -20.0, places=4)
+        self.assertAlmostEqual(d['length'], 20 * PIXEL, delta=0.05)
+        self.assertNotIn('statistics', d)
+        # A spot with no temperature: no ΔT, and why
+        none = self.region(delta((50, 40), (5, 40)), shape='delta').data
+        self.assertEqual((none['valid'], none['reason'], none['delta_t'], none['second'], none['reasons']),
+                         (False, 'nodata', None, None, [None, 'nodata']))
+        self.crop(40, 30, 60, 50)
+        self.assertEqual(self.region(delta((50, 40), (70, 40)), shape='delta').data['reasons'], [None, 'excluded'])
+        # Not a line of two distinct spots
+        for wrong in (delta((50, 40)), delta((50, 40), (51, 40), (52, 40)), delta((50, 40), (50, 40)),
+                      {'type': 'Point', 'coordinates': list(lonlat(50, 40))}, square(20, 10, 29, 19)):
+            self.assertEqual(self.region(wrong, shape='delta').status_code, status.HTTP_400_BAD_REQUEST, wrong)
+        # Corrected: each spot as the layer is
+        wanted = {'emissivity': 0.8, 'reflected': 10.0}
+        self.assertEqual(self.region(delta((50, 40), (45, 40)), shape='delta', correction=wanted).status_code,
+                         status.HTTP_400_BAD_REQUEST)
+        xmp_tiff(os.path.join(self.task.task_path(), "DJI_0001_T_temp_c.tiff"), 0.91, 21.0)
+        fixed = self.region(delta((50, 40), (45, 40)), shape='delta', correction=wanted).data
+        a, b = corrected(60.0, (0.8, 10.0), (0.91, 21.0)), corrected(55.0, (0.8, 10.0), (0.91, 21.0))
+        self.assertAlmostEqual(fixed['first'], a, places=4)
+        self.assertAlmostEqual(fixed['delta_t'], b - a, places=4)
+        self.assertEqual([round(m, 4) for m in fixed['measured']], [60.0, 55.0])
+
+    def test_a_delta_t_is_saved_with_its_two_spots_like_the_other_measurements(self):
+        url = self.url(self.task, "measurements")
+        line = {'type': 'LineString', 'coordinates': [list(lonlat(50, 40)), list(lonlat(50, 60))]}
+        res = self.client.post(url, {'name': "Joint", 'shape': 'delta', 'geometry': line, 'isotherm': {'low': 25, 'high': None}},
+                               format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        m = res.data
+        self.assertEqual((m['shape'], m['geometry'], m['isotherm'], m['correction']), ('delta', line, None, None))
+        self.assertAlmostEqual(m['values']['first'], 60.0, places=4)
+        self.assertAlmostEqual(m['values']['second'], 65.0, places=4)
+        self.assertAlmostEqual(m['values']['delta_t'], 5.0, places=4)
+        self.assertEqual([x['name'] for x in self.client.get(url).data['measurements']], ["Joint"])
+        three = dict(line, coordinates=line['coordinates'] + [list(lonlat(1, 1))])
+        self.assertEqual(self.client.post(url, {'name': "Bad", 'shape': 'delta', 'geometry': three}, format="json").status_code,
+                         status.HTTP_400_BAD_REQUEST)
 
     def test_who_can_only_view_the_project_sees_the_saved_measurements_but_cant_change_them(self):
         url = self.url(self.task, "measurements")

@@ -991,13 +991,23 @@ def png_response(content):
     return response
 
 
+def point_query(request):
+    """The lon and lat of a viewer request's query"""
+    try:
+        lon, lat = float(request.query_params.get('lon')), float(request.query_params.get('lat'))
+    except (TypeError, ValueError):
+        raise ValidationError({'error': "lon and lat are required"}) from None
+    if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+        raise ValidationError({'error': "Coordinates out of range"})
+    return lon, lat
+
+
 class MosaicPoint(DatasetView):
     def get(self, request, pk, cid, tab):
         """A viewer tab's values at a point (lon, lat): temperature, source frame and view angle"""
         task = get_conversion(request, pk, cid)
         tab_raster(task, cid, tab)
-        lon, lat, radius = inspector_api.point_query(request)
-        return Response(mosaics.point(task, cid, tab, lon, lat, radius_m=radius))
+        return Response(mosaics.point(task, cid, tab, *point_query(request)))
 
 
 def temperature_raster(task, cid, tab):
@@ -1011,13 +1021,29 @@ class MosaicRegion(DatasetView):
     def post(self, request, pk, cid, tab):
         """The statistics of a temperature tab's values (°C) inside a polygon or along a line, as the Thermal
         Inspector's regions of an orthophoto (inspector_api.region_request); a line's profile names each sample's
-        source frame"""
+        source frame; a ΔT's figures for {shape: "delta"} (inspector_api.delta_values)"""
         task = get_conversion(request, pk, cid)
         temperature_raster(task, cid, tab)
+        if inspector_api.is_delta(request.data):
+            out = inspector_api.delta_values(request.data, mosaic_point(task, cid, tab),
+                                             lambda: correction.workset_baseline(task, cid))
+            out.pop('geometry')
+            return Response(out)
         geometry, percentiles, bins, isotherm, wanted = inspector_api.region_request(request)
         fix = inspector_api.layer_correction(wanted, lambda: correction.workset_baseline(task, cid))
         return inspector_api.region_response(
             lambda: mosaic_region(task, cid, tab, geometry, percentiles, bins, isotherm, fix))
+
+
+def mosaic_point(task, cid, tab):
+    """A point of a temperature tab read for a pin or a ΔT: point(lon, lat) -> (°C or None, why)"""
+    unit = mosaics.result(task, cid).get('unit') or 'C'
+
+    def point(lon, lat):
+        found = mosaics.point(task, cid, tab, lon, lat)
+        t = found.get('temperature')
+        return (None, found.get('reason') or 'nodata') if t is None else (float(inspector.to_celsius(t, unit)), None)
+    return point
 
 
 def mosaic_region(task, cid, tab, geometry, percentiles, bins, isotherm, fix):
@@ -1049,7 +1075,7 @@ class MosaicFrames(DatasetView):
         false for mosaics built without the frames' models (built again, they have them)"""
         task = get_conversion(request, pk, cid)
         tab_raster(task, cid, tab)
-        frames = mosaics.frames_at(task, cid, tab, *inspector_api.point_query(request)[:2])
+        frames = mosaics.frames_at(task, cid, tab, *point_query(request))
         return Response({'frames': frames or [], 'models': frames is not None})
 
 
@@ -1080,19 +1106,12 @@ class MosaicMeasurements(DatasetView):
                                         request.user.has_perm('change_project', task.project))
 
     def post(self, request, pk, cid):
-        """A pin, region or line measured on a tab of temperatures ({tab, ...}) and saved (inspector_api.saved_record)"""
+        """A pin, region, line or ΔT measured on a tab of temperatures ({tab, ...}) and saved (inspector_api.saved_record)"""
         task = get_conversion(request, pk, cid, 'change_project')
         tab = request.data.get('tab') if isinstance(request.data, dict) else None
         temperature_raster(task, cid, tab)
-        unit = mosaics.result(task, cid).get('unit') or 'C'
-
-        def point(lon, lat):
-            found = mosaics.point(task, cid, tab, lon, lat)
-            t = found.get('temperature')
-            return (None, found.get('reason') or 'nodata') if t is None else (float(inspector.to_celsius(t, unit)), None)
-
         record = inspector_api.saved_record(
-            request.data, point, lambda *a: mosaic_region(task, cid, tab, *a),
+            request.data, mosaic_point(task, cid, tab), lambda *a: mosaic_region(task, cid, tab, *a),
             lambda: correction.workset_baseline(task, cid))
         record['tab'] = tab
         return Response(measurements.add(task, measurements.workset_path(task, cid), record, request.user),

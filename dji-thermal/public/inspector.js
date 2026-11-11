@@ -95,6 +95,7 @@
         if (celsius === null || celsius === undefined || isNaN(celsius)) return "";
         return (celsius > 0 ? "+" : "") + formatDelta(celsius, unit);
     }
+    function numberOrNull(v) { return typeof v === "number" && isFinite(v) ? v : null; }
     function formatLength(m, unit) {
         var imperial = (unit || userUnit()) === "F";
         return (imperial ? m * FT_PER_M : m).toFixed(m >= 100 ? 0 : 1) + (imperial ? " ft" : " m");
@@ -142,10 +143,8 @@
         if (t.mosaic) return mosaicBase(t.mosaic) + "/mosaics/" + t.mosaic.tab + "/" + what;
         return API + "projects/" + t.project + "/tasks/" + t.task + "/inspector/" + what;
     }
-    // radius: Delta T From Surroundings' (m)
-    function pointUrl(t, latlng, radius) {
-        return inspectorUrl(t, "point") + "?lon=" + Number(latlng.lng).toFixed(8) + "&lat=" + Number(latlng.lat).toFixed(8) +
-            (radius ? "&radius=" + radius : "");
+    function pointUrl(t, latlng) {
+        return inspectorUrl(t, "point") + "?lon=" + Number(latlng.lng).toFixed(8) + "&lat=" + Number(latlng.lat).toFixed(8);
     }
     // The colours of a palette for the legend: the task's, or for a mosaic the project's
     function paletteUrl(t, name) {
@@ -598,17 +597,23 @@
     function regionsCsv(regions, unit) {
         var u = unit.toLowerCase();
         var rows = [["label", "shape", "pixels", "area_m2", "length_m"].concat(["min", "max", "mean", "std", "median", "p2", "p98", "surroundings", "delta_t"].map(function (s) { return s + "_" + u; }))
-            .concat(["isotherm_share_pct", "coldest_latitude", "coldest_longitude", "hottest_latitude", "hottest_longitude"])];
+            .concat(["isotherm_share_pct", "coldest_latitude", "coldest_longitude", "hottest_latitude", "hottest_longitude", "first_spot_" + u, "second_spot_" + u])];
         regions.forEach(function (r) {
+            var t = function (c) { return c === null || c === undefined ? "" : shownTemp(c, unit).toFixed(3); };
+            var d = function (c) { return c === null || c === undefined ? "" : (unit === "F" ? c * 1.8 : c).toFixed(3); };
+            if (r.shape === "delta") {
+                if (typeof r.delta_t !== "number") return;
+                rows.push([r.label, r.shape, "", "", typeof r.length === "number" ? r.length.toFixed(3) : "", "", "", "", "", "", "", "", "", d(r.delta_t),
+                           "", "", "", "", "", t(r.first), t(r.second)]);
+                return;
+            }
             var s = r.statistics;
             if (!s) return;
-            var t = function (c) { return c === null || c === undefined ? "" : shownTemp(c, unit).toFixed(3); };
             var p = s.percentiles || {};
-            var d = function (c) { return c === null || c === undefined ? "" : (unit === "F" ? c * 1.8 : c).toFixed(3); };
             var share = typeof s.isotherm_share === "number" ? (s.isotherm_share * 100).toFixed(2) : "";
             rows.push([r.label, r.shape, s.count, regionArea(r) === null ? "" : regionArea(r).toFixed(3), typeof r.length === "number" ? r.length.toFixed(3) : "",
                        t(s.min), t(s.max), t(s.mean), d(s.std), t(s.median), t(p["2"]), t(p["98"]), t(s.surroundings), d(s.delta_t), share,
-                       s.min_location[1].toFixed(8), s.min_location[0].toFixed(8), s.max_location[1].toFixed(8), s.max_location[0].toFixed(8)]);
+                       s.min_location[1].toFixed(8), s.min_location[0].toFixed(8), s.max_location[1].toFixed(8), s.max_location[0].toFixed(8), "", ""]);
         });
         return rows.map(function (r) { return r.map(csvCell).join(","); }).join("\n") + "\n";
     }
@@ -631,6 +636,7 @@
     function statisticsHtml(r, unit, iso, pixels) {
         if (r.loading) return '<div class="text-muted"><i class="fa fa-spinner fa-spin"></i> Reading the region…</div>';
         if (r.error) return '<div class="text-danger">' + escapeHtml(r.error) + "</div>";
+        if (r.shape === "delta") return deltaHtml(r, unit, pixels);
         var s = r.statistics;
         if (!s) return '<div class="text-muted">' + escapeHtml(REASONS[r.reason] || "No temperatures in this region") + "</div>";
         var p = s.percentiles || {};
@@ -646,6 +652,20 @@
             return "<tr><td>" + escapeHtml(row[0]) + '</td><td class="text-right">' + escapeHtml(row[1]) + "</td></tr>";
         }).join("") + "</tbody></table>" + (r.profile ? profileHtml(r.profile, unit, r.length, pixels) : histogramHtml(s.histogram, unit)) +
             (r.resampled ? '<div class="text-muted dt-inspector-hint">A large region: read at a reduced resolution.</div>' : "");
+    }
+
+    // A ΔT's figures: each spot's temperature (its pixel's), ΔT (the second's less the first's) and the distance between
+    // them (pixels: on a frame, in pixels)
+    function deltaHtml(r, unit, pixels) {
+        var spot = function (v, reason) {
+            return typeof v === "number" ? formatTemp(v, unit) : pixels && reason === "outside_raster" ? "Outside the frame" : REASONS[reason] || "No data here";
+        };
+        var rows = [["First spot", spot(r.first, (r.reasons || [])[0])], ["Second spot", spot(r.second, (r.reasons || [])[1])],
+                    ["ΔT", typeof r.delta_t === "number" ? formatSigned(r.delta_t, unit) : ""]];
+        if (typeof r.length === "number") rows.push(["Distance", pixels ? r.length.toFixed(1) + " px" : formatLength(r.length, unit)]);
+        return '<table class="table table-condensed dt-inspector-stats dt-inspector-delta-figures"><tbody>' + rows.filter(function (row) { return row[1]; }).map(function (row) {
+            return "<tr><td>" + escapeHtml(row[0]) + '</td><td class="text-right">' + escapeHtml(row[1]) + "</td></tr>";
+        }).join("") + "</tbody></table>";
     }
 
     var HIST_W = 240, HIST_H = 48;
@@ -698,13 +718,14 @@
 
     function regionsHtml(state, unit) {
         var regions = state.regions;
-        if (!regions.length) return '<div class="text-muted dt-inspector-hint">Choose a shape or the line, then draw on the map to read a region\'s temperatures.</div>';
+        if (!regions.length) return '<div class="text-muted dt-inspector-hint">Choose a shape or the line, then draw on the map to read a region\'s temperatures, or ΔT to compare two spots.</div>';
         var shown = regions.filter(function (r) { return r.id === state.shown; })[0];
         return '<table class="table table-condensed dt-inspector-pins dt-inspector-regions"><tbody>' + regions.map(function (r) {
             var s = r.statistics;
             return '<tr data-region="' + escapeHtml(r.id) + '"' + (r === shown ? ' class="active"' : "") + '><td><i class="' + SHAPES[r.shape] + '"></i> ' +
                 '<a href="javascript:void(0)" data-act="goto" title="Show on the map">' + escapeHtml(r.label) + "</a></td><td>" +
-                (s ? escapeHtml(formatTemp(s.mean, unit)) + ' <span class="text-muted">mean</span>' :
+                (r.shape === "delta" && typeof r.delta_t === "number" ? escapeHtml(formatSigned(r.delta_t, unit)) + ' <span class="text-muted">ΔT</span>' :
+                    s ? escapeHtml(formatTemp(s.mean, unit)) + ' <span class="text-muted">mean</span>' :
                     '<span class="text-muted">' + escapeHtml(r.loading ? "…" : REASONS[r.reason] || "none") + "</span>") +
                 '</td><td class="text-right">' + saveLink(state, r) + '<a href="javascript:void(0)" data-act="remove" title="Remove"><i class="fa fa-times"></i></a></td></tr>';
         }).join("") + "</tbody></table>" + formHtml(state.form, "region") +
@@ -723,10 +744,7 @@
         if (!r) return '<span class="text-muted">Move the cursor over a thermal layer.' + (frames ? " Click it to see the frames that saw the point." : "") + "</span>";
         if (r.error) return '<span class="text-danger">' + escapeHtml(r.error) + "</span>";
         if (!r.valid) return '<span class="text-muted">' + escapeHtml(REASONS[r.reason] || "No temperature here") + "</span>";
-        // The temperature less its surroundings' (within Delta T From Surroundings' circle), as the mosaic viewer's says it
-        var d = typeof r.difference === "number" ? ' <span class="dt-inspector-delta">ΔT from surroundings ' +
-            escapeHtml(formatSigned(r.difference, unit)) + "</span>" : "";
-        return '<span class="dt-inspector-temp">' + escapeHtml(formatTemp(r.temperature, unit)) + "</span>" + d;
+        return '<span class="dt-inspector-temp">' + escapeHtml(formatTemp(r.temperature, unit)) + "</span>";
     }
 
     // state: the panel's (its pins, form, what can be saved and the corrected temperatures)
@@ -790,6 +808,7 @@
     function savedValue(m, unit) {
         var v = m.values || {};
         if (m.shape === "pin") return v.temperature === null || v.temperature === undefined ? '<span class="text-muted">' + escapeHtml(REASONS[v.reason] || "none") + "</span>" : escapeHtml(formatTemp(v.temperature, unit));
+        if (m.shape === "delta") return typeof v.delta_t === "number" ? escapeHtml(formatSigned(v.delta_t, unit)) + ' <span class="text-muted">ΔT</span>' : '<span class="text-muted">' + escapeHtml(REASONS[v.reason] || "none") + "</span>";
         return v.statistics ? escapeHtml(formatTemp(v.statistics.mean, unit)) + ' <span class="text-muted">mean</span>' : '<span class="text-muted">' + escapeHtml(REASONS[v.reason] || "none") + "</span>";
     }
 
@@ -838,7 +857,8 @@
         var u = unit.toLowerCase();
         var head = ["name", "comment", "shape", "layer", "tab", "created_at", "created_by", "latitude", "longitude", "temperature_" + u,
                     "pixels", "area_m2", "length_m"].concat(["min", "max", "mean", "std", "median", "p2", "p98", "surroundings", "delta_t"].map(function (k) { return k + "_" + u; }))
-            .concat(["isotherm_low_" + u, "isotherm_high_" + u, "isotherm_share_pct", "emissivity", "reflected_" + u, "measured_emissivity", "measured_reflected_" + u]);
+            .concat(["isotherm_low_" + u, "isotherm_high_" + u, "isotherm_share_pct", "emissivity", "reflected_" + u, "measured_emissivity", "measured_reflected_" + u,
+                     "first_spot_" + u, "second_spot_" + u]);
         var t = function (c) { return c === null || c === undefined ? "" : Number(shownTemp(c, unit).toFixed(3)); };
         var d = function (c) { return c === null || c === undefined ? "" : Number((unit === "F" ? c * 1.8 : c).toFixed(3)); };
         var rows = items.map(function (i) {
@@ -847,9 +867,10 @@
             return [m.name, m.comment || "", m.shape, i.source.name, m.tab || "", m.created_at || "", m.created_by || "",
                     pin ? Number(pin[1].toFixed(8)) : "", pin ? Number(pin[0].toFixed(8)) : "", t(v.temperature), s.count === undefined ? "" : s.count,
                     area === null ? "" : Number(area.toFixed(3)), typeof v.length === "number" ? Number(v.length.toFixed(3)) : "",
-                    t(s.min), t(s.max), t(s.mean), d(s.std), t(s.median), t(p["2"]), t(p["98"]), t(s.surroundings), d(s.delta_t),
+                    t(s.min), t(s.max), t(s.mean), d(s.std), t(s.median), t(p["2"]), t(p["98"]), t(s.surroundings), d(m.shape === "delta" ? v.delta_t : s.delta_t),
                     t(iso.low), t(iso.high), typeof s.isotherm_share === "number" ? Number((s.isotherm_share * 100).toFixed(2)) : "",
-                    c ? c.emissivity : "", c ? t(c.reflected) : "", c ? c.baseline.emissivity : "", c ? t(c.baseline.reflected) : ""];
+                    c ? c.emissivity : "", c ? t(c.reflected) : "", c ? c.baseline.emissivity : "", c ? t(c.baseline.reflected) : "",
+                    t(v.first), t(v.second)];
         });
         return {head: head, rows: rows};
     }
@@ -903,18 +924,20 @@
         return '<div class="dt-inspector-top"><div class="dt-inspector-head"><strong><i class="fa fa-thermometer-half"></i> Thermal Inspector</strong>' +
             '<a href="javascript:void(0)" class="dt-inspector-close" data-act="close" title="Close"><i class="fa fa-times"></i></a></div>' +
             '<div class="btn-group btn-group-xs dt-inspector-modes">' +
-            ["hover", "pin", "rectangle", "circle", "polygon", "line"].map(function (m) {
+            ["hover", "delta", "pin", "rectangle", "circle", "polygon", "line"].map(function (m) {
                 var label = m === "hover" ? '<i class="fa fa-mouse-pointer"></i> Hover' : m === "pin" ? '<i class="' + Regions.TOOLS.pin.icon + '"></i> Pin' :
-                    '<i class="' + SHAPES[m] + '"></i>';
+                    m === "delta" ? '<i class="' + SHAPES.delta + '"></i> ' + SHAPE_NAMES.delta : '<i class="' + SHAPES[m] + '"></i>';
                 return '<button type="button" class="btn btn-' + (state.mode === m ? "primary" : "default") + '" data-mode="' + m + '"' +
-                    (SHAPES[m] ? ' title="' + (m === "line" ? "Draw a line: its temperatures along it" : "Draw a region: " + SHAPE_NAMES[m].toLowerCase()) + '"' : "") + ">" + label + "</button>";
+                    (SHAPES[m] ? ' title="' + (m === "line" ? "Draw a line: its temperatures along it" : m === "delta" ? "ΔT: click two spots, the second's temperature less the first's" :
+                        "Draw a region: " + SHAPE_NAMES[m].toLowerCase()) + '"' : "") + ">" + label + "</button>";
             }).join("") + "</div>" +
+            (state.mode === "delta" ? '<div class="text-muted dt-inspector-hint">Click the first spot, then the second: ΔT is the second\'s temperature less the first\'s. Esc cancels.</div>' : "") +
             (state.mode === "polygon" ? '<div class="text-muted dt-inspector-hint">Click the corners; double-click or Enter finishes, Esc cancels.</div>' : "") +
             (state.mode === "line" ? '<div class="text-muted dt-inspector-hint">Click the line\'s points; double-click or Enter finishes, Esc cancels.</div>' : "") +
             (state.notice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.notice) + "</div>" : "") +
             '<div class="dt-inspector-pointer"><strong>Pointer Info</strong>' +
             '<label class="dt-inspector-check"><input type="checkbox" data-act="pointer-temperature"' + (state.pointerTemperature ? " checked" : "") +
-            "> Temperature On Pointer</label>" + Regions.surroundingsHtml(state.surroundings, unit, 'data-act="surroundings"') + "</div>" +
+            "> Temperature On Pointer</label></div>" +
             '<div class="dt-inspector-readout">' + readoutHtml(state.readout, unit, state.frames) + "</div>" +
             (options.length ? '<label class="dt-inspector-label">Palette <select class="form-control input-sm" data-act="palette">' +
                 options.map(function (o) {
@@ -961,12 +984,12 @@
         var state = {open: false, mode: "hover", readout: null, pins: loadPins(storage, key), pinsVisible: true,
                      regions: regions, regionsVisible: true, shown: regions.length ? regions[regions.length - 1].id : null,
                      notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
-                     legendVisible: false, pointerTemperature: true, surroundings: Regions.RADIUS.value, mosaics: null, laid: {}, frames: false, pick: null,
+                     legendVisible: false, pointerTemperature: true, mosaics: null, laid: {}, frames: false, pick: null,
                      correction: {on: false}, correctionNotice: "", sources: {}, onMap: [], savedVisible: true,
                      savedShown: null, form: null, savable: {}, scale: null, rangeError: ""};
         var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
         var search = deps.search !== undefined ? deps.search : root.location && root.location.search;
-        var container, panel, frameBox, panelMove, legendMove, frameMove, framesMoved = false, cursor, circle, hovered = null, pinLayer, regionLayer, savedLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
+        var container, panel, frameBox, panelMove, legendMove, frameMove, framesMoved = false, cursor, pinLayer, regionLayer, savedLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
         var profileMarker = null, profileAt = null;     // the point of the profile hovered, on the map
         var pickSeq = 0;                    // the frames asked for last
         var overlays = [], colors = {};     // the isotherm's layer over each thermal layer; each palette's colours
@@ -982,7 +1005,10 @@
             state.pinTemp = pinTemp;
             state.savable = {};
             state.pins.forEach(function (p) { state.savable[p.id] = canSaveAt({lat: p.lat, lng: p.lng}); });
-            state.regions.forEach(function (r) { state.savable[r.id] = !!r.statistics && canSaveAt(regionBounds(r).getCenter()); });
+            state.regions.forEach(function (r) {
+                var measured = r.shape === "delta" ? typeof r.delta_t === "number" : !!r.statistics;
+                state.savable[r.id] = measured && canSaveAt(regionBounds(r).getCenter());
+            });
             state.scale = scaleState();
             state.correctionDefault = correctionDefault();
             panel.innerHTML = panelHtml(state);
@@ -1046,7 +1072,7 @@
         // correction measured again
         function correctionChanged() {
             state.regions.forEach(function (r) {
-                if (r.loading || (!r.statistics && !r.reason)) return;
+                if (r.loading || (!r.statistics && !r.reason && r.first === undefined)) return;
                 var t = thermalLayerAt(map, regionBounds(r).getCenter()) || thermalLayers(map)[0];
                 if (t && (r.correction || "null") !== fixKey(fixFor(t))) measure(r);
             });
@@ -1405,6 +1431,10 @@
             if (!state.regionsVisible) return;
             state.regions.forEach(function (r) {
                 var style = r.id === state.shown ? Regions.STYLE : {color: Regions.STYLE.color, weight: 1, opacity: 0.8, fillOpacity: 0.05};
+                if (r.shape === "delta") {
+                    return deltaLayers(latLngs(r), style.color, r.label + (typeof r.delta_t === "number" ? ": ΔT " + formatSigned(r.delta_t) : ""), "dt-inspector-tip")
+                        .forEach(function (l) { regionLayer.addLayer(l); });
+                }
                 var shape = r.circle ? L.circle([r.circle.lat, r.circle.lng], assign({radius: r.circle.radius, interactive: false}, style)) :
                     r.shape === "line" ? L.polyline(latLngs(r), assign({interactive: false}, style, {weight: style.weight + 1})) :
                     L.polygon(latLngs(r), assign({interactive: false}, style));
@@ -1418,6 +1448,14 @@
                     regionLayer.addLayer(extremeMarker(r, "max"));
                 }
             });
+        }
+
+        // A ΔT on the map: a thin line between its spots, a dot at each (the first hollow), the label at the second
+        function deltaLayers(points, color, label, className) {
+            var dot = function (p, fill) { return L.circleMarker(p, {radius: 4, color: color, weight: 2, fillColor: fill, fillOpacity: 1, interactive: false}); };
+            var second = dot(points[1], color);
+            second.bindTooltip(label, {permanent: true, direction: "right", className: className});
+            return [L.polyline(points, {color: color, weight: 1.5, opacity: 0.95, dashArray: "4 3", interactive: false}), dot(points[0], "#fff"), second];
         }
 
         function regionsChanged() {
@@ -1447,6 +1485,10 @@
                 if (m.shape === "pin") {
                     var c = m.geometry.coordinates;
                     shape = L.circleMarker([c[1], c[0]], {radius: 5, color: "#fff", weight: 2, fillColor: SAVED_STYLE.color, fillOpacity: 1, interactive: false});
+                } else if (m.shape === "delta") {
+                    var v = m.values || {};
+                    return deltaLayers(savedLatLngs(m), SAVED_STYLE.color, m.name + (typeof v.delta_t === "number" ? ": ΔT " + formatSigned(v.delta_t) : ""),
+                                       "dt-inspector-tip dt-inspector-saved-tip").forEach(function (l) { savedLayer.addLayer(l); });
                 } else if (m.circle) shape = L.circle([m.circle.lat, m.circle.lng], assign({radius: m.circle.radius, interactive: false}, style));
                 else if (m.shape === "line") shape = L.polyline(savedLatLngs(m), assign({interactive: false}, style, {weight: style.weight + 1}));
                 else shape = L.polygon(savedLatLngs(m), assign({interactive: false}, style));
@@ -1555,13 +1597,17 @@
             var iso = limitsKey(state.isotherm), fix = fixFor(t);
             return fetchFn(inspectorUrl(t, "region"), {method: "POST", credentials: "same-origin",
                 headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken(doc)},
-                body: JSON.stringify({geometry: r.geometry, isotherm: isothermLimits(state.isotherm), correction: fix ? fix.wanted : null})}).then(readJson).then(function (res) {
+                body: JSON.stringify({geometry: r.geometry, shape: r.shape === "delta" ? "delta" : undefined, isotherm: isothermLimits(state.isotherm),
+                                      correction: fix ? fix.wanted : null})}).then(readJson).then(function (res) {
                 if (!res.ok) return {error: (res.data && (res.data.error || res.data.detail)) || "Could not read the region"};
                 return res.data;
             }, function () { return {error: "Could not read the region"}; }).then(function (data) {
                 r.loading = false;
                 if (data.error) r.error = data.error;
-                else assign(r, {statistics: data.statistics || null, reason: data.reason || null, pixel_size: data.pixel_size,
+                else if (r.shape === "delta") {
+                    assign(r, {statistics: null, reason: data.reason || null, first: numberOrNull(data.first), second: numberOrNull(data.second),
+                               delta_t: numberOrNull(data.delta_t), reasons: data.reasons || [], length: data.length, correction: fixKey(fix)});
+                } else assign(r, {statistics: data.statistics || null, reason: data.reason || null, pixel_size: data.pixel_size,
                                 resampled: !!data.resampled, length: data.length, profile: data.profile || null, isotherm: iso, correction: fixKey(fix)});
                 if (state.regions.indexOf(r) === -1) return;
                 // The correction changed while it was measured
@@ -1573,7 +1619,7 @@
         function regionDrawn(shape, drawn) {
             drawnAt = Date.now();
             map.removeLayer(drawn.layer);       // drawn again with the others
-            var prefix = shape === "line" ? "L" : "R";
+            var prefix = shape === "line" ? "L" : shape === "delta" ? "D" : "R";
             var n = state.regions.reduce(function (m, r) {
                 return String(r.label).charAt(0) === prefix ? Math.max(m, Number(String(r.label).replace(/\D/g, "")) || 0) : m;
             }, 0) + 1;
@@ -1603,23 +1649,14 @@
 
         // The temperature at a point of a thermal layer, in °C (a mosaic's in its unit; a frame's alone isn't one)
         function query(t, latlng) {
-            return fetchFn(pointUrl(t, latlng, state.surroundings), {credentials: "same-origin"}).then(readJson).then(function (r) {
+            return fetchFn(pointUrl(t, latlng), {credentials: "same-origin"}).then(readJson).then(function (r) {
                 if (!r.ok) return {error: (r.data && (r.data.error || r.data.detail)) || "Could not read the temperature"};
                 if (t.mosaic) {
                     var c = typeof r.data.temperature === "number" ? toCelsius(r.data.temperature, t.mosaic.unit) : null;
-                    // A difference in °C: scaled, never shifted
-                    var d = typeof r.data.difference === "number" ? (t.mosaic.unit === "F" ? r.data.difference / 1.8 : r.data.difference) : null;
-                    return assign({}, r.data, {temperature: c, difference: d, valid: c !== null, reason: c !== null ? null : r.data.reason || "nodata"});
+                    return assign({}, r.data, {temperature: c, valid: c !== null, reason: c !== null ? null : r.data.reason || "nodata"});
                 }
                 return r.data;
             }, function () { return {error: "Could not read the temperature"}; });
-        }
-
-        // A point's reading (query's) corrected as its layer is, the point and its surroundings alike
-        function correctedReadout(t, r) {
-            var fix = fixFor(t);
-            return fix && r && r.valid ? assign({}, r, {temperature: corrected(r.temperature, fix),
-                difference: typeof r.difference === "number" ? corrected(r.temperature, fix) - corrected(r.temperature - r.difference, fix) : r.difference}) : r;
         }
 
         function onMove(e) {
@@ -1627,20 +1664,16 @@
             var t = thermalLayerAt(map, e.latlng);
             if (timer) clearTimeout(timer);
             var mine = ++seq;
-            hovered = t ? {t: t, latlng: e.latlng} : null;
             if (!t) {
                 state.readout = null;
                 cursor.style.display = "none";
-                circle.hide();
                 return renderReadout();
             }
-            // Delta T From Surroundings' circle around the pointer, but while a region is drawn
-            if (!SHAPES[state.mode]) circle.show(e.latlng, state.surroundings);
             timer = setTimeout(function () {
                 query(t, e.latlng).then(function (r) {
                     if (mine !== seq || !state.open) return;
-                    if (!(r && typeof r.difference === "number")) circle.hide();
-                    state.readout = correctedReadout(t, r);
+                    var fix = fixFor(t);
+                    state.readout = fix && r && r.valid ? assign({}, r, {temperature: corrected(r.temperature, fix)}) : r;
                     renderReadout();
                     // The temperature the panel shows, corrected as it is
                     var text = state.pointerTemperature && r && r.valid ? formatTemp(state.readout.temperature) : "";
@@ -1659,30 +1692,6 @@
             seq++;
             if (timer) clearTimeout(timer);
             cursor.style.display = "none";
-            circle.hide();
-        }
-
-        // Delta T From Surroundings: the circle's radius as the slider moves, then saved as the user's preference (for
-        // the Analyzer's pages too; never from a public map) and the point last hovered read again over it
-        function slideSurroundings(target) {
-            state.surroundings = Number(target.value);
-            var shown = target.parentNode && target.parentNode.querySelector(".dt-surroundings-value");
-            if (shown) shown.textContent = Regions.formatRadius(state.surroundings, userUnit());
-        }
-        function chooseSurroundings(target) {
-            slideSurroundings(target);
-            var at = hovered, mine = ++seq;
-            if (at) {
-                query(at.t, at.latlng).then(function (r) {
-                    if (mine !== seq || !state.open) return;
-                    state.readout = correctedReadout(at.t, r);
-                    renderReadout();
-                });
-            }
-            if (publicMap) return;
-            fetchFn(API + "display", {method: "PUT", credentials: "same-origin",
-                headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken(doc)},
-                body: JSON.stringify({surroundings_m: state.surroundings})}).catch(function () {});
         }
 
         // A click while pinning pins the point and is not WebODM's (no popup), nor is one while drawing
@@ -2102,7 +2111,6 @@
             var what = e.target.getAttribute("data-act") || "";
             if (what === "palette") choosePalette(e.target.value);
             else if (what === "pointer-temperature") choosePointerTemperature(e.target.checked);
-            else if (what === "surroundings") chooseSurroundings(e.target);
             else if (what.indexOf("isotherm-") === 0) isothermInput(what.slice("isotherm-".length), e.target.value);
             else if (what.indexOf("range-") === 0 || what.indexOf("image-") === 0) onScaleInput(what, e.target);
             else if (what.indexOf("correction-") === 0) {
@@ -2127,8 +2135,6 @@
             setMode("hover");
             state.open = false;
             state.readout = null;
-            hovered = null;
-            circle.hide();
             container.classList.remove("open");
             plainPointer();
             onOut();
@@ -2172,7 +2178,6 @@
                     if (field && state.form) state.form[field] = e.target.value;
                     // While a slider moves, the tiles, the scale, the boxes and the legend follow
                     if (/^image-(brightness|contrast|gamma|sharpen)$/.test((e.target.getAttribute && e.target.getAttribute("data-act")) || "")) slide(e.target);
-                    else if (e.target.getAttribute && e.target.getAttribute("data-act") === "surroundings") slideSurroundings(e.target);
                 });
                 panel.addEventListener("keydown", function (e) {
                     if (e.key === "Enter" && e.target.getAttribute && e.target.getAttribute("data-form") === "name") submitForm();
@@ -2200,7 +2205,6 @@
         map.addControl(new LegendControl());
         cursor = L.DomUtil.create("div", "dt-inspector-cursor", map.getContainer());
         cursor.style.display = "none";
-        circle = new Regions.SurroundingsCircle(L, map);
         savedLayer = L.layerGroup().addTo(map);
         regionLayer = L.layerGroup().addTo(map);
         pinLayer = L.layerGroup().addTo(map);
@@ -2233,7 +2237,6 @@
                 state.legendVisible = !r.ok || r.data.legend !== false;
                 // On unless the user cleared it, here or on the Analyzer's pages
                 state.pointerTemperature = !r.ok || r.data.pointer_temperature !== false;
-                if (r.ok) state.surroundings = Regions.radiusOf(r.data.surroundings_m);
                 plainPointer();
                 if (!r.ok) return renderLegend();
                 state.display = r.data;

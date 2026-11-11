@@ -261,11 +261,6 @@
 body:not(.leaflet-dragging) .leaflet-container.dt-pointer-plain.leaflet-grab{ cursor: default; }
 .ta-viewer .ta-pointer-check{ display: block; margin: 2px 0 6px; font-weight: normal; }
 .ta-viewer .ta-pointer-check input{ margin: 0 4px 0 0; vertical-align: -2px; }
-/* Delta T From Surroundings: its slider (regions.js) and its circle around the pointer, outlined so it shows on any palette */
-.ta-viewer .dt-surroundings-field{ display: block; margin: 0 0 6px; font-weight: normal; }
-.ta-viewer .dt-surroundings-field input{ display: block; width: 100%; margin-top: 2px; }
-.ta-viewer .dt-surroundings-value{ float: right; color: #777; }
-.dt-surroundings-circle{ filter: drop-shadow(0 0 1px #000); }
 .ta-viewer .ta-pointer-temp{ position: absolute; z-index: 1000; pointer-events: none; padding: 1px 5px; border-radius: 3px;
     background: rgba(0, 0, 0, .75); color: #fff; font-size: 12px; white-space: nowrap; }
 .ta-viewer .ta-viewer-panel{ flex: 0 0 300px; max-height: calc(100vh - 230px); overflow-y: auto; font-size: 13px; }

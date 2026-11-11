@@ -281,6 +281,27 @@ const SHOTS = {
         await p.waitForTimeout(1000);
         return p;
     },
+    "inspector-delta": async (p, env) => {
+        // ΔT between two spots of the map's thermal orthophoto: each spot's temperature and their difference
+        await p.setViewportSize({width: SIZE.width, height: 1000});
+        await p.goto(env.url + need(env, "DT_DOCS_MAP"));
+        await p.waitForSelector(".dt-inspector-button", {timeout: 30000});
+        await p.waitForTimeout(3000);
+        await p.click(".dt-inspector-button");
+        const map = await p.locator(".leaflet-container").first().boundingBox();
+        const at = (fx, fy) => [map.x + map.width * fx, map.y + map.height * fy];
+        await p.click('.dt-inspector-modes [data-mode="delta"]');
+        await p.mouse.click(...at(0.38, 0.5));
+        await p.waitForTimeout(300);
+        await p.mouse.click(...at(0.52, 0.44));
+        await p.waitForSelector(".dt-inspector-delta-figures", {timeout: 30000});
+        // The panel is drawn again as it reads: scrolled to the figures once they are there
+        await p.waitForTimeout(500);
+        await p.evaluate(() => document.querySelector(".dt-inspector-shown").scrollIntoView({block: "nearest"}));
+        await p.mouse.move(...at(0.2, 0.85));
+        await p.waitForTimeout(800);
+        return p;
+    },
     "inspector-image": async (p, env) => {
         // The colour scale and the Image section under Palette: the contrast raised, gamma above 1 and some sharpening
         // (not Equalized: its histogram would be kept on the server, and the script stays read only)

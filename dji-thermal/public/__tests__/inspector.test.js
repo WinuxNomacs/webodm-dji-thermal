@@ -30,8 +30,6 @@ function fakeLeaflet() {
     const layer = extra => Object.assign({addTo(m) { m.added.push(this); return this; }}, extra);
     L.layerGroup = () => layer({layers: [], addLayer(l) { this.layers.push(l); }, clearLayers() { this.layers = []; }});
     L.circleMarker = (latlng, opts) => ({latlng, opts, bindTooltip(text) { this.tooltip = text; return this; }});
-    // Delta T From Surroundings' circle (regions.js)
-    L.circle = (latlng, opts) => layer({circle: latlng, opts, setLatLng(p) { this.circle = p; }, setRadius(r) { this.opts.radius = r; }});
     L.DomUtil = {create(tag, cls, parent) { const el = document.createElement(tag); el.className = cls; if (parent) parent.appendChild(el); return el; }};
     L.DomEvent = {disableClickPropagation() {}, disableScrollPropagation() {}};
     L.Control = {extend(proto) { return function () { Object.assign(this, proto); }; }};
@@ -118,9 +116,6 @@ describe("the Thermal Inspector", () => {
         expect(inspector.formatTemp(21.5)).toBe("70.70 °F");
         expect(inspector.formatTemp(null)).toBe("");
         expect(inspector.readoutHtml({valid: false, reason: "excluded"}, "C")).toContain("Outside the task&#39;s crop");
-        // The temperature less its surroundings', scaled into °F
-        expect(inspector.readoutHtml({valid: true, temperature: 20, difference: -1.5}, "F")).toContain("ΔT from surroundings -2.70 °F");
-        expect(inspector.readoutHtml({valid: true, temperature: 20, difference: null}, "C")).not.toContain("ΔT");
     });
 
     it("shows temperatures in the unit units.js gives (an anonymous viewer's default) over WebODM's", () => {
@@ -173,7 +168,7 @@ describe("the Thermal Inspector", () => {
     it("reads the temperature where the cursor rests, beside it and in the panel", async () => {
         jest.useFakeTimers();
         const map = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
-        const {ins, fetchFn, panel} = start(map, {[POINT]: {valid: true, temperature: 52.5, difference: 2.25}});
+        const {ins, fetchFn, panel} = start(map, {[POINT]: {valid: true, temperature: 52.5}});
         ins.open();
         map.fire("mousemove", {latlng: {lat: 0.6, lng: 0.5}});
         map.fire("mousemove", {latlng: {lat: 0.7, lng: 0.5}});
@@ -181,8 +176,8 @@ describe("the Thermal Inspector", () => {
         jest.useRealTimers();
         await flush(); await flush();
         expect(fetchFn.mock.calls.filter(c => c[0].indexOf("/point") >= 0).map(c => c[0])).toEqual([
-            "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/point?lon=0.50000000&lat=0.70000000&radius=1"]);
-        expect(panel().querySelector(".dt-inspector-readout").textContent).toBe("52.50 °C ΔT from surroundings +2.25 °C");
+            "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/point?lon=0.50000000&lat=0.70000000"]);
+        expect(panel().querySelector(".dt-inspector-readout").textContent).toBe("52.50 °C");
         expect(map.el.querySelector(".dt-inspector-cursor").textContent).toBe("52.50 °C");
     });
 
@@ -220,57 +215,6 @@ describe("the Thermal Inspector", () => {
         expect(panel().querySelector(".dt-inspector-readout").textContent).toContain("52.50 °C");
         expect(label.style.display).toBe("none");
         expect(box().checked).toBe(false);
-    });
-
-    it("measures ΔT from surroundings within the circle Delta T From Surroundings sets, drawn around the pointer, saved for the user", async () => {
-        const map = fakeMap([tileLayer(TILES, THERMAL_TASK)]);
-        // The difference grows with the radius asked for; none where the point has no temperature
-        const point = url => {
-            const radius = Number(new URL(url, "http://x").searchParams.get("radius"));
-            return jsonResponse(url.indexOf("lat=0.90000000") >= 0 ? {valid: false, reason: "nodata"} : {valid: true, temperature: 52.5, difference: radius});
-        };
-        const {ins, fetchFn, panel} = start(map, {[POINT]: point,
-                                                  "GET /api/plugins/dji-thermal/display": Object.assign({}, DISPLAY, {surroundings_m: 2}),
-                                                  "PUT /api/plugins/dji-thermal/display": Object.assign({}, DISPLAY, {surroundings_m: 3.5})});
-        await ins.ready; await flush();
-        ins.open();
-        const slider = () => panel().querySelector('[data-act="surroundings"]'), circle = () => map.added.find(l => l.circle);
-        const readout = () => panel().querySelector(".dt-inspector-readout").textContent;
-        const hover = async lat => {
-            map.fire("mousemove", {latlng: {lat, lng: 0.5}});
-            await new Promise(r => setTimeout(r, 100));
-            await flush(); await flush();
-        };
-        // Under Pointer Info, after Temperature On Pointer, at the radius the user chose
-        expect(slider().closest(".dt-inspector-pointer")).not.toBeNull();
-        expect(slider().parentNode.textContent).toBe("Delta T From Surroundings 2.00 m");
-        expect(slider().value).toBe("2");
-        // The circle around the pointer, the point read within it
-        await hover(0.7);
-        expect([circle().circle, circle().opts.radius]).toEqual([{lat: 0.7, lng: 0.5}, 2]);
-        expect(readout()).toBe("52.50 °C ΔT from surroundings +2.00 °C");
-        expect(fetchFn.mock.calls.map(c => c[0]).filter(u => u.indexOf("/point") >= 0).pop()).toContain("&radius=2");
-        // Where the point has no temperature, none
-        await hover(0.9);
-        expect(circle()).toBeUndefined();
-        await hover(0.7);
-        map.fire("mouseout");
-        expect(circle()).toBeUndefined();
-
-        // Moved and let go: the point last hovered read again within it, and saved for the user (the Analyzer's pages too)
-        slider().value = "3.5";
-        slider().dispatchEvent(new Event("input", {bubbles: true}));
-        expect(slider().parentNode.textContent).toBe("Delta T From Surroundings 3.50 m");
-        slider().dispatchEvent(new Event("change", {bubbles: true}));
-        await flush(); await flush();
-        expect(readout()).toBe("52.50 °C ΔT from surroundings +3.50 °C");
-        const put = fetchFn.mock.calls.filter(c => c[1] && c[1].method === "PUT");
-        expect(put.map(c => [c[0], JSON.parse(c[1].body)])).toEqual([["/api/plugins/dji-thermal/display", {surroundings_m: 3.5}]]);
-        await hover(0.7);
-        expect(circle().opts.radius).toBe(3.5);
-        // Closed: none
-        ins.close();
-        expect(circle()).toBeUndefined();
     });
 
     it("leaves Temperature On Pointer cleared when the user cleared it", async () => {
@@ -457,7 +401,7 @@ describe("the Thermal Inspector's regions", () => {
         expect(saved[0]).toMatchObject({label: "R1", shape: "rectangle", statistics: {mean: 30}});
         expect(saved[0].loading).toBeUndefined();
         expect(inspector.regionsCsv(saved, "F").split("\n")[1]).toBe(
-            "R1,rectangle,400,100.000,,50.000,122.000,86.000,9.000,85.100,53.600,118.400,78.800,7.200,,0.50010000,0.49990000,0.50020000,0.49980000");
+            "R1,rectangle,400,100.000,,50.000,122.000,86.000,9.000,85.100,53.600,118.400,78.800,7.200,,0.50010000,0.49990000,0.50020000,0.49980000,,");
         window.localStorage.setItem("unit_system", "imperial");
         expect(inspector.statisticsHtml(saved[0], "F")).toContain("1076 ft²");
         panel().querySelector('[data-region] [data-act="remove"]').click();
@@ -599,6 +543,74 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         ticks.forEach(([at, label]) => expect(at).toBeCloseTo((inspector.uncorrected(label, half) - 10) / 30 * 100, 0));
     });
 
+    it("measures ΔT between two spots clicked after choosing ΔT beside Hover, the second's temperature less the first's", async () => {
+        const map = leafletMap();
+        const DELTA = {valid: true, reason: null, first: 20, second: 26.5, delta_t: 6.5, reasons: [null, null], length: 2.31, measured: [20, 26.5], correction: null};
+        const {ins, fetchFn, panel} = start(map, {[REGION]: DELTA}, {L});
+        const posts = () => calls(fetchFn, "POST").map(c => JSON.parse(c[1].body));
+        ins.open();
+        const modes = [...panel().querySelectorAll(".dt-inspector-modes [data-mode]")].map(b => b.getAttribute("data-mode"));
+        expect(modes.slice(0, 3)).toEqual(["hover", "delta", "pin"]);
+        expect(panel().querySelector('[data-mode="delta"]').textContent.trim()).toBe("ΔT");
+        panel().querySelector('[data-mode="delta"]').click();
+        expect(panel().textContent).toContain("Click the first spot, then the second");
+        map.fire("click", {latlng: L.latLng(0.5, 0.5)});
+        expect(posts(fetchFn)).toEqual([]);
+        map.fire("click", {latlng: L.latLng(0.5, 0.50002)});
+        await flush(); await flush();
+        expect(posts(fetchFn)).toEqual([{geometry: {type: "LineString", coordinates: [[0.5, 0.5], [0.50002, 0.5]]}, shape: "delta", isotherm: null, correction: null}]);
+        expect(ins.state.mode).toBe("hover");
+        const shown = panel().querySelector(".dt-inspector-shown");
+        ["D1", "ΔT", "First spot20.00 °C", "Second spot26.50 °C", "ΔT+6.50 °C", "Distance2.3 m"].forEach(t => expect(shown.textContent).toContain(t));
+        expect(shown.textContent).not.toContain("Mean");
+        expect(panel().querySelector("[data-region]").textContent).toContain("+6.50 °C ΔT");
+        const tips = [];
+        map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) tips.push([l.getTooltip()._content, l.getLatLng()]); });
+        expect(tips).toEqual([["D1: ΔT +6.50 °C", L.latLng(0.5, 0.50002)]]);     // at the second spot
+        expect(inspector.regionsCsv(ins.state.regions, "F").split("\n")[1]).toBe("D1,delta,,,2.310,,,,,,,,,11.700,,,,,,68.000,79.700");
+
+        // A spot with no temperature: no ΔT, and which one says why
+        const missing = Object.assign({}, DELTA, {valid: false, reason: "nodata", second: null, delta_t: null, reasons: [null, "nodata"]});
+        expect(inspector.statisticsHtml(Object.assign({shape: "delta"}, missing), "C")).toContain("No data here");
+        map.remove();
+    });
+
+    it("saves a ΔT like the other measurements, listed with its ΔT and both spots in the CSV", async () => {
+        const map = leafletMap();
+        const DELTA = {valid: true, reason: null, first: 20, second: 18, delta_t: -2, reasons: [null, null], length: 3, measured: [20, 18]};
+        let saved = null;
+        const {ins, fetchFn, panel} = start(map, {
+            [REGION]: DELTA,
+            ["GET " + SAVED]: {measurements: [], can_change: true, baseline: BASELINE},
+            ["POST " + SAVED]: (url, opts) => {
+                saved = Object.assign({}, JSON.parse(opts.body), {id: "0123456789ab", values: DELTA, created_by: "ana", created_at: "2026-11-11T10:00:00Z"});
+                return jsonResponse(saved);
+            }
+        }, {L});
+        await ins.ready; await flush();
+        ins.open();
+        panel().querySelector('[data-mode="delta"]').click();
+        map.fire("click", {latlng: L.latLng(0.5, 0.5)});
+        map.fire("click", {latlng: L.latLng(0.50002, 0.5)});
+        await flush(); await flush();
+        panel().querySelector('[data-region] [data-act="save"]').click();
+        type(panel().querySelector('[data-form="name"]'), "Vent");
+        panel().querySelector('[data-act="form-save"]').click();
+        await flush(); await flush();
+        const body = JSON.parse(calls(fetchFn, "POST").filter(c => c[0] === SAVED)[0][1].body);
+        expect(body).toMatchObject({name: "Vent", shape: "delta", geometry: {type: "LineString", coordinates: [[0.5, 0.5], [0.5, 0.50002]]}});
+        expect(ins.state.regions).toEqual([]);
+        expect(panel().querySelector("[data-saved]").textContent).toContain("-2.00 °C ΔT");
+        const shown = panel().querySelector('[data-profile-of="saved"]').textContent;
+        ["Vent", "ΔT", "First spot20.00 °C", "Second spot18.00 °C", "ΔT-2.00 °C"].forEach(t => expect(shown).toContain(t));
+        const tips = [];
+        map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) tips.push(l.getTooltip()._content); });
+        expect(tips).toContain("Vent: ΔT -2.00 °C");
+        expect(inspector.savedCsv([{source: {name: "Roof survey"}, m: saved}], "C").split("\n")[1]).toMatch(
+            /^Vent,,delta,Roof survey,,2026-11-11T10:00:00Z,ana,,,,,,3,,,,,,,,,-2,,,,,,,,20,18$/);
+        map.remove();
+    });
+
     it("saves a region named, with a comment, for everyone who can view the project; renames, deletes and exports it", async () => {
         const map = leafletMap();
         let saved = null;
@@ -638,7 +650,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         expect(tips).toContain("Warm roof");
 
         const item = {source: {name: "Roof survey"}, m: saved};
-        expect(inspector.savedCsv([item], "C").split("\n")[1]).toMatch(/^Warm roof,Above the boiler,rectangle,Roof survey,,2026-11-01T10:00:00Z,ana,,,,400,100,,10,50,30,5,29.5,12,48,26,4,,,,,,,$/);
+        expect(inspector.savedCsv([item], "C").split("\n")[1]).toMatch(/^Warm roof,Above the boiler,rectangle,Roof survey,,2026-11-01T10:00:00Z,ana,,,,400,100,,10,50,30,5,29.5,12,48,26,4,,,,,,,,,$/);
         const geo = JSON.parse(inspector.savedGeoJson([item], "F"));
         expect(geo.features[0].geometry).toEqual(saved.geometry);
         expect(geo.features[0].properties).toMatchObject({name: "Warm roof", mean_f: 86, delta_t_f: 7.2});
@@ -733,9 +745,9 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         map.remove();
     });
 
-    it("corrects the difference from the surroundings under the cursor as it corrects the point and its surroundings", async () => {
+    it("corrects the temperature beside the pointer as it corrects the layer", async () => {
         const map = leafletMap();
-        const {ins, panel} = start(map, {[POINT]: {valid: true, temperature: 30, difference: 2, reason: null},
+        const {ins, panel} = start(map, {[POINT]: {valid: true, temperature: 30, reason: null},
                                          ["GET " + SAVED]: {measurements: [], can_change: true, baseline: BASELINE}}, {L});
         await ins.ready; await flush();
         ins.open();
@@ -748,10 +760,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         map.fire("mousemove", {latlng: L.latLng(0.5, 0.5)});
         await new Promise(r => setTimeout(r, 120));
         await flush();
-        const want = model(30, 0.8, 21, 0.91, 21) - model(28, 0.8, 21, 0.91, 21);
-        expect(panel().querySelector(".dt-inspector-delta").textContent).toBe("ΔT from surroundings +" + want.toFixed(2) + " °C");
-        expect(want).not.toBeCloseTo(2, 2);
-        // Beside the pointer, the temperature the panel shows: corrected too
+        // Beside the pointer, the temperature the panel shows: corrected
         expect(map.getContainer().querySelector(".dt-inspector-cursor").textContent).toBe(model(30, 0.8, 21, 0.91, 21).toFixed(2) + " °C");
     });
 
@@ -1177,7 +1186,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
 
     it("lays a workset's mosaic on the map in the user's palette, reads it in °C and swipes it with WebODM's split control", async () => {
         const map = leafletMap(THERMAL_TASK);
-        const point = jest.fn(() => jsonResponse({valid: true, temperature: 104, difference: -4.5, unit: "F", frame: "DJI_0001_T.JPG"}));
+        const point = jest.fn(() => jsonResponse({valid: true, temperature: 104, unit: "F", frame: "DJI_0001_T.JPG"}));
         const region = jest.fn(() => jsonResponse({valid: true, reason: null, pixel_size: 0.1, resampled: false, statistics: {
             count: 4, min: 20, max: 40, mean: 30, std: 2, median: 30, percentiles: {"2": 21, "98": 39},
             histogram: {counts: [2, 2], edges: [20, 30, 40]}, min_location: [0.5, 0.5], max_location: [0.5, 0.5]}}));
@@ -1199,8 +1208,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
         await new Promise(r => setTimeout(r, 120));
         await flush();
         expect(point.mock.calls[0][0]).toContain(BASE + "as_converted/point?lon=0.50000000&lat=0.50000000");
-        // A mosaic's difference in its °F, in °C: scaled, never shifted
-        expect(panel().querySelector(".dt-inspector-readout").textContent).toBe("40.00 °C ΔT from surroundings -2.50 °C");
+        expect(panel().querySelector(".dt-inspector-readout").textContent).toBe("40.00 °C");
 
         // A region over it reads the mosaic's
         panel().querySelector('[data-mode="rectangle"]').click();

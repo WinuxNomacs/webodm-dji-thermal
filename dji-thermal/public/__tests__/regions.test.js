@@ -118,25 +118,20 @@ describe("drawing a region", () => {
         expect(tool.isActive()).toBe(false);
         expect(shapes(map)).toBe(0);
     });
-});
-
-describe("Delta T From Surroundings", () => {
-    it("keeps a radius the user chose within its limits, 1 m otherwise, shown in metres or with Fahrenheit in feet", () => {
-        expect(regions.radiusOf(2.5)).toBe(2.5);
-        expect([regions.radiusOf(null), regions.radiusOf(0.1), regions.radiusOf(11), regions.radiusOf("2")]).toEqual([1, 1, 1, 1]);
-        expect(regions.formatRadius(1, "C")).toBe("1.00 m");
-        expect(regions.formatRadius(1, "F")).toBe("3.3 ft");
-    });
-
-    it("draws a thin circle without a fill around a point, moved and resized on Leaflet's own map, and removed", () => {
-        const map = makeMap(), circle = new regions.SurroundingsCircle(L, map);
-        const circles = () => Object.values(map._layers).filter(l => l instanceof L.Circle);
-        circle.show(p(-88, 42), 2);
-        circle.show(p(-88.001, 42), 4);
-        expect(circles().length).toBe(1);
-        expect([circles()[0].getLatLng().lng, circles()[0].getRadius(), circles()[0].options.fill, circles()[0].options.interactive]).toEqual([-88.001, 4, false, false]);
-        circle.hide();
-        expect(circles().length).toBe(0);
-        expect(circle.isShown()).toBe(false);
+    it("finishes a ΔT on its second spot, as a line of two, whatever Enter, a double-click or a click twice there", () => {
+        draw("delta");
+        map.fire("click", {latlng: at(map, 10, 10)});
+        key("Enter");
+        map.fire("dblclick", {latlng: at(map, 10, 10)});
+        map.fire("click", {latlng: at(map, 10, 10)});
+        expect(calls.finish).toEqual([]);
+        expect(calls.invalid).toEqual([]);
+        map.fire("click", {latlng: at(map, 80, 40)});
+        expect(calls.finish.length).toBe(1);
+        const g = calls.finish[0].geometry;
+        expect(g.type).toBe("LineString");
+        expect(g.coordinates).toEqual([[at(map, 10, 10).lng, at(map, 10, 10).lat], [at(map, 80, 40).lng, at(map, 80, 40).lat]]);
+        expect(tool.isActive()).toBe(false);
+        expect(regions.TOOLS.delta.name).toBe("ΔT");
     });
 });

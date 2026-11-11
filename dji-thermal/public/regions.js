@@ -1,7 +1,7 @@
 // Drawing the Thermal Inspector's regions on WebODM's map (inspector.js): a rectangle or a circle (press, drag,
 // release: the circle grows from its centre), a polygon (click the corners; double-click, Enter or a click on the
-// first corner finishes; Backspace removes the last corner; Esc cancels) or a line (as a polygon, without closing it),
-// as GeoJSON polygons or lines in lon/lat. While it draws, it takes over the map's panning and double-click zoom.
+// first corner finishes; Backspace removes the last corner; Esc cancels), a line (as a polygon, without closing it)
+// or a ΔT (two clicks: the first spot, then the second, which finishes it), as GeoJSON polygons or lines in lon/lat. While it draws, it takes over the map's panning and double-click zoom.
 // WebODM's 2D map has no drawing tool a plugin can use.
 (function (root) {
     var STYLE = {color: "#ff9800", weight: 2, opacity: 0.95, fillColor: "#ff9800", fillOpacity: 0.12};
@@ -14,7 +14,9 @@
     // name}. Each page lists them in its own order; a shape the server saves is in measurements.SHAPES too.
     var TOOLS = {pin: {icon: "fa fa-map-pin", name: "Pin"}, line: {icon: "fa fa-route", name: "Line"},
                  rectangle: {icon: "far fa-square", name: "Rectangle"}, circle: {icon: "far fa-circle", name: "Circle"},
-                 polygon: {icon: "fa fa-draw-polygon", name: "Polygon"}};
+                 polygon: {icon: "fa fa-draw-polygon", name: "Polygon"},
+                 // Two spots, each a pixel, and their difference: the second's temperature less the first's
+                 delta: {icon: "fa fa-arrows-alt-h", name: "ΔT"}};
 
     function assign(target) {
         for (var i = 1; i < arguments.length; i++) {
@@ -103,13 +105,14 @@
 
     function sameLatLng(a, b) { return a.lat === b.lat && a.lng === b.lng; }
 
-    // A shape being drawn: opts {shape: "rectangle" | "circle" | "polygon" | "line", onFinish({geometry, layer, circle}),
+    // A shape being drawn: opts {shape: "rectangle" | "circle" | "polygon" | "line" | "delta", onFinish({geometry, layer, circle}),
     // onCancel(), onInvalid(reason)}. The finished layer is the caller's; circle is {lat, lng, radius} for circles.
     function DrawTool(L, map, opts) {
         var self = this;
         var doc = opts.doc || root.document;
         var active = false, guides = [], vertices = [], polyGuides = [], origin = null, drawn = null, saved = {};
-        var clicked = opts.shape === "polygon" || opts.shape === "line";     // drawn a click per point
+        var clicked = opts.shape === "polygon" || opts.shape === "line" || opts.shape === "delta";     // drawn a click per point
+        var two = opts.shape === "delta";       // finished by its second point, not a double-click or Enter
 
         function addGuide(layer) { layer.addTo(map); guides.push(layer); return layer; }
         function dropGuide(layer) {
@@ -128,7 +131,7 @@
 
         function onKey(e) {
             if (e.key === "Escape") self.cancel();
-            else if (clicked && e.key === "Enter") onPolyFinish();
+            else if (clicked && !two && e.key === "Enter") onPolyFinish();
             else if (clicked && e.key === "Backspace") {
                 e.preventDefault();
                 vertices.pop();
@@ -178,6 +181,7 @@
                 return onPolyFinish();
             }
             vertices.push(e.latlng);
+            if (two && vertices.length === 2) return onPolyFinish();
             redrawPolygon();
         }
         function onPolyMove(e) { if (vertices.length) redrawPolygon(e.latlng); }
@@ -193,7 +197,7 @@
         function onPolyFinish() {
             // A double-click ends with the same point twice
             var points = vertices.filter(function (p, i) { return i === 0 || !sameLatLng(p, vertices[i - 1]); });
-            if (opts.shape === "line") {
+            if (opts.shape === "line" || two) {
                 var line = lineGeometry(points);
                 if (!line) return (opts.onInvalid || function () {})("line_too_short");
                 return finish(addGuide(L.polyline(points, assign({interactive: false}, STYLE))), line);
@@ -212,7 +216,7 @@
             map.getContainer().style.cursor = "crosshair";
             if (clicked) {
                 map.on("click", onPolyClick);
-                map.on("dblclick", onPolyFinish);
+                if (!two) map.on("dblclick", onPolyFinish);
                 map.on("mousemove", onPolyMove);
             } else map.on("mousedown", onDown);
             doc.addEventListener("keydown", onKey);
@@ -249,48 +253,7 @@
         this.isActive = function () { return active; };
     }
 
-    // Pointer Info's Delta T From Surroundings (the mosaic viewer, the frame page, the Thermal Inspector): the pixel
-    // under the pointer less the median of those within a circle around it, its radius (m) the user's, RADIUS.value
-    // until they choose one (as intensify.RADIUS_M, RADIUS_MIN and RADIUS_MAX)
-    var RADIUS = {min: 0.25, max: 10, step: 0.25, value: 1};
-    var FEET = 3.28084;
-    function radiusOf(saved) {
-        return typeof saved === "number" && saved >= RADIUS.min && saved <= RADIUS.max ? saved : RADIUS.value;
-    }
-    // In feet with Fahrenheit (WebODM's imperial units), else in metres
-    function formatRadius(m, unit) {
-        return unit === "F" ? (m * FEET).toFixed(1) + " ft" : m.toFixed(2) + " m";
-    }
-    // The slider and its value (attrs: the slider's own attributes, its id or data-act)
-    function surroundingsHtml(radius, unit, attrs) {
-        return '<label class="dt-surroundings-field">Delta T From Surroundings <span class="dt-surroundings-value">' +
-            formatRadius(radius, unit) + "</span>" + '<input type="range" min="' + RADIUS.min + '" max="' + RADIUS.max +
-            '" step="' + RADIUS.step + '" value="' + radius + '" ' + (attrs || "") + ' title="The circle\'s radius: the pixels ' +
-            'within it are the surroundings"></label>';
-    }
-
-    // The circle around the pointer's tip on a map: show(latlng, radius) in metres (on a frame's map, CRS.Simple: in
-    // its pixels), hide()
-    function SurroundingsCircle(L, map) {
-        var circle = null;
-        this.show = function (latlng, radius) {
-            if (!circle) {
-                circle = L.circle(latlng, {radius: radius, interactive: false, fill: false, weight: 1, color: "#fff",
-                                           opacity: 0.95, className: "dt-surroundings-circle"}).addTo(map);
-            } else {
-                circle.setLatLng(latlng);
-                circle.setRadius(radius);
-            }
-        };
-        this.hide = function () {
-            if (circle) map.removeLayer(circle);
-            circle = null;
-        };
-        this.isShown = function () { return !!circle; };
-    }
-
-    var api = {STYLE: STYLE, TOOLS: TOOLS, RADIUS: RADIUS, radiusOf: radiusOf, formatRadius: formatRadius,
-               surroundingsHtml: surroundingsHtml, SurroundingsCircle: SurroundingsCircle, rectangleRing: rectangleRing, polygonRing: polygonRing, circleRing: circleRing,
+    var api = {STYLE: STYLE, TOOLS: TOOLS, rectangleRing: rectangleRing, polygonRing: polygonRing, circleRing: circleRing,
                ringToGeometry: ringToGeometry, validatePolygon: validatePolygon, lineGeometry: lineGeometry, DrawTool: DrawTool};
     root.ThermalRegions = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

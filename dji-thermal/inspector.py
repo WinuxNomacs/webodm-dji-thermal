@@ -7,7 +7,7 @@ workset's mosaics laid on the map read them alike (raster_region, raster_isother
 import math
 
 from . import correction as correcting
-from . import intensify, webodm_versions
+from . import webodm_versions
 
 THERMAL_BAND = 'lwir'
 REGION_MAX_SIZE = 4096        # pixels along the longer side; a larger region is read downsampled
@@ -54,10 +54,9 @@ def _measured(values, unit):
     return np.isfinite(values) & (values > ABSOLUTE_ZERO.get(unit, ABSOLUTE_ZERO['C']) + 1)
 
 
-def point(task, lon, lat, radius_m=intensify.RADIUS_M):
-    """The temperature at a point (lon/lat): {coordinates, valid, temperature, difference, reason}, reason 'excluded'
-    (outside the crop), 'outside_raster' or 'nodata' when there is none; difference: the temperature less its
-    surroundings' within radius_m (intensify.raster_difference, the crop's pixels only)"""
+def point(task, lon, lat):
+    """The temperature at a point (lon/lat): {coordinates, valid, temperature, reason}, reason 'excluded' (outside the
+    crop), 'outside_raster' or 'nodata' when there is none"""
     import rasterio
     from rasterio.warp import transform
 
@@ -83,12 +82,6 @@ def point(task, lon, lat, radius_m=intensify.RADIUS_M):
         window = Window(col, row, 1, 1)
         value = float(src.read(1, window=window)[0, 0])
         valid = bool(_valid(src, window)[0, 0]) and math.isfinite(value)
-        if valid:
-            crs = src.crs
-            metre = crs.linear_units_factor[1] if crs.is_projected else DEGREE_M
-            out['difference'] = intensify.raster_difference(src, row, col, value, abs(src.res[0]) * metre,
-                                                            lambda w, data: _usable(src, w, data.shape, crop),
-                                                            radius_m=radius_m)
     if not valid:
         out['reason'] = 'nodata'
         return out
@@ -96,18 +89,38 @@ def point(task, lon, lat, radius_m=intensify.RADIUS_M):
     return out
 
 
-def _usable(src, window, out_shape, crop=None):
-    """Where the orthophoto has data in a window (_valid), within crop (a shapes.Shape, lon/lat) when given"""
-    from rasterio.features import geometry_mask
-    from rasterio.warp import transform_geom
+def delta(readings, length=None):
+    """
+    A ΔT's figures from its two spots' readings [(temperature or None, why there is none)], each a single pixel as a
+    pin reads it: {valid, reason (the first missing spot's), first, second, delta_t (second less first), reasons (each
+    spot's), length}
+    """
+    (first, why_first), (second, why_second) = readings
+    valid = first is not None and second is not None
+    return {'valid': valid, 'reason': None if valid else (why_first if first is None else why_second) or 'nodata',
+            'first': first, 'second': second, 'delta_t': second - first if valid else None,
+            'reasons': [None if first is not None else why_first or 'nodata',
+                        None if second is not None else why_second or 'nodata'],
+            'length': length}
 
-    from . import shapes
-    usable = _valid(src, window)
-    if crop is not None:
-        polygons = _polygons(shapes.shape(transform_geom('EPSG:4326', src.crs, _polygons(crop))))
-        usable &= geometry_mask([polygons], out_shape=out_shape, transform=src.window_transform(window), invert=True,
-                                all_touched=True) if polygons else False
-    return usable
+
+def delta_ends(geometry):
+    """A ΔT's two spots ([x, y] or [lon, lat]) from its GeoJSON line, None when it isn't a line of two distinct points"""
+    coordinates = geometry.get('coordinates') if isinstance(geometry, dict) and geometry.get('type') == 'LineString' else None
+    try:
+        ends = [(float(c[0]), float(c[1])) for c in coordinates]
+    except (TypeError, ValueError, IndexError):
+        return None
+    if len(ends) != 2 or ends[0] == ends[1] or not all(math.isfinite(v) for e in ends for v in e):
+        return None
+    return ends
+
+
+def ground_distance(a, b):
+    """The distance (m) between two points (lon, lat) on the ground, along the sphere Leaflet measures on"""
+    lon1, lat1, lon2, lat2 = (math.radians(v) for v in (a[0], a[1], b[0], b[1]))
+    h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
+    return 2 * 6371000 * math.asin(min(1.0, math.sqrt(h)))
 
 
 def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS, isotherm=None, correction=None):
