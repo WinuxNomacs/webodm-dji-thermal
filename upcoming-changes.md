@@ -3,7 +3,43 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- Nothing planned.
+- **R11. Delta T From Surroundings, over a radius the user picks** (the user, 2026-11-11, in `new.md`): "Under
+  Pointer Info, add a slider to configure "Delta T From Surroundings", this enables a feature where a user
+  configurable circumference from the hovered/selected pixel has its Delta T calculated against the pixels within
+  the surrounding circumference area. The circumference area should be visible to the user as a thin circle outline
+  around the tip of the pointer indicating the pixels within the circle are included in the circumference. The data
+  is then displayed underneath the Pointer Info are of the detail pane."
+  Builds on R6's "ΔT from surroundings" row (the pixel less the median of a square about 2 m wide:
+  `intensify.SIZE_M`, `window_difference`, `raster_difference`; `mosaics.point`, `inspector.point`; `frame.js`
+  `surroundingsAt` with `frames.info`'s `pixel_m`), R10's Pointer Info sections (`viewer.html`, `frame.html`, the
+  Inspector's `panelHtml`) and the display preferences (`conversions.py` `parse_display`, `analyzer_core.js`
+  `saveDisplay`).
+  - **Proposed**: a "Delta T From Surroundings" slider under Pointer Info, in metres, setting a radius; the row
+    becomes the pixel less the median of the pixels within that circle (a disc, not R6's square); the radius kept
+    as a display preference `surroundings_m` (range-checked, as `legend`); a thin circle following the pointer's tip
+    (`L.circle` in metres on the viewer and the Inspector, in frame pixels through `pixel_m` on the frame page),
+    shown only where the row is; the server's point requests take the radius. Tests: Jest (the slider, the circle,
+    the preference), Django (the disc's difference, the radius parameter, the preference's check). Docs: README,
+    quickstart-worksets, quickstart-inspector, measurement, api, developing.md; screenshots showing Pointer Info
+    retaken.
+  - **Decided** (the user, 2026-11-11): it **replaces** R6's fixed 2 m square (one "ΔT from surroundings" row, over
+    the circle; the slider starts at 1 m radius, about today's 2 m window); on **all three** pages (the mosaic
+    viewer, the frame page, the Thermal Inspector).
+  - **Open, settled while building**: the slider's range and step (proposed 0.25 to 10 m, step 0.25); on the
+    viewer's Harmonized tab, the row follows the slider, worked out from the harmonized mosaic (proposed), while
+    the Intensify tab's raster stays built at 2 m.
+- **R12. A "Delta T" measuring tool** (the user, 2026-11-11, in `new.md`): "Add a measurement tool to the Thermal
+  Inspector and Analyzer UI called "Delta T", it will allow the user to place 2 points on the map and the Delta T
+  will be calculated between the 2 points that can be saved same as a box, line, etc..."
+  Builds on `regions.js` `TOOLS` (Pin, Line, Rectangle, Circle, Polygon), shared by the Thermal Inspector
+  (`inspector.js` modes, saved measurements, CSV) and the frame page (`frame.js` `TOOLS`, `savedHtml`).
+  - **Proposed**: a Delta T tool beside the others; two clicks place A and B; the panel shows A's and B's
+    temperatures and ΔT = B − A (corrected where a correction is set); drawn as two labelled markers joined by a
+    thin line; saved, listed, shown again and exported to CSV like the other measurements (shape `delta`). Tests:
+    Jest (placing, the figures, saving), Django (the saved shape's check). Docs: README, quickstart-inspector,
+    measurement, api, developing.md; screenshots retaken where the tools show.
+  - **Decided** (the user, 2026-11-11): on the **Thermal Inspector and the frame page** (the mosaic viewer has no
+    drawing tools); each point read as a **single pixel**, as Pin reads it.
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
