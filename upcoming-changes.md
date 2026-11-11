@@ -3,6 +3,24 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **R13. Stepped instead of Equalized** (the user, 2026-11-11): "Add Stepped as a choice and remove Equalized since
+  it's not useful for accurate measurement." Builds on the Image section's tone list (`scale.js`
+  `imageControlsHtml`), shared by the Thermal Inspector, the mosaic viewer and the frame page; the browser's colouring
+  (`recolour.js` `curveShares`/`drawnShares`) and the server's (`colouring.py`, `mosaics.curve`, `inspector.tile`,
+  the legend's `curve` requests).
+  - **Proposed**: Linear or **Stepped**: flat bands of a fixed width in the user's unit, their edges at whole multiples
+    of it (18–19 °C, 19–20 °C), each band the palette's colour at its middle; the colour scale drawn in bands with
+    their edges. Equalized removed everywhere: the option, `equalize=1`, the histogram requests and the histograms
+    kept on the server (`histogram*.json`), its curve in the legend; a view saved with it opens Linear.
+  - **Decided** (the user, 2026-11-11): the band width **Auto** (a round width, 0.5, 1, 2, 5, 10…, giving about 10–20
+    bands over the range shown, again when the range changes) with a field beside Linear/Stepped to type one's own,
+    which then stays (cleared: Auto again); on **all three pages**, Intensify too (bands of difference).
+- **R14. Mosaic Overlays at the bottom, as a dropdown** (the user, 2026-11-11, in `new.md`): "move Mosaic Overlays to
+  the bottom of the Thermal Inspector. Also make it a collapsible multi-select dropdown instead of the infinitely
+  growing list." Builds on `inspector.js` `mosaicsHtml` (a checkbox per workset mosaic, the checked ones' tab,
+  opacity, Swipe and zoom) and `panelHtml`'s order (it sits under Image, above Saved measurements).
+  - **Decided** (the user, 2026-11-11): last in the panel; a collapsed button ("Mosaic Overlays: 1 of 5 shown")
+    opening a checklist of the mosaics; **the checked ones' controls listed below the dropdown**.
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
