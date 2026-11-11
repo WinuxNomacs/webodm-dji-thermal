@@ -3,6 +3,21 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **R20. The overlays' own divider: horizontal, and either side** (the user, 2026-11-11): "Is it possible to change
+  the side by side comparison divider from vertical to horizontal when the control is right clicked? Is it also
+  possible to add a control that allows the user to pick which side of the divider the compared ortho appears
+  upon?" Builds on R14/R15's Swipe under Mosaic Overlays and Ortho Overlays (today WebODM's split control,
+  `PluginsAPI.Map.sideBySideChanged`: always vertical, the swiped layer always on the right; no hook changes either),
+  and R17/R19's readings and measurements that follow the divider (`shownAt`, `shownClip`, `updateCrossLines`).
+  - **Decided** (the user, 2026-11-11): **the plugin's own divider** for its overlays (WebODM's own Swipe in its
+    layer panel keeps WebODM's); right-clicking its handle turns it horizontal or vertical, **and a small button**
+    does too; **beside each overlay's Swipe button**, a control choosing its side (right or left; below or above).
+  - Proposed: one divider for every swiped overlay (a line and a round handle, dragged), each overlay clipped to its
+    side; the divider's orientation and place shared; WebODM's own Swipe and the plugin's never both at once (each
+    turns the other off, through `sideBySideChanged` and `onSideBySideChanged`); `shownClip` extended to a divider
+    across (top and bottom). Tests: Jest (clips each side and orientation, right-click, the buttons, WebODM's Swipe
+    turning it off, measurements ending at a horizontal divider). Docs: README, quickstart-inspector (its screenshot
+    retaken).
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
