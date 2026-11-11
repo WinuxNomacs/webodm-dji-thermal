@@ -139,8 +139,12 @@ above WebODM's layers and listed below the button with its opacity, **Swipe** an
   Image section read and draw it, in your palette. A measurement made on it is saved on that task.
 - An **RGB** orthophoto is a picture, drawn as WebODM draws it, for context.
 - To compare two flights, lay one and **Swipe** it: the readings follow WebODM's divider, so the cursor reads the
-  overlay on its right and your task's orthophoto on its left. A ΔT is read from the layer under the middle of its two
-  points.
+  overlay on its right and your task's orthophoto on its left.
+- A **ΔT across the divider** compares the two flights: click its first spot on one side and its second on the other,
+  and each spot is read from the layer showing where you clicked it. The list names both layers ("first → second").
+  Each dot shows only where its own layer does, and the line between them only while both dots show, so dragging the
+  divider past a spot hides that spot and the line. A ΔT across two layers can't be saved: it stays in the panel
+  until you leave the page. One with both spots on the same layer is saved as usual.
 - Pins, regions, lines and ΔTs, saved ones too, are drawn only where the layer they were read on shows: one read on
   your task's orthophoto ends at the divider. Drag the divider to see more of it. The same goes for a swiped workset
   mosaic.

@@ -209,7 +209,10 @@ The measuring tools (ΔT, pin, line, rectangle, circle, polygon) are on the Ther
 the frame page's Measure section (`frame.js`). Both draw with `regions.js`. A new shape that reaches the server as a
 GeoJSON `Polygon` or `LineString` needs no change to how it is measured: `inspector.raster_region` and
 `frames.region` measure any of those. ΔT is the exception: its two spots are read as pins (`inspector.delta` from
-`inspector_api.delta_values` on the map, `frames.delta` on a frame), asked for with `shape: "delta"`.
+`inspector_api.delta_values` on the map, `frames.delta` on a frame), asked for with `shape: "delta"`. A ΔT whose
+spots were clicked on two layers (either side of WebODM's divider; `DrawTool`'s `onPoint` reports each click) keeps
+their source keys (`sources`) and is read in the browser instead, each spot from its own layer's `point`
+(`measureAcross`); `acrossLayers` tells it apart (not saveable, not kept in `localStorage`).
 
 1. `regions.js`: add it to `TOOLS` (its icon and name), and teach `DrawTool` to draw it (`opts.shape`), turning
    what was drawn into GeoJSON as `circleRing` does for a circle.

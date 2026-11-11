@@ -52,7 +52,8 @@
     var DJI_PREFIX = "dji_";            // a DJI palette's key among a mosaic's palettes
     var REASONS = {excluded: "Outside the task's crop", outside_raster: "Outside the orthophoto", nodata: "No data here",
                    too_few_points: "A polygon needs three corners", self_intersecting: "The polygon's edges cross",
-                   no_area: "The polygon has no area", line_too_short: "A line needs two points"};
+                   no_area: "The polygon has no area", line_too_short: "A line needs two points",
+                   no_layer: "Its layer isn't on the map"};
 
     function assign(target) {
         for (var i = 1; i < arguments.length; i++) {
@@ -787,7 +788,14 @@
         if (typeof r.length === "number") rows.push(["Distance", pixels ? r.length.toFixed(1) + " px" : formatLength(r.length, unit)]);
         return '<table class="table table-condensed dt-inspector-stats dt-inspector-delta-figures"><tbody>' + rows.filter(function (row) { return row[1]; }).map(function (row) {
             return "<tr><td>" + escapeHtml(row[0]) + '</td><td class="text-right">' + escapeHtml(row[1]) + "</td></tr>";
-        }).join("") + "</tbody></table>";
+        }).join("") + "</tbody></table>" +
+            (acrossLayers(r) && r.layers ? '<div class="text-muted dt-inspector-hint dt-inspector-across">The first spot read on \u201c' + escapeHtml(r.layers[0]) +
+                "\u201d, the second on \u201c" + escapeHtml(r.layers[1]) + "\u201d. A ΔT across two layers isn't saved: it stays here until you leave the page.</div>" : "");
+    }
+
+    // A ΔT whose spots were read on two layers (each where it was clicked: the map's and an overlay swiped beside it)
+    function acrossLayers(r) {
+        return !!(r && r.shape === "delta" && r.sources && r.sources[0] && r.sources[1] && r.sources[0] !== r.sources[1]);
     }
 
     var HIST_W = 240, HIST_H = 48;
@@ -854,6 +862,7 @@
             } else {
                 value = r.shape === "delta" && typeof r.delta_t === "number" ? escapeHtml(formatSigned(r.delta_t, unit)) + " " + muted("ΔT") :
                     s ? escapeHtml(formatTemp(s.mean, unit)) + " " + muted("mean") : muted(r.loading ? "…" : REASONS[r.reason] || "none");
+                if (acrossLayers(r) && r.layers) value += '<div class="text-muted dt-inspector-across">' + escapeHtml(r.layers[0] + " \u2192 " + r.layers[1]) + "</div>";
             }
             return "<tr data-" + m.kind + '="' + escapeHtml(r.id) + '"' + (r === shown ? ' class="active"' : "") + '><td><i class="' +
                 (m.kind === "pin" ? Regions.TOOLS.pin.icon : SHAPES[r.shape]) + '"></i> ' +
@@ -1122,7 +1131,7 @@
             state.pins.forEach(function (p) { state.savable[p.id] = canSaveAt({lat: p.lat, lng: p.lng}); });
             state.regions.forEach(function (r) {
                 var measured = r.shape === "delta" ? typeof r.delta_t === "number" : !!r.statistics;
-                state.savable[r.id] = measured && canSaveAt(regionBounds(r).getCenter());
+                state.savable[r.id] = measured && !acrossLayers(r) && canSaveAt(regionBounds(r).getCenter());
             });
             state.scale = scaleState();
             state.correctionDefault = correctionDefault();
@@ -1176,6 +1185,10 @@
             var t = thermalLayerAt(map, latlng), src = t && state.sources[layerSource(t).key];
             return !!(src && src.can_change);
         }
+        // The thermal layer on the map a source key names (layerSource's), or null
+        function layerOfKey(k) {
+            return thermalLayers(map, true).filter(function (t) { return layerSource(t).key === k; }).pop() || null;
+        }
 
         // The correction of a layer (or of the layer a source key names), when it is on and the layer's baseline known
         function fixForKey(k) {
@@ -1185,6 +1198,8 @@
         }
         function fixFor(t) { return t ? fixForKey(layerSource(t).key) : null; }
         function fixKey(fix) { return JSON.stringify(fix ? fix.wanted : null); }
+        // What a ΔT across two layers is corrected with: each spot for its own layer
+        function acrossFix(r) { return r.sources.map(function (k) { return fixKey(fixForKey(k)); }).join("|"); }
         // A pin's temperature shown: corrected for the layer it was read on
         function pinTemp(p) { return p.source ? corrected(p.temperature, fixForKey(p.source)) : p.temperature; }
 
@@ -1193,6 +1208,7 @@
         function correctionChanged() {
             state.regions.forEach(function (r) {
                 if (r.loading || (!r.statistics && !r.reason && r.first === undefined)) return;
+                if (acrossLayers(r)) return (r.correction || "null") !== acrossFix(r) && measure(r);
                 var t = thermalLayerAt(map, regionBounds(r).getCenter()) || thermalLayers(map)[0];
                 if (t && (r.correction || "null") !== fixKey(fixFor(t))) measure(r);
             });
@@ -1523,7 +1539,7 @@
         // Each thermal layer's measurements (pins, regions, lines, ΔT, saved ones) go in a pane of their own, clipped
         // to where that layer shows (shownClip), so with an overlay swiped a ΔT read on the left layer ends at the
         // divider. Panes by the layer's source key (layerSource's); a measurement without one is drawn as before
-        var panes = {}, clipsQueued = false;
+        var panes = {}, clipsQueued = false, ACROSS_PANE = "across";     // the lines of ΔTs across two layers: a pane never clipped
         function paneOf(key) {
             if (!key || !map.createPane) return undefined;
             if (!panes[key]) {
@@ -1553,6 +1569,7 @@
                 var nw = map.containerPointToLayerPoint([0, 0]), se = map.containerPointToLayerPoint(map.getSize());
                 pane.style.clip = shownClip(layers, {left: nw.x, right: se.x});
             });
+            updateCrossLines();
         }
         function queueClips() {
             if (clipsQueued) return;
@@ -1593,12 +1610,13 @@
 
         function drawRegions() {
             regionLayer.clearLayers();
+            crossLines = [];
             if (!state.measurementsVisible) return;
             state.regions.forEach(function (r) {
                 var style = r.id === state.shown ? Regions.STYLE : {color: Regions.STYLE.color, weight: 1, opacity: 0.8, fillOpacity: 0.05};
                 if (r.shape === "delta") {
-                    return deltaLayers(latLngs(r), style.color, r.label + (typeof r.delta_t === "number" ? ": ΔT " + formatSigned(r.delta_t) : ""), "dt-inspector-tip", r.source)
-                        .forEach(function (l) { regionLayer.addLayer(l); });
+                    return deltaLayers(latLngs(r), style.color, r.label + (typeof r.delta_t === "number" ? ": ΔT " + formatSigned(r.delta_t) : ""), "dt-inspector-tip",
+                                       acrossLayers(r) ? r.sources : r.source).forEach(function (l) { regionLayer.addLayer(l); });
                 }
                 var shape = r.circle ? L.circle([r.circle.lat, r.circle.lng], inPane(r.source, assign({radius: r.circle.radius, interactive: false}, style))) :
                     r.shape === "line" ? L.polyline(latLngs(r), inPane(r.source, assign({interactive: false}, style, {weight: style.weight + 1}))) :
@@ -1613,19 +1631,41 @@
                     regionLayer.addLayer(extremeMarker(r, "max"));
                 }
             });
+            updateCrossLines();
         }
 
         // A ΔT on the map: a thin line between its spots, a dot at each (the first hollow), the label at the second; in
-        // the pane of the layer it was read on (key)
+        // the pane of the layer it was read on (key). Across two layers (key: [first's, second's]), each dot in its own
+        // layer's pane, and the line in one of its own, shown only while both dots show (updateCrossLines)
+        var crossLines = [];
         function deltaLayers(points, color, label, className, key) {
-            var dot = function (p, fill) { return L.circleMarker(p, inPane(key, {radius: 4, color: color, weight: 2, fillColor: fill, fillOpacity: 1, interactive: false})); };
-            var second = dot(points[1], color);
-            second.bindTooltip(label, inPane(key, {permanent: true, direction: "right", className: className}));
-            return [L.polyline(points, inPane(key, {color: color, weight: 1.5, opacity: 0.95, dashArray: "4 3", interactive: false})), dot(points[0], "#fff"), second];
+            var keys = Array.isArray(key) ? key : [key, key], across = keys[0] !== keys[1];
+            var dot = function (p, fill, k) { return L.circleMarker(p, inPane(k, {radius: 4, color: color, weight: 2, fillColor: fill, fillOpacity: 1, interactive: false})); };
+            var second = dot(points[1], color, keys[1]);
+            second.bindTooltip(label, inPane(keys[1], {permanent: true, direction: "right", className: className}));
+            var line = L.polyline(points, inPane(across ? ACROSS_PANE : keys[0], {color: color, weight: 1.5, opacity: 0.95, dashArray: "4 3", interactive: false}));
+            if (across) crossLines.push({line: line, points: points, keys: keys});
+            return [line, dot(points[0], "#fff", keys[0]), second];
+        }
+        // Each ΔT across two layers: its line shown only while both its spots are on screen, each where its own layer
+        // shows (inside its pane's clip: WebODM's divider), so a line never leads to a spot that isn't there
+        function updateCrossLines() {
+            if (!crossLines.length || !map.getPane("mapPane")) return;     // none, or the map is gone
+            var view = map.getBounds();
+            crossLines.forEach(function (c) {
+                var shown = c.points.every(function (p, i) {
+                    var t = layerOfKey(c.keys[i]), at = L.latLng(p);
+                    if (!t || (t.layer.isHidden && t.layer.isHidden()) || !view.contains(at)) return false;
+                    var r = clipOf(panes[c.keys[i]] && map.getPane(panes[c.keys[i]])), pt = map.latLngToLayerPoint(at);
+                    return !r || (pt.x >= r.left && pt.x <= r.right && pt.y >= r.top && pt.y <= r.bottom);
+                });
+                c.line.setStyle({opacity: shown ? 0.95 : 0});
+            });
         }
 
         function regionsChanged() {
-            savePins(storage, rkey, state.regions.map(function (r) {
+            // A ΔT across two layers stays only for this visit
+            savePins(storage, rkey, state.regions.filter(function (r) { return !acrossLayers(r); }).map(function (r) {
                 var kept = assign({}, r);
                 delete kept.loading;
                 delete kept.error;
@@ -1753,6 +1793,7 @@
 
         // The statistics of a region, from the thermal orthophoto at its centre; with the isotherm shown, its share in it
         function measure(r) {
+            if (acrossLayers(r)) return measureAcross(r);
             var t = thermalLayerAt(map, regionBounds(r).getCenter()) || thermalLayers(map)[0];
             if (!t) {
                 assign(r, {loading: false, statistics: null, reason: "outside_raster"});
@@ -1783,7 +1824,35 @@
             });
         }
 
-        function regionDrawn(shape, drawn) {
+        // A ΔT across two layers: each spot read from its own layer's point, corrected for that layer, and ΔT (the
+        // second's less the first's) worked out here
+        function measureAcross(r) {
+            var spots = latLngs(r).map(function (p) { return L.latLng(p[0], p[1]); }), layers = r.sources.map(layerOfKey);
+            var fixes = layers.map(fixFor), withFix = acrossFix(r);
+            r.loading = true;
+            r.error = null;
+            return Promise.all(layers.map(function (t, i) {
+                return t ? query(t, spots[i]) : Promise.resolve({valid: false, reason: "no_layer"});
+            })).then(function (read) {
+                r.loading = false;
+                var failed = read.filter(function (x) { return x && x.error; })[0];
+                if (failed) r.error = failed.error;
+                else {
+                    var temps = read.map(function (x, i) { return x.valid ? corrected(x.temperature, fixes[i]) : null; });
+                    var reasons = read.map(function (x) { return x.valid ? null : x.reason || "nodata"; });
+                    var both = temps[0] !== null && temps[1] !== null;
+                    assign(r, {statistics: null, first: temps[0], second: temps[1], reasons: reasons, delta_t: both ? temps[1] - temps[0] : null,
+                               reason: both ? null : reasons[0] || reasons[1], length: map.distance(spots[0], spots[1]), correction: withFix});
+                }
+                if (state.regions.indexOf(r) === -1) return;
+                // The correction changed while it was read
+                if (!r.error && r.correction !== acrossFix(r)) return measure(r);
+                regionsChanged();
+            });
+        }
+
+        // A shape drawn; spots: for a ΔT, the thermal layer each spot was clicked on
+        function regionDrawn(shape, drawn, spots) {
             drawnAt = Date.now();
             map.removeLayer(drawn.layer);       // drawn again with the others
             var prefix = shape === "line" ? "L" : shape === "delta" ? "D" : "R";
@@ -1792,6 +1861,12 @@
             }, 0) + 1;
             var r = {id: String(Date.now()) + "r" + n, label: prefix + n, shape: shape, geometry: drawn.geometry, statistics: null, reason: null};
             if (drawn.circle) r.circle = drawn.circle;
+            // Its spots on two layers: each read from its own
+            var keys = shape === "delta" && spots ? [0, 1].map(function (i) { return spots[i] ? layerSource(spots[i]).key : null; }) : [];
+            if (keys[0] && keys[1] && keys[0] !== keys[1]) {
+                r.sources = keys;
+                r.layers = [layerSource(spots[0]).name, layerSource(spots[1]).name];
+            }
             state.regions.push(r);
             state.shown = r.id;
             state.measurementsVisible = true;
@@ -1805,8 +1880,10 @@
             state.notice = "";
             map.getContainer().style.cursor = mode === "pin" ? "crosshair" : "";
             if (SHAPES[mode] && Regions) {
+                var spots = [];         // a ΔT's: the layer showing where each spot is clicked
                 tool = new Regions.DrawTool(L, map, {shape: mode, doc: doc,
-                    onFinish: function (drawn) { regionDrawn(mode, drawn); },
+                    onPoint: function (latlng, i) { spots[i] = thermalLayerAt(map, latlng); },
+                    onFinish: function (drawn) { regionDrawn(mode, drawn, spots); },
                     onCancel: function () { tool = null; setMode("hover"); },
                     onInvalid: function (reason) { state.notice = REASONS[reason] || "Not a region"; render(); }});
                 tool.start();
@@ -2562,7 +2639,7 @@
                framesSource: framesSource, fromCelsius: fromCelsius, corrected: corrected, uncorrected: uncorrected,
                rawIsotherm: rawIsotherm, keptRange: keptRange, correctionHtml: correctionHtml, forgetCorrections: forgetCorrections,
                savedHtml: savedHtml, savedCsv: savedCsv, savedGeoJson: savedGeoJson, formHtml: formHtml, measurementsHtml: measurementsHtml,
-               mosaicsHtml: mosaicsHtml, orthosHtml: orthosHtml, orthosOf: orthosOf, orthoUrl: orthoUrl, shownAt: shownAt, shownClip: shownClip, toCelsius: toCelsius, movable: movable, adjustOf: adjustOf, autoRange: autoRange,
+               mosaicsHtml: mosaicsHtml, orthosHtml: orthosHtml, orthosOf: orthosOf, orthoUrl: orthoUrl, shownAt: shownAt, shownClip: shownClip, acrossLayers: acrossLayers, toCelsius: toCelsius, movable: movable, adjustOf: adjustOf, autoRange: autoRange,
                scaleHtml: scaleHtml, imageHtml: imageHtml, create: create};
     root.ThermalInspector = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

@@ -1503,6 +1503,60 @@ describe("the Thermal Inspector's workset mosaics", () => {
         map.remove();
     });
 
+    it("reads a ΔT across WebODM's divider from both layers, unsaved, its line shown only while both spots show", async () => {
+        const map = leafletMap(THERMAL_TASK);
+        const base = "/api/plugins/dji-thermal/projects/2/tasks/";
+        const mine = {measurements: [], can_change: true, baseline: null};
+        const {ins, fetchFn, panel} = begin(map, [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}],
+                                            Object.assign({[POINT]: {valid: true, temperature: 20}, ["GET " + base + "therm-3/inspector/point"]: {valid: true, temperature: 26.5},
+                                                           ["GET " + base + "abc-1/inspector/measurements"]: mine, ["GET " + base + "therm-3/inspector/measurements"]: mine}, ORTHO_ROUTES));
+        await ins.orthosReady;
+        ins.open();
+        openOverlays(panel(), "ortho");
+        change(panel().querySelector('[data-ortho="therm-3"] [data-act="ortho-on"]'), true);
+        await flush(); await flush();
+        const overlay = orthoLayers(map)[0];
+        // A map 1000 pixels wide, on the overlay (laying it fitted the map to it); swiped: the overlay right of the divider at 500
+        map.getSize = () => L.point(1000, 800);
+        map.setView([0.5, 0.5], 18, {animate: false});
+        const nw = map.containerPointToLayerPoint([0, 0]);
+        const swiped = x => { overlay.getContainer().style.clip = `rect(${nw.y}px, ${nw.x + 1000}px, ${nw.y + 800}px, ${nw.x + x}px)`; };
+        swiped(500);
+        ins.setMode("delta");
+        map.fire("click", {latlng: map.containerPointToLatLng([400, 400])});      // on the map's own layer
+        map.fire("click", {latlng: map.containerPointToLatLng([600, 400])});      // on the overlay
+        await flush(); await flush(); await flush();
+        // Each spot read from its own layer, ΔT worked out here: nothing posted
+        expect(fetchFn.mock.calls.filter(c => c[1] && c[1].method === "POST")).toEqual([]);
+        const d = ins.state.regions[0];
+        expect([d.first, d.second, d.delta_t, d.sources]).toEqual([20, 26.5, 6.5, ["t:abc-1", "t:therm-3"]]);
+        const row = panel().querySelector("[data-region]");
+        expect(row.textContent).toContain("+6.50 °C ΔT");
+        expect(row.textContent).toContain("This task → Spring flight");
+        expect(row.querySelector('[data-act="save"]')).toBe(null);
+        expect(panel().querySelector(".dt-inspector-shown").textContent).toContain("A ΔT across two layers isn't saved");
+        expect(inspector.loadPins(window.localStorage, inspector.regionsKey(["abc-1"]))).toEqual([]);
+        // Each dot in its layer's pane, the line in its own; shown while both dots show
+        await new Promise(r => setTimeout(r, 40));
+        const lines = [], dots = [];
+        map.eachLayer(l => {
+            if (l.options && l.options.dashArray === "4 3") lines.push(l);
+            else if (l.getLatLng && l.options && l.options.radius === 4) dots.push(l.options.pane);
+        });
+        expect(lines.length).toBe(1);
+        expect(dots.length).toBe(2);
+        expect(new Set(dots.concat(lines[0].options.pane)).size).toBe(3);
+        expect(lines[0].options.opacity).toBe(0.95);
+        // The divider dragged past the second spot (at 600): the overlay no longer shows there, so the line goes
+        swiped(750);
+        await new Promise(r => setTimeout(r, 40));
+        expect(lines[0].options.opacity).toBe(0);
+        swiped(500);
+        await new Promise(r => setTimeout(r, 40));
+        expect(lines[0].options.opacity).toBe(0.95);
+        map.remove();
+    });
+
     it("opens with the mosaic a link asks for laid on the map", async () => {
         const map = leafletMap();
         const {ins, panel, laid} = begin(map, [], {}, {search: "?dt-mosaic=d-1%2Fabc123def456/harmonized"});
