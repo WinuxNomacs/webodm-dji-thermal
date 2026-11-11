@@ -2246,9 +2246,8 @@
         // -- the overlays' divider ------------------------------------------------------------------------------------
         // The overlays swiped are shown on their side of the Inspector's own divider (split.js, not WebODM's split
         // control, which is always upright with its layer on the right): laid.side "after" (right or below) or
-        // "before" (left or above). WebODM's own Swipe (its layer panel's) and this one are never both shown: each
-        // turns the other off
-        var webodmSwiped = [];
+        // "before" (left or above). WebODM's own Swipe (its layer panel's), another plugin's divider and this one are
+        // never both shown: each turns the others off
         var split = Split.create(L, map, {doc: doc, vertical: state.split.vertical, at: state.split.at});
         split.on("change", function (e) {
             state.split.vertical = e.vertical;
@@ -2266,7 +2265,7 @@
             if (!laid.side) laid.side = "after";
             if (!laid.layer) return;
             if (on) {
-                leaveWebodmSwipe(laid);
+                announceSwipe(laid);
                 split.add(laid.layer, laid.side);
             } else split.remove(laid.layer);
         }
@@ -2275,21 +2274,20 @@
             if (laid.swipe) split.setSide(laid.layer, laid.side);
         }
         function turnSplit() { split.turn(); }
-        // WebODM's own Swipe on: off, the way its layer panel turns it off when another layer is swiped (each of its
-        // layers sided turns itself off when it hears of another), the overlay then taken off WebODM's split again
-        function leaveWebodmSwipe(laid) {
-            if (!webodmSwiped.length || !plugins || !plugins.Map || !plugins.Map.sideBySideChanged) return;
+        // Told to everyone listening to WebODM's split event, each time: WebODM's own Swipe turns off, the way its layer
+        // panel turns it off when another layer is swiped (each of its layers sided turns itself off when it hears of
+        // another), and so does another plugin's divider that listens alike (TweakUI's Other Tasks); the overlay is then
+        // taken off WebODM's split again
+        function announceSwipe(laid) {
+            if (!plugins || !plugins.Map || !plugins.Map.sideBySideChanged) return;
             var z = (laid.layer.options || {}).zIndex;
             plugins.Map.sideBySideChanged(laid.layer, true);
             plugins.Map.sideBySideChanged(laid.layer, false);
             if (z !== undefined && laid.layer.setZIndex) laid.layer.setZIndex(z);     // brought to the front there
-            webodmSwiped = [];
             setTimeout(split.update, 0);        // after WebODM's split control is gone, with whatever it clipped
         }
         function onWebodmSwipe(layer, side) {
             if (allLaid().some(function (l) { return l.layer === layer; })) return;     // the Inspector's own call
-            webodmSwiped = webodmSwiped.filter(function (l) { return l !== layer; });
-            if (side) webodmSwiped.push(layer);
             if (side && allLaid().some(function (l) { return l.swipe; })) {
                 allLaid().forEach(function (l) { if (l.swipe) swipe(l, false); });
                 render();

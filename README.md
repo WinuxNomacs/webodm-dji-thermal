@@ -478,7 +478,8 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   divider: the mosaic on one side, WebODM's layers on the other) and zoom to it. While swiped, a button beside Swipe
   chooses its side (**Right** or **Left**; **Below** or **Above**), and a small button turns the divider horizontal
   or vertical, as a right-click on its handle does; drag the handle to move it. WebODM's own Swipe (in its layer
-  panel) and the Inspector's take turns: turning one on turns the other off. Hover, pins, regions, the isotherm and the
+  panel), another plugin's divider (TweakUI's Other Tasks) and the Inspector's take turns: turning one on turns the
+  others off. Hover, pins, regions, the isotherm and the
   legend read the topmost thermal layer, a mosaic or an orthophoto. They are the plugin's layers, not entries of
   WebODM's layer panel (a plugin can't add those), and are laid again on each visit; the workset's **Open on
   WebODM's map** opens the project's map with its mosaic laid. Not on WebODM's public maps.

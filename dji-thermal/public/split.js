@@ -121,8 +121,8 @@
             doc.addEventListener(e.touches ? "touchend" : "mouseup", endDrag);
         }
 
-        // Its place on the view kept as the map moves
-        var MAP_EVENTS = "move zoomend viewreset resize";
+        // Its place on the view kept as the map moves, and a layer of its put back on the map (a new container) clipped
+        var MAP_EVENTS = "move zoomend viewreset resize layeradd";
         map.on(MAP_EVENTS, update);
 
         var api = {

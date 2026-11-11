@@ -84,6 +84,16 @@ describe("the split divider", () => {
         map.remove();
     });
 
+    it("clips a layer of its put back on the map, whose container is a new one", () => {
+        const map = leafletMap(), a = layer(map);
+        SplitDivider.create(L, map).add(a);
+        map.removeLayer(a);
+        map.addLayer(a);
+        const nw = map.containerPointToLayerPoint([0, 0]);
+        expect(a.getContainer().style.clip).toBe(`rect(${nw.y}px, ${nw.x + 1000}px, ${nw.y + 800}px, ${nw.x + 500}px)`);
+        map.remove();
+    });
+
     it("takes a class, a handle and a title of its own, can leave right-clicks alone, and goes when destroyed", () => {
         const map = leafletMap(), a = layer(map);
         const split = SplitDivider.create(L, map, {vertical: false, at: 0.4, className: "my-plugin-split", title: "Compare",

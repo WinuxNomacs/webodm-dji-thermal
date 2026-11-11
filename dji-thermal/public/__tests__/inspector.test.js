@@ -1306,7 +1306,9 @@ describe("the Thermal Inspector's workset mosaics", () => {
         change(panel().querySelector('[data-act="mosaic-opacity"]'), "40");
         expect(layer.options.opacity).toBe(0.4);
         panel().querySelector('[data-act="mosaic-swipe"]').click();
-        expect(plugins.Map.sideBySideChanged).not.toHaveBeenCalled();
+        // Its own divider, WebODM's split event told (so WebODM's or another plugin's divider goes) and left at once
+        expect(plugins.Map.sideBySideChanged.mock.calls.map(c => c[1])).toEqual([true, false]);
+        await flush();      // its clips again, once WebODM's split control is gone
         expect(map.el.querySelector(".split-divider")).not.toBe(null);
         expect(layer.getContainer().style.clip).not.toBe("");
         // Its isotherm is clipped as the divider clips it
@@ -1314,7 +1316,9 @@ describe("the Thermal Inspector's workset mosaics", () => {
         const overlay = ins.overlays().find(o => o.layer === layer).overlay;
         expect(valuesOf(overlay)).toContain(BASE + "harmonized/values/");
         expect(drawn(overlay).isotherm[0]).toBeCloseTo(ins.state.isotherm.low * 1.8 + 32, 9);      // °F, the mosaic's unit
+        await flush();      // the isotherm's layer added: the divider clips its layers again
         layer.getContainer().style.clip = "rect(0px, 500px, 400px, 200px)";
+        map.fire("moveend");
         await flush();
         expect(overlay.getContainer().style.clip).toBe("rect(0px, 500px, 400px, 200px)");
         // Lifted while swiped: the divider goes with it
@@ -1668,11 +1672,16 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(split()).not.toBe(null);
         await flush();
         expect(clip()).toBe(`rect(${moved.y}px, ${moved.x + 300}px, ${moved.y + 800}px, ${moved.x}px)`);      // its side and place kept
-        // Not again while WebODM's is off
+        // Told each time, WebODM's Swipe on or not, so another plugin's divider listening alike goes too
         api.Map.sideBySideChanged.mockClear();
         row().querySelector('[data-act="ortho-swipe"]').click();
         row().querySelector('[data-act="ortho-swipe"]').click();
-        expect(api.Map.sideBySideChanged).not.toHaveBeenCalled();
+        expect(api.Map.sideBySideChanged.mock.calls).toEqual([[overlay, true], [overlay, false]]);
+        // Another plugin's divider (TweakUI's Other Tasks), telling WebODM's event as this one does: the Inspector's goes
+        const other = {};
+        api.Map.sideBySideChanged(other, true);
+        api.Map.sideBySideChanged(other, false);
+        expect(split()).toBe(null);
         map.remove();
     });
 
