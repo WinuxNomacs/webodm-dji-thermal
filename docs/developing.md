@@ -227,7 +227,7 @@ GeoJSON `Polygon` or `LineString` needs no change to how it is measured: `inspec
 The panel is drawn whole by `panelHtml(state)` in `inspector.js` on every change, from the `state` object `create`
 keeps.
 
-1. Write `somethingHtml(state, unit)` beside the other sections (`pinsHtml`, `isothermHtml`): a plain function
+1. Write `somethingHtml(state, unit)` beside the other sections (`measurementsHtml`, `isothermHtml`): a plain function
    returning HTML, with every value escaped (`escapeHtml`) and its controls marked `data-act="something-..."`.
 2. Add it to `panelHtml` as `'<div class="dt-inspector-section"><strong>Title</strong>' + somethingHtml(...) + '</div>'`
    where it belongs.

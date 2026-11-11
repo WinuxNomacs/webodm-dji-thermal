@@ -257,7 +257,13 @@ const SHOTS = {
         await p.click('.dt-inspector-modes [data-mode="hover"]');
         await p.mouse.move(...at(0.4, 0.55));
         await p.waitForTimeout(1500);
-        await p.locator(".dt-inspector-shown").scrollIntoViewIfNeeded();
+        // Measurements at the top of the part that scrolls, just under the panel's top: the list, then R1's statistics
+        await p.evaluate(() => {
+            const section = [...document.querySelectorAll(".dt-inspector-section")]
+                .filter(s => s.querySelector("strong").textContent === "Measurements")[0];
+            section.style.scrollMarginTop = document.querySelector(".dt-inspector-top").offsetHeight + "px";
+            section.scrollIntoView({block: "start"});
+        });
         await p.waitForTimeout(300);
         return p;
     },

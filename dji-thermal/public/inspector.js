@@ -692,32 +692,40 @@
         var s = String(v === null || v === undefined ? "" : v);
         return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     }
-    // temp: a pin's temperature shown (°C, corrected), its own without
-    function pinsCsv(pins, unit, temp) {
-        temp = temp || function (p) { return p.temperature; };
-        var rows = [["label", "latitude", "longitude", "temperature_" + unit.toLowerCase()]];
-        pins.forEach(function (p) {
-            var c = temp(p);
-            rows.push([p.label, p.lat.toFixed(8), p.lng.toFixed(8), c === null || c === undefined ? "" : shownTemp(c, unit).toFixed(3)]);
-        });
-        return rows.map(function (r) { return r.map(csvCell).join(","); }).join("\n") + "\n";
-    }
-
     function regionArea(r) {
         return r.statistics && r.pixel_size && r.shape !== "line" ? r.statistics.count * r.pixel_size * r.pixel_size : null;
     }
 
-    // One row per region with statistics
-    function regionsCsv(regions, unit) {
+    // When a pin or region was made: its id starts with the time (Date.now(), 13 digits)
+    function madeAt(item) { return Number(String(item.id).slice(0, 13)) || 0; }
+
+    // The pins and regions in one list, in the order they were made: [{kind: "pin" | "region", item}]
+    function measurementsOf(state) {
+        return state.pins.map(function (p) { return {kind: "pin", item: p}; })
+            .concat(state.regions.map(function (r) { return {kind: "region", item: r}; }))
+            .sort(function (a, b) { return madeAt(a.item) - madeAt(b.item); });
+    }
+
+    // One row per measurement (list: measurementsOf's), its shape in a column; temp: a pin's temperature shown (°C,
+    // corrected), its own without. A region without statistics, or a ΔT without its value, isn't a row.
+    function measurementsCsv(list, unit, temp) {
+        temp = temp || function (p) { return p.temperature; };
         var u = unit.toLowerCase();
-        var rows = [["label", "shape", "pixels", "area_m2", "length_m"].concat(["min", "max", "mean", "std", "median", "p2", "p98", "surroundings", "delta_t"].map(function (s) { return s + "_" + u; }))
+        var rows = [["label", "shape", "latitude", "longitude", "temperature_" + u, "pixels", "area_m2", "length_m"]
+            .concat(["min", "max", "mean", "std", "median", "p2", "p98", "surroundings", "delta_t"].map(function (k) { return k + "_" + u; }))
             .concat(["isotherm_share_pct", "coldest_latitude", "coldest_longitude", "hottest_latitude", "hottest_longitude", "first_spot_" + u, "second_spot_" + u])];
-        regions.forEach(function (r) {
-            var t = function (c) { return c === null || c === undefined ? "" : shownTemp(c, unit).toFixed(3); };
-            var d = function (c) { return c === null || c === undefined ? "" : (unit === "F" ? c * 1.8 : c).toFixed(3); };
+        var t = function (c) { return c === null || c === undefined ? "" : shownTemp(c, unit).toFixed(3); };
+        var d = function (c) { return c === null || c === undefined ? "" : (unit === "F" ? c * 1.8 : c).toFixed(3); };
+        var length = function (r) { return typeof r.length === "number" ? r.length.toFixed(3) : ""; };
+        list.forEach(function (m) {
+            var r = m.item;
+            if (m.kind === "pin") {
+                rows.push([r.label, "pin", r.lat.toFixed(8), r.lng.toFixed(8), t(temp(r))].concat(Array.apply(null, new Array(19)).map(function () { return ""; })));
+                return;
+            }
             if (r.shape === "delta") {
                 if (typeof r.delta_t !== "number") return;
-                rows.push([r.label, r.shape, "", "", typeof r.length === "number" ? r.length.toFixed(3) : "", "", "", "", "", "", "", "", "", d(r.delta_t),
+                rows.push([r.label, r.shape, "", "", "", "", "", length(r), "", "", "", "", "", "", "", "", d(r.delta_t),
                            "", "", "", "", "", t(r.first), t(r.second)]);
                 return;
             }
@@ -725,7 +733,7 @@
             if (!s) return;
             var p = s.percentiles || {};
             var share = typeof s.isotherm_share === "number" ? (s.isotherm_share * 100).toFixed(2) : "";
-            rows.push([r.label, r.shape, s.count, regionArea(r) === null ? "" : regionArea(r).toFixed(3), typeof r.length === "number" ? r.length.toFixed(3) : "",
+            rows.push([r.label, r.shape, "", "", "", s.count, regionArea(r) === null ? "" : regionArea(r).toFixed(3), length(r),
                        t(s.min), t(s.max), t(s.mean), d(s.std), t(s.median), t(p["2"]), t(p["98"]), t(s.surroundings), d(s.delta_t), share,
                        s.min_location[1].toFixed(8), s.min_location[0].toFixed(8), s.max_location[1].toFixed(8), s.max_location[0].toFixed(8), "", ""]);
         });
@@ -830,27 +838,36 @@
         return best;
     }
 
-    function regionsHtml(state, unit) {
-        var regions = state.regions;
-        if (!regions.length) return '<div class="text-muted dt-inspector-hint">Choose a shape or the line, then draw on the map to read a region\'s temperatures, or ΔT to compare two spots.</div>';
-        var shown = regions.filter(function (r) { return r.id === state.shown; })[0];
-        return '<table class="table table-condensed dt-inspector-pins dt-inspector-regions"><tbody>' + regions.map(function (r) {
-            var s = r.statistics;
-            return '<tr data-region="' + escapeHtml(r.id) + '"' + (r === shown ? ' class="active"' : "") + '><td><i class="' + SHAPES[r.shape] + '"></i> ' +
-                '<a href="javascript:void(0)" data-act="goto" title="Show on the map">' + escapeHtml(r.label) + "</a></td><td>" +
-                (r.shape === "delta" && typeof r.delta_t === "number" ? escapeHtml(formatSigned(r.delta_t, unit)) + ' <span class="text-muted">ΔT</span>' :
-                    s ? escapeHtml(formatTemp(s.mean, unit)) + ' <span class="text-muted">mean</span>' :
-                    '<span class="text-muted">' + escapeHtml(r.loading ? "…" : REASONS[r.reason] || "none") + "</span>") +
+    // The pins, ΔTs, regions and lines in one list, in the order made, each with its tool's icon; the region shown
+    // (its statistics, a line's profile) under it. state: the panel's (its pins and regions, form, what can be saved and
+    // the corrected temperatures)
+    function measurementsHtml(state, unit) {
+        var list = measurementsOf(state), temp = state.pinTemp || function (p) { return p.temperature; };
+        if (!list.length) return '<div class="text-muted dt-inspector-hint">Choose Pin and click the map to keep a point\'s temperature, ΔT to compare two spots, or a shape or the line and draw on the map to read a region\'s temperatures.</div>';
+        var shown = state.regions.filter(function (r) { return r.id === state.shown; })[0];
+        var muted = function (text) { return '<span class="text-muted">' + escapeHtml(text) + "</span>"; };
+        return '<table class="table table-condensed dt-inspector-pins dt-inspector-regions"><tbody>' + list.map(function (m) {
+            var r = m.item, s = r.statistics, value;
+            if (m.kind === "pin") {
+                var c = temp(r);
+                value = c === null || c === undefined ? muted(REASONS[r.reason] || "none") : escapeHtml(formatTemp(c, unit));
+            } else {
+                value = r.shape === "delta" && typeof r.delta_t === "number" ? escapeHtml(formatSigned(r.delta_t, unit)) + " " + muted("ΔT") :
+                    s ? escapeHtml(formatTemp(s.mean, unit)) + " " + muted("mean") : muted(r.loading ? "…" : REASONS[r.reason] || "none");
+            }
+            return "<tr data-" + m.kind + '="' + escapeHtml(r.id) + '"' + (r === shown ? ' class="active"' : "") + '><td><i class="' +
+                (m.kind === "pin" ? Regions.TOOLS.pin.icon : SHAPES[r.shape]) + '"></i> ' +
+                '<a href="javascript:void(0)" data-act="goto" title="Show on the map">' + escapeHtml(r.label) + "</a></td><td>" + value +
                 '</td><td class="text-right">' + saveLink(state, r) + '<a href="javascript:void(0)" data-act="remove" title="Remove"><i class="fa fa-times"></i></a></td></tr>';
-        }).join("") + "</tbody></table>" + formHtml(state.form, "region") +
+        }).join("") + "</tbody></table>" + formHtml(state.form, "pin") + formHtml(state.form, "region") +
             (shown ? '<div class="dt-inspector-shown" data-profile-of="region"><strong>' + escapeHtml(shown.label) + "</strong> " +
                 '<span class="text-muted">' + escapeHtml(SHAPE_NAMES[shown.shape] || "") + "</span>" + statisticsHtml(shown, unit, state.isotherm) +
                 (shown.profile && shown.statistics ? '<button type="button" class="btn btn-default btn-xs" data-act="csv-profile"><i class="fa fa-download"></i> Profile CSV</button>' : "") +
                 "</div>" : "") +
             '<div class="dt-inspector-actions">' +
-            '<button type="button" class="btn btn-default btn-xs" data-act="toggle-regions">' + (state.regionsVisible ? '<i class="fa fa-eye-slash"></i> Hide' : '<i class="fa fa-eye"></i> Show') + "</button> " +
-            '<button type="button" class="btn btn-default btn-xs" data-act="csv-regions"><i class="fa fa-download"></i> CSV</button> ' +
-            '<button type="button" class="btn btn-default btn-xs" data-act="clear-regions"><i class="fa fa-trash"></i> Remove all</button></div>';
+            '<button type="button" class="btn btn-default btn-xs" data-act="toggle-measurements">' + (state.measurementsVisible ? '<i class="fa fa-eye-slash"></i> Hide' : '<i class="fa fa-eye"></i> Show') + "</button> " +
+            '<button type="button" class="btn btn-default btn-xs" data-act="csv-measurements"><i class="fa fa-download"></i> CSV</button> ' +
+            '<button type="button" class="btn btn-default btn-xs" data-act="clear-measurements"><i class="fa fa-trash"></i> Remove all</button></div>';
     }
 
     // frames: a click shows the frames that saw a point of a layer shown
@@ -859,24 +876,6 @@
         if (r.error) return '<span class="text-danger">' + escapeHtml(r.error) + "</span>";
         if (!r.valid) return '<span class="text-muted">' + escapeHtml(REASONS[r.reason] || "No temperature here") + "</span>";
         return '<span class="dt-inspector-temp">' + escapeHtml(formatTemp(r.temperature, unit)) + "</span>";
-    }
-
-    // state: the panel's (its pins, form, what can be saved and the corrected temperatures)
-    function pinsHtml(state, unit) {
-        var pins = state.pins, temp = state.pinTemp || function (p) { return p.temperature; };
-        if (!pins.length) return '<div class="text-muted dt-inspector-hint">Choose Pin, then click the map to keep a point\'s temperature.</div>';
-        return '<table class="table table-condensed dt-inspector-pins"><tbody>' + pins.map(function (p) {
-            var c = temp(p);
-            return '<tr data-pin="' + escapeHtml(p.id) + '"><td><a href="javascript:void(0)" data-act="goto" title="Show on the map">' +
-                escapeHtml(p.label) + "</a></td><td>" +
-                (c === null || c === undefined ? '<span class="text-muted">' + escapeHtml(REASONS[p.reason] || "none") + "</span>" :
-                    escapeHtml(formatTemp(c, unit))) +
-                '</td><td class="text-right">' + saveLink(state, p) + '<a href="javascript:void(0)" data-act="remove" title="Remove"><i class="fa fa-times"></i></a></td></tr>';
-        }).join("") + "</tbody></table>" + formHtml(state.form, "pin") +
-            '<div class="dt-inspector-actions">' +
-            '<button type="button" class="btn btn-default btn-xs" data-act="toggle">' + (state.pinsVisible ? '<i class="fa fa-eye-slash"></i> Hide' : '<i class="fa fa-eye"></i> Show') + "</button> " +
-            '<button type="button" class="btn btn-default btn-xs" data-act="csv"><i class="fa fa-download"></i> CSV</button> ' +
-            '<button type="button" class="btn btn-default btn-xs" data-act="clear"><i class="fa fa-trash"></i> Remove all</button></div>';
     }
 
     // -- saved measurements ------------------------------------------------------------------------------------------
@@ -1066,8 +1065,7 @@
             imageHtml(state.scale) +
             '<div class="dt-inspector-section"><strong>Isotherm</strong>' + isothermHtml(state.isotherm, unit) +
             (state.isothermNotice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.isothermNotice) + "</div>" : "") + "</div>" +
-            '<div class="dt-inspector-section"><strong>Pinned points</strong>' + pinsHtml(state, unit) + "</div>" +
-            '<div class="dt-inspector-section"><strong>Regions and lines</strong>' + regionsHtml(state, unit) + "</div>" +
+            '<div class="dt-inspector-section"><strong>Measurements</strong>' + measurementsHtml(state, unit) + "</div>" +
             ((state.onMap || []).length ? '<div class="dt-inspector-section"><strong>Saved measurements</strong>' + savedHtml(state, unit) + "</div>" : "") +
             mosaicsHtml(state) + orthosHtml(state);
     }
@@ -1099,8 +1097,8 @@
         forgetCorrections(storage);
         try { storage.removeItem(LEGEND_KEY); } catch (e) { /* nothing kept */ }
         var regions = loadPins(storage, rkey).filter(function (r) { return r && r.geometry && SHAPES[r.shape]; });
-        var state = {open: false, mode: "hover", readout: null, pins: loadPins(storage, key), pinsVisible: true,
-                     regions: regions, regionsVisible: true, shown: regions.length ? regions[regions.length - 1].id : null,
+        var state = {open: false, mode: "hover", readout: null, pins: loadPins(storage, key), measurementsVisible: true,
+                     regions: regions, shown: regions.length ? regions[regions.length - 1].id : null,
                      notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
                      legendVisible: false, pointerTemperature: true, mosaics: null, laid: {}, orthos: null, orthoLaid: {}, overlaysOpen: {}, frames: false, pick: null,
                      correction: {on: false}, correctionNotice: "", sources: {}, onMap: [], savedVisible: true,
@@ -1564,7 +1562,7 @@
 
         function drawPins() {
             pinLayer.clearLayers();
-            if (!state.pinsVisible) return;
+            if (!state.measurementsVisible) return;
             state.pins.forEach(function (p) {
                 var marker = L.circleMarker([p.lat, p.lng], inPane(p.source, {radius: 5, color: "#fff", weight: 2, fillColor: "#d9534f", fillOpacity: 1}));
                 var c = pinTemp(p);
@@ -1595,7 +1593,7 @@
 
         function drawRegions() {
             regionLayer.clearLayers();
-            if (!state.regionsVisible) return;
+            if (!state.measurementsVisible) return;
             state.regions.forEach(function (r) {
                 var style = r.id === state.shown ? Regions.STYLE : {color: Regions.STYLE.color, weight: 1, opacity: 0.8, fillOpacity: 0.05};
                 if (r.shape === "delta") {
@@ -1796,7 +1794,7 @@
             if (drawn.circle) r.circle = drawn.circle;
             state.regions.push(r);
             state.shown = r.id;
-            state.regionsVisible = true;
+            state.measurementsVisible = true;
             setMode("hover");
             return measure(r);
         }
@@ -1879,6 +1877,7 @@
                 pin.temperature = r && r.valid ? r.temperature : null;
                 pin.reason = r && !r.valid ? (r.reason || "error") : null;
                 state.pins.push(pin);
+                if (!state.measurementsVisible) { state.measurementsVisible = true; drawRegions(); }
                 pinsChanged();
             });
             return true;
@@ -2272,9 +2271,9 @@
                 showFrames(thermalLayerAt(map, L.latLng(pin.lat, pin.lng)), L.latLng(pin.lat, pin.lng));
             }
             else if (what === "remove" && pin) { state.pins = state.pins.filter(function (p) { return p !== pin; }); pinsChanged(); }
-            else if (what === "toggle") { state.pinsVisible = !state.pinsVisible; drawPins(); render(); }
-            else if (what === "clear") { state.pins = []; pinsChanged(); }
-            else if (what === "csv") download("thermal-points.csv", pinsCsv(state.pins, userUnit(), pinTemp));
+            else if (what === "toggle-measurements") { state.measurementsVisible = !state.measurementsVisible; drawPins(); drawRegions(); render(); }
+            else if (what === "clear-measurements") { state.pins = []; state.regions = []; state.shown = null; savePins(storage, key, state.pins); drawPins(); regionsChanged(); }
+            else if (what === "csv-measurements") download("thermal-measurements.csv", measurementsCsv(measurementsOf(state), userUnit(), pinTemp));
             else if (what === "toggle-saved") { state.savedVisible = !state.savedVisible; drawSaved(); render(); }
             else if (what === "csv-saved") download("thermal-saved-measurements.csv", savedCsv(savedItems(state), userUnit()));
             else if (what === "geojson-saved") download("thermal-saved-measurements.geojson", savedGeoJson(savedItems(state), userUnit()), "application/geo+json");
@@ -2282,9 +2281,6 @@
                 var saved = savedItem(state.savedShown);
                 if (saved && saved.m.values && saved.m.values.profile) download("thermal-profile-" + saved.m.name.replace(/[^\w.-]+/g, "_") + ".csv", profileCsv(saved.m.values, userUnit()));
             }
-            else if (what === "toggle-regions") { state.regionsVisible = !state.regionsVisible; drawRegions(); render(); }
-            else if (what === "clear-regions") { state.regions = []; state.shown = null; regionsChanged(); }
-            else if (what === "csv-regions") download("thermal-regions.csv", regionsCsv(state.regions, userUnit()));
             else if (what === "csv-profile") {
                 var line = state.regions.filter(function (r) { return r.id === state.shown; })[0];
                 if (line && line.profile) download("thermal-profile-" + line.label + ".csv", profileCsv(line, userUnit()));
@@ -2558,14 +2554,14 @@
                withPalette: withPalette, paletteOf: paletteOf, paletteOptions: paletteOptions, rangeOf: rangeOf,
                isothermKey: isothermKey, validIsotherm: validIsotherm, loadIsotherm: loadIsotherm, defaultIsotherm: defaultIsotherm,
                isothermUrl: isothermUrl, describeIsotherm: describeIsotherm, legendHtml: legendHtml,
-               pinsKey: pinsKey, regionsKey: regionsKey, loadPins: loadPins, savePins: savePins, pinsCsv: pinsCsv,
-               regionsCsv: regionsCsv, profileCsv: profileCsv, statisticsHtml: statisticsHtml, profileHtml: profileHtml, profileIndex: profileIndex,
+               pinsKey: pinsKey, regionsKey: regionsKey, loadPins: loadPins, savePins: savePins, measurementsOf: measurementsOf, measurementsCsv: measurementsCsv,
+               profileCsv: profileCsv, statisticsHtml: statisticsHtml, profileHtml: profileHtml, profileIndex: profileIndex,
                isothermLimits: isothermLimits, readoutHtml: readoutHtml,
                panelHtml: panelHtml, hasThermal: hasThermal, projectOf: projectOf, linkedMosaic: linkedMosaic, paletteKey: paletteKey,
                mosaicRange: mosaicRange, laidMosaic: laidMosaic, mosaicValuesUrl: mosaicValuesUrl, isothermStyle: isothermStyle, valuesUrl: valuesUrl,
                framesSource: framesSource, fromCelsius: fromCelsius, corrected: corrected, uncorrected: uncorrected,
                rawIsotherm: rawIsotherm, keptRange: keptRange, correctionHtml: correctionHtml, forgetCorrections: forgetCorrections,
-               savedHtml: savedHtml, savedCsv: savedCsv, savedGeoJson: savedGeoJson, formHtml: formHtml, pinsHtml: pinsHtml,
+               savedHtml: savedHtml, savedCsv: savedCsv, savedGeoJson: savedGeoJson, formHtml: formHtml, measurementsHtml: measurementsHtml,
                mosaicsHtml: mosaicsHtml, orthosHtml: orthosHtml, orthosOf: orthosOf, orthoUrl: orthoUrl, shownAt: shownAt, shownClip: shownClip, toCelsius: toCelsius, movable: movable, adjustOf: adjustOf, autoRange: autoRange,
                scaleHtml: scaleHtml, imageHtml: imageHtml, create: create};
     root.ThermalInspector = api;

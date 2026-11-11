@@ -78,6 +78,9 @@ function server(routes) {
 const DISPLAY = {unit: null, palette: null, palettes: ["ironred"], colormaps: ["inferno", "magma", "jet"]};
 const POINT = "GET /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/point";
 
+// Regions as the Measurements CSV has them
+const regionsCsv = (regions, unit) => inspector.measurementsCsv(regions.map(r => ({kind: "region", item: r})), unit);
+
 function start(map, routes, extra) {
     const storage = window.localStorage;
     const plugins = {Map: {onHandleClick: jest.fn()}};
@@ -250,9 +253,10 @@ describe("the Thermal Inspector", () => {
         expect(JSON.parse(window.localStorage.getItem(key))[0]).toMatchObject({label: "P1", lat: 0.6, lng: 0.5, temperature: 30});
 
         window.localStorage.setItem("unit_system", "imperial");
-        expect(inspector.pinsCsv(inspector.loadPins(window.localStorage, key), "F")).toBe(
-            "label,latitude,longitude,temperature_f\nP1,0.60000000,0.50000000,86.000\n");
-        panel().querySelector('[data-act="toggle"]').click();
+        const csv = inspector.measurementsCsv(inspector.loadPins(window.localStorage, key).map(p => ({kind: "pin", item: p})), "F").split("\n");
+        expect(csv[0]).toMatch(/^label,shape,latitude,longitude,temperature_f,pixels,area_m2,length_m,min_f,.*,first_spot_f,second_spot_f$/);
+        expect(csv[1]).toBe("P1,pin,0.60000000,0.50000000,86.000" + ",".repeat(19));
+        panel().querySelector('[data-act="toggle-measurements"]').click();
         expect(pins.layers).toEqual([]);
         panel().querySelector('[data-act="remove"]').click();
         expect(window.localStorage.getItem(key)).toBe(null);
@@ -401,14 +405,51 @@ describe("the Thermal Inspector's regions", () => {
         const saved = JSON.parse(window.localStorage.getItem(inspector.regionsKey(["abc-1"])));
         expect(saved[0]).toMatchObject({label: "R1", shape: "rectangle", statistics: {mean: 30}});
         expect(saved[0].loading).toBeUndefined();
-        expect(inspector.regionsCsv(saved, "F").split("\n")[1]).toBe(
-            "R1,rectangle,400,100.000,,50.000,122.000,86.000,9.000,85.100,53.600,118.400,78.800,7.200,,0.50010000,0.49990000,0.50020000,0.49980000,,");
+        expect(regionsCsv(saved, "F").split("\n")[1]).toBe(
+            "R1,rectangle,,,,400,100.000,,50.000,122.000,86.000,9.000,85.100,53.600,118.400,78.800,7.200,,0.50010000,0.49990000,0.50020000,0.49980000,,");
         window.localStorage.setItem("unit_system", "imperial");
         expect(inspector.statisticsHtml(saved[0], "F")).toContain("1076 ft²");
         panel().querySelector('[data-region] [data-act="remove"]').click();
         expect(window.localStorage.getItem(inspector.regionsKey(["abc-1"]))).toBe(null);
         expect(panel().querySelector(".dt-inspector-shown")).toBe(null);
         map.remove();
+    });
+
+    it("lists pins, ΔTs, regions and lines under Measurements in the order made, with one Hide, CSV and Remove all", async () => {
+        let now = 1731300000000;
+        const clock = jest.spyOn(Date, "now").mockImplementation(() => (now += 1000));
+        try {
+            const map = leafletMap();
+            const {ins, plugins, panel} = start(map, {[REGION]: STATS, [POINT]: {valid: true, temperature: 30}}, {L});
+            ins.open();
+            panel().querySelector('[data-mode="rectangle"]').click();
+            drawRectangle(map);
+            await flush(); await flush();
+            panel().querySelector('[data-mode="pin"]').click();
+            plugins.Map.onHandleClick.mock.calls[0][0]({latlng: map.getCenter()});
+            await flush(); await flush();
+            const sections = [...panel().querySelectorAll(".dt-inspector-section > strong")].map(s => s.textContent);
+            expect(sections).toContain("Measurements");
+            expect(sections).not.toContain("Pinned points");
+            expect(sections).not.toContain("Regions and lines");
+            const rows = [...panel().querySelectorAll(".dt-inspector-regions tr")];
+            expect(rows.map(r => r.querySelector("a").textContent)).toEqual(["R1", "P1"]);       // made first, listed first
+            expect(rows.map(r => r.querySelector("i").className)).toEqual(["far fa-square", "fa fa-map-pin"]);
+            expect(panel().querySelectorAll('[data-act="toggle-measurements"], [data-act="csv-measurements"], [data-act="clear-measurements"]').length).toBe(3);
+            const csv = inspector.measurementsCsv(inspector.measurementsOf(ins.state), "C").split("\n");
+            expect(csv.slice(1, 3).map(r => r.split(",").slice(0, 2).join(","))).toEqual(["R1,rectangle", "P1,pin"]);
+
+            panel().querySelector('[data-act="toggle-measurements"]').click();
+            const tips = () => { const t = []; map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) t.push(l.getTooltip()._content); }); return t; };
+            expect(tips()).toEqual([]);
+            panel().querySelector('[data-act="toggle-measurements"]').click();
+            expect(tips()).toEqual(expect.arrayContaining(["R1", "P1: 30.00 °C"]));
+            panel().querySelector('[data-act="clear-measurements"]').click();
+            expect(ins.state.pins).toEqual([]);
+            expect(ins.state.regions).toEqual([]);
+            expect(tips()).toEqual([]);
+            expect(panel().querySelector(".dt-inspector-regions")).toBe(null);
+        } finally { clock.mockRestore(); }
     });
 
     it("draws a line and shows its temperatures along it, each found on the map from its profile, and exports them", async () => {
@@ -446,7 +487,7 @@ describe("the Thermal Inspector's regions", () => {
 
         expect(inspector.profileCsv(ins.state.regions[0], "C").split("\n").slice(0, 3)).toEqual(
             ["distance_m,latitude,longitude,temperature_c", "0.000,0.50000000,0.50000000,20.000", "5.000,0.50000000,0.50010000,"]);
-        expect(inspector.regionsCsv(ins.state.regions, "C").split("\n")[1]).toMatch(/^L1,line,400,,12\.500,/);
+        expect(regionsCsv(ins.state.regions, "C").split("\n")[1]).toMatch(/^L1,line,,,,400,,12\.500,/);
         // Lines and regions are numbered apart
         panel().querySelector('[data-mode="rectangle"]').click();
         drawRectangle(map);
@@ -576,7 +617,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         const tips = [];
         map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) tips.push([l.getTooltip()._content, l.getLatLng()]); });
         expect(tips).toEqual([["D1: ΔT +6.50 °C", L.latLng(0.5, 0.50002)]]);     // at the second spot
-        expect(inspector.regionsCsv(ins.state.regions, "F").split("\n")[1]).toBe("D1,delta,,,2.310,,,,,,,,,11.700,,,,,,68.000,79.700");
+        expect(regionsCsv(ins.state.regions, "F").split("\n")[1]).toBe("D1,delta,,,,,,2.310,,,,,,,,,11.700,,,,,,68.000,79.700");
 
         // A spot with no temperature: no ΔT, and which one says why
         const missing = Object.assign({}, DELTA, {valid: false, reason: "nodata", second: null, delta_t: null, reasons: [null, "nodata"]});
@@ -644,7 +685,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         expect(panel().querySelector('[data-form="name"]').value).toBe("R1");
         type(panel().querySelector('[data-form="name"]'), "Warm roof");
         type(panel().querySelector('[data-form="comment"]'), "Above the boiler");
-        ins.state.regionsVisible = true;
+        ins.state.measurementsVisible = true;
         panel().querySelector('[data-act="form-save"]').click();
         await flush(); await flush();
         const body = JSON.parse(calls(fetchFn, "POST").filter(c => c[0] === SAVED)[0][1].body);
