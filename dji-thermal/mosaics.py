@@ -51,8 +51,8 @@ PALETTES_FILE = 'palettes.json'
 JOB_FILE = 'mosaic-job.json'
 RESULT_FILE = 'mosaics.json'
 PERCENTILES = (2, 98)
-# A large mosaic is never read whole: its range block by block (ROWS_PIXELS at a time), its percentiles and its
-# histogram from a read of at most SAMPLE_SIZE pixels a side (all of it when smaller)
+# A large mosaic is never read whole: its range block by block (ROWS_PIXELS at a time), its percentiles from a read of
+# at most SAMPLE_SIZE pixels a side (all of it when smaller)
 ROWS_PIXELS = 1 << 22
 SAMPLE_SIZE = 2048
 ABSOLUTE_ZERO = {'C': -273.15, 'F': -459.67, 'K': 0.0}
@@ -70,8 +70,7 @@ DJI_PREFIX = 'dji_'
 SEAM_COLORS = ((0, 0, 0), (255, 255, 255))   # the source frame tab's lines: a pixel of each, either side of a seam
 TILE_SIZE = 256
 EARTH_CIRCUMFERENCE_M = 40075016.686
-HISTOGRAM_FILE = 'histogram-{}.json'    # a temperature mosaic's histogram, in VIEWER_DIR, for the equalization
-NO_ADJUST = {'gamma': 1.0, 'equalize': False, 'sharpen': 0.0}
+NO_ADJUST = {'gamma': 1.0, 'sharpen': 0.0, 'bands': None}
 # What VIEWER_DIR holds that isn't the mosaics': the measurements saved on them and on the frames (see measurements)
 KEPT_FILES = (measurements.FILE, measurements.FRAMES_FILE)
 # While a workset with frames removed builds its mosaics: links to the frames it keeps, as the dataset holds them
@@ -572,45 +571,23 @@ def is_temperature(tab):
 
 
 def in_unit(tab):
-    """Whether a viewer tab's values are in the mosaic's unit, temperatures or differences of them: those can be
-    equalized and drawn as isotherms"""
+    """Whether a viewer tab's values are in the mosaic's unit, temperatures or differences of them: those can be drawn
+    in bands and as isotherms"""
     return is_temperature(tab) or tab in DIFFERENCE_TABS
-
-
-def temperatures(raster, unit):
-    """A mosaic's temperatures (band_sample: reduced to SAMPLE_SIZE pixels a side when larger), NaN where it has none"""
-    import numpy as np
-    import rasterio
-    with rasterio.open(raster) as src:
-        values = band_sample(src, 1).astype(np.float64)
-    values[~np.isfinite(values) | (values <= low_value(unit))] = np.nan
-    return values
-
-
-def histogram(task, cid, tab):
-    """A temperature tab's histogram (colouring.value_histogram of its mosaic), kept beside the viewer's other files"""
-    from . import colouring
-    raster, _band = tab_raster(task, cid, tab)
-    unit = result(task, cid).get('unit') or 'C'
-    return colouring.kept_histogram(raster, lambda p: temperatures(p, unit),
-                                    path(task, cid, VIEWER_DIR, HISTOGRAM_FILE.format(tab_kind(tab))))
 
 
 def shares(task, cid, tab, low, high, adjust):
     """
     The palette's share at values evenly across low..high that a viewer tab is drawn with (colouring.curve_shares): its
-    gamma, and with equalize its mosaic's histogram equalization; None when drawn linearly
-    :raises ValueError: equalize asked on a tab of no temperatures
+    gamma; None when drawn linearly
+    :raises ValueError: bands asked on a tab of no temperatures
     """
     from . import colouring
-    curve = None
-    if adjust['equalize']:
-        if not in_unit(tab):
-            raise ValueError("Only temperatures can be equalized")
-        curve = colouring.equalization(histogram(task, cid, tab), low, high)
-    elif adjust['gamma'] == 1.0:
+    if adjust['bands'] and not in_unit(tab):
+        raise ValueError("Only temperatures can be drawn in bands")
+    if adjust['gamma'] == 1.0:
         return None
-    return colouring.curve_shares(low, high, adjust, curve)
+    return colouring.curve_shares(low, high, adjust)
 
 
 def tile_pixel_m(z, y):
@@ -631,7 +608,7 @@ def tile(task, cid, tab, z, x, y, cmap, low, high, adjust=None, isotherm=None):
     and the isotherm (colouring: its temperatures in the palette, the rest in grey); the source frames as the temperatures with black and white lines where one frame meets the next;
     never interpolated (nearest pixel).
     :return: None when the tile is outside the mosaic
-    :raises ValueError: equalize asked on a tab of no temperatures
+    :raises ValueError: bands asked on a tab of no temperatures
     """
     from . import colouring
     adjust = adjust or NO_ADJUST
@@ -644,7 +621,7 @@ def tile(task, cid, tab, z, x, y, cmap, low, high, adjust=None, isotherm=None):
         return None
     values, frames, sigma = found
     rgba = colouring.colour(values, palette_colors(cmap), (low, high), tone, adjust['sharpen'],
-                            colouring.isotherm_range(isotherm), sigma=sigma, margin=buffer)
+                            colouring.isotherm_range(isotherm), sigma=sigma, margin=buffer, bands=adjust['bands'])
     if framed:
         first, second = frames
         inner = (slice(buffer, -buffer), slice(buffer, -buffer))
@@ -893,4 +870,4 @@ def frame_image(task, cid, tab, index, cmap, low, high, adjust=None, isotherm=No
     adjust = adjust or NO_ADJUST
     tone = shares(task, cid, tab, low, high, adjust)
     return png(colouring.colour(frame_values(task, cid, tab, index), palette_colors(cmap), (low, high), tone,
-                                adjust['sharpen'], colouring.isotherm_range(isotherm)))
+                                adjust['sharpen'], colouring.isotherm_range(isotherm), bands=adjust['bands']))

@@ -61,14 +61,24 @@
         return inUnit(tab) && style.isotherm && style.isotherm.value ? "&isotherm=" + encodeURIComponent(style.isotherm.value) : "";
     }
 
-    // The legend's shares as the image is drawn: the server's curve with equalization, else gamma's, else none (linear)
-    function styleShares(style) { return scale.adjustShares(style.adjust, style.curve); }
+    // The legend's shares as the image is drawn: gamma's, else none (linear)
+    function styleShares(style) { return scale.adjustShares(style.adjust); }
+
+    // How a tab's values (in the mosaic's unit) read in the user's unit, for Stepped's bands (scale.bandsOf): null on a
+    // tab of other values
+    function toUser(tab, unit) {
+        if (!inUnit(tab)) return null;
+        return {scale: core.convertDelta(1, unit), offset: isDifference(tab) ? 0 : core.convertTemp(0, unit)};
+    }
+    // The bands a tab is drawn in (scale.bandsOf's, in the mosaic's unit), or null
+    function styleBands(tab, style, unit) { return inUnit(tab) ? scale.bandsOf(style.adjust, style.range, toUser(tab, unit)) : null; }
+    function styleSteps(tab, style, unit) { return scale.stepsOf(styleBands(tab, style, unit), style.range); }
 
     // The source frames are shown over the as-converted temperatures; the frame page shows one frame's
     function isTemperature(tab) { return tab === "as_converted" || tab === "harmonized" || tab === "source_frame" || tab === "frame"; }
     // Intensify shows differences of temperatures (each pixel less its surroundings), in the mosaic's unit
     function isDifference(tab) { return tab === "intensify"; }
-    // Temperatures or their differences: shown in the user's unit, equalized, drawn as isotherms
+    // Temperatures or their differences: shown in the user's unit, drawn in bands and as isotherms
     function inUnit(tab) { return isTemperature(tab) || isDifference(tab); }
 
     // What a tab shows, in the controls' words
@@ -121,15 +131,15 @@
         return range.map(function (x) { return exactValue(tab, x, unit); });
     }
 
-    // A colour scale: the palette's gradient (along shares: how the image is drawn) over the range shown ([lo, hi]),
-    // marked with its ends' values and round values between them
-    function legendHtml(encoded, shown, shares) {
+    // A colour scale: the palette's gradient (along shares, in bands with steps: how the image is drawn) over the range
+    // shown ([lo, hi]), marked with its ends' values and round values between them
+    function legendHtml(encoded, shown, shares, steps) {
         if (!encoded) return "";
         var ticks = rangeTicks(shown[0], shown[1], 5).map(function (t) {
             var end = t.at < 0.1 ? " ta-tick-start" : t.at > 0.9 ? " ta-tick-end" : "";
             return '<span class="ta-tick' + end + '" style="left: ' + (t.at * 100).toFixed(1) + '%;">' + esc(t.label) + "</span>";
         }).join("");
-        return '<div class="ta-viewer-legend" style="background: ' + gradientCss(encoded, shares) + ';"></div>' +
+        return '<div class="ta-viewer-legend" style="background: ' + gradientCss(encoded, shares, steps) + ';"></div>' +
             '<div class="ta-legend-ticks">' + ticks + "</div>";
     }
 
@@ -153,11 +163,11 @@
     }
 
     // One of the mosaic's frames as the tab draws it (its temperatures, or on View angle its pixels' angles), with the
-    // tab's palette and range, cached as the tiles are
-    function frameUrl(base, tab, index, style, builtAt) {
+    // tab's palette and range (unit: the mosaic's, for its bands), cached as the tiles are
+    function frameUrl(base, tab, index, style, builtAt, unit) {
         var query = ["v=" + encodeURIComponent(builtAt || ""), "color_map=" + encodeURIComponent(style.palette),
                      "rescale=" + style.range[0] + "," + style.range[1]];
-        return Frames.frameUrl(base, tab, index, query.join("&") + adjustQuery(style.adjust) + isothermQuery(tab, style));
+        return Frames.frameUrl(base, tab, index, query.join("&") + adjustQuery(style.adjust, styleBands(tab, style, unit)) + isothermQuery(tab, style));
     }
 
     function tabsHtml(tabs, current) {
@@ -179,7 +189,7 @@
                 return '<option value="' + esc(p.key) + '"' + (p.key === style.palette ? " selected" : "") + ">" + esc(p.label) + "</option>";
             }).join("") + "</select></div>";
         out += '<div class="ta-scale" id="ta-viewer-scale">' + legendHtml(current && current.color_map, shownRange(tab.tab, style.range, unit),
-                                                                           styleShares(style)) + "</div>";
+                                                                           styleShares(style), styleSteps(tab.tab, style, unit)) + "</div>";
         out += '<div class="ta-viewer-range">' +
             '<input type="number" step="0.1" class="form-control input-sm" id="ta-viewer-min" value="' + shown(style.range[0]) + '" title="Minimum">' +
             scale.spanButtonsHtml(function (name) { return 'id="ta-viewer-' + name + '"'; }, "btn-sm",
@@ -212,15 +222,22 @@
             (difference ? " Its values are differences from the surroundings (e.g. below -1.5)." : "") + "</p></details>";
     }
 
-    // How the image is drawn: brightness and contrast move the range, gamma and the tone curve share out the colours,
-    // sharpening brings out edges
+    // How the image is drawn: brightness and contrast move the range, gamma shares out the colours, Stepped draws flat
+    // bands, sharpening brings out edges
     function imageHtml(tab, style, unit) {
         var temperature = inUnit(tab.tab);
         return '<details class="ta-section" open data-section="image"><summary><h5>Image</h5></summary>' +
             scale.imageControlsHtml(style.adjust, sliderPositions(defaultRange(tab, unit), style.range),
-                                    {field: function (name) { return 'id="ta-viewer-' + name + '"'; }, equalize: temperature, whole: wholeName(tab.tab)}) +
+                                    {field: function (name) { return 'id="ta-viewer-' + name + '"'; }, stepped: temperature,
+                                     bands: styleBands(tab.tab, style, unit), unit: core.unitSymbol(core.userUnit())}) +
             '<p class="ta-message">How the image is drawn: the ' + (isDifference(tab.tab) ? "differences" : temperature ? "temperatures" : "values") +
             " stay as they are.</p></details>";
+    }
+
+    // Auto's band width as the range changes, in the width's field (when it is shown and empty)
+    function stepHint($, bands) {
+        var field = $("ta-viewer-step");
+        if (field && bands) field.placeholder = "Auto " + Number(bands.auto.toPrecision(6));
     }
 
     // The button that lets go of the point a click kept
@@ -359,8 +376,12 @@
                 return o.restyle();
             }
             if (/^ta-viewer-iso-(mode|a|b)$/.test(e.target.id)) return isotherm();
-            if (e.target.id === "ta-viewer-tone") {
-                o.style().adjust.equalize = e.target.value === "equalize";
+            // Linear or Stepped, and the bands' width (empty: Auto): the controls drawn again, for the width's field
+            if (e.target.id === "ta-viewer-tone" || e.target.id === "ta-viewer-step") {
+                var a = o.style().adjust;
+                if (e.target.id === "ta-viewer-tone") a.tone = e.target.value === "stepped" ? "stepped" : "linear";
+                else a.step = scale.typedStep(e.target.value);
+                o.el.innerHTML = controlsHtml(o.current(), o.style(), o.palettes(), o.unit());
                 return o.restyle();
             }
             // A slider let go of draws what the server draws again too (while it moves, the image follows)
@@ -395,10 +416,7 @@
         o.el.addEventListener("click", function (e) {
             if (e.target.id !== "ta-viewer-auto" && e.target.id !== "ta-viewer-reset") return;
             o.style().range = defaultRange(o.current(), o.unit());
-            if (e.target.id === "ta-viewer-reset") {
-                o.style().adjust = defaultAdjust();
-                o.style().curve = null;
-            }
+            if (e.target.id === "ta-viewer-reset") o.style().adjust = defaultAdjust();
             o.el.innerHTML = controlsHtml(o.current(), o.style(), o.palettes(), o.unit());
             o.restyle();
         });
@@ -438,41 +456,23 @@
             var g = styleGroup(tab);
             var first = isTemperature(tab) ? v.default_palette : isDifference(tab) && v.difference_palette || "inferno";
             if (!styles[g]) styles[g] = {palette: first, range: defaultRange(current(), v.unit),
-                                         adjust: defaultAdjust(), curve: null, isotherm: {mode: "", a: "", b: "", value: ""}};
+                                         adjust: defaultAdjust(), isotherm: {mode: "", a: "", b: "", value: ""}};
             return styles[g];
-        }
-
-        // The curve with equalization, for the range shown: from the tab's histogram (the whole mosaic's), asked for
-        // once, as the server draws it
-        var histograms = {};
-        function loadCurve() {
-            var s = style(), askedTab = tab, h = histograms[tab];
-            if (!s.adjust.equalize || !inUnit(tab)) return;
-            if (h && !h.then) {
-                s.curve = Recolour.curveShares(s.range[0], s.range[1], s.adjust, Recolour.equalization(h, s.range[0], s.range[1]));
-                return;
-            }
-            if (h) return;
-            histograms[tab] = fetchFn(base + "/mosaics/" + tab + "/histogram", {credentials: "same-origin"}).then(core.readJson).then(function (r) {
-                histograms[askedTab] = r.ok ? r.data : {counts: null, edges: null};
-                if (askedTab === tab) recolour();
-            }, function () {
-                // Never reached the server: asked again on the next change
-                delete histograms[askedTab];
-            });
         }
 
         // How the tab's tiles are coloured now (recolour.js's style)
         function drawStyle() {
             var s = style(), p = (v.palettes || []).filter(function (x) { return x.key === s.palette; })[0];
             if (!p) return null;
-            return {palette: s.palette, colors: p.color_map, range: s.range, shares: styleShares(s), sharpen: s.adjust.sharpen,
+            return {palette: s.palette, colors: p.color_map, range: s.range, shares: styleShares(s), steps: styleSteps(tab, s, v.unit), sharpen: s.adjust.sharpen,
                     isotherm: inUnit(tab) ? Recolour.isothermRange(s.isotherm && s.isotherm.value) : null, seams: tab === "source_frame"};
         }
 
         function showScale() {
             var p = (v.palettes || []).filter(function (x) { return x.key === style().palette; })[0];
-            $("ta-viewer-scale").innerHTML = legendHtml(p && p.color_map, shownRange(tab, style().range, v.unit), styleShares(style()));
+            $("ta-viewer-scale").innerHTML = legendHtml(p && p.color_map, shownRange(tab, style().range, v.unit), styleShares(style()),
+                                                        styleSteps(tab, style(), v.unit));
+            stepHint($, styleBands(tab, style(), v.unit));
         }
 
         function ensureMap() {
@@ -564,7 +564,7 @@
         function showPick() {
             var box = $("ta-viewer-pip"), f = pick.frames[pick.at];
             box.hidden = false;
-            box.innerHTML = pipHtml(pick, f ? frameUrl(base, tab, f.index, style(), v.built_at) : "", base);
+            box.innerHTML = pipHtml(pick, f ? frameUrl(base, tab, f.index, style(), v.built_at, v.unit) : "", base);
             if (pipMove) pipMove.keep();
             pickLayer.clearLayers();
             if (f && f.footprint) {
@@ -601,7 +601,6 @@
             if (v.project) $("ta-viewer-webodm-map").href = "/map/project/" + encodeURIComponent(v.project) + "/?dt-mosaic=" +
                 encodeURIComponent(v.dataset + "/" + v.id) + (isTemperature(tab) ? "/" + tab : "");
             $("ta-viewer-tabs").innerHTML = tabsHtml(v.tabs, tab);
-            loadCurve();
             $("ta-viewer-controls").innerHTML = controlsHtml(t, style(), v.palettes || [], v.unit);
             // Intensify's report is the harmonized mosaic's, which it is made from
             var kind = (v.kinds[t.kind] || {}).of || t.kind;
@@ -615,7 +614,6 @@
 
         // The scale and the tiles coloured again, as the palette, range or adjustments change (no requests)
         function recolour() {
-            loadCurve();
             showScale();
             if (layer) layer.recolour();
         }
@@ -746,7 +744,7 @@
     }
 
     var api = {tabLabel: tabLabel, styleGroup: styleGroup, defaultRange: defaultRange, parseRange: parseRange, shownRange: shownRange,
-               gradientCss: gradientCss, scaleTicks: scaleTicks, legendHtml: legendHtml, takenText: takenText, valuesUrl: valuesUrl,
+               gradientCss: gradientCss, scaleTicks: scaleTicks, toUser: toUser, styleBands: styleBands, styleSteps: styleSteps, stepHint: stepHint, legendHtml: legendHtml, takenText: takenText, valuesUrl: valuesUrl,
                frameUrl: frameUrl, pipHtml: pipHtml, READOUT_HINT: READOUT_HINT, tabsHtml: tabsHtml, controlsHtml: controlsHtml, readoutHtml: readoutHtml, reportHtml: reportHtml, statusHtml: statusHtml,
                baseLayers: baseLayers, loadLeaflet: loadLeaflet, init: init, adjustQuery: adjustQuery, toneShares: toneShares,
                slidRange: slidRange, sliderPositions: sliderPositions, sliderGamma: sliderGamma, gammaSlider: gammaSlider,

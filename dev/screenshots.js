@@ -303,8 +303,8 @@ const SHOTS = {
         return p;
     },
     "inspector-image": async (p, env) => {
-        // The colour scale and the Image section under Palette: the contrast raised, gamma above 1 and some sharpening
-        // (not Equalized: its histogram would be kept on the server, and the script stays read only)
+        // The colour scale and the Image section under Palette: the contrast raised, Stepped at Auto's width (the map and
+        // the colour bar in bands) and some sharpening
         await p.setViewportSize({width: SIZE.width, height: 1100});
         await p.goto(env.url + need(env, "DT_DOCS_MAP"));
         await p.waitForSelector(".dt-inspector-button", {timeout: 30000});
@@ -316,7 +316,7 @@ const SHOTS = {
             e.dispatchEvent(new Event("change", {bubbles: true}));
         }, value);
         await set("image-contrast", "0.5");
-        await set("image-gamma", "0.6");
+        await set("image-tone", "stepped");
         await set("image-sharpen", "1");
         await p.waitForTimeout(4000);
         return p;

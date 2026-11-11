@@ -473,22 +473,20 @@ class TestInspector(BootTestCase):
         np.testing.assert_allclose(self.pixel(50, 40, palette='magma', rescale='0,200')[:3],
                                    [(c >> 24) & 255, (c >> 16) & 255, (c >> 8) & 255], atol=8)
 
-    def test_a_tile_is_drawn_with_gamma_equalized_or_sharpened_as_the_mosaics_are(self):
+    def test_a_tile_is_drawn_with_gamma_stepped_or_sharpened_as_the_mosaics_are(self):
         # (50, 40) is at 60 °C: 30% of 0..200; gamma 2 draws it at its square root
         self.assertLess(abs(self.pixel(50, 40, palette='whitehot', rescale='0,200', gamma=2)[0] - 0.3 ** 0.5 * 255), 4)
-        # Equalized: at the share of the orthophoto's pixels below it (its alpha band left out), kept in the task's
-        # thermal folder
-        values = temperatures()[:, TRANSPARENT_COLUMNS:]
-        share = float((values < 60).mean())
-        self.assertLess(abs(self.pixel(50, 40, palette='whitehot', rescale='0,200', equalize=1)[0] - share * 255), 8)
-        kept = os.path.join(self.task.task_path(), "thermal", "histogram.json")
-        self.assertTrue(os.path.exists(kept))
+        # Stepped: in the colour of its band's middle (50 to 100 °C: 75 °C, 37.5% of 0..200), beside WebODM's own
+        # bands=L; a view kept from before Stepped (equalize) drawn Linear
+        self.assertLess(abs(self.pixel(50, 40, palette='whitehot', rescale='0,200', bands='L', stepped='50,0')[0] - 0.375 * 255), 4)
+        self.assertLess(abs(self.pixel(50, 40, palette='whitehot', rescale='0,200', equalize=1)[0] - 0.3 * 255), 4)
+        self.assertFalse(os.path.exists(os.path.join(self.task.task_path(), "thermal", "histogram.json")))
         # Sharpened: the edge of its data stands out (beside it, only hotter pixels: (11, 40) is at 21 °C), and the
         # middle of a steady slope stays
         plain = self.pixel(TRANSPARENT_COLUMNS + 1, 40, palette='whitehot', rescale='17,25')[0]
         self.assertLess(self.pixel(TRANSPARENT_COLUMNS + 1, 40, palette='whitehot', rescale='17,25', sharpen=5)[0], plain - 20)
         self.assertLess(abs(self.pixel(50, 40, palette='whitehot', rescale='0,200', sharpen=5, size=512)[0] - 0.3 * 255), 4)
-        for params in ({'gamma': 9}, {'gamma': 'x'}, {'equalize': 2}, {'sharpen': -1}):
+        for params in ({'gamma': 9}, {'gamma': 'x'}, {'stepped': '0,0'}, {'stepped': '1'}, {'sharpen': -1}):
             self.assertEqual(self.tile(50, 40, palette='whitehot', **params)[0].status_code, status.HTTP_400_BAD_REQUEST, params)
 
     def test_a_value_tile_holds_the_temperatures_a_tile_is_drawn_from_with_a_margin(self):
@@ -528,22 +526,13 @@ class TestInspector(BootTestCase):
         far = self.client.get(self.url(self.task, "values/18/0/0"))
         self.assertEqual(far.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_the_orthophotos_histogram_is_given_for_the_browsers_equalization(self):
-        res = self.client.get(self.url(self.task, "histogram"))
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        counts, edges = inspector.histogram(self.task)
-        self.assertEqual((res.data['counts'], res.data['edges']), (counts.tolist(), edges.tolist()))
-
     def test_the_legends_curve_is_the_tiles(self):
         res = self.client.get(self.url(self.task, "curve"), {'rescale': '0,200', 'gamma': 2})
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         shares = res.data['shares']
         self.assertEqual((len(shares), shares[0], shares[-1]), (65, 0.0, 1.0))
         self.assertAlmostEqual(shares[16], 0.25 ** 0.5, places=6)
-        equalized = self.client.get(self.url(self.task, "curve"), {'rescale': '0,200', 'equalize': 1}).data['shares']
-        # Nothing of the orthophoto is above 120 °C: the palette is spent by then
-        self.assertEqual(equalized[39:], [1.0] * 26)
-        self.assertEqual(equalized, sorted(equalized))
+        self.assertEqual(self.client.get(self.url(self.task, "histogram")).status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(self.client.get(self.url(self.task, "curve"), {'rescale': '0,200', 'gamma': 0}).status_code,
                          status.HTTP_400_BAD_REQUEST)
 

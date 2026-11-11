@@ -1,6 +1,7 @@
 // Tiles coloured in the browser, shared by the mosaic viewer (viewer.js) and the Thermal Inspector (inspector.js): the
 // server sends a tile's values once (a value tile: colouring.value_png), and the browser colours them as the server's
-// colouring.colour does (palette, range, tone curve, unsharp mask, isotherm, seams), on every change, with no requests.
+// colouring.colour does (palette, range, tone curve, bands, unsharp mask, isotherm, seams), on every change, with no
+// requests.
 (function (root) {
     // As colouring.py has them
     var TONE_STEPS = 1024, LEVELS = 255, SIGMA_LIMITS = [0.5, 4], CURVE_SAMPLES = 65;
@@ -48,64 +49,29 @@
         });
     }
 
-    // -- the tone curve (colouring.equalization, tone and curve_shares) -------------------------------------------------
+    // -- the tone curve (colouring.tone and curve_shares) ---------------------------------------------------------------
 
-    // numpy's interp: x's place along xs (increasing, perhaps with repeats), ys's value there
-    function interp(x, xs, ys) {
-        var n = xs.length;
-        if (x < xs[0]) return ys[0];
-        if (x > xs[n - 1]) return ys[n - 1];
-        var lo = 0, hi = n;     // the last index whose xs is at most x
-        while (hi - lo > 1) {
-            var mid = (lo + hi) >> 1;
-            if (xs[mid] <= x) lo = mid; else hi = mid;
-        }
-        if (lo === n - 1 || xs[lo] === x) return ys[lo];
-        return (ys[lo + 1] - ys[lo]) / (xs[lo + 1] - xs[lo]) * (x - xs[lo]) + ys[lo];
-    }
-
-    // Histogram equalization over low..high ({counts, edges}: the server's histogram): [values, shares] to interpolate
-    // a value's share of the palette from, or null when none of its values are in the range
-    function equalization(histogram, low, high) {
-        if (!histogram || !histogram.counts || !histogram.edges) return null;
-        var counts = histogram.counts, edges = histogram.edges, inside = [], total = 0;
-        var clamp = function (x) { return Math.min(Math.max(x, low), high); };
-        for (var i = 0; i < counts.length; i++) {
-            var width = edges[i + 1] - edges[i];
-            // a bin's values taken as spread evenly over it: the part of it within the range counts
-            inside.push(counts[i] * (width > 0 ? (clamp(edges[i + 1]) - clamp(edges[i])) / width : 0));
-            total += inside[i];
-        }
-        if (!(total > 0)) return null;
-        var values = [low], shares = [0], sum = 0;
-        for (var j = 0; j < counts.length; j++) {
-            sum += inside[j];
-            values.push(clamp(edges[j + 1]));
-            shares.push(sum / total);
-        }
-        values.push(high);
-        shares.push(1);
-        return [values, shares];
-    }
-
-    // The palette's share at CURVE_SAMPLES values evenly across low..high: linear, or along curve (equalization), then
-    // gamma
-    function curveShares(low, high, adjust, curve) {
+    // The palette's share at CURVE_SAMPLES values evenly across low..high, with gamma
+    function curveShares(low, high, adjust) {
         var gamma = (adjust && adjust.gamma) || 1, out = [];
         for (var i = 0; i < CURVE_SAMPLES; i++) {
-            var v = low + (high - low) * i / (CURVE_SAMPLES - 1);
-            var t = clip01(curve ? interp(v, curve[0], curve[1]) : (v - low) / (high - low));
+            var t = i / (CURVE_SAMPLES - 1);
             out.push(gamma !== 1 ? Math.pow(t, 1 / gamma) : t);
         }
         return out;
     }
 
-    // The shares a tile is drawn with (as the server's tiles are): with equalization, along the histogram's curve; with
-    // gamma alone, gamma's; else none (linear)
-    function drawnShares(low, high, adjust, histogram) {
+    // The shares a tile is drawn with (as the server's tiles are): gamma's, else none (linear)
+    function drawnShares(low, high, adjust) {
         var a = adjust || {};
-        if (a.equalize) return curveShares(low, high, a, equalization(histogram, low, high));
-        return a.gamma && a.gamma !== 1 ? curveShares(low, high, a, null) : null;
+        return a.gamma && a.gamma !== 1 ? curveShares(low, high, a) : null;
+    }
+
+    // A share of the range in flat bands (colouring.banded): the share at the middle of its band (steps: {start,
+    // width}, the bands' edges at start + k * width, in shares of the range), clipped; as it is without steps
+    function banded(u, steps) {
+        if (!steps) return u;
+        return clip01(steps.start + (Math.floor((u - steps.start) / steps.width) + 0.5) * steps.width);
     }
 
     // -- colouring (colouring.colour) --------------------------------------------------------------------------------
@@ -118,11 +84,11 @@
     }
 
     // The palette as drawn along the range: TONE_STEPS colours (r, g, b each), each the level of its toned share in the
-    // palette (encoded: 0xRRGGBBAA), or in grey
-    function tonedPalette(colors, shares, grey) {
+    // palette (encoded: 0xRRGGBBAA; in flat bands with steps: banded's), or in grey
+    function tonedPalette(colors, shares, grey, steps) {
         var out = new Uint8Array(TONE_STEPS * 3), n = colors.length;
         for (var i = 0; i < TONE_STEPS; i++) {
-            var level = Math.round(toned(i / (TONE_STEPS - 1), shares) * LEVELS);
+            var level = Math.round(toned(banded(i / (TONE_STEPS - 1), steps), shares) * LEVELS);
             if (grey) {
                 out[i * 3] = out[i * 3 + 1] = out[i * 3 + 2] = level;
             } else if (n) {
@@ -161,7 +127,8 @@
     }
 
     // A tile ({values, flags, width, height, margin, sigma}) coloured into out (the RGBA of its inner pixels, a canvas's
-    // ImageData's data). style: {colors (encoded), range: [low, high], shares (null: linear), sharpen, isotherm: [low,
+    // ImageData's data). style: {colors (encoded), range: [low, high], shares (null: linear), steps (flat bands, banded's:
+    // {start, width}, or null), sharpen, isotherm: [low,
     // high] (the values drawn in the palette, the rest in grey) or null, seams: draw the flagged seams}; or, to paint an
     // isotherm over another layer, {paint: [r, g, b], isotherm: [low, high]}. The blur is kept on the tile for the same
     // range and sigma.
@@ -169,7 +136,8 @@
         var w = tile.width, h = tile.height, m = tile.margin || 0, iw = w - 2 * m, ih = h - 2 * m, v = tile.values;
         if (style.paint) return paint(tile, style.paint, style.isotherm, out);
         var low = style.range[0], high = style.range[1], span = (high - low) || 1;
-        var palette = tonedPalette(style.colors, style.shares), grey = style.isotherm ? tonedPalette(style.colors, style.shares, true) : null;
+        var steps = style.steps || null;
+        var palette = tonedPalette(style.colors, style.shares, false, steps), grey = style.isotherm ? tonedPalette(style.colors, style.shares, true, steps) : null;
         var blur = null;
         if (style.sharpen > 0) {
             var key = low + "," + high + "," + tile.sigma;
@@ -304,7 +272,7 @@
         return layer;
     }
 
-    var api = {decode: decode, fetchValues: fetchValues, interp: interp, equalization: equalization, curveShares: curveShares,
+    var api = {decode: decode, fetchValues: fetchValues, curveShares: curveShares, banded: banded,
                drawnShares: drawnShares, tonedPalette: tonedPalette, colour: colour, isothermRange: isothermRange,
                drawFromValues: drawFromValues, CURVE_SAMPLES: CURVE_SAMPLES};
     root.ThermalRecolour = api;

@@ -409,24 +409,18 @@
         function current() { return {tab: "frame", stats: infos[0] && infos[0].stats}; }
         function unit() { return meta.unit; }
 
-        // The equalization's curve, from the frame's own histogram, for the range shown
-        function loadCurve() {
-            var h = infos[0] && infos[0].stats && infos[0].stats.histogram;
-            style.curve = style.adjust.equalize && h ?
-                Recolour.curveShares(style.range[0], style.range[1], style.adjust, Recolour.equalization(h, style.range[0], style.range[1])) : null;
-        }
-
         function drawStyle() {
             var p = (meta.palettes || []).filter(function (x) { return x.key === style.palette; })[0];
             if (!p) return null;
-            return {palette: style.palette, colors: p.color_map, range: style.range, shares: scale.adjustShares(style.adjust, style.curve),
-                    sharpen: style.adjust.sharpen, isotherm: Recolour.isothermRange(style.isotherm && style.isotherm.value), seams: false};
+            return {palette: style.palette, colors: p.color_map, range: style.range, shares: scale.adjustShares(style.adjust),
+                    steps: Viewer.styleSteps("frame", style, unit()), sharpen: style.adjust.sharpen, isotherm: Recolour.isothermRange(style.isotherm && style.isotherm.value), seams: false};
         }
 
         function showScale() {
             var p = (meta.palettes || []).filter(function (x) { return x.key === style.palette; })[0];
             $("ta-viewer-scale").innerHTML = Viewer.legendHtml(p && p.color_map, Viewer.shownRange("frame", style.range, unit()),
-                                                               scale.adjustShares(style.adjust, style.curve));
+                                                               scale.adjustShares(style.adjust), Viewer.styleSteps("frame", style, unit()));
+            Viewer.stepHint($, Viewer.styleBands("frame", style, unit()));
         }
 
         // Each pane's canvas coloured from its values, once a frame (as a slider moves)
@@ -441,7 +435,6 @@
             });
         }
         function recolour() {
-            loadCurve();
             showScale();
             if (drawing) return;
             var later = root.requestAnimationFrame || function (f) { return root.setTimeout(f, 16); };
@@ -728,7 +721,7 @@
                 tiles = found.map(function (f) { return f[1]; });
                 if (!style) {
                     style = {palette: meta.default_palette, range: Viewer.defaultRange(current(), unit()), adjust: scale.defaultAdjust(),
-                             curve: null, isotherm: {mode: "", a: "", b: "", value: ""}};
+                             isotherm: {mode: "", a: "", b: "", value: ""}};
                 }
                 render();
             }, function () {

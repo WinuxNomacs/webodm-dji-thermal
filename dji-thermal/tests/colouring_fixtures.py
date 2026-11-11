@@ -16,7 +16,7 @@ SIZE, MARGIN = 30, 8
 
 
 def build(colouring):
-    """The fixtures: the values, palettes and histogram, and each case's style with the RGBA it is drawn in"""
+    """The fixtures: the values and palettes, and each case's style with the RGBA it is drawn in"""
     import numpy as np
     rng = np.random.default_rng(7)
     values = rng.normal(20, 8, (SIZE, SIZE))
@@ -29,14 +29,15 @@ def build(colouring):
         "long": [(i << 24) | ((255 - i) << 16) | (((i * 7) % 256) << 8) | 255 for i in range(256)],
         "short": [0xFF0000FF, 0x00FF00FF, 0x0000FFFF, 0xFFFF00FF, 0xFFFFFFFF],
     }
-    counts, edges = colouring.value_histogram(values)
-    histogram = {"counts": counts.tolist(), "edges": edges.tolist()}
-    equalized = colouring.curve_shares(12, 34, {"gamma": 1.0}, colouring.equalization((counts, edges), 12, 34))
     cases = [
         {"name": "linear", "palette": "long", "range": [10, 30]},
         {"name": "a short palette", "palette": "short", "range": [5, 40]},
         {"name": "gamma", "palette": "long", "range": [10, 30], "shares": colouring.curve_shares(10, 30, {"gamma": 2.0})},
-        {"name": "equalized", "palette": "long", "range": [12, 34], "shares": equalized},
+        {"name": "stepped", "palette": "long", "range": [10, 30], "bands": [2.0, 0.0]},
+        {"name": "stepped, bands off the range's ends, with gamma", "palette": "short", "range": [12.3, 34.1],
+         "bands": [5.0, -17.78], "shares": colouring.curve_shares(12.3, 34.1, {"gamma": 1.8})},
+        {"name": "stepped and sharpened, with an isotherm", "palette": "long", "range": [10, 30], "bands": [2.5, 1.0],
+         "sharpen": 1.5, "sigma": 1.2, "isotherm": [15, 25]},
         {"name": "sharpened", "palette": "long", "range": [10, 30], "sharpen": 2.5, "sigma": 1.7},
         {"name": "sharpened wide, with gamma", "palette": "short", "range": [0, 45], "sharpen": 1.0, "sigma": 3.2,
          "shares": colouring.curve_shares(0, 45, {"gamma": 0.6})},
@@ -47,7 +48,8 @@ def build(colouring):
     inner = (slice(MARGIN, -MARGIN), slice(MARGIN, -MARGIN))
     for case in cases:
         rgba = colouring.colour(values, palettes[case["palette"]], tuple(case["range"]), case.get("shares"),
-                                case.get("sharpen", 0.0), case.get("isotherm"), case.get("sigma", 1.0), MARGIN)
+                                case.get("sharpen", 0.0), case.get("isotherm"), case.get("sigma", 1.0), MARGIN,
+                                case.get("bands"))
         if case.get("seams"):
             # as the source frames' tiles are drawn (mosaics.tile), only where there are values
             here = rgba[..., 3] > 0
@@ -55,8 +57,7 @@ def build(colouring):
                 rgba[(flags[inner] == flag) & here, :3] = color
         case["rgba"] = rgba.reshape(-1).tolist()
     return {"size": SIZE, "margin": MARGIN, "values": [None if np.isnan(v) else float(v) for v in values.reshape(-1)],
-            "flags": flags.reshape(-1).tolist(), "palettes": palettes, "histogram": histogram,
-            "equalization": {"range": [12, 34], "shares": equalized}, "cases": cases}
+            "flags": flags.reshape(-1).tolist(), "palettes": palettes, "cases": cases}
 
 
 def text(fixtures):

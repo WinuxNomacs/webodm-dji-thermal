@@ -1,16 +1,12 @@
 """
 How the mosaic viewer's tiles and frames are drawn, from dji-thermal-ui (analyzer/colouring.py and the colours of
-analyzer/thermal_measure.py): values over a range, toned by a curve (gamma, or a histogram equalization), sharpened with
+analyzer/thermal_measure.py): values over a range, toned by a curve (gamma), in flat bands when stepped, sharpened with
 an unsharp mask, an isotherm's pixels in the palette and the rest in grey. They change how values are drawn, never the
 values.
 """
-import json
-import os
-import tempfile
+import math
 
 import numpy as np
-
-from . import portable
 
 # The palette's entries along the range, the tone curve baked into them, and the server's 256 levels of a palette
 TONE_STEPS = 1024
@@ -22,17 +18,12 @@ TAPS = (-2, -1, 0, 1, 2)
 WEIGHTS = (1, 4, 6, 4, 1)
 # The pixels the unsharp mask reads around one: a tile is read with this many more on each side
 MARGIN = int(np.floor(TAPS[-1] * SIGMA_LIMITS[1] + 0.5))
-# The adjustments' limits, the histogram equalization reads and the legend's samples
+# The adjustments' limits and the legend's samples
 GAMMA_LIMITS = (0.2, 5.0)
 SHARPEN_LIMITS = (0.0, 5.0)
-EQUALIZE_BINS = 1024
-EQUALIZE_SPAN = (0.1, 99.9)     # the percentiles a mosaic's histogram spans: its outliers would empty all its bins but one
 CURVE_SAMPLES = 65
 ISOTHERM_MODES = ('above', 'below', 'between')
-HISTOGRAMS_KEPT = 16      # the mosaics' histograms kept in memory
 VALUE_CODES = 65535       # a value tile's codes run from 0 to this, a tile's lowest value to its highest
-
-_histograms = {}
 
 
 def js_round(x):
@@ -58,10 +49,30 @@ def toned(u, shares=None):
     return s[i] * (1 - f) + s[i + 1] * f
 
 
-def toned_palette(colors, shares=None, grey=False):
+def banded(u, steps):
+    """Shares of the range (0 to 1) in flat bands: each the share at the middle of its band (steps: (start, width), the
+    bands' edges at start + k * width, in shares of the range), clipped to the range; as they are without steps"""
+    x = np.asarray(u, dtype=np.float64)
+    if not steps:
+        return x
+    start, width = steps
+    return np.clip(start + (np.floor((x - start) / width) + 0.5) * width, 0.0, 1.0)
+
+
+def band_steps(low, high, bands):
+    """Bands of values ((width, origin): their edges at origin + k * width, in the values' unit) as shares of the
+    range low..high, as banded takes them; None without bands"""
+    if not bands:
+        return None
+    span = (high - low) or 1.0
+    return ((bands[1] - low) / span, bands[0] / span)
+
+
+def toned_palette(colors, shares=None, grey=False, steps=None):
     """The palette as drawn along the range: TONE_STEPS colours ((TONE_STEPS, 3) uint8), each the level (0 to 255) of
-    its toned share in the palette, or in grey"""
-    levels = js_round(toned(np.arange(TONE_STEPS) / (TONE_STEPS - 1), shares) * LEVELS).astype(np.int64)
+    its toned share in the palette (in flat bands with steps: banded's), or in grey"""
+    u = banded(np.arange(TONE_STEPS) / (TONE_STEPS - 1), steps)
+    levels = js_round(toned(u, shares) * LEVELS).astype(np.int64)
     if grey:
         return np.repeat(levels[:, None], 3, axis=1).astype(np.uint8)
     palette = rgb(colors)
@@ -70,7 +81,7 @@ def toned_palette(colors, shares=None, grey=False):
     return palette[js_round(levels * (len(palette) - 1) / LEVELS).astype(np.int64)]
 
 
-def colour(values, colors, value_range=None, shares=None, sharpen=0.0, isotherm=None, sigma=1.0, margin=0):
+def colour(values, colors, value_range=None, shares=None, sharpen=0.0, isotherm=None, sigma=1.0, margin=0, bands=None):
     """
     Values (a 2-D array, NaN where there are none) coloured: an (h, w, 4) uint8 RGBA image, clear where there are no
     values.
@@ -82,6 +93,7 @@ def colour(values, colors, value_range=None, shares=None, sharpen=0.0, isotherm=
     :param isotherm: the values drawn in the palette, (low, high), the rest in grey (None: all in the palette)
     :param sigma: the unsharp mask's, in the pixels drawn
     :param margin: the pixels around the image only read (by the unsharp mask), not coloured
+    :param bands: flat bands of values, (width, origin): their edges at origin + k * width (None: smooth)
     """
     v = np.asarray(values, dtype=np.float64)
     inner = (slice(margin, v.shape[0] - margin), slice(margin, v.shape[1] - margin))
@@ -115,10 +127,11 @@ def colour(values, colors, value_range=None, shares=None, sharpen=0.0, isotherm=
         with np.errstate(invalid='ignore', divide='ignore'):
             u = np.clip(u + sharpen * (u - total / weight), 0.0, 1.0)
     step = js_round(np.where(here, u, 0) * (TONE_STEPS - 1)).astype(np.int64)
-    palette = toned_palette(colors, shares)
+    steps = band_steps(low, high, bands)
+    palette = toned_palette(colors, shares, steps=steps)
     out[..., :3] = palette[step]
     if isotherm:
-        grey = toned_palette(colors, shares, grey=True)
+        grey = toned_palette(colors, shares, grey=True, steps=steps)
         vals = v[inner]
         with np.errstate(invalid='ignore'):
             outside = ~((vals >= isotherm[0]) & (vals <= isotherm[1]))
@@ -162,8 +175,9 @@ def sharpen_sigma(raster_pixel, drawn_pixel):
 
 def parse_adjust(params):
     """
-    The adjustments a mosaic or frame is drawn with (gamma, equalize=1, sharpen), checked: {gamma, equalize, sharpen},
-    none by default
+    The adjustments a mosaic or frame is drawn with (gamma, sharpen, stepped=width,origin: flat bands of values, their
+    edges at origin + k * width, in the values' unit), checked: {gamma, sharpen, bands: (width, origin) or None}, none by
+    default
     :raises ValueError: one is not valid (the message is for the user)
     """
     def ranged(name, label, limits, default):
@@ -178,11 +192,22 @@ def parse_adjust(params):
             raise ValueError("{} is from {:g} to {:g}".format(label, *limits))
         return v
 
-    equalize = params.get('equalize') or '0'
-    if equalize not in ('0', '1'):
-        raise ValueError("equalize is 1 or 0")
-    return {'gamma': ranged('gamma', "Gamma", GAMMA_LIMITS, 1.0), 'equalize': equalize == '1',
-            'sharpen': ranged('sharpen', "Sharpening", SHARPEN_LIMITS, 0.0)}
+    return {'gamma': ranged('gamma', "Gamma", GAMMA_LIMITS, 1.0), 'sharpen': ranged('sharpen', "Sharpening", SHARPEN_LIMITS, 0.0),
+            'bands': parse_bands(params.get('stepped'))}
+
+
+def parse_bands(value):
+    """stepped=width,origin as (width, origin), None when empty
+    :raises ValueError: not two numbers, the width above 0 (the message is for the user)"""
+    if value is None or value == "":
+        return None
+    try:
+        width, origin = (float(p) for p in str(value).split(','))
+    except ValueError:
+        raise ValueError("Stepped's bands are width,origin") from None
+    if not (math.isfinite(width) and math.isfinite(origin) and width > 0):
+        raise ValueError("Stepped's band width must be above 0")
+    return width, origin
 
 
 def parse_isotherm(value):
@@ -218,83 +243,13 @@ def isotherm_range(isotherm):
     return (-3e38 if low is None else low, 3e38 if high is None else high)
 
 
-def value_histogram(values, span=None):
-    """
-    The EQUALIZE_BINS histogram ((counts, edges)) of an array's finite values within span (low, high; by default its
-    EQUALIZE_SPAN percentiles), or None when there are none
-    """
-    v = values[np.isfinite(values)]
-    if span is None and v.size:
-        span = tuple(float(p) for p in np.percentile(v, EQUALIZE_SPAN))
-    if not v.size or span[1] < span[0]:
-        return None
-    counts, edges = np.histogram(v, bins=EQUALIZE_BINS, range=span)
-    return (counts, edges) if counts.any() else None
-
-
-def equalization(histogram, low, high):
-    """
-    Histogram equalization over low..high: (values, shares) to interpolate a value's share of the palette from (the
-    share of the histogram's values within the range below it), or None when none of them are in it
-    """
-    if histogram is None:
-        return None
-    counts, edges = np.asarray(histogram[0], dtype=np.float64), np.asarray(histogram[1], dtype=np.float64)
-    left, right = np.clip(edges[:-1], low, high), np.clip(edges[1:], low, high)
-    width = edges[1:] - edges[:-1]
-    # a bin's values taken as spread evenly over it: the part of it within the range counts
-    inside = counts * np.where(width > 0, (right - left) / np.where(width > 0, width, 1), 0)
-    total = inside.sum()
-    if not total > 0:
-        return None
-    values = np.concatenate([[low], right, [high]])
-    shares = np.concatenate([[0.0], np.cumsum(inside) / total, [1.0]])
-    return values, shares
-
-
-def tone(values, low, high, adjust=None, curve=None):
-    """Values' shares of the palette (0..1) over low..high: linear, or along curve (equalization), then gamma"""
-    if curve is not None:
-        t = np.interp(values, curve[0], curve[1])
-    else:
-        t = (np.asarray(values, dtype=np.float64) - low) / (high - low)
-    t = np.clip(t, 0.0, 1.0)
+def tone(values, low, high, adjust=None):
+    """Values' shares of the palette (0..1) over low..high, then gamma"""
+    t = np.clip((np.asarray(values, dtype=np.float64) - low) / (high - low), 0.0, 1.0)
     gamma = (adjust or {}).get('gamma', 1.0)
     return t ** (1.0 / gamma) if gamma != 1.0 else t
 
 
-def curve_shares(low, high, adjust=None, curve=None):
+def curve_shares(low, high, adjust=None):
     """The palette's share at CURVE_SAMPLES values evenly across low..high, for the tiles and the legend's gradient"""
-    return [float(t) for t in tone(np.linspace(low, high, CURVE_SAMPLES), low, high, adjust, curve)]
-
-
-def kept_histogram(path, read, kept):
-    """
-    A raster's histogram (value_histogram of read(path)), kept in the file kept for the raster's version (it is read
-    whole once), and in memory
-    """
-    st = os.stat(path)
-    key = [[st.st_ino, st.st_size, st.st_mtime_ns], EQUALIZE_BINS, list(EQUALIZE_SPAN)]
-    memo = _histograms.get((path, kept))
-    if memo and memo[0] == key:
-        return memo[1]
-    histogram = None
-    try:
-        with open(kept) as f:
-            found = json.load(f)
-        if found.get('key') != key:
-            raise ValueError("another version")
-        if found.get('counts') is not None:
-            histogram = (np.array(found['counts']), np.array(found['edges']))
-    except (OSError, ValueError, AttributeError):
-        histogram = value_histogram(read(path))
-        os.makedirs(os.path.dirname(kept), exist_ok=True)
-        fd, temporary = tempfile.mkstemp(dir=os.path.dirname(kept), suffix='.tmp')
-        with os.fdopen(fd, 'w') as f:
-            json.dump({'key': key, 'counts': histogram[0].tolist() if histogram else None,
-                       'edges': histogram[1].tolist() if histogram else None}, f)
-        portable.replace(temporary, kept)
-    if len(_histograms) >= HISTOGRAMS_KEPT:
-        _histograms.pop(next(iter(_histograms)))
-    _histograms[(path, kept)] = (key, histogram)
-    return histogram
+    return [float(t) for t in tone(np.linspace(low, high, CURVE_SAMPLES), low, high, adjust)]
