@@ -25,7 +25,7 @@ import statistics
 import time
 import uuid
 
-from . import converter, datasets
+from . import converter, datasets, intensify
 from .analysis import PROGRESS_INTERVAL, Canceled, clean, relative
 
 CONVERSIONS_DIR = 'conversions'
@@ -818,12 +818,27 @@ def display(user):
     """{'unit': the unit the user chose (C or F) or None, 'default_unit': the administrator's (default_unit),
     'palette': one of display_palettes() or None, 'legend': whether the Thermal Inspector shows the legend on
     WebODM's map (shown unless hidden), 'pointer_temperature': whether Temperature On Pointer is ticked, None until the
-    user first ticks or clears it (each page then has its own default: off, but on in the Thermal Inspector)}"""
+    user first ticks or clears it (each page then has its own default: off, but on in the Thermal Inspector),
+    'surroundings_m': the radius of Pointer Info's Delta T From Surroundings (m), None until the user moves its slider
+    (intensify.RADIUS_M then)}"""
     saved = saved_display(user)
     return {'unit': saved.get('unit') if saved.get('unit') in DISPLAY_UNITS else None, 'default_unit': default_unit(),
             'palette': saved.get('palette') if saved.get('palette') in display_palettes() else None,
             'legend': saved.get('legend') is not False,
-            'pointer_temperature': saved.get('pointer_temperature') if isinstance(saved.get('pointer_temperature'), bool) else None}
+            'pointer_temperature': saved.get('pointer_temperature') if isinstance(saved.get('pointer_temperature'), bool) else None,
+            'surroundings_m': saved.get('surroundings_m') if radius_error(saved.get('surroundings_m')) is None else None}
+
+
+def radius_error(value):
+    """Why a radius sent for Delta T From Surroundings is not one (a number of metres, intensify.RADIUS_MIN to
+    RADIUS_MAX), None when it is"""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        try:
+            intensify.parse_radius(value)
+            return None
+        except ValueError as e:
+            return str(e)
+    return "Must be a number of metres"
 
 
 def parse_display(raw):
@@ -848,6 +863,10 @@ def parse_display(raw):
         out['pointer_temperature'] = raw.get('pointer_temperature')
         if not isinstance(out['pointer_temperature'], bool):
             errors['pointer_temperature'] = "Must be true or false"
+    if 'surroundings_m' in raw:
+        out['surroundings_m'] = raw.get('surroundings_m')
+        if radius_error(out['surroundings_m']) is not None:
+            errors['surroundings_m'] = radius_error(out['surroundings_m'])
     return out, errors
 
 

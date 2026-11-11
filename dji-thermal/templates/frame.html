@@ -37,6 +37,7 @@
                 <details class="ta-section" open data-section="cursor">
                     <summary><h5>Pointer Info</h5></summary>
                     <label class="ta-pointer-check"><input type="checkbox" id="ta-pointer-temp"> Temperature On Pointer</label>
+                    <div class="ta-surroundings" id="ta-surroundings"></div>
                     <div class="ta-viewer-readout" id="ta-frame-readout"></div>
                 </details>
                 <details class="ta-section" open data-section="measure">
@@ -69,8 +70,8 @@
 <script src="{{ public }}scale.js?v={{ v }}"></script>
 <script src="{{ public }}recolour.js?v={{ v }}"></script>
 <script src="{{ public }}frames.js?v={{ v }}"></script>
-<script src="{{ public }}viewer.js?v={{ v }}"></script>
 <script src="{{ public }}regions.js?v={{ v }}"></script>
+<script src="{{ public }}viewer.js?v={{ v }}"></script>
 <script src="{{ public }}inspector.js?v={{ v }}"></script>
 <script src="{{ public }}frame.js?v={{ v }}"></script>
 {% endblock %}

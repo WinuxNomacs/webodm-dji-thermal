@@ -343,7 +343,7 @@ describe("the pages' dialog", () => {
         palette.value = "magma";
         legend.value = "hidden";
         click(button("Save"));
-        expect(await edited).toEqual({unit: "F", palette: "magma", pointer_temperature: null});
+        expect(await edited).toEqual({unit: "F", palette: "magma", pointer_temperature: null, surroundings_m: null});
         expect(saved).toEqual([{unit: "F", palette: "magma", legend: false}]);
         expect(fetchFn.mock.calls[1][1].headers["X-CSRFToken"]).toBe("tok");
         expect(window.localStorage.getItem("unit_system")).toBe("imperial");
@@ -2611,6 +2611,8 @@ describe("the mosaic viewer", () => {
         };
         L.layerGroup = () => layer({group: true, clearLayers() { this.layers = []; }});
         L.circleMarker = (latlng, opts) => layer({marker: latlng, opts});
+        // Delta T From Surroundings' circle (regions.js)
+        L.circle = (latlng, opts) => layer({circle: latlng, opts, setLatLng(p) { this.circle = p; }, setRadius(r) { this.opts.radius = r; }});
         L.polygon = (points, opts) => layer({polygon: points, opts});
         L.control = {layers: (bases) => layer({bases}), scale: () => layer({})};
         return L;
@@ -2724,7 +2726,7 @@ describe("the mosaic viewer", () => {
         window.localStorage.setItem("unit_system", "imperial");
         const L = fakeLeaflet();
         const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
-                                [C9 + "/mosaics/harmonized/point?lon=10.0005&lat=45.0005"]: {valid: true, temperature: 30, frame: "b_T.JPG", view_angle: 2},
+                                [C9 + "/mosaics/harmonized/point?lon=10.0005&lat=45.0005&radius=1"]: {valid: true, temperature: 30, frame: "b_T.JPG", view_angle: 2},
                                 "PUT /api/plugins/dji-thermal/display": (u, o) => jsonResponse(Object.assign({unit: null}, JSON.parse(o.body)))});
         await start(fetchFn, L, [{label: "Streets", url: "https://s/{z}/{x}/{y}.png"}]);
         await ticks();
@@ -2821,7 +2823,7 @@ describe("the mosaic viewer", () => {
             difference_palette: "bwr"
         });
         const fetchFn = server({[C9 + "/mosaics"]: v,
-                                [C9 + "/mosaics/intensify/point?lon=10.0005&lat=45.0005"]: {valid: true, difference: -2.5, temperature: 30, frame: "b_T.JPG"},
+                                [C9 + "/mosaics/intensify/point?lon=10.0005&lat=45.0005&radius=1"]: {valid: true, difference: -2.5, temperature: 30, frame: "b_T.JPG"},
                                 "PUT /api/plugins/dji-thermal/display": (u, o) => jsonResponse(Object.assign({unit: null}, JSON.parse(o.body)))});
         await start(fetchFn, L);
         await ticks();
@@ -2878,8 +2880,8 @@ describe("the mosaic viewer", () => {
         const L = fakeLeaflet();
         const here = {lng: 10.0005, lat: 45.0005}, none = {lng: 10.0002, lat: 45.0002};
         const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
-                                [C9 + "/mosaics/as_converted/point?lon=10.0005&lat=45.0005"]: {valid: true, temperature: 30, frame: "b_T.JPG"},
-                                [C9 + "/mosaics/as_converted/point?lon=10.0002&lat=45.0002"]: {valid: false, reason: "nodata"},
+                                [C9 + "/mosaics/as_converted/point?lon=10.0005&lat=45.0005&radius=1"]: {valid: true, temperature: 30, frame: "b_T.JPG"},
+                                [C9 + "/mosaics/as_converted/point?lon=10.0002&lat=45.0002&radius=1"]: {valid: false, reason: "nodata"},
                                 "PUT /api/plugins/dji-thermal/display": (u, o) => jsonResponse(Object.assign({unit: null}, JSON.parse(o.body)))});
         await start(fetchFn, L);
         await ticks();
@@ -2931,6 +2933,60 @@ describe("the mosaic viewer", () => {
         expect(plain()).toBe(false);
         await ticks();
         expect(core.preferences().pointer_temperature).toBe(false);
+        core.setPreferences(null);
+    });
+
+    it("measures ΔT from surroundings within the circle Delta T From Surroundings sets, drawn around the pointer and kept with a click, saved for the user", async () => {
+        core.setPreferences({surroundings_m: 2.5});
+        const L = fakeLeaflet();
+        const here = {lng: 10.0005, lat: 45.0005}, at = "?lon=10.0005&lat=45.0005";
+        const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
+                                [C9 + "/mosaics/as_converted/frames" + at]: {frames: [], models: true},
+                                [C9 + "/mosaics/view_angle/frames" + at]: {frames: [], models: true},
+                                [C9 + "/mosaics/as_converted/point" + at + "&radius=2.5"]: {valid: true, temperature: 30, difference: -1},
+                                [C9 + "/mosaics/as_converted/point" + at + "&radius=4"]: {valid: true, temperature: 30, difference: 0.5},
+                                [C9 + "/mosaics/view_angle/point" + at + "&radius=4"]: {valid: true, view_angle: 3},
+                                "PUT /api/plugins/dji-thermal/display": (u, o) => jsonResponse(Object.assign({unit: null}, JSON.parse(o.body)))});
+        await start(fetchFn, L);
+        await ticks();
+        const map = L.maps[0], readout = () => $("ta-viewer-readout").textContent, circle = () => map.layers.find(l => l.circle);
+        const slider = () => $("ta-surroundings").querySelector('input[type="range"]');
+        jest.useFakeTimers();
+
+        // Under Pointer Info, at the radius the user chose before (1 m until they do), in metres with °C
+        expect($("ta-surroundings").closest('[data-section="cursor"]')).not.toBeNull();
+        expect($("ta-surroundings").textContent).toBe("Delta T From Surroundings 2.50 m");
+        expect([slider().min, slider().max, slider().step, slider().value]).toEqual(["0.25", "10", "0.25", "2.5"]);
+
+        // The circle around the pointer at once, the readout's difference within it
+        map.fire("mousemove", {latlng: here, containerPoint: {x: 100, y: 50}});
+        expect([circle().circle, circle().opts.radius]).toEqual([here, 2.5]);
+        jest.advanceTimersByTime(200);
+        await ticks();
+        expect(readout()).toContain("ΔT from surroundings-1.00 °C");
+        map.fire("mouseout");
+        expect(circle()).toBeUndefined();
+
+        // A click keeps it on its point; the slider moved, the point is read again within the new circle
+        map.fire("click", {latlng: here});
+        await ticks();
+        slider().value = "4";
+        slider().dispatchEvent(new Event("input", {bubbles: true}));
+        expect($("ta-surroundings").textContent).toBe("Delta T From Surroundings 4.00 m");
+        expect([circle().circle, circle().opts.radius]).toEqual([here, 4]);
+        jest.advanceTimersByTime(200);
+        await ticks();
+        expect(readout()).toContain("ΔT from surroundings+0.50 °C");
+        // Saved once let go
+        change(slider());
+        await ticks();
+        expect(fetchFn.mock.calls.filter(c => c[1] && c[1].method === "PUT").map(c => JSON.parse(c[1].body))).toEqual([{surroundings_m: 4}]);
+        expect(core.preferences().surroundings_m).toBe(4);
+
+        // None on View angle, which has no temperatures
+        click($("ta-viewer-tabs").querySelector('[data-tab="view_angle"]'));
+        await ticks();
+        expect(circle()).toBeUndefined();
         core.setPreferences(null);
     });
 
@@ -3093,13 +3149,13 @@ describe("the mosaic viewer", () => {
 
     it("a click keeps the readout on its point until Follow the cursor or Esc", async () => {
         const L = fakeLeaflet();
-        const at = "?lon=10.0005&lat=45.0005", elsewhere = "?lon=10.0002&lat=45.0002";
+        const at = "?lon=10.0005&lat=45.0005", elsewhere = "?lon=10.0002&lat=45.0002", R = "&radius=1";
         const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
                                 [C9 + "/mosaics/as_converted/frames" + at]: {frames: [], models: true},
                                 [C9 + "/mosaics/view_angle/frames" + at]: {frames: [], models: true},
-                                [C9 + "/mosaics/as_converted/point" + at]: {valid: true, temperature: 30, frame: "b_T.JPG"},
-                                [C9 + "/mosaics/view_angle/point" + at]: {valid: true, frame: "b_T.JPG", view_angle: 3},
-                                [C9 + "/mosaics/as_converted/point" + elsewhere]: {valid: true, temperature: 20, frame: "a_T.JPG"}});
+                                [C9 + "/mosaics/as_converted/point" + at + R]: {valid: true, temperature: 30, frame: "b_T.JPG"},
+                                [C9 + "/mosaics/view_angle/point" + at + R]: {valid: true, frame: "b_T.JPG", view_angle: 3},
+                                [C9 + "/mosaics/as_converted/point" + elsewhere + R]: {valid: true, temperature: 20, frame: "a_T.JPG"}});
         await start(fetchFn, L);
         await ticks();
         const map = L.maps[0], kept = map.layers.filter(l => l.group)[2], readout = () => $("ta-viewer-readout").textContent;
@@ -3114,11 +3170,15 @@ describe("the mosaic viewer", () => {
         expect(readout()).toContain("b_T.JPG");
         expect($("ta-viewer-follow")).not.toBeNull();
         expect(kept.layers.length).toBe(1);
+        // Delta T From Surroundings' circle stays on the point kept, 1 m until the user chooses
+        const circle = () => map.layers.find(l => l.circle);
+        expect(circle().circle).toEqual({lng: 10.0005, lat: 45.0005});
+        expect(circle().opts).toEqual(expect.objectContaining({radius: 1, fill: false, interactive: false}));
 
         // The cursor moving on leaves it; another tab reads the kept point for its mosaic
         await hover({lng: 10.0002, lat: 45.0002});
         expect(readout()).toContain("b_T.JPG");
-        expect(calls(fetchFn)).not.toContain("GET " + C9 + "/mosaics/as_converted/point" + elsewhere);
+        expect(calls(fetchFn)).not.toContain("GET " + C9 + "/mosaics/as_converted/point" + elsewhere + R);
         click($("ta-viewer-tabs").querySelector('[data-tab="view_angle"]'));
         await ticks();
         expect(readout()).toContain("3.0°");
@@ -3130,6 +3190,7 @@ describe("the mosaic viewer", () => {
         click($("ta-viewer-follow"));
         expect(readout()).toBe(viewer.READOUT_HINT);
         expect(kept.layers.length).toBe(0);
+        expect(circle()).toBeUndefined();
         await hover({lng: 10.0002, lat: 45.0002});
         expect(readout()).toContain("a_T.JPG");
         expect($("ta-viewer-follow")).toBeNull();

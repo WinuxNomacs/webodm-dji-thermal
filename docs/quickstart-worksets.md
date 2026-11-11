@@ -100,7 +100,8 @@ The tabs:
   2 m). A roof's slopes, its sunny side and its gradients drop to about 0, so a narrow cooler or warmer feature, such
   as a seam letting air in, stands out wherever it is: blue below its surroundings, red above, in its own palette
   (blue-white-red) over a range centred on 0. Its numbers are differences, not temperatures; the readout gives the
-  difference and the harmonized temperature. Anything 2 m wide or more fades out. See
+  harmonized temperature and its ΔT from surroundings (within Pointer Info's circle). Anything 2 m wide or more fades
+  out. See
   [Finding small differences](measurement.md#finding-small-differences-intensify).
 - **Source frame**: which frame each pixel comes from.
 - **View angle**: the angle each pixel was seen at.
@@ -114,8 +115,9 @@ colours over the temperatures the mosaic has most of, and **Reset** goes back to
 They only change how the image is drawn, never the temperatures, and the map follows them as they move: your browser
 colours the mosaic from its temperatures, so nothing waits on the server. An **Isotherm** (above, below or between
 temperatures; on Intensify, differences) keeps the palette for the pixels in it and turns the rest grey. Its **Pointer Info** gives the
-temperature, frame, frame pixel and view angle under the cursor (and on the temperature tabs its **ΔT from
-surroundings**: how much warmer or cooler it is than the median within about 2 m); tick **Temperature On Pointer**
+temperature, frame, frame pixel and view angle under the cursor (and on the temperature tabs and Intensify its **ΔT
+from surroundings**: how much warmer or cooler it is than the median within the thin circle drawn around the pointer,
+whose radius the **Delta T From Surroundings** slider sets, 1 m until you move it); tick **Temperature On Pointer**
 under it to see the temperature beside the pointer too, a plain arrow rather than the hand (kept with your preferences, for the frame page and the
 Thermal Inspector as well). The panel also shows what dji-thermal-cli reports about the mosaic (seams,
 misalignment, frame offsets), and the files to download.
@@ -148,7 +150,8 @@ who can view the project.
 recorded them, as the frame was measured with them, and fields to change them. Change one and press **Measure
 again** (or Enter): dji-thermal-cli measures the frame again, exactly as a workset with those settings would, and
 shows it beside the first, with both temperatures and their difference in Pointer Info. Pointer Info also gives
-each one's **ΔT from surroundings**: the pixel less the median of the frame's pixels within about 2 m around it. Pins and regions are
+each one's **ΔT from surroundings**: the pixel less the median of the frame's pixels within the Delta T From
+Surroundings circle around it. Pins and regions are
 measured with the new values too.
 
 ![The frame measured again with another emissivity, beside the frame as converted](images/frame-measure-again.png)

@@ -249,7 +249,48 @@
         this.isActive = function () { return active; };
     }
 
-    var api = {STYLE: STYLE, TOOLS: TOOLS, rectangleRing: rectangleRing, polygonRing: polygonRing, circleRing: circleRing,
+    // Pointer Info's Delta T From Surroundings (the mosaic viewer, the frame page, the Thermal Inspector): the pixel
+    // under the pointer less the median of those within a circle around it, its radius (m) the user's, RADIUS.value
+    // until they choose one (as intensify.RADIUS_M, RADIUS_MIN and RADIUS_MAX)
+    var RADIUS = {min: 0.25, max: 10, step: 0.25, value: 1};
+    var FEET = 3.28084;
+    function radiusOf(saved) {
+        return typeof saved === "number" && saved >= RADIUS.min && saved <= RADIUS.max ? saved : RADIUS.value;
+    }
+    // In feet with Fahrenheit (WebODM's imperial units), else in metres
+    function formatRadius(m, unit) {
+        return unit === "F" ? (m * FEET).toFixed(1) + " ft" : m.toFixed(2) + " m";
+    }
+    // The slider and its value (attrs: the slider's own attributes, its id or data-act)
+    function surroundingsHtml(radius, unit, attrs) {
+        return '<label class="dt-surroundings-field">Delta T From Surroundings <span class="dt-surroundings-value">' +
+            formatRadius(radius, unit) + "</span>" + '<input type="range" min="' + RADIUS.min + '" max="' + RADIUS.max +
+            '" step="' + RADIUS.step + '" value="' + radius + '" ' + (attrs || "") + ' title="The circle\'s radius: the pixels ' +
+            'within it are the surroundings"></label>';
+    }
+
+    // The circle around the pointer's tip on a map: show(latlng, radius) in metres (on a frame's map, CRS.Simple: in
+    // its pixels), hide()
+    function SurroundingsCircle(L, map) {
+        var circle = null;
+        this.show = function (latlng, radius) {
+            if (!circle) {
+                circle = L.circle(latlng, {radius: radius, interactive: false, fill: false, weight: 1, color: "#fff",
+                                           opacity: 0.95, className: "dt-surroundings-circle"}).addTo(map);
+            } else {
+                circle.setLatLng(latlng);
+                circle.setRadius(radius);
+            }
+        };
+        this.hide = function () {
+            if (circle) map.removeLayer(circle);
+            circle = null;
+        };
+        this.isShown = function () { return !!circle; };
+    }
+
+    var api = {STYLE: STYLE, TOOLS: TOOLS, RADIUS: RADIUS, radiusOf: radiusOf, formatRadius: formatRadius,
+               surroundingsHtml: surroundingsHtml, SurroundingsCircle: SurroundingsCircle, rectangleRing: rectangleRing, polygonRing: polygonRing, circleRing: circleRing,
                ringToGeometry: ringToGeometry, validatePolygon: validatePolygon, lineGeometry: lineGeometry, DrawTool: DrawTool};
     root.ThermalRegions = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
