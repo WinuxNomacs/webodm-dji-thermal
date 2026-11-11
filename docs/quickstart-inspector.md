@@ -17,7 +17,8 @@ button is only on maps with temperatures: a thermal orthophoto, or a workset mos
 ## 2. Read temperatures
 
 The top of the panel (the buttons, Pointer Info, Palette and the colour scale) stays in view while the sections
-below it scroll. The panel's buttons choose what a click on the map does:
+below it scroll. The panel's buttons (icons, but ΔT: hover over one for its name and what it does) choose what a click
+on the map does:
 
 - **Hover**: the temperature under the cursor, in the panel under **Pointer Info**, and in a small label
   beside the pointer, a plain arrow rather than the hand. Clear **Temperature On Pointer** to hide the label: that choice is kept with your preferences,

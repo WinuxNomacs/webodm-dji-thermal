@@ -925,11 +925,15 @@
             '<a href="javascript:void(0)" class="dt-inspector-close" data-act="close" title="Close"><i class="fa fa-times"></i></a></div>' +
             '<div class="btn-group btn-group-xs dt-inspector-modes">' +
             ["hover", "delta", "pin", "rectangle", "circle", "polygon", "line"].map(function (m) {
-                var label = m === "hover" ? '<i class="fa fa-mouse-pointer"></i> Hover' : m === "pin" ? '<i class="' + Regions.TOOLS.pin.icon + '"></i> Pin' :
+                // Icons only but ΔT's, so the buttons fit on one row; each says what it does when hovered
+                var label = m === "hover" ? '<i class="fa fa-mouse-pointer"></i>' : m === "pin" ? '<i class="' + Regions.TOOLS.pin.icon + '"></i>' :
                     m === "delta" ? '<i class="' + SHAPES.delta + '"></i> ' + SHAPE_NAMES.delta : '<i class="' + SHAPES[m] + '"></i>';
-                return '<button type="button" class="btn btn-' + (state.mode === m ? "primary" : "default") + '" data-mode="' + m + '"' +
-                    (SHAPES[m] ? ' title="' + (m === "line" ? "Draw a line: its temperatures along it" : m === "delta" ? "ΔT: click two spots, the second's temperature less the first's" :
-                        "Draw a region: " + SHAPE_NAMES[m].toLowerCase()) + '"' : "") + ">" + label + "</button>";
+                var title = m === "hover" ? "Hover: read the temperature under the cursor" :
+                    m === "pin" ? "Pin: click the map to keep a point and its temperature" :
+                    m === "line" ? "Draw a line: its temperatures along it" : m === "delta" ? "ΔT: click two spots, the second's temperature less the first's" :
+                    "Draw a region: " + SHAPE_NAMES[m].toLowerCase();
+                return '<button type="button" class="btn btn-' + (state.mode === m ? "primary" : "default") + '" data-mode="' + m + '" title="' + escapeHtml(title) + '"' +
+                    ' aria-label="' + escapeHtml(m === "hover" ? "Hover" : m === "pin" ? "Pin" : SHAPE_NAMES[m]) + '">' + label + "</button>";
             }).join("") + "</div>" +
             (state.mode === "delta" ? '<div class="text-muted dt-inspector-hint">Click the first spot, then the second: ΔT is the second\'s temperature less the first\'s. Esc cancels.</div>' : "") +
             (state.mode === "polygon" ? '<div class="text-muted dt-inspector-hint">Click the corners; double-click or Enter finishes, Esc cancels.</div>' : "") +

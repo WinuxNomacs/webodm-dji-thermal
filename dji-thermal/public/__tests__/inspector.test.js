@@ -552,6 +552,14 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         const modes = [...panel().querySelectorAll(".dt-inspector-modes [data-mode]")].map(b => b.getAttribute("data-mode"));
         expect(modes.slice(0, 3)).toEqual(["hover", "delta", "pin"]);
         expect(panel().querySelector('[data-mode="delta"]').textContent.trim()).toBe("ΔT");
+        // Hover and Pin are icons, each named and described when hovered
+        ["hover", "pin"].forEach(m => {
+            const b = panel().querySelector('[data-mode="' + m + '"]');
+            expect(b.textContent.trim()).toBe("");
+            expect([b.getAttribute("aria-label"), b.title]).toEqual(m === "hover" ?
+                ["Hover", "Hover: read the temperature under the cursor"] :
+                ["Pin", "Pin: click the map to keep a point and its temperature"]);
+        });
         panel().querySelector('[data-mode="delta"]').click();
         expect(panel().textContent).toContain("Click the first spot, then the second");
         map.fire("click", {latlng: L.latLng(0.5, 0.5)});
