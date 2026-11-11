@@ -3,16 +3,6 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R18. One "Measurements" section** (the user, 2026-11-11, in `new.md`): "Would it not be sensible to combine
-  "Pinned Points" and "Regions and lines" under a single "Measurements" section?" Builds on `inspector.js`
-  `pinsHtml` and `regionsHtml` (each its list and its Hide/Show, CSV and Remove all) and `panelHtml`'s order.
-  - **Decided** (the user, 2026-11-11): **one list, one set of buttons**: pins, ΔTs, rectangles, circles, polygons
-    and lines in one list in the order made, each with its tool's icon; one Hide/Show, one CSV (all of them, with a
-    shape column, as Saved measurements' CSV) and one Remove all; the section "Measurements", above "Saved
-    measurements".
-  - Proposed: the selected region's statistics and a line's profile still shown under the list; the pins' and
-    regions' browser storage kept as it is (no data moved). Tests: Jest (the one list in order, the buttons, the CSV).
-    Docs: README, quickstart-inspector and its screenshots.
 - **R19. ΔT across two orthophotos** (the user, 2026-11-11, in `new.md`): "Would it be possible for the "Delta T"
   measurement tool to function across 2 orthophotos? Idea being if I select a point on the left orthophoto and a
   point on the right orthophoto, it calculates the delta between them. The line between the dots would only appear
@@ -41,6 +31,23 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R18. One "Measurements" section** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "Would it not be sensible to combine
+  "Pinned Points" and "Regions and lines" under a single "Measurements" section?" Builds on `inspector.js`
+  `pinsHtml` and `regionsHtml` (each its list and its Hide/Show, CSV and Remove all) and `panelHtml`'s order.
+  - **Decided** (the user, 2026-11-11): **one list, one set of buttons**: pins, ΔTs, rectangles, circles, polygons
+    and lines in one list in the order made, each with its tool's icon; one Hide/Show, one CSV (all of them, with a
+    shape column, as Saved measurements' CSV) and one Remove all; the section "Measurements", above "Saved
+    measurements".
+  - Built (`one-measurements-section`): `inspector.js` `measurementsHtml` (replaces `pinsHtml` and `regionsHtml`):
+    the pins and regions in one table by `measurementsOf` (ordered by `madeAt`, the time their ids start with), each
+    row keeping its `data-pin`/`data-region` so the clicks act as before, the region shown under the list; one
+    `measurementsVisible` (drawing a pin or region shows them again); `toggle-measurements`, `csv-measurements`
+    (`measurementsCsv`, `thermal-measurements.csv`: pins' position and temperature, regions' statistics, ΔTs' spots,
+    a `shape` column; replaces `pinsCsv` and `regionsCsv`) and `clear-measurements`. The browser storage is as it was
+    (pins and regions under their own keys). Tests: `__tests__/inspector.test.js` ("lists pins, ΔTs, regions and lines
+    under Measurements in the order made…", and the pin, region, line and ΔT tests' CSVs). Docs: README,
+    quickstart-inspector (and its stale section numbers), developing; screenshots `inspector` (now scrolled to the
+    list), `inspector-delta`, `inspector-line`, `inspector-saved` retaken.
 - **R17. Measurements follow WebODM's divider** (built 2026-11-11; the user, 2026-11-11, with a screenshot of a ΔT read
   on the left orthophoto drawn across the divider over the right one): "Can the comparison slider also pertain to the
   inspector measurements/controls? ... I would expect the line to end at the comparison control border, indicating

@@ -399,11 +399,11 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
 - **ΔT**, beside Hover: click a first spot, then a second, labelled D1, D2…. The panel gives each spot's temperature
   (its own pixel, as a pin reads it), **ΔT**, the second's less the first's (corrected with Manual Corrections), and
   the distance between them; the map shows a thin line between the spots, labelled at the second with its ΔT. A ΔT
-  is listed with the regions, kept in your browser, saved like them and exported in their CSV (with **first_spot**
-  and **second_spot** columns).
+  is listed under Measurements, kept in your browser, saved like a region and exported in the CSV (with
+  **first_spot** and **second_spot** columns).
 - **Pin**: a click pins the point with its temperature, labelled P1, P2…, shown on the map instead of WebODM's
-  popup. The pins are listed in the panel (click one to go to it), can be hidden and shown together, removed, and
-  downloaded as CSV (latitude, longitude, temperature). They are kept in your browser for the same tasks.
+  popup. Pins are listed under Measurements (click one to go to it), with their latitude, longitude and temperature
+  in the CSV.
 - **Regions and lines**: draw a rectangle or a circle (press and drag) or a polygon (click its corners; double-click
   or Enter finishes, Backspace removes the last corner, Esc cancels), labelled R1, R2…, or a line (click its points,
   finished the same way), labelled L1, L2…. The panel shows the statistics of the temperatures inside a region, or
@@ -415,13 +415,15 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   every pixel along it, broken where there are none. Hovering the profile marks its
   point on the map (and on a workset mosaic names the frame it came from); a click there opens the frames that saw
   it. Pixels outside the task's crop or without data are left out; a region more than 4,096 pixels across is read at
-  a reduced resolution, and the panel says so. Regions and lines are listed (click one's row for its statistics, or
-  its name to go to it too), can be hidden, removed and downloaded as CSV (a row of statistics per region or line,
-  with the hottest and coldest pixels' positions; a line's profile as its own CSV), and are kept in your browser for
-  the same tasks.
+  a reduced resolution, and the panel says so. Regions and lines are listed under Measurements (click one's row for its
+  statistics, or its name to go to it too), with a row of statistics each in the CSV (and the hottest and coldest
+  pixels' positions; a line's profile has its own CSV).
+- **Measurements**: the pins, ΔTs, regions and lines in one list, in the order made, each with its tool's icon, and
+  one set of buttons for all of them: Hide/Show, CSV (a row each, with a **shape** column) and Remove all. They are
+  kept in your browser for the same tasks.
 - **Saved measurements**: a pin's, region's or line's Save (for those who can change the project) names it, with an
   optional comment, and keeps it with what it measures: the task, or the workset of a mosaic. It is measured again on
-  the server as it is saved, with the isotherm's limits and the correction then on, and leaves your browser's lists.
+  the server as it is saved, with the isotherm's limits and the correction then on, and leaves Measurements.
   Everyone who can view the project sees the saved measurements of the layers on the map, dashed in green, with their
   values as saved, who saved them and when; those who can change it rename them, change their comment and delete
   them. The list downloads as CSV and GeoJSON (a line's profile as its own CSV).

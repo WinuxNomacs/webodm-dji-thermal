@@ -26,7 +26,7 @@ on the map does:
 - **ΔT**: click a first spot, then a second (D1, D2…). The panel gives each spot's temperature, the temperature of
   its own pixel, and **ΔT**, the second's minus the first's: click the cold spot first and a warmer one second, and
   ΔT is above zero. The map shows a thin line between them, labelled with the ΔT at the second spot. With Manual
-  Corrections on (section 2), both spots are corrected. Save it, rename it and delete it like a region.
+  Corrections on (section 8), both spots are corrected. Save it, rename it and delete it like a region.
 - **Pin**: a click pins the point with its temperature (P1, P2…). The pins are listed in the panel; click one to go
   to it.
 - **Rectangle**, **circle** and **polygon**: draw a region (R1, R2…). For a rectangle or circle, press and drag. For
@@ -47,13 +47,16 @@ the number of pixels, the area and a histogram. The hottest and coldest pixels a
 
 A line is measured along a strip 0.25 m either side of it, with its surroundings in a band 1 m wide beside it. In
 place of the histogram it has its **profile**: the temperatures every pixel along it. Hover the profile to see each
-point's distance and temperature, marked on the map; click it to open the frames that saw that point (section 5).
+point's distance and temperature, marked on the map; click it to open the frames that saw that point (section 6).
 
 ![A line across a roof, its profile hovered: the point is marked on the map](images/inspector-line.png)
 
-Pins, regions and lines can be hidden, removed, and downloaded as CSV; a line's profile has its own **Profile CSV**
-(distance, position and temperature of each point, and on a workset mosaic its frame). Your browser keeps them for
-the next time you open the same task; to share one, save it (section 6).
+Pins, ΔTs, regions and lines are listed together under **Measurements**, in the order you made them, each with its
+tool's icon. Click a row to see its figures under the list, or its name to go to it on the map. The buttons under
+the list act on all of them: **Hide** and **Show**, **CSV** (one row each, with a **shape** column: a pin's position
+and temperature, a region's or line's statistics, a ΔT's spots), and **Remove all**. A line's profile has its own
+**Profile CSV** (distance, position and temperature of each point, and on a workset mosaic its frame). Your browser
+keeps them for the next time you open the same task; to share one, save it (section 7).
 
 ## 3. Colours, legend and isotherms
 
@@ -68,7 +71,7 @@ the next time you open the same task; to share one, save it (section 6).
   range set there shows here, and the map draws the one set here. WebODM's panel only shows its new value when the
   page is next loaded.
 - **Emissivity** and **Reflected**, under the colour scale: what the layer was measured with, greyed out until you
-  tick **Manual Corrections** to correct for others (section 7).
+  tick **Manual Corrections** to correct for others (section 8).
 - **Image**: how the layer is drawn, as in the Analyzer's mosaic viewer. **Brightness** and **Contrast** move and
   narrow the range from Auto's; **Gamma** above 1 brightens the cooler part of the range; **Banded** draws the
   colours in flat bands of one temperature width each, with the colour bar in the same bands, so a colour reads as a
@@ -77,7 +80,7 @@ the next time you open the same task; to share one, save it (section 6).
   with Manual Corrections the bands are of corrected temperatures); **Sharpening** brings out edges. **Reset** goes back to
   Auto's range with no adjustments. The temperatures don't change, only the colours. The map follows each slider as it
   moves: your browser colours the layer from its temperatures, so nothing waits on the server. The frames window
-  (section 5) is drawn again once you let go.
+  (section 6) is drawn again once you let go.
 - **The legend on the map**: a colour bar with the palette's range, at the map's top left (hidden or shown in the DJI
   Thermal Analyzer's Preferences, under Thermal Inspector). Its two ends say the range's
   lowest and highest temperatures, with round values between them. If the image itself goes colder or hotter than
@@ -94,7 +97,7 @@ with no adjustments.
 
 The panel and the legend can be moved out of the way: drag the panel by its heading (the frames window comes along,
 beside it), or the legend by any part. Both stay inside the map. Closing the panel or reloading the page puts
-them back where they started. The frames window (section 5) can be dragged on its own too.
+them back where they started. The frames window (section 6) can be dragged on its own too.
 
 Temperatures are shown in your unit: the °C / °F menu at the top of the page, beside your user icon, linked to
 WebODM's Metric/Imperial units. See [Palettes and units](palettes.md).
@@ -174,8 +177,8 @@ a small form: give the measurement a name (it starts as P1, R1 or L1) and, if yo
 ![A region measured with the correction on, its Save form filled in](images/inspector-saved.png)
 
 The measurement is measured again on the server as it's saved, with the isotherm's limits and the correction
-(section 7) that are on, and kept with what it measures: the task, or the workset of a mosaic laid on the map. It
-leaves your own lists and appears under **Saved measurements**:
+(section 8) that are on, and kept with what it measures: the task, or the workset of a mosaic laid on the map. It
+leaves your **Measurements** and appears under **Saved measurements**:
 
 - Everyone who can view the project sees the saved measurements of the layers on the map, dashed in green with their
   names. Click one to see its values as they were saved, its comment, who saved it and when, and the correction it
