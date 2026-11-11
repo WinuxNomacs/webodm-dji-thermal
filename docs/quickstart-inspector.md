@@ -122,7 +122,8 @@ Once it's laid, it's listed below the button, list open or closed, with its cont
 - While it's swiped, the button beside **Swipe** says which side it's on (**Right** or **Left**): click it to move it
   to the other side. The small button next to it turns the divider horizontal (the sides become **Below** and
   **Above**) or vertical again; so does a right-click on the divider's handle.
-- WebODM's own Swipe, in its layer panel, has a divider of its own: turning one on turns the other off.
+- WebODM's own Swipe, in its layer panel, has a divider of its own, and so does TweakUI's Other Tasks panel: turning
+  one on turns the others off.
 - The magnifier zooms to it.
 
 Hover, pins, regions, the isotherm and the legend read the topmost thermal layer, the mosaic or a task's thermal

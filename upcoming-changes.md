@@ -14,6 +14,14 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R22. The divider takes turns with other plugins', and re-clips a layer put back** (built 2026-11-12; asked from
+  TweakUI, 2026-11-12, which reuses `split.js` and `split.css` for its Other Tasks comparison; approved by the user).
+  The Inspector's Swipe told WebODM's split event only while WebODM's own Swipe was on (`leaveWebodmSwipe`), so
+  another plugin's divider listening to that event (TweakUI's) stayed when the Inspector's started: now
+  `announceSwipe` tells it each time. `split.js` follows `layeradd`, so a layer of its put back on the map (a new
+  container) is clipped at once, not at the map's next move. Tests: `split.test.js` "clips a layer of its put back on
+  the map", `inspector.test.js` (the swipe tests: told each time; another plugin's divider ends the Inspector's);
+  README, quickstart-inspector, developing.md.
 - **R21. Ortho Overlays above Mosaic Overlays** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "Move Ortho
   Overlays above Mosaic Overlays in the Thermal Inspector UI." Built: `inspector.js` `panelHtml` (Ortho Overlays,
   then Mosaic Overlays, last in the panel); test: `inspector.test.js` "puts Ortho Overlays above Mosaic Overlays at
