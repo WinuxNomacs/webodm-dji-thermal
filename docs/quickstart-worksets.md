@@ -109,9 +109,10 @@ The panel on the right sets the palette and the colour range (with the cross of 
 and **▶** narrow or widen it by a tenth, **▲** and **▼** raise or lower it by a tenth of its width but never past the
 mosaic's hottest or coldest temperature, and **Auto**, in the middle, uses the 2nd to 98th percentile), and under
 **Image** how the image is drawn: **Brightness** and **Contrast** move and narrow the range, **Gamma** brightens the
-cooler part of it (above 1) or the warmer part (below 1), **Sharpening** brings out edges, **Stepped** draws the
-colours in flat bands of one temperature width each (so a colour reads as a span of temperatures: Auto picks a round
-width giving 10 to 20 bands, or type your own in the field beside it, in your unit), and **Reset** goes back to the
+cooler part of it (above 1) or the warmer part (below 1), **Sharpening** brings out edges, **Banded** draws the
+colours in flat bands of one temperature width each (so a colour reads as a span of temperatures). The field beside
+it holds the width in your unit: Auto's at first, a round width giving 10 to 20 bands that follows the range, until
+you type another or step it with its arrows (empty it for Auto's again), and **Reset** goes back to the
 Auto range with none of them.
 They only change how the image is drawn, never the temperatures, and the map follows them as they move: your browser
 colours the mosaic from its temperatures, so nothing waits on the server. An **Isotherm** (above, below or between

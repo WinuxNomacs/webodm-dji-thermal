@@ -1104,7 +1104,12 @@
             });
             state.scale = scaleState();
             state.correctionDefault = correctionDefault();
+            // A number or text field being typed in or stepped keeps the focus as the panel is drawn again
+            var active = doc.activeElement, act = active && panel.contains(active) && /^(number|text)$/.test(active.type || "") &&
+                active.getAttribute("data-act");
             panel.innerHTML = panelHtml(state);
+            var again = act && panel.querySelector('[data-act="' + act + '"]');
+            if (again) again.focus();
             // Within the map, above its bottom controls
             var room = map.getContainer().clientHeight - container.offsetTop - 60;
             if (room > 0) panel.style.maxHeight = Math.max(160, room) + "px";
@@ -1372,7 +1377,7 @@
             field("image-sharpen-value").textContent = Number(s.adjust.sharpen).toFixed(1);
             field("image-tone").value = s.adjust.tone === "stepped" ? "stepped" : "linear";
             // Auto's band width as the range changes
-            if (field("image-step") && s.bands) field("image-step").placeholder = "Auto " + Number(s.bands.auto.toPrecision(6));
+            Scale.showAutoStep(field("image-step"), s.bands);
         }
 
         // The topmost layer drawn over a range (°C) with adjustments: a mosaic's tile URL, an orthophoto's (the

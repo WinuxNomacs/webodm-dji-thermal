@@ -1730,7 +1730,7 @@ describe("the Thermal Inspector's colour scale and Image section", () => {
         expect(ins.legend().querySelector(".dt-legend-bar").style.background).toMatch(/linear-gradient/);
     });
 
-    it("draws Stepped's bands, Auto's width as the range changes or a typed one, and Reset draws Auto's range without adjustments", async () => {
+    it("draws Banded's bands, Auto's width as the range changes or a typed one, and Reset draws Auto's range without adjustments", async () => {
         const layer = orthophoto();
         const map = fakeMap([layer]);
         const {ins, panel, fetchFn} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}});
@@ -1742,18 +1742,28 @@ describe("the Thermal Inspector's colour scale and Image section", () => {
         change(field(panel(), "image-tone"), "stepped");
         expect(inspector.adjustOf(layer._url)).toMatchObject({tone: "stepped", step: null});
         // 10 to 40 °C: Auto's 2 °C bands, their edges on whole multiples of 2, the colour bar in them, no requests
-        expect(field(panel(), "image-step").placeholder).toBe("Auto 2");
+        expect(field(panel(), "image-step").value).toBe("2");      // Auto's, a value the arrows step from
         expect(drawn(layer).steps.width).toBeCloseTo(2 / 30, 12);
         expect(drawn(layer).steps.start).toBeCloseTo(-10 / 30, 12);
         expect(ins.legend().querySelector(".dt-legend-bar").style.background).toContain("%");
         change(field(panel(), "range-max"), "30");
-        expect(field(panel(), "image-step").placeholder).toBe("Auto 1");
+        expect(field(panel(), "image-step").value).toBe("1");
         expect(drawn(layer).steps.width).toBeCloseTo(1 / 20, 12);
-        // A typed width stays, kept in the layer's URL
+        // A typed width stays, kept in the layer's URL; the field keeps the focus as the panel is drawn again, so its
+        // arrows can step it on
+        field(panel(), "image-step").focus();
         change(field(panel(), "image-step"), "5");
+        expect(document.activeElement).toBe(field(panel(), "image-step"));
         expect(layer._url).toContain("&tone=stepped&step=5");
         expect(drawn(layer).steps.width).toBeCloseTo(5 / 20, 12);
         expect(fetchFn.mock.calls.length).toBe(asked);
+        // and stays as the range moves; emptied, Auto's again, back in the field
+        change(field(panel(), "range-max"), "40");
+        expect(field(panel(), "image-step").value).toBe("5");
+        change(field(panel(), "image-step"), "");
+        expect(inspector.adjustOf(layer._url).step).toBe(null);
+        expect(field(panel(), "image-step").value).toBe("2");
+        change(field(panel(), "image-step"), "5");
         expect(field(panel(), "image-tone").value).toBe("stepped");
         field(panel(), "image-reset").click();
         expect(layer._url).toBe(TILES.replace("color_map=magma&rescale=10,40", "rescale=12.3,38.1&color_map=magma"));

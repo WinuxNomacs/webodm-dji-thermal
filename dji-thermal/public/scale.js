@@ -137,7 +137,15 @@
         if (!adjust || adjust.tone !== "stepped" || !range) return null;
         var m = toUser || {scale: 1, offset: 0}, auto = autoStep(Math.abs((range[1] - range[0]) * m.scale));
         var shown = adjust.step > 0 ? adjust.step : auto;
-        return {width: shown / Math.abs(m.scale), origin: -m.offset / m.scale, shown: shown, auto: auto};
+        return {width: shown / Math.abs(m.scale), origin: -m.offset / m.scale, shown: shown, auto: auto, typed: adjust.step > 0};
+    }
+
+    // The width's field follows Auto's width as the range changes, until a width is typed or stepped to (not while
+    // the field has the focus)
+    function showAutoStep(field, bands) {
+        if (!field || !bands || bands.typed || (field.ownerDocument && field.ownerDocument.activeElement === field)) return;
+        field.value = bandText(bands.auto);
+        field.step = field.min = String(stepIncrement(bands.auto));
     }
 
     // Bands as shares of the range (recolour.js's and colouring.band_steps'): {start, width}, or null
@@ -207,9 +215,13 @@
 
     // The Image section's controls: brightness and contrast (at: their positions) move the range, gamma and the tone
     // curve share out the colours, sharpening brings out edges, and Reset. o.field(name) gives each control's attributes
-    // (brightness, contrast, gamma, sharpen, their name-value labels, tone, step and reset); o.stepped offers Stepped,
+    // (brightness, contrast, gamma, sharpen, their name-value labels, tone, step and reset); o.stepped offers Banded,
     // flat bands o.bands wide (bandsOf's, for the step field: the width typed, or Auto's), in o.unit (its symbol)
     function bandText(w) { return w > 0 ? String(Number(w.toPrecision(6))) : ""; }
+
+    // The width field's arrows step by a round increment for its size (1 for 2.5 or 5, 0.1 for 0.5), from that
+    // increment up, so they land on whole multiples of it
+    function stepIncrement(w) { return w > 0 ? Number(Math.pow(10, Math.floor(Math.log10(w))).toPrecision(6)) : 1; }
 
     // A band width typed: a number above 0, or null (Auto) for anything else
     function typedStep(value) {
@@ -219,6 +231,7 @@
 
     function imageControlsHtml(adjust, at, o) {
         var a = adjust || defaultAdjust(), stepped = !!o.stepped && a.tone === "stepped";
+        var inc = stepIncrement((o.bands && o.bands.shown) || (a.step > 0 ? a.step : 1));
         var range = function (name, value, title, label, shown) {
             var sl = SLIDERS[name];
             return '<label class="ta-slider" title="' + title + '"><span>' + label + '</span><input type="range" ' + o.field(name) +
@@ -230,18 +243,18 @@
             range("gamma", gammaSlider(a.gamma), "Above 1 brightens the cooler part of the range", "Gamma", a.gamma.toFixed(2)) +
             range("sharpen", a.sharpen, "Brings out edges (an unsharp mask)", "Sharpening", Number(a.sharpen).toFixed(1)) +
             '<div class="ta-viewer-tone"><select class="form-control input-sm" ' + o.field("tone") + ' aria-label="Tone" ' +
-            'title="Stepped draws flat bands of a fixed width, so each colour is one span of temperatures">' +
+            'title="Banded draws flat bands of a fixed width, so each colour is one span of temperatures">' +
             '<option value="linear"' + (stepped ? "" : " selected") + ">Linear</option>" +
-            (o.stepped ? '<option value="stepped"' + (stepped ? " selected" : "") + ">Stepped</option>" : "") + "</select>" +
-            (stepped ? '<input type="number" min="0" step="any" class="form-control input-sm dt-step-field" ' + o.field("step") +
-                ' aria-label="Band width" title="Each band\'s width; empty for Auto" placeholder="Auto ' + bandText(o.bands && o.bands.auto) + '" value="' +
-                (a.step > 0 ? a.step : "") + '"><span class="dt-step-unit">' + (o.unit || "") + "</span>" : "") +
+            (o.stepped ? '<option value="stepped"' + (stepped ? " selected" : "") + ">Banded</option>" : "") + "</select>" +
+            (stepped ? '<input type="number" min="' + inc + '" step="' + inc + '" class="form-control input-sm dt-step-field" ' + o.field("step") +
+                ' aria-label="Band width" title="Each band\'s width: Auto\'s (10 to 20 bands over the range, following it) until you change it; empty it for Auto again" placeholder="Auto" value="' +
+                (a.step > 0 ? a.step : bandText(o.bands && o.bands.auto)) + '"><span class="dt-step-unit">' + (o.unit || "") + "</span>" : "") +
             '<button type="button" class="btn btn-default btn-sm" ' + o.field("reset") + ' title="The Auto range, no adjustments">Reset</button></div>';
     }
 
     var api = {colorCss: colorCss, paletteCss: paletteCss, gradientCss: gradientCss, scaleTicks: scaleTicks, rangeTicks: rangeTicks,
                SLIDERS: SLIDERS, defaultAdjust: defaultAdjust, adjusted: adjusted, adjustQuery: adjustQuery, toneShares: toneShares,
-               adjustShares: adjustShares, autoStep: autoStep, bandsOf: bandsOf, stepsOf: stepsOf, typedStep: typedStep, tonedShare: tonedShare,
+               adjustShares: adjustShares, autoStep: autoStep, bandsOf: bandsOf, stepsOf: stepsOf, typedStep: typedStep, stepIncrement: stepIncrement, showAutoStep: showAutoStep, tonedShare: tonedShare,
                slidRange: slidRange, spanRange: spanRange, shiftRange: shiftRange, spanButtonsHtml: spanButtonsHtml, sliderPositions: sliderPositions, sliderGamma: sliderGamma,
                gammaSlider: gammaSlider, imageControlsHtml: imageControlsHtml};
     root.ThermalScale = api;
