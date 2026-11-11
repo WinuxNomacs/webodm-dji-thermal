@@ -334,7 +334,7 @@
         return Scale.bandsOf(info.adjust, info.range, linearOver(function (v) { return shownTemp(toCelsius(v, info.unit)); }, info.range));
     }
 
-    // An overlay dropdown, last in the panel (Mosaic Overlays; each kind of overlay its own): a button saying how many
+    // An overlay dropdown, at the end of the panel (Ortho Overlays, then Mosaic Overlays: each kind its own): a button saying how many
     // are shown, opening a checklist of them (kept open while ticking, as a multi-select is); the shown ones listed
     // below it, each with its tickbox and its controls. o: {kind (the rows' data-<kind> and data-act="<kind>-on"),
     // title, open, items: [{id, name (HTML), laid}], controls(item) -> HTML}
@@ -1094,7 +1094,7 @@
             (state.isothermNotice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.isothermNotice) + "</div>" : "") + "</div>" +
             '<div class="dt-inspector-section"><strong>Measurements</strong>' + measurementsHtml(state, unit) + "</div>" +
             ((state.onMap || []).length ? '<div class="dt-inspector-section"><strong>Saved measurements</strong>' + savedHtml(state, unit) + "</div>" : "") +
-            mosaicsHtml(state) + orthosHtml(state);
+            orthosHtml(state) + mosaicsHtml(state);
     }
 
     function csrfToken(doc) {

@@ -14,6 +14,10 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R21. Ortho Overlays above Mosaic Overlays** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "Move Ortho
+  Overlays above Mosaic Overlays in the Thermal Inspector UI." Built: `inspector.js` `panelHtml` (Ortho Overlays,
+  then Mosaic Overlays, last in the panel); test: `inspector.test.js` "puts Ortho Overlays above Mosaic Overlays at
+  the end of the panel"; README and quickstart-inspector say where each is.
 - **R20. The overlays' own divider: horizontal, and either side** (built 2026-11-11; the user, 2026-11-11): "Is it possible to change
   the side by side comparison divider from vertical to horizontal when the control is right clicked? Is it also
   possible to add a control that allows the user to pick which side of the divider the compared ortho appears

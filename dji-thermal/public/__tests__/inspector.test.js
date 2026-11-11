@@ -1404,6 +1404,17 @@ describe("the Thermal Inspector's workset mosaics", () => {
         map.remove();
     });
 
+    it("puts Ortho Overlays above Mosaic Overlays at the end of the panel", async () => {
+        const map = leafletMap(THERMAL_TASK);
+        const {ins, panel} = begin(map, [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}],
+                                   Object.assign({}, ORTHO_ROUTES, {[LIST]: {mosaics: MOSAICS}}));
+        await ins.orthosReady;
+        await ins.mosaicsReady;
+        ins.open();
+        expect([...panel().querySelectorAll('[data-act="overlays-toggle"]')].map(b => b.getAttribute("data-overlays"))).toEqual(["ortho", "mosaic"]);
+        map.remove();
+    });
+
     it("says so when an orthophoto's details can't be loaded", async () => {
         const map = leafletMap(THERMAL_TASK);
         const {ins, panel} = begin(map, [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}],
