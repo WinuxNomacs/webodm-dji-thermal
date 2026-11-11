@@ -23,6 +23,8 @@ function tileLayer(url, task, opts) {
 // How a layer drawn from values is coloured now (recolour.js's style), and its value tile at 18/1/2
 const drawn = layer => layer.__dtValues.style();
 const valuesOf = layer => layer.__dtValues.url({z: 18, x: 1, y: 2});
+// Opens (or closes) an overlay dropdown at the bottom of the panel (Mosaic Overlays)
+const openOverlays = (panel, kind = "mosaic") => panel.querySelector(`[data-act="overlays-toggle"][data-overlays="${kind}"]`).click();
 
 function fakeLeaflet() {
     const L = {};
@@ -1147,11 +1149,43 @@ describe("the Thermal Inspector's workset mosaics", () => {
         await s.ins.mosaicsReady;
         s.ins.open();
         expect(s.panel().textContent).not.toContain("Mosaic Overlays");
-        expect(s.panel().querySelector(".dt-inspector-mosaic")).toBe(null);
+        expect(s.panel().querySelector(".dt-inspector-overlays")).toBe(null);
         s = begin(leafletMap(THERMAL_TASK), tasks);
         await s.ins.mosaicsReady;
         s.ins.open();
         expect(s.panel().textContent).toContain("Mosaic Overlays");
+    });
+
+    it("lists Mosaic Overlays last in the panel, a dropdown saying how many are shown, the shown ones' controls below it", async () => {
+        const map = leafletMap(THERMAL_TASK);
+        const {ins, panel, laid} = begin(map, [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}]);
+        await ins.mosaicsReady;
+        ins.open();
+        const sections = panel().querySelectorAll(".dt-inspector-section");
+        expect(sections[sections.length - 1].classList.contains("dt-inspector-overlays")).toBe(true);
+        const button = () => panel().querySelector('[data-act="overlays-toggle"]');
+        // Collapsed: no checklist, no controls
+        expect(button().textContent).toContain("Mosaic Overlays: 0 of 1 shown");
+        expect(button().getAttribute("aria-expanded")).toBe("false");
+        expect(panel().querySelector(".dt-inspector-checklist")).toBe(null);
+        expect(panel().querySelector('[data-act="mosaic-on"]')).toBe(null);
+        // Opened, it stays open while ticking; the laid one's controls below the list
+        openOverlays(panel());
+        expect(button().getAttribute("aria-expanded")).toBe("true");
+        change(panel().querySelector('.dt-inspector-checklist [data-act="mosaic-on"]'), true);
+        expect(laid().length).toBe(1);
+        expect(button().textContent).toContain("1 of 1 shown");
+        expect(panel().querySelector(".dt-inspector-checklist")).not.toBe(null);
+        expect(panel().querySelector('.dt-inspector-checklist [data-act="mosaic-tab"]')).toBe(null);
+        // Closed, the shown one stays listed with its controls, its tickbox lifting it
+        openOverlays(panel());
+        expect(panel().querySelector(".dt-inspector-checklist")).toBe(null);
+        expect(panel().querySelector('[data-act="mosaic-tab"]')).not.toBe(null);
+        change(panel().querySelector('[data-act="mosaic-on"]'), false);
+        expect(laid().length).toBe(0);
+        expect(button().textContent).toContain("0 of 1 shown");
+        expect(panel().querySelector('[data-act="mosaic-on"]')).toBe(null);
+        map.remove();
     });
 
     it("shows its button only where the map has temperatures: a thermal orthophoto or a linked mosaic, not an RGB map with mosaics", async () => {
@@ -1201,7 +1235,8 @@ describe("the Thermal Inspector's workset mosaics", () => {
                                                   {["GET " + BASE + "as_converted/point"]: point, ["POST " + BASE + "as_converted/region"]: region});
         await ins.mosaicsReady;
         ins.open();
-        expect(panel().querySelector(".dt-inspector-mosaic").textContent).toContain("Roof › Normalized");
+        openOverlays(panel());
+        expect(panel().querySelector(".dt-inspector-checklist").textContent).toContain("Roof › Normalized");
         change(panel().querySelector('[data-act="mosaic-on"]'), true);
         const layer = laid()[0];
         // Drawn from the Analyzer's values (kept until it is built again), in DJI's ironred (the user's) over the tab's
@@ -1271,6 +1306,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
         const {ins, panel, laid} = begin(map, [], {["GET " + BASE + "as_converted/frames"]: frames, ["GET " + BASE + "harmonized/frames"]: frames});
         await ins.mosaicsReady;
         ins.open();
+        openOverlays(panel());
         change(panel().querySelector('[data-act="mosaic-on"]'), true);
         expect(panel().querySelector(".dt-inspector-readout").textContent).toContain("Click it to see the frames that saw the point");
 
@@ -1325,6 +1361,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
         const {ins, panel} = begin(map, [], {["GET " + BASE + "as_converted/frames"]: frames});
         await ins.mosaicsReady;
         ins.open();
+        openOverlays(panel());
         change(panel().querySelector('[data-act="mosaic-on"]'), true);
         ins.click({latlng: L.latLng(0.5, 0.5)});
         await flush(); await flush();

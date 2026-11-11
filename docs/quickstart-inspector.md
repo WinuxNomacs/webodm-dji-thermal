@@ -100,14 +100,15 @@ WebODM's Metric/Imperial units. See [Palettes and units](palettes.md).
 
 ## 4. Mosaic Overlays on the map
 
-**Mosaic Overlays** in the panel lists the mosaics of every workset in the project's datasets; the section is there
-only when a workset has built mosaics. Tick one to lay it
-on the map, above WebODM's layers, or open the map from the workset's **Open on WebODM's map**, which lays it for
-you.
+**Mosaic Overlays**, at the bottom of the panel, holds the mosaics of every workset in the project's datasets; it is
+there only when a workset has built mosaics. Its button says how many are shown ("Mosaic Overlays: 1 of 5 shown");
+click it to open the list, and tick one to lay it on the map, above WebODM's layers. The list stays open while you
+tick, and closes with the button again. Or open the map from the workset's **Open on WebODM's map**, which lays it
+for you.
 
 ![A workset's mosaic laid on the project's map and swiped against the thermal orthophoto](images/inspector-mosaics.png)
 
-Once it's laid:
+Once it's laid, it's listed below the button, list open or closed, with its controls (untick it there to lift it):
 
 - Choose **Mosaic**, **Harmonized** or **Source frame**. It's drawn in your palette, over its own 2nd to 98th
   percentile.

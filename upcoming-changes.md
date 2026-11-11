@@ -3,14 +3,6 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R14. Mosaic Overlays at the bottom, as a dropdown** (the user, 2026-11-11, in `new.md`): "move Mosaic Overlays to
-  the bottom of the Thermal Inspector. Also make it a collapsible multi-select dropdown instead of the infinitely
-  growing list." Builds on `inspector.js` `mosaicsHtml` (a checkbox per workset mosaic, the checked ones' tab,
-  opacity, Swipe and zoom) and `panelHtml`'s order (it sits under Image, above Saved measurements).
-  - **Decided** (the user, 2026-11-11): last in the panel; a collapsed button ("Mosaic Overlays: 1 of 5 shown")
-    opening a checklist of the mosaics; **the checked ones' controls listed below the dropdown**.
-  - Design note: the dropdown is built as one reusable piece (button, checklist, controls below), so R15 uses it
-    too.
 - **R15. Ortho Overlays** (the user, 2026-11-11, in `new.md`): "would it be possible to add a "Ortho Overlays"
   feature akin to how "Mosaic Overlays" works for mosaics, but using Orthophotos from within the same project?"
   Builds on R14's dropdown and on Mosaic Overlays (`inspector.js` `mosaicsHtml`, `layMosaic`, `liftMosaic`, `swipe`,
@@ -44,6 +36,19 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R14. Mosaic Overlays at the bottom, as a dropdown** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "move Mosaic Overlays to
+  the bottom of the Thermal Inspector. Also make it a collapsible multi-select dropdown instead of the infinitely
+  growing list." Builds on `inspector.js` `mosaicsHtml` (a checkbox per workset mosaic, the checked ones' tab,
+  opacity, Swipe and zoom) and `panelHtml`'s order (it sits under Image, above Saved measurements).
+  - **Decided** (the user, 2026-11-11): last in the panel; a collapsed button ("Mosaic Overlays: 1 of 5 shown")
+    opening a checklist of the mosaics; **the checked ones' controls listed below the dropdown**.
+  - Built (2026-11-11, `r14-mosaic-dropdown`): `inspector.js` `overlaysHtml` (one dropdown per kind of overlay:
+    its button `overlays-toggle` with "N of M shown", the checklist kept open while ticking, the laid ones below it
+    with their tickbox and controls; `state.overlaysOpen`), `mosaicsHtml` built on it, last in `panelHtml`;
+    `inspector.css` (`.dt-inspector-dropdown`, `-checklist`, `-overlay`). `inspector.test.js` (the dropdown: last
+    in the panel, collapsed, ticking, closed with the laid one's controls; the mosaic tests open it). README,
+    quickstart-inspector, developing; `inspector-mosaics.png` retaken. Checked live (read only): the list opened, a
+    mosaic laid and its controls below the closed list; no page errors. R15 uses `overlaysHtml`.
 - **R13. Stepped instead of Equalized** (built 2026-11-11; the user, 2026-11-11): "Add Stepped as a choice and remove Equalized since
   it's not useful for accurate measurement." Builds on the Image section's tone list (`scale.js`
   `imageControlsHtml`), shared by the Thermal Inspector, the mosaic viewer and the frame page; the browser's colouring

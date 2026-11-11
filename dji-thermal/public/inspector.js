@@ -288,26 +288,47 @@
         return Scale.bandsOf(info.adjust, info.range, linearOver(function (v) { return shownTemp(toCelsius(v, info.unit)); }, info.range));
     }
 
-    // The panel's Mosaic Overlays: each workset of the project's datasets, with a tickbox laying it on the map; once
+    // An overlay dropdown, last in the panel (Mosaic Overlays; each kind of overlay its own): a button saying how many
+    // are shown, opening a checklist of them (kept open while ticking, as a multi-select is); the shown ones listed
+    // below it, each with its tickbox and its controls. o: {kind (the rows' data-<kind> and data-act="<kind>-on"),
+    // title, open, items: [{id, name (HTML), laid}], controls(item) -> HTML}
+    function overlaysHtml(o) {
+        if (!o.items || !o.items.length) return "";
+        var shown = o.items.filter(function (i) { return i.laid; });
+        var row = function (i, controls) {
+            return '<div class="dt-inspector-overlay" data-' + o.kind + '="' + escapeHtml(i.id) + '">' +
+                '<label class="dt-inspector-check dt-inspector-overlay-name"><input type="checkbox" data-act="' + o.kind + '-on"' +
+                (i.laid ? " checked" : "") + "> " + i.name + "</label>" + (controls ? o.controls(i) : "") + "</div>";
+        };
+        return '<div class="dt-inspector-section dt-inspector-overlays">' +
+            '<button type="button" class="btn btn-default btn-sm dt-inspector-dropdown" data-act="overlays-toggle" data-overlays="' + o.kind +
+            '" aria-expanded="' + (o.open ? "true" : "false") + '" title="' + (o.open ? "Close the list" : "Choose which to show on the map") + '">' +
+            "<strong>" + escapeHtml(o.title) + "</strong>: " + shown.length + " of " + o.items.length + " shown " +
+            '<i class="fa fa-caret-' + (o.open ? "up" : "down") + '"></i></button>' +
+            (o.open ? '<div class="dt-inspector-checklist">' + o.items.map(function (i) { return row(i, false); }).join("") + "</div>" : "") +
+            shown.map(function (i) { return row(i, true); }).join("") + "</div>";
+    }
+
+    // The panel's Mosaic Overlays: each workset of the project's datasets, its tickbox laying it on the map; once
     // laid, its tab, opacity, Swipe (WebODM's split control) and Zoom to
     function mosaicsHtml(state) {
-        if (!state.mosaics || !state.mosaics.length) return "";
-        return '<div class="dt-inspector-section"><strong>Mosaic Overlays</strong>' + state.mosaics.map(function (m) {
-            var id = mosaicId(m), laid = state.laid[id];
-            var head = '<label class="dt-inspector-check dt-inspector-mosaic-name"><input type="checkbox" data-act="mosaic-on"' + (laid ? " checked" : "") +
-                "> " + escapeHtml(m.dataset.name) + ' <span class="text-muted">›</span> ' + escapeHtml(m.workset.name) + "</label>";
-            if (!laid) return '<div class="dt-inspector-mosaic" data-mosaic="' + escapeHtml(id) + '">' + head + "</div>";
-            var info = laid.layer.__dtMosaic;
-            return '<div class="dt-inspector-mosaic" data-mosaic="' + escapeHtml(id) + '">' + head +
-                '<div class="dt-inspector-mosaic-controls"><select class="form-control input-sm" data-act="mosaic-tab" title="Which mosaic">' +
-                m.tabs.map(function (t) {
-                    return '<option value="' + t.tab + '"' + (t.tab === info.tab ? " selected" : "") + ">" + escapeHtml(MOSAIC_TABS[t.tab] || t.tab) + "</option>";
-                }).join("") + "</select>" +
-                '<input type="range" min="0" max="100" step="5" value="' + laid.opacity + '" data-act="mosaic-opacity" title="Opacity: ' + laid.opacity + '%">' +
-                '<button type="button" class="btn btn-' + (laid.swipe ? "primary" : "default") + ' btn-xs" data-act="mosaic-swipe" title="' +
-                (laid.swipe ? "Stop swiping" : "Show it on the right of a divider, WebODM's layers on the left") + '"><i class="fa fa-columns"></i> Swipe</button>' +
-                '<a href="javascript:void(0)" data-act="mosaic-zoom" title="Zoom to it"><i class="fa fa-search-plus"></i></a></div></div>';
-        }).join("") + "</div>";
+        return overlaysHtml({kind: "mosaic", title: "Mosaic Overlays", open: !!(state.overlaysOpen || {}).mosaic,
+            items: (state.mosaics || []).map(function (m) {
+                var id = mosaicId(m);
+                return {id: id, laid: state.laid[id], mosaic: m,
+                        name: escapeHtml(m.dataset.name) + ' <span class="text-muted">›</span> ' + escapeHtml(m.workset.name)};
+            }),
+            controls: function (i) {
+                var laid = i.laid, info = laid.layer.__dtMosaic;
+                return '<div class="dt-inspector-overlay-controls"><select class="form-control input-sm" data-act="mosaic-tab" title="Which mosaic">' +
+                    i.mosaic.tabs.map(function (t) {
+                        return '<option value="' + t.tab + '"' + (t.tab === info.tab ? " selected" : "") + ">" + escapeHtml(MOSAIC_TABS[t.tab] || t.tab) + "</option>";
+                    }).join("") + "</select>" +
+                    '<input type="range" min="0" max="100" step="5" value="' + laid.opacity + '" data-act="mosaic-opacity" title="Opacity: ' + laid.opacity + '%">' +
+                    '<button type="button" class="btn btn-' + (laid.swipe ? "primary" : "default") + ' btn-xs" data-act="mosaic-swipe" title="' +
+                    (laid.swipe ? "Stop swiping" : "Show it on the right of a divider, WebODM's layers on the left") + '"><i class="fa fa-columns"></i> Swipe</button>' +
+                    '<a href="javascript:void(0)" data-act="mosaic-zoom" title="Zoom to it"><i class="fa fa-search-plus"></i></a></div>';
+            }});
     }
 
     // A tile URL with one parameter set (or removed, with no value), its others kept
@@ -966,12 +987,12 @@
             correctionHtml(state.correction, unit, (state.onMap || []).map(function (k) { return state.sources[k]; }).filter(Boolean),
                            state.correctionNotice, state.correctionDefault) +
             imageHtml(state.scale) +
-            mosaicsHtml(state) +
             '<div class="dt-inspector-section"><strong>Isotherm</strong>' + isothermHtml(state.isotherm, unit) +
             (state.isothermNotice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.isothermNotice) + "</div>" : "") + "</div>" +
             '<div class="dt-inspector-section"><strong>Pinned points</strong>' + pinsHtml(state, unit) + "</div>" +
             '<div class="dt-inspector-section"><strong>Regions and lines</strong>' + regionsHtml(state, unit) + "</div>" +
-            ((state.onMap || []).length ? '<div class="dt-inspector-section"><strong>Saved measurements</strong>' + savedHtml(state, unit) + "</div>" : "");
+            ((state.onMap || []).length ? '<div class="dt-inspector-section"><strong>Saved measurements</strong>' + savedHtml(state, unit) + "</div>" : "") +
+            mosaicsHtml(state);
     }
 
     function csrfToken(doc) {
@@ -1004,7 +1025,7 @@
         var state = {open: false, mode: "hover", readout: null, pins: loadPins(storage, key), pinsVisible: true,
                      regions: regions, regionsVisible: true, shown: regions.length ? regions[regions.length - 1].id : null,
                      notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
-                     legendVisible: false, pointerTemperature: true, mosaics: null, laid: {}, frames: false, pick: null,
+                     legendVisible: false, pointerTemperature: true, mosaics: null, laid: {}, overlaysOpen: {}, frames: false, pick: null,
                      correction: {on: false}, correctionNotice: "", sources: {}, onMap: [], savedVisible: true,
                      savedShown: null, form: null, savable: {}, scale: null, rangeError: ""};
         var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
@@ -2005,6 +2026,11 @@
             var what = act && act.getAttribute("data-act");
             var mrow = e.target.closest("[data-mosaic]");
             if (mrow && (what === "mosaic-swipe" || what === "mosaic-zoom")) return onMosaicInput(mrow, what.slice("mosaic-".length));
+            if (what === "overlays-toggle") {
+                var kind = act.getAttribute("data-overlays");
+                state.overlaysOpen[kind] = !state.overlaysOpen[kind];
+                return render();
+            }
             if (what === "range-narrow" || what === "range-wider" || what === "range-raise" || what === "range-lower") {
                 var shown = topLayer(), range = shown && lookOf(shown).range;
                 if (!range) return;
