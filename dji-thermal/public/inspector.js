@@ -140,9 +140,12 @@
         return p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom;
     }
 
-    // An element's clip: {top, right, bottom, left} in pixels, or null without one
+    // An element's clip: {top, right, bottom, left} in pixels, or null without one. A browser may write a large one
+    // in exponent notation (Chrome: rect(-1e+07px, ...), shownClip's)
+    var CLIP_NUMBER = "(-?[\\d.]+(?:e[+-]?\\d+)?)px";
+    var CLIP = new RegExp("rect\\(\\s*" + [CLIP_NUMBER, CLIP_NUMBER, CLIP_NUMBER, CLIP_NUMBER].join(",?\\s*") + "\\s*\\)", "i");
     function clipOf(el) {
-        var m = /rect\(\s*(-?[\d.]+)px,?\s*(-?[\d.]+)px,?\s*(-?[\d.]+)px,?\s*(-?[\d.]+)px\s*\)/.exec((el && el.style && el.style.clip) || "");
+        var m = CLIP.exec((el && el.style && el.style.clip) || "");
         return m ? {top: Number(m[1]), right: Number(m[2]), bottom: Number(m[3]), left: Number(m[4])} : null;
     }
 
@@ -2639,7 +2642,7 @@
                framesSource: framesSource, fromCelsius: fromCelsius, corrected: corrected, uncorrected: uncorrected,
                rawIsotherm: rawIsotherm, keptRange: keptRange, correctionHtml: correctionHtml, forgetCorrections: forgetCorrections,
                savedHtml: savedHtml, savedCsv: savedCsv, savedGeoJson: savedGeoJson, formHtml: formHtml, measurementsHtml: measurementsHtml,
-               mosaicsHtml: mosaicsHtml, orthosHtml: orthosHtml, orthosOf: orthosOf, orthoUrl: orthoUrl, shownAt: shownAt, shownClip: shownClip, acrossLayers: acrossLayers, toCelsius: toCelsius, movable: movable, adjustOf: adjustOf, autoRange: autoRange,
+               mosaicsHtml: mosaicsHtml, orthosHtml: orthosHtml, orthosOf: orthosOf, orthoUrl: orthoUrl, shownAt: shownAt, shownClip: shownClip, clipOf: clipOf, acrossLayers: acrossLayers, toCelsius: toCelsius, movable: movable, adjustOf: adjustOf, autoRange: autoRange,
                scaleHtml: scaleHtml, imageHtml: imageHtml, create: create};
     root.ThermalInspector = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

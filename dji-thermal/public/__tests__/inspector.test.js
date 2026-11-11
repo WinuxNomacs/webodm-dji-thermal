@@ -1468,6 +1468,10 @@ describe("the Thermal Inspector's workset mosaics", () => {
         // A layer above clipped on both sides (not WebODM's divider) cuts nothing
         expect(inspector.shownClip([{container: el(""), z: 14, own: true}, {container: el("rect(0px, 600px, 50px, 400px)"), z: 15}], view)).toBe("");
         expect(inspector.shownClip([], view)).toBe("");
+        // Read back as a browser writes it: Chrome puts the large numbers in exponent notation
+        expect(inspector.clipOf(el("rect(-1e+07px, 503.5px, 1e+07px, -1e+07px)"))).toEqual({top: -B, right: 503.5, bottom: B, left: -B});
+        expect(inspector.clipOf(el("rect(-8px 1003px 672px 216.4px)"))).toEqual({top: -8, right: 1003, bottom: 672, left: 216.4});
+        expect(inspector.clipOf(el(""))).toBe(null);
     });
 
     it("ends a measurement read on the map's layer at WebODM's divider when another is swiped over its right", async () => {
@@ -1554,6 +1558,25 @@ describe("the Thermal Inspector's workset mosaics", () => {
         swiped(500);
         await new Promise(r => setTimeout(r, 40));
         expect(lines[0].options.opacity).toBe(0.95);
+        // Clicked the other way round (the overlay first), the clips written as Chrome writes them: the divider dragged
+        // left of both spots hides the map layer's spot, so the line goes too
+        ins.state.regions = [];
+        ins.setMode("delta");
+        map.fire("click", {latlng: map.containerPointToLatLng([600, 400])});
+        map.fire("click", {latlng: map.containerPointToLatLng([400, 400])});
+        await flush(); await flush(); await flush();
+        expect(ins.state.regions[0].sources).toEqual(["t:therm-3", "t:abc-1"]);
+        Object.values(map.getPanes()).forEach(pane => {
+            let clip = pane.style.clip;
+            Object.defineProperty(pane.style, "clip", {configurable: true, set(v) { clip = v; },
+                get() { return clip.replace(/-10000000px/g, "-1e+07px").replace(/10000000px/g, "1e+07px"); }});
+        });
+        const across = () => { const found = []; map.eachLayer(l => { if (l.options && l.options.dashArray === "4 3") found.push(l); }); return found[0]; };
+        expect(across().options.opacity).toBe(0.95);
+        swiped(300);
+        await new Promise(r => setTimeout(r, 40));
+        expect(Object.values(map.getPanes()).some(pane => pane.style.clip.includes("1e+07px"))).toBe(true);
+        expect(across().options.opacity).toBe(0);
         map.remove();
     });
 
