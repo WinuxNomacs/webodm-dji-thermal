@@ -277,7 +277,8 @@ body:not(.leaflet-dragging) .leaflet-container.dt-pointer-plain.leaflet-grab{ cu
     font-weight: normal; }
 .ta-viewer .ta-slider input[type=range]{ margin: 0; }
 .ta-viewer .ta-slider-value{ text-align: right; opacity: .75; font-size: 12px; }
-.ta-viewer .ta-viewer-tone{ display: flex; gap: 6px; margin: 6px 0; }
+.ta-viewer .ta-viewer-tone{ display: flex; align-items: center; gap: 6px; margin: 6px 0; }
+.ta-viewer .ta-viewer-tone .dt-step-field{ width: 7.5em; }
 .ta-viewer .ta-viewer-tone select{ width: auto; }
 .ta-viewer .ta-viewer-isotherm{ display: flex; gap: 6px; align-items: center; margin: 6px 0; }
 .ta-viewer .ta-viewer-isotherm select{ width: auto; }

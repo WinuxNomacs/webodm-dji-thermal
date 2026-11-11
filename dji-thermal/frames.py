@@ -174,20 +174,17 @@ def measure(task, cid, rel, changes=None):
 
 def info(task, cid, rel, changes=None):
     """What the page shows of a frame (measure's, its values summed up): {frame, width, height, unit, params,
-    recorded, distance_source, notes, offset, offset_known, changes, stats: {min, max, mean, percentiles, histogram
-    (the equalization's, colouring.value_histogram)} or None without values}"""
+    recorded, distance_source, notes, offset, offset_known, changes, stats: {min, max, mean, percentiles} or None
+    without values}"""
     import numpy as np
 
-    from . import colouring
     m = measure(task, cid, rel, changes)
     values = m.pop('values')
     found = values[np.isfinite(values)]
     stats = None
     if found.size:
-        counts, edges = colouring.value_histogram(found)
         stats = {'min': float(found.min()), 'max': float(found.max()), 'mean': float(found.mean()),
-                 'percentiles': [float(p) for p in np.percentile(found, mosaics.PERCENTILES)],
-                 'histogram': {'counts': counts.tolist(), 'edges': edges.tolist()}}
+                 'percentiles': [float(p) for p in np.percentile(found, mosaics.PERCENTILES)]}
     return dict(m, frame=rel, width=int(values.shape[1]), height=int(values.shape[0]), unit=unit_of(task, cid),
                 recorded=recorded(task, rel, cid), changes=changes or {}, stats=stats)
 

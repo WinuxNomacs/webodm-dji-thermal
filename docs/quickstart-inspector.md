@@ -70,8 +70,10 @@ the next time you open the same task; to share one, save it (section 6).
 - **Emissivity** and **Reflected**, under the colour scale: what the layer was measured with, greyed out until you
   tick **Manual Corrections** to correct for others (section 7).
 - **Image**: how the layer is drawn, as in the Analyzer's mosaic viewer. **Brightness** and **Contrast** move and
-  narrow the range from Auto's; **Gamma** above 1 brightens the cooler part of the range; **Equalized** spreads the
-  colours over the temperatures the whole layer has most of; **Sharpening** brings out edges. **Reset** goes back to
+  narrow the range from Auto's; **Gamma** above 1 brightens the cooler part of the range; **Stepped** draws the
+  colours in flat bands of one temperature width each, with the colour bar in the same bands, so a colour reads as a
+  span of temperatures (Auto's width is a round one giving 10 to 20 bands, or type your own beside it, in your unit;
+  with Manual Corrections the bands are of corrected temperatures); **Sharpening** brings out edges. **Reset** goes back to
   Auto's range with no adjustments. The temperatures don't change, only the colours. The map follows each slider as it
   moves: your browser colours the layer from its temperatures, so nothing waits on the server. The frames window
   (section 5) is drawn again once you let go.
@@ -83,7 +85,7 @@ the next time you open the same task; to share one, save it (section 6).
 - **Isotherm**: paints the temperatures above, below or between limits you type, in a colour you choose. The
   legend marks the part painted. **Off** removes it.
 
-![The colour scale and the Image section under Palette, the contrast raised and gamma above 1](images/inspector-image.png)
+![The colour scale and the Image section under Palette, the contrast raised and Stepped chosen: the map and the colour bar in bands](images/inspector-image.png)
 
 With several thermal layers on the map, the scale and the Image section are those of the topmost one (the panel
 says which), and each layer keeps its own. Nothing is remembered: each visit starts from the layer's own range,

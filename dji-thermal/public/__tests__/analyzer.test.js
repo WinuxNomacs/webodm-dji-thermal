@@ -8,7 +8,6 @@ const conversions = require('../conversions');
 window.ThermalAnalyzerConversions = conversions;
 const dataset = require('../dataset');
 const viewer = require('../viewer');
-const Recolour = require('../recolour');
 
 // A page's markup from its Django template, with the template tags filled in as the plugin does
 function page(name) {
@@ -2567,8 +2566,6 @@ describe("the mosaic viewer", () => {
     const BOUNDS = [10.0, 45.0, 10.001, 45.001];
     const tab = (name, kind, stats) => ({tab: name, kind, bounds: BOUNDS, minzoom: 15, maxzoom: 21, stats});
     const TEMPS = {min: 10.2, max: 48.9, percentiles: [12.34, 40.06]};
-    // A mosaic's histogram, for the equalization
-    const HISTOGRAM = {counts: [1, 0, 3, 2], edges: [0, 10, 20, 30, 40]};
     const INFERNO = Array.from({length: 256}, (_, i) => ((i << 24) | (0 << 16) | ((255 - i) << 8) | 255) >>> 0);
     const VIEWER = Object.assign({}, CONVERSION, {
         dataset_name: "Roof", unit: "C", flown: ["2026:10:12 18:29:50", "2026:10:12 18:30:10"], built_at: "2026-10-18T11:05:00Z",
@@ -3147,14 +3144,30 @@ describe("the mosaic viewer", () => {
         expect(viewer.sliderPositions([10, 30], [0, 20])).toEqual({brightness: 0.5, contrast: 0});
         expect(viewer.sliderPositions([10, 30], [29, 29.5])).toEqual({brightness: -0.46, contrast: 2});
         expect([viewer.sliderGamma(1), viewer.gammaSlider(2), viewer.sliderGamma(-5)]).toEqual([2, 1, 0.2]);
-        expect(viewer.adjustQuery({gamma: 1, equalize: false, sharpen: 0})).toBe("");
-        expect(viewer.adjustQuery({gamma: 2, equalize: true, sharpen: 1.5})).toBe("&gamma=2&equalize=1&sharpen=1.5");
+        expect(viewer.adjustQuery({gamma: 1, sharpen: 0})).toBe("");
+        expect(viewer.adjustQuery({gamma: 2, sharpen: 1.5}, {width: 2, origin: 0})).toBe("&gamma=2&sharpen=1.5&stepped=2,0");
         const t = viewer.toneShares(2);
         expect([t.length, t[0], t[64]]).toEqual([65, 0, 1]);
         expect(t[16]).toBeCloseTo(0.5);
         const scale = require("../scale");
         expect(scale.gradientCss([0x000000ff, 0xffffffff], [0, 0.5, 1])).toBe("linear-gradient(to right, rgb(0,0,0), rgb(128,128,128), rgb(255,255,255))");
         expect(scale.gradientCss([0x000000ff, 0xffffffff]).match(/rgb\(/g).length).toBe(16);
+    });
+
+    it("bands Stepped at a round width giving 10 to 20 bands, a typed one in the user's unit, edges on its whole multiples", () => {
+        const scale = require("../scale");
+        expect([40, 41, 8, 0.9, 100].map(scale.autoStep)).toEqual([2, 2.5, 0.5, 0.05, 5]);
+        expect(scale.bandsOf({tone: "linear"}, [10, 30])).toBeNull();
+        expect(scale.bandsOf({tone: "stepped"}, [10, 30])).toEqual({width: 1, origin: -0, shown: 1, auto: 1});
+        // °C values shown in °F: 1 °F wide bands are 1/1.8 °C, their edges on whole °F (0 °F is -17.78 °C)
+        const f = scale.bandsOf({tone: "stepped", step: 1}, [10, 30], {scale: 1.8, offset: 32});
+        expect([f.width, f.origin, f.shown, f.auto]).toEqual([1 / 1.8, -32 / 1.8, 1, 2]);
+        expect(scale.stepsOf({width: 2, origin: 0}, [10, 30])).toEqual({start: -0.5, width: 0.1});
+        expect([scale.typedStep("2.5"), scale.typedStep(""), scale.typedStep("0"), scale.typedStep("-1"), scale.typedStep("x")])
+            .toEqual([2.5, null, null, null, null]);
+        // The colour bar in flat bands, each the colour at its middle
+        expect(scale.gradientCss([0x000000ff, 0xffffffff], null, {start: 0, width: 0.5}))
+            .toBe("linear-gradient(to right, rgb(64,64,64) 0.000%, rgb(64,64,64) 50.000%, rgb(191,191,191) 50.000%, rgb(191,191,191) 100.000%)");
     });
 
     it("turns an isotherm typed in the user's unit into the server's, in the mosaic's unit", () => {
@@ -3171,11 +3184,10 @@ describe("the mosaic viewer", () => {
         expect(viewer.isothermParam("above", "104", "", "C", "harmonized")).toEqual({value: "above,40"});
     });
 
-    it("draws the image as the Image section says: the sliders, Equalized, Reset, and the frames' pictures too", async () => {
+    it("draws the image as the Image section says: the sliders, Stepped, Reset, and the frames' pictures too", async () => {
         const L = fakeLeaflet();
         const at = "?lon=10.0005&lat=45.0005";
         const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
-                                [C9 + "/mosaics/as_converted/histogram"]: HISTOGRAM,
                                 [C9 + "/mosaics/as_converted/point" + at]: {valid: true, temperature: 30, frame: "b_T.JPG"},
                                 [C9 + "/mosaics/as_converted/frames" + at]: {frames: [{index: 1, file: "b_T.JPG", x: 3.5, y: 2.5,
                                     width: 8, height: 6, view_angle: 2, source: true}], models: true},
@@ -3214,22 +3226,31 @@ describe("the mosaic viewer", () => {
         slide("ta-viewer-sharpen", "2", false);
         expect(tile().sharpen).toBe(2);
 
-        // Equalized: the tiles and the colour bar along the curve of the mosaic's histogram, asked for once
-        $("ta-viewer-tone").value = "equalize";
+        // Stepped: Auto's bands (2 °C over 27.8 °C, edges on whole multiples), the tiles and the colour bar in them,
+        // no requests; a typed width stays as the range moves, and empty is Auto again
+        expect($("ta-viewer-step")).toBeNull();
+        $("ta-viewer-tone").value = "stepped";
         change($("ta-viewer-tone"));
         await ticks();
-        const curve = Recolour.curveShares(-1.6, 26.2, {gamma: 2}, Recolour.equalization(HISTOGRAM, -1.6, 26.2));
-        expect(tile().shares).toEqual(curve);
-        expect(legend().match(/rgb\(/g).length).toBe(Recolour.CURVE_SAMPLES);
+        expect($("ta-viewer-step").placeholder).toBe("Auto 2");
+        expect(tile().steps.width).toBeCloseTo(2 / 27.8, 12);
+        expect(tile().steps.start).toBeCloseTo(1.6 / 27.8, 12);
+        expect(tile().shares[16]).toBeCloseTo(0.5, 12);
+        expect(legend()).toContain("%");
+        $("ta-viewer-step").value = "5";
+        change($("ta-viewer-step"));
+        await ticks();
+        expect(tile().steps.width).toBeCloseTo(5 / 27.8, 12);
         slide("ta-viewer-brightness", "0", true);
-        expect(tile().shares).toEqual(Recolour.curveShares(12.3, 40.1, {gamma: 2}, Recolour.equalization(HISTOGRAM, 12.3, 40.1)));
-        expect(calls(fetchFn).filter(c => c.endsWith("/histogram"))).toHaveLength(1);
+        expect(tile().steps.width).toBeCloseTo(5 / 27.8, 12);
+        expect(tile().steps.start).toBeCloseTo(-12.3 / 27.8, 12);
+        expect(fetchFn.mock.calls.length).toBe(asked);
         slide("ta-viewer-brightness", "0.5", true);
 
         // The frames window's picture is drawn the same way
         L.maps[0].fire("click", {latlng: {lng: 10.0005, lat: 45.0005}});
         await ticks();
-        expect($("ta-viewer-pip").querySelector("img").getAttribute("src")).toContain("rescale=-1.6,26.2&gamma=2&equalize=1&sharpen=2");
+        expect($("ta-viewer-pip").querySelector("img").getAttribute("src")).toContain("rescale=-1.6,26.2&gamma=2&sharpen=2&stepped=5,0");
 
         // The isotherm: its fields shown for its mode, no error before a temperature is typed, then drawn in the tiles
         // and the frames window's picture
@@ -3244,7 +3265,7 @@ describe("the mosaic viewer", () => {
         expect(tile().isotherm).toEqual([30, 3e38]);
         expect($("ta-viewer-pip").querySelector("img").getAttribute("src")).toContain("&isotherm=above%2C30");
 
-        // View angle: no Equalized, no isotherm
+        // View angle: no Stepped, no isotherm
         click($("ta-viewer-tabs").querySelector('[data-tab="view_angle"]'));
         await ticks();
         expect([...$("ta-viewer-tone").options].map(o => o.value)).toEqual(["linear"]);

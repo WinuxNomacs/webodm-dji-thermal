@@ -214,7 +214,7 @@
     // A mosaic's tiles and its frames are drawn alike: build time, palette, range (its unit) and adjustments
     function mosaicQuery(info) {
         return "v=" + encodeURIComponent(info.built_at) + "&color_map=" + encodeURIComponent(info.key) + "&rescale=" + info.range[0] + "," + info.range[1] +
-            Scale.adjustQuery(info.adjust);
+            Scale.adjustQuery(info.adjust, mosaicBands(info));
     }
     // A mosaic's value tile, which the browser colours (recolour.js), kept by the browser until it is built again
     function mosaicValuesUrl(info, coords) {
@@ -276,6 +276,18 @@
     // A thermal layer's range (°C) in its values' unit: a mosaic's, or °C
     function valuesRange(t, range) { return t.mosaic ? range.map(function (c) { return fromCelsius(c, t.mosaic.unit); }) : range; }
 
+    // How values over a range read once shown (f: a value as shown, a monotonic function), as the straight line through
+    // the range's ends: {scale, offset} (Stepped's scale.bandsOf; exact without a correction, close with one)
+    function linearOver(f, range) {
+        var a = f(range[0]), b = f(range[1]), scale = (b - a) / ((range[1] - range[0]) || 1);
+        return {scale: scale, offset: a - scale * range[0]};
+    }
+
+    // A mosaic's frames are drawn by the server: Stepped's bands in its unit, its temperatures in the user's
+    function mosaicBands(info) {
+        return Scale.bandsOf(info.adjust, info.range, linearOver(function (v) { return shownTemp(toCelsius(v, info.unit)); }, info.range));
+    }
+
     // The panel's Mosaic Overlays: each workset of the project's datasets, with a tickbox laying it on the map; once
     // laid, its tab, opacity, Swipe (WebODM's split control) and Zoom to
     function mosaicsHtml(state) {
@@ -324,18 +336,21 @@
         if (own.indexOf(name) !== -1 || Scale.adjusted(adjust)) {
             url = url.replace(WEBODM_TILES, API + "projects/$1/inspector/tiles/");
             url = withParam(withParam(url, "color_map", ""), "palette", name);
-            url = withParam(url, "gamma", a.gamma && a.gamma !== 1 ? String(a.gamma) : "");
-            url = withParam(url, "equalize", a.equalize ? "1" : "");
+            url = withParam(withParam(url, "gamma", a.gamma && a.gamma !== 1 ? String(a.gamma) : ""), "equalize", "");
+            // Stepped and its width (none: Auto), kept with the layer as its other adjustments are
+            url = withParam(url, "tone", a.tone === "stepped" ? "stepped" : "");
+            url = withParam(url, "step", a.tone === "stepped" && a.step > 0 ? String(a.step) : "");
             return withParam(url, "sharpen", a.sharpen ? String(a.sharpen) : "");
         }
         url = url.replace(PLUGIN_TILES, "/api/projects/$1/orthophoto/tiles/");
-        ["palette", "gamma", "equalize", "sharpen"].forEach(function (k) { url = withParam(url, k, ""); });
+        ["palette", "gamma", "equalize", "tone", "step", "sharpen"].forEach(function (k) { url = withParam(url, k, ""); });
         return withColorMap(url, name);
     }
     // The adjustments a thermal layer's tile URL draws with
     function adjustOf(url) {
         if (!PLUGIN_TILES.test(url || "")) return Scale.defaultAdjust();
-        return {gamma: parseFloat(paramOf(url, "gamma")) || 1, equalize: paramOf(url, "equalize") === "1", sharpen: parseFloat(paramOf(url, "sharpen")) || 0};
+        return {gamma: parseFloat(paramOf(url, "gamma")) || 1, sharpen: parseFloat(paramOf(url, "sharpen")) || 0,
+                tone: paramOf(url, "tone") === "stepped" ? "stepped" : "linear", step: Scale.typedStep(paramOf(url, "step"))};
     }
     function paletteOf(url) { return PLUGIN_TILES.test(url || "") ? paramOf(url, "palette") : colorMapOf(url); }
     // A tile URL drawn over another range (°C)
@@ -484,16 +499,16 @@
     // correction (fix), the marks are of corrected temperatures where the layer's own values are drawn, and the
     // isotherm's limits corrected ones too. extent, the image's lowest and highest temperatures (°C), is said under the
     // bar when it reaches beyond the range
-    function legendHtml(colors, range, label, unit, iso, fix, extent, shares) {
+    function legendHtml(colors, range, label, unit, iso, fix, extent, shares, steps) {
         if (!colors || !colors.length || !range) return "";
         unit = unit || userUnit();
         return '<div class="dt-legend-title">' + escapeHtml(label) + ' <span class="text-muted">°' + unit + "</span></div>" +
-            barHtml(colors, range, unit, iso, fix, shares) + extentHtml(range, unit, fix, extent);
+            barHtml(colors, range, unit, iso, fix, shares, steps) + extentHtml(range, unit, fix, extent);
     }
 
     // A colour scale: the palette's gradient over the range (°C; along shares: how the image is drawn), its marks, and
     // the part an isotherm paints (legendHtml)
-    function barHtml(colors, range, unit, iso, fix, shares) {
+    function barHtml(colors, range, unit, iso, fix, shares, steps) {
         var lo = shownTemp(corrected(range[0], fix), unit), hi = shownTemp(corrected(range[1], fix), unit);
         var at = function (celsius) { return (uncorrected(celsius, fix) - range[0]) / (range[1] - range[0]); };
         var ticks = Scale.rangeTicks(lo, hi, 4).map(function (t) {
@@ -512,7 +527,7 @@
                     ((to - from) / (range[1] - range[0]) * 100).toFixed(1) + "%; border-color: #" + ISOTHERM_COLORS[iso.color] + ';"></div>';
             }
         }
-        return '<div class="dt-legend-bar" style="background: ' + Scale.gradientCss(colors, shares) + ';">' + mark + "</div>" +
+        return '<div class="dt-legend-bar" style="background: ' + Scale.gradientCss(colors, shares, steps) + ';">' + mark + "</div>" +
             '<div class="dt-legend-ticks">' + ticks + "</div>";
     }
 
@@ -524,7 +539,7 @@
         var shown = function (c) { return roundShown(corrected(c, s.fix), unit); };
         return '<div class="dt-inspector-scale">' +
             (s.name ? '<div class="text-muted dt-inspector-hint">Of ' + escapeHtml(s.name) + "</div>" : "") +
-            '<div class="dt-inspector-scale-bar">' + (s.colors ? barHtml(s.colors, s.range, unit, state.isotherm, s.fix, s.shares) : "") + "</div>" +
+            '<div class="dt-inspector-scale-bar">' + (s.colors ? barHtml(s.colors, s.range, unit, state.isotherm, s.fix, s.shares, s.steps) : "") + "</div>" +
             '<div class="dt-inspector-range">' +
             '<input type="number" step="0.1" class="form-control input-sm" data-act="range-min" value="' + shown(s.range[0]) + '" title="Minimum">' +
             Scale.spanButtonsHtml(function (name) { return 'data-act="range-' + name + '"'; }, "btn-xs",
@@ -537,12 +552,13 @@
     }
 
     // The Image section of the topmost thermal layer (s: scaleHtml's): brightness and contrast move its range from its
-    // Auto one, gamma, the tone curve and sharpening change how it is drawn (the mosaic viewer's)
+    // Auto one, gamma, Stepped's bands and sharpening change how it is drawn (the mosaic viewer's)
     function imageHtml(s) {
         if (!s || !s.range) return "";
         var at = s.auto ? Scale.sliderPositions(s.auto, s.range) : {brightness: 0, contrast: 0};
         return '<div class="dt-inspector-section dt-inspector-image"><strong>Image</strong>' +
-            Scale.imageControlsHtml(s.adjust, at, {field: function (name) { return 'data-act="image-' + name + '"'; }, equalize: true, whole: "layer"}) +
+            Scale.imageControlsHtml(s.adjust, at, {field: function (name) { return 'data-act="image-' + name + '"'; }, stepped: true,
+                                                   bands: s.bands, unit: "°" + userUnit()}) +
             '<div class="text-muted dt-inspector-hint">How the image is drawn: the temperatures stay as they are.</div></div>';
     }
 
@@ -998,7 +1014,6 @@
         var pickSeq = 0;                    // the frames asked for last
         var overlays = [], colors = {};     // the isotherm's layer over each thermal layer; each palette's colours
         var paletteChosen = false;          // a palette the user chose on this page, which the task's no longer replaces
-        var histograms = {};                // each thermal image's histogram for the equalization, by its URL
         var sliding = false;                // while an Image slider moves (the frames window's picture waits)
 
         function render() {
@@ -1173,7 +1188,8 @@
             var c = paletteColors(t, name);
             if (!c) { legend.hidden = true; return; }
             var label = ((state.display && state.display.palettes) || []).indexOf(name) !== -1 ? "DJI " + name : name;
-            legend.innerHTML = legendHtml(c, look.range, label, userUnit(), state.isotherm, fixFor(t), layerExtent(t), sharesOf(t, look));
+            legend.innerHTML = legendHtml(c, look.range, label, userUnit(), state.isotherm, fixFor(t), layerExtent(t), sharesOf(t, look),
+                                          stepsOf(t, look));
             legend.hidden = false;
             legendMove.keep();
         }
@@ -1199,29 +1215,23 @@
         // How a thermal layer is drawn, {range (°C), adjust}
         function lookOf(t) { return {range: layerRange(t), adjust: layerAdjust(t)}; }
 
-        // A thermal layer's histogram (for the equalization), asked for once; the layers, the legend and the scale
-        // drawn again when it comes
-        function histogramOf(t) {
-            var url = inspectorUrl(t, "histogram");
-            if (histograms[url] === undefined) {
-                histograms[url] = null;
-                fetchFn(url, {credentials: "same-origin"}).then(readJson).then(function (r) {
-                    histograms[url] = r.ok ? r.data : false;
-                    renderLegend();
-                    showScale();
-                    recolourAll();
-                }, function () { histograms[url] = false; });
-            }
-            return histograms[url] || null;
-        }
-
-        // The palette's share at values evenly across a layer's range as its tiles are drawn: with equalization, along
-        // its histogram's curve (gamma's alone until it comes)
+        // The palette's share at values evenly across a layer's range as its tiles are drawn (gamma's)
         function sharesOf(t, look) {
             if (!look.range) return null;
             var r = valuesRange(t, look.range);
-            return Recolour.drawnShares(r[0], r[1], look.adjust, look.adjust.equalize ? histogramOf(t) : null);
+            return Recolour.drawnShares(r[0], r[1], look.adjust);
         }
+
+        // Stepped's bands of a layer drawn so (look: {range (°C), adjust}), in its values' unit (scale.bandsOf's), their
+        // edges at whole multiples of the width in the user's unit, of corrected temperatures with a correction; null
+        // when not stepped
+        function bandsOf(t, look) {
+            if (!look.range) return null;
+            var r = valuesRange(t, look.range), fix = fixFor(t);
+            var shown = function (v) { return shownTemp(corrected(t.mosaic ? toCelsius(v, t.mosaic.unit) : v, fix)); };
+            return Scale.bandsOf(look.adjust, r, linearOver(shown, r));
+        }
+        function stepsOf(t, look) { return look.range ? Scale.stepsOf(bandsOf(t, look), valuesRange(t, look.range)) : null; }
 
         // -- the thermal layers' tiles, coloured in the browser from their values ------------------------------------
 
@@ -1236,6 +1246,7 @@
             var look = t && lookOf(t), range = look && (look.range || layerExtent(t));
             if (!colors || !range) return null;
             return {colors: colors, range: valuesRange(t, range), shares: sharesOf(t, {range: range, adjust: look.adjust}),
+                    steps: stepsOf(t, {range: range, adjust: look.adjust}),
                     sharpen: look.adjust.sharpen || 0, isotherm: null, seams: !!t.mosaic && t.mosaic.tab === "source_frame"};
         }
 
@@ -1245,7 +1256,7 @@
                                                    style: function () { return drawStyle(layer); }, fetchFn: fetchFn});
         }
 
-        // Every thermal layer and isotherm coloured again (a palette's colours or a histogram came)
+        // Every thermal layer and isotherm coloured again (a palette's colours came)
         function recolourAll() {
             thermalLayers(map, true).forEach(function (t) { if (t.layer.recolour) t.layer.recolour(); });
             overlays.forEach(function (o) { o.overlay.recolour(); });
@@ -1262,7 +1273,7 @@
             var look = lookOf(t), name = layerPalette(t);
             return {name: thermalLayers(map).length > 1 ? layerName(t) : "", colors: name ? paletteColors(t, name) : null,
                     range: look.range, auto: autoRange(t, userUnit()), extent: layerExtent(t), adjust: look.adjust,
-                    shares: look.range ? sharesOf(t, look) : null, fix: fixFor(t)};
+                    shares: look.range ? sharesOf(t, look) : null, steps: stepsOf(t, look), bands: bandsOf(t, look), fix: fixFor(t)};
         }
 
         // The panel's scale, range boxes and sliders as the layer is (or would be) drawn, without drawing the panel
@@ -1273,7 +1284,7 @@
             var s = state.scale = scaleState(), unit = userUnit();
             if (!s || !s.range) return render();
             var shown = function (c) { return roundShown(corrected(c, s.fix), unit); };
-            box.querySelector(".dt-inspector-scale-bar").innerHTML = s.colors ? barHtml(s.colors, s.range, unit, state.isotherm, s.fix, s.shares) : "";
+            box.querySelector(".dt-inspector-scale-bar").innerHTML = s.colors ? barHtml(s.colors, s.range, unit, state.isotherm, s.fix, s.shares, s.steps) : "";
             var field = function (act) { return panel.querySelector('[data-act="' + act + '"]'); };
             field("range-min").value = shown(s.range[0]);
             field("range-max").value = shown(s.range[1]);
@@ -1285,7 +1296,9 @@
             });
             field("image-gamma-value").textContent = s.adjust.gamma.toFixed(2);
             field("image-sharpen-value").textContent = Number(s.adjust.sharpen).toFixed(1);
-            field("image-tone").value = s.adjust.equalize ? "equalize" : "linear";
+            field("image-tone").value = s.adjust.tone === "stepped" ? "stepped" : "linear";
+            // Auto's band width as the range changes
+            if (field("image-step") && s.bands) field("image-step").placeholder = "Auto " + Number(s.bands.auto.toPrecision(6));
         }
 
         // The topmost layer drawn over a range (°C) with adjustments: a mosaic's tile URL, an orthophoto's (the
@@ -1351,7 +1364,13 @@
                 if (r.error) { state.rangeError = r.error; return render(); }
                 return setLook(t, r.range, look.adjust);
             }
-            if (what === "image-tone") return setLook(t, look.range, assign({}, look.adjust, {equalize: target.value === "equalize"}));
+            // Linear or Stepped, and the bands' width (empty: Auto): the panel drawn again, for the width's field
+            if (what === "image-tone" || what === "image-step") {
+                var change = what === "image-tone" ? {tone: target.value === "stepped" ? "stepped" : "linear"} : {step: Scale.typedStep(target.value)};
+                setLook(t, look.range, assign({}, look.adjust, change));
+                restylePick();
+                return render();
+            }
             if (/^image-(brightness|contrast|gamma|sharpen)$/.test(what)) return slide(target, true);
         }
 

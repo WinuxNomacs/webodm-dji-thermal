@@ -25,6 +25,16 @@ It's used:
 WebODM's own layer panel lists only WebODM's colour maps. Choosing one there also sets your palette; a colour map
 WebODM has that the plugin's list doesn't is drawn but not saved.
 
+## Reading temperatures from colours
+
+A smooth palette shades gradually, so two nearby colours are hard to tell apart and a colour can't be matched to the
+colour bar closely. For reading temperatures by eye, choose **Stepped** in the Image section (the mosaic viewer, the
+frame page and the Thermal Inspector): the colours come in flat bands, each a band of temperatures of the same width
+(2 °C, say), with the colour bar in the same bands, so every colour stands for a known span of temperatures. Its
+width is Auto (a round width giving 10 to 20 bands over the range, changing with the range) or the one you type in
+the field beside it, in your unit; the bands' edges fall on whole multiples of it (at 20, 22, 24 °C, not 21.3,
+23.3 …). For an exact temperature, hover or pin it: the colours are only ever a picture of the temperatures.
+
 ## A workset's colours
 
 A workset's colour pictures (the colour PNG and DJI R-JPEG outputs) are drawn in the palette and colour range set

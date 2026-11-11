@@ -3,18 +3,6 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R13. Stepped instead of Equalized** (the user, 2026-11-11): "Add Stepped as a choice and remove Equalized since
-  it's not useful for accurate measurement." Builds on the Image section's tone list (`scale.js`
-  `imageControlsHtml`), shared by the Thermal Inspector, the mosaic viewer and the frame page; the browser's colouring
-  (`recolour.js` `curveShares`/`drawnShares`) and the server's (`colouring.py`, `mosaics.curve`, `inspector.tile`,
-  the legend's `curve` requests).
-  - **Proposed**: Linear or **Stepped**: flat bands of a fixed width in the user's unit, their edges at whole multiples
-    of it (18–19 °C, 19–20 °C), each band the palette's colour at its middle; the colour scale drawn in bands with
-    their edges. Equalized removed everywhere: the option, `equalize=1`, the histogram requests and the histograms
-    kept on the server (`histogram*.json`), its curve in the legend; a view saved with it opens Linear.
-  - **Decided** (the user, 2026-11-11): the band width **Auto** (a round width, 0.5, 1, 2, 5, 10…, giving about 10–20
-    bands over the range shown, again when the range changes) with a field beside Linear/Stepped to type one's own,
-    which then stays (cleared: Auto again); on **all three pages**, Intensify too (bands of difference).
 - **R14. Mosaic Overlays at the bottom, as a dropdown** (the user, 2026-11-11, in `new.md`): "move Mosaic Overlays to
   the bottom of the Thermal Inspector. Also make it a collapsible multi-select dropdown instead of the infinitely
   growing list." Builds on `inspector.js` `mosaicsHtml` (a checkbox per workset mosaic, the checked ones' tab,
@@ -32,6 +20,34 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R13. Stepped instead of Equalized** (built 2026-11-11; the user, 2026-11-11): "Add Stepped as a choice and remove Equalized since
+  it's not useful for accurate measurement." Builds on the Image section's tone list (`scale.js`
+  `imageControlsHtml`), shared by the Thermal Inspector, the mosaic viewer and the frame page; the browser's colouring
+  (`recolour.js` `curveShares`/`drawnShares`) and the server's (`colouring.py`, `mosaics.curve`, `inspector.tile`,
+  the legend's `curve` requests).
+  - **Proposed**: Linear or **Stepped**: flat bands of a fixed width in the user's unit, their edges at whole multiples
+    of it (18–19 °C, 19–20 °C), each band the palette's colour at its middle; the colour scale drawn in bands with
+    their edges. Equalized removed everywhere: the option, `equalize=1`, the histogram requests and the histograms
+    kept on the server (`histogram*.json`), its curve in the legend; a view saved with it opens Linear.
+  - **Decided** (the user, 2026-11-11): the band width **Auto** (a round width, 0.5, 1, 2, 5, 10…, giving about 10–20
+    bands over the range shown, again when the range changes) with a field beside Linear/Stepped to type one's own,
+    which then stays (cleared: Auto again); on **all three pages**, Intensify too (bands of difference).
+  - **Built**: `colouring.py` `banded`, `band_steps`, `toned_palette(steps=)`, `colour(bands=)` and `parse_adjust`'s
+    `stepped=width,origin` (in the values' unit; not `bands`, which WebODM's tile URLs already carry as `bands=L`),
+    mirrored by `recolour.js` `banded`/`tonedPalette`; `scale.js` `autoStep` (1, 2, 2.5, 5 × 10^k, at most 20 bands),
+    `bandsOf` (the user's unit to the values': a linear map, °F's and corrections' too), `stepsOf`, `typedStep`,
+    `gradientCss(…, steps)` (the colour bar in hard-edged bands) and the width's field in `imageControlsHtml`. The
+    viewer and frame page map a tab's values to the user's unit (`viewer.js` `toUser`; differences without the
+    offset); the Inspector keeps `tone=stepped&step=` in a layer's URL with its other adjustments (`withPalette`,
+    `adjustOf`), its bands through the range's ends (`linearOver`: exact for °F, close with Manual Corrections, the
+    bands of corrected temperatures), and sends a mosaic's frames `stepped=` in the mosaic's unit (`mosaicBands`).
+    Removed: the `histogram` endpoints (mosaics and the Inspector), `colouring.equalization` and its histograms,
+    `mosaics.histogram`/`temperatures`, `inspector.histogram`, the frame's `stats.histogram`. Histogram files kept on
+    the server before (`histogram*.json`) are no longer read or written; they are left where they are. Tests: the colouring fixtures (three Stepped cases), `recolour.test.js`,
+    `analyzer.test.js` (autoStep, bandsOf, the viewer's Stepped), `inspector.test.js` (Stepped, °F, a mosaic's
+    frames), `test_analyzer` (bands, `stepped` checked, a mosaic tile), `test_inspector` (a tile beside `bands=L`).
+    Docs: README, quickstart-worksets, quickstart-inspector (`inspector-image.png` retaken with Stepped), palettes
+    ("Reading temperatures from colours"), api, developing.
 - **R12. The ΔT tool** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "Add a measurement tool to the Thermal
   Inspector and Analyzer UI called "Delta T", it will allow the user to place 2 points on the map and the Delta T
   will be calculated between the 2 points that can be saved same as a box, line, etc..."; then (the user,

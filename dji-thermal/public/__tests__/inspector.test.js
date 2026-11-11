@@ -1,6 +1,5 @@
 // The Thermal Inspector on WebODM's 2D map (inspector.js), on a fake Leaflet map with WebODM's layer metadata
 const inspector = require("../inspector.js");
-const Recolour = require("../recolour.js");
 
 const META = Symbol.for("meta");
 const TILES = "/api/projects/2/tasks/abc-1/orthophoto/tiles/{z}/{x}/{y}.png?formula=Celsius&bands=L&color_map=magma&rescale=10,40";
@@ -1430,7 +1429,6 @@ describe("the Thermal Inspector's workset mosaics", () => {
 
 describe("the Thermal Inspector's colour scale and Image section", () => {
     const PALETTE = "GET /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/palette";
-    const HISTOGRAM = "GET /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/histogram";
     const PLUGIN = "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/tiles/";
     const INFERNO = Array.from({length: 256}, (_, i) => ((i << 24) | ((255 - i) << 8) | 255) >>> 0);
     const change = (el, value) => { el.value = value; el.dispatchEvent(new Event("change", {bubbles: true})); };
@@ -1445,12 +1443,14 @@ describe("the Thermal Inspector's colour scale and Image section", () => {
     };
 
     it("draws an orthophoto with adjustments by the plugin's tiles, and by WebODM's again in its colour maps without", () => {
-        const adjusted = inspector.withPalette(TILES, "magma", DISPLAY, {gamma: 1.5, equalize: true, sharpen: 2});
-        expect(adjusted).toBe(PLUGIN + "{z}/{x}/{y}.png?formula=Celsius&bands=L&rescale=10,40&palette=magma&gamma=1.5&equalize=1&sharpen=2");
-        expect(inspector.adjustOf(adjusted)).toEqual({gamma: 1.5, equalize: true, sharpen: 2});
-        expect(inspector.withPalette(adjusted, "magma", DISPLAY, {gamma: 1, equalize: false, sharpen: 0})).toBe(TILES.replace("color_map=magma&", "") + "&color_map=magma");
+        const adjusted = inspector.withPalette(TILES, "magma", DISPLAY, {gamma: 1.5, sharpen: 2, tone: "stepped", step: 2.5});
+        expect(adjusted).toBe(PLUGIN + "{z}/{x}/{y}.png?formula=Celsius&bands=L&rescale=10,40&palette=magma&gamma=1.5&tone=stepped&step=2.5&sharpen=2");
+        expect(inspector.adjustOf(adjusted)).toEqual({gamma: 1.5, sharpen: 2, tone: "stepped", step: 2.5});
+        // A view kept from before Stepped opens Linear
+        expect(inspector.adjustOf(adjusted.replace("&tone=stepped&step=2.5", "&equalize=1")).tone).toBe("linear");
+        expect(inspector.withPalette(adjusted, "magma", DISPLAY, {gamma: 1, sharpen: 0, tone: "linear", step: null})).toBe(TILES.replace("color_map=magma&", "") + "&color_map=magma");
         expect(inspector.withPalette(adjusted, "ironred", DISPLAY)).toBe(PLUGIN + "{z}/{x}/{y}.png?formula=Celsius&bands=L&rescale=10,40&palette=ironred");
-        expect(inspector.adjustOf(TILES)).toEqual({gamma: 1, equalize: false, sharpen: 0});
+        expect(inspector.adjustOf(TILES)).toEqual({gamma: 1, sharpen: 0, tone: "linear", step: null});
     });
 
     it("finds a layer's Auto range: an orthophoto's percentiles rounded outwards in the user's unit, a mosaic's own", () => {
@@ -1558,34 +1558,53 @@ describe("the Thermal Inspector's colour scale and Image section", () => {
         change(gamma, "1");
         expect([layer.redraws, fetchFn.mock.calls.length]).toEqual([redraws, asked]);
         expect(layer._url).toContain(PLUGIN);
-        expect(inspector.adjustOf(layer._url)).toEqual({gamma: 2, equalize: false, sharpen: 0});
+        expect(inspector.adjustOf(layer._url)).toEqual({gamma: 2, sharpen: 0, tone: "linear", step: null});
         expect(inspector.paletteOf(layer._url)).toBe("magma");
         expect(ins.legend().querySelector(".dt-legend-bar").style.background).toMatch(/linear-gradient/);
     });
 
-    it("equalizes along the orthophoto's histogram, asked for once, and Reset draws Auto's range without adjustments", async () => {
+    it("draws Stepped's bands, Auto's width as the range changes or a typed one, and Reset draws Auto's range without adjustments", async () => {
         const layer = orthophoto();
         const map = fakeMap([layer]);
-        const H = {counts: [1, 2, 3, 0], edges: [0, 10, 20, 30, 40]};
-        const histogram = jest.fn(() => jsonResponse(H));
-        const {ins, panel} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}, [HISTOGRAM]: histogram});
+        const {ins, panel, fetchFn} = start(map, {[PALETTE]: {name: "magma", color_map: INFERNO}});
         await ins.ready;
         await flush();
         ins.open();
-        change(field(panel(), "image-tone"), "equalize");
-        expect(inspector.adjustOf(layer._url).equalize).toBe(true);
-        await flush();
-        const curve = Recolour.curveShares(10, 40, {gamma: 1}, Recolour.equalization(H, 10, 40));
-        expect(drawn(layer).shares).toEqual(curve);
-        const stops = ins.legend().querySelector(".dt-legend-bar").style.background.match(/rgb\(/g) || [];
-        expect(stops.length).toBe(65);      // one stop per share of the curve
+        expect(field(panel(), "image-step")).toBeNull();
+        const asked = fetchFn.mock.calls.length;
+        change(field(panel(), "image-tone"), "stepped");
+        expect(inspector.adjustOf(layer._url)).toMatchObject({tone: "stepped", step: null});
+        // 10 to 40 °C: Auto's 2 °C bands, their edges on whole multiples of 2, the colour bar in them, no requests
+        expect(field(panel(), "image-step").placeholder).toBe("Auto 2");
+        expect(drawn(layer).steps.width).toBeCloseTo(2 / 30, 12);
+        expect(drawn(layer).steps.start).toBeCloseTo(-10 / 30, 12);
+        expect(ins.legend().querySelector(".dt-legend-bar").style.background).toContain("%");
         change(field(panel(), "range-max"), "30");
-        expect(drawn(layer).shares).toEqual(Recolour.curveShares(10, 30, {gamma: 1}, Recolour.equalization(H, 10, 30)));
-        expect(histogram).toHaveBeenCalledTimes(1);
-        expect(field(panel(), "image-tone").value).toBe("equalize");
+        expect(field(panel(), "image-step").placeholder).toBe("Auto 1");
+        expect(drawn(layer).steps.width).toBeCloseTo(1 / 20, 12);
+        // A typed width stays, kept in the layer's URL
+        change(field(panel(), "image-step"), "5");
+        expect(layer._url).toContain("&tone=stepped&step=5");
+        expect(drawn(layer).steps.width).toBeCloseTo(5 / 20, 12);
+        expect(fetchFn.mock.calls.length).toBe(asked);
+        expect(field(panel(), "image-tone").value).toBe("stepped");
         field(panel(), "image-reset").click();
         expect(layer._url).toBe(TILES.replace("color_map=magma&rescale=10,40", "rescale=12.3,38.1&color_map=magma"));
         expect(field(panel(), "image-tone").value).toBe("linear");
+        expect(drawn(layer).steps).toBeNull();
+    });
+
+    it("bands temperatures shown in °F at whole °F, and a mosaic's frames in its own unit", () => {
+        window.localStorage.setItem("unit_system", "imperial");
+        const layer = orthophoto();
+        const t = inspector.thermalLayer(layer);
+        layer._url = inspector.withPalette(layer._url, "magma", DISPLAY, {gamma: 1, sharpen: 0, tone: "stepped", step: 1});
+        const frames = inspector.framesSource(t, [{dataset: {id: "d-1", name: "Roof"}, workset: {id: "w-1", name: "W"},
+            unit: "C", built_at: "b", palettes: ["magma"], default_palette: "magma", tasks: ["abc-1"], tabs: [{tab: "as_converted", stats: {}}]}], "magma", DISPLAY);
+        // 1 °F wide bands of °C values, their edges on whole °F (0 °F is -17.78 °C)
+        const m = frames.query.match(/&stepped=([^,&]+),([^&]+)/);
+        expect(parseFloat(m[1])).toBeCloseTo(1 / 1.8, 9);
+        expect(parseFloat(m[2])).toBeCloseTo(-32 / 1.8, 9);
     });
 
     it("keeps the range in step with WebODM's layer panel both ways, and its adjustments when a colour map is chosen there", async () => {
@@ -1625,7 +1644,7 @@ describe("the Thermal Inspector's colour scale and Image section", () => {
         expect(inspector.adjustOf(below._url).sharpen).toBe(2);
         // A mosaic laid above it: its own range (°F) and no adjustments
         const info = {project: "2", dataset: "d-1", workset: "w-1", tab: "as_converted", unit: "F", built_at: "b", key: "magma",
-                      range: [50, 104], auto: [50, 104], adjust: {gamma: 1, equalize: false, sharpen: 0}, extent: null, name: "Roof › W"};
+                      range: [50, 104], auto: [50, 104], adjust: {gamma: 1, sharpen: 0, tone: "linear", step: null}, extent: null, name: "Roof › W"};
         const mosaic = fakeLeaflet().gridLayer({zIndex: 1000});
         mosaic.__dtMosaic = info;
         ins.state.mosaics = [{dataset: {id: "d-1", name: "Roof"}, workset: {id: "w-1", name: "W"}, palettes: ["magma"], default_palette: "magma", tabs: []}];
@@ -1634,9 +1653,9 @@ describe("the Thermal Inspector's colour scale and Image section", () => {
         expect([field(panel(), "range-min").value, field(panel(), "range-max").value]).toEqual(["10", "40"]);
         expect(field(panel(), "image-sharpen").value).toBe("0");
         change(field(panel(), "image-gamma"), "-1");
-        expect(mosaic.__dtMosaic).toMatchObject({range: [50, 104], adjust: {gamma: 0.5, equalize: false, sharpen: 0}});
+        expect(mosaic.__dtMosaic).toMatchObject({range: [50, 104], adjust: {gamma: 0.5, sharpen: 0}});
         expect(inspector.framesSource(inspector.thermalLayer(mosaic)).query).toContain("&gamma=0.5");
-        expect(inspector.adjustOf(below._url)).toEqual({gamma: 1, equalize: false, sharpen: 2});
+        expect(inspector.adjustOf(below._url)).toEqual({gamma: 1, sharpen: 2, tone: "linear", step: null});
         // The orthophoto's frames are drawn with its adjustments too
         const frames = inspector.framesSource(inspector.thermalLayer(below), [{dataset: {id: "d-1", name: "Roof"}, workset: {id: "w-1", name: "W"},
             unit: "C", built_at: "b", palettes: ["magma"], default_palette: "magma", tasks: ["abc-1"], tabs: [{tab: "as_converted", stats: {}}]}], "magma", DISPLAY);

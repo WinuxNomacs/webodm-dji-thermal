@@ -26,16 +26,35 @@
     }
 
     // A palette as a CSS gradient: from 16 of its colours, or, with shares (the palette's share at values evenly across
-    // the range: how the image is drawn), one stop per share
-    function gradientCss(encoded, shares) {
+    // the range: how the image is drawn), one stop per share; with steps (stepsOf's), in flat bands, each the colour of
+    // its middle (toned along shares), with hard edges
+    function gradientCss(encoded, shares, steps) {
         if (!encoded || !encoded.length) return "";
         var stops = [];
+        if (steps) {
+            var pct = function (x) { return (Math.max(0, Math.min(1, x)) * 100).toFixed(3) + "%"; };
+            var first = Math.floor((0 - steps.start) / steps.width), last = Math.floor((1 - steps.start) / steps.width);
+            for (var k = first; k <= last; k++) {
+                var a = steps.start + k * steps.width, b = a + steps.width;
+                if (b <= 0 || a >= 1) continue;
+                var c = paletteCss(encoded, tonedShare(Math.max(0, Math.min(1, a + steps.width / 2)), shares));
+                stops.push(c + " " + pct(a), c + " " + pct(b));
+            }
+            return "linear-gradient(to right, " + stops.join(", ") + ")";
+        }
         if (shares && shares.length > 1) {
             stops = shares.map(function (t) { return paletteCss(encoded, t); });
         } else {
             for (var i = 0; i < 16; i++) stops.push(colorCss(encoded[Math.round(i * (encoded.length - 1) / 15)]));
         }
         return "linear-gradient(to right, " + stops.join(", ") + ")";
+    }
+
+    // A share of the range toned along shares (interpolated between its samples), as recolour.js tones it
+    function tonedShare(u, shares) {
+        if (!shares || shares.length < 2) return u;
+        var at = u * (shares.length - 1), i = Math.min(Math.floor(at), shares.length - 2), f = at - i;
+        return shares[i] * (1 - f) + shares[i + 1] * f;
     }
 
     // Round values to mark on a colour scale from lo to hi (as shown), about count of them: each with its label and
@@ -72,30 +91,60 @@
 
     // -- the Image section: how the image is drawn ---------------------------------------------------------------------
 
-    function defaultAdjust() { return {gamma: 1, equalize: false, sharpen: 0}; }
-    function adjusted(adjust) { return !!adjust && ((adjust.gamma && adjust.gamma !== 1) || !!adjust.equalize || !!adjust.sharpen); }
-
-    // The adjustments as a query (&gamma=&equalize=1&sharpen=), those not as by default
-    function adjustQuery(adjust) {
-        if (!adjust) return "";
-        return (adjust.gamma && adjust.gamma !== 1 ? "&gamma=" + adjust.gamma : "") + (adjust.equalize ? "&equalize=1" : "") +
-            (adjust.sharpen ? "&sharpen=" + adjust.sharpen : "");
+    // tone: "linear" or "stepped" (flat bands); step: the bands' width in the user's unit, null for Auto (autoStep)
+    function defaultAdjust() { return {gamma: 1, sharpen: 0, tone: "linear", step: null}; }
+    function adjusted(adjust) {
+        return !!adjust && ((adjust.gamma && adjust.gamma !== 1) || adjust.tone === "stepped" || !!adjust.sharpen);
     }
 
-    // The palette's share at CURVE_SAMPLES values evenly across the range, with gamma alone (what the server's curve
-    // gives with equalization)
+    // The adjustments as a query (&gamma=&sharpen=&stepped=width,origin), those not as by default; bands: bandsOf's
+    function adjustQuery(adjust, bands) {
+        if (!adjust) return "";
+        return (adjust.gamma && adjust.gamma !== 1 ? "&gamma=" + adjust.gamma : "") + (adjust.sharpen ? "&sharpen=" + adjust.sharpen : "") +
+            (bands ? "&stepped=" + bands.width + "," + bands.origin : "");
+    }
+
+    // The palette's share at CURVE_SAMPLES values evenly across the range, with gamma
     function toneShares(gamma) {
         var out = [];
         for (var i = 0; i < CURVE_SAMPLES; i++) out.push(Math.pow(i / (CURVE_SAMPLES - 1), 1 / (gamma || 1)));
         return out;
     }
 
-    // The scale's shares as the image is drawn: the server's curve (curve) with equalization, else gamma's, else none
-    // (linear)
-    function adjustShares(adjust, curve) {
+    // The scale's shares as the image is drawn: gamma's, else none (linear)
+    function adjustShares(adjust) {
         var a = adjust || defaultAdjust();
-        if (a.equalize) return curve || null;
-        return a.gamma !== 1 ? toneShares(a.gamma) : null;
+        return a.gamma && a.gamma !== 1 ? toneShares(a.gamma) : null;
+    }
+
+    // -- Stepped: flat bands of a fixed width, their edges at whole multiples of it in the user's unit ---------------
+
+    var BANDS_MAX = 20;         // Auto's width gives at most this many bands over the range, and at least about half
+
+    // Auto's width for a range span wide (the user's unit): the narrowest round one (1, 2, 2.5 or 5 times a power of
+    // ten) giving at most BANDS_MAX bands
+    function autoStep(span) {
+        if (!(span > 0)) return 1;
+        var mag = Math.pow(10, Math.floor(Math.log10(span / BANDS_MAX)));
+        var found = [1, 2, 2.5, 5, 10].map(function (m) { return m * mag; }).filter(function (w) { return span / w <= BANDS_MAX + 1e-9; })[0];
+        return Number(found.toPrecision(6));
+    }
+
+    // The bands an image is drawn in, in its values' unit, or null when not stepped: {width, origin (an edge), shown
+    // (the width in the user's unit), auto (Auto's)}. range: its values' [low, high]; toUser: how its values read in
+    // the user's unit, {scale, offset} (shown = scale * value + offset; a difference's offset is 0)
+    function bandsOf(adjust, range, toUser) {
+        if (!adjust || adjust.tone !== "stepped" || !range) return null;
+        var m = toUser || {scale: 1, offset: 0}, auto = autoStep(Math.abs((range[1] - range[0]) * m.scale));
+        var shown = adjust.step > 0 ? adjust.step : auto;
+        return {width: shown / Math.abs(m.scale), origin: -m.offset / m.scale, shown: shown, auto: auto};
+    }
+
+    // Bands as shares of the range (recolour.js's and colouring.band_steps'): {start, width}, or null
+    function stepsOf(bands, range) {
+        if (!bands || !range) return null;
+        var span = (range[1] - range[0]) || 1;
+        return {start: (bands.origin - range[0]) / span, width: bands.width / span};
     }
 
     // The brightness (-1 to 1) and contrast (-2 to 2) sliders move the range from ref (the Auto one): brightness
@@ -158,10 +207,18 @@
 
     // The Image section's controls: brightness and contrast (at: their positions) move the range, gamma and the tone
     // curve share out the colours, sharpening brings out edges, and Reset. o.field(name) gives each control's attributes
-    // (brightness, contrast, gamma, sharpen, their name-value labels, tone and reset); o.equalize offers Equalized,
-    // spreading the colours over what the whole of o.whole has most of
+    // (brightness, contrast, gamma, sharpen, their name-value labels, tone, step and reset); o.stepped offers Stepped,
+    // flat bands o.bands wide (bandsOf's, for the step field: the width typed, or Auto's), in o.unit (its symbol)
+    function bandText(w) { return w > 0 ? String(Number(w.toPrecision(6))) : ""; }
+
+    // A band width typed: a number above 0, or null (Auto) for anything else
+    function typedStep(value) {
+        var w = parseFloat(String(value).replace(",", "."));
+        return w > 0 && isFinite(w) ? w : null;
+    }
+
     function imageControlsHtml(adjust, at, o) {
-        var a = adjust || defaultAdjust();
+        var a = adjust || defaultAdjust(), stepped = !!o.stepped && a.tone === "stepped";
         var range = function (name, value, title, label, shown) {
             var sl = SLIDERS[name];
             return '<label class="ta-slider" title="' + title + '"><span>' + label + '</span><input type="range" ' + o.field(name) +
@@ -173,15 +230,19 @@
             range("gamma", gammaSlider(a.gamma), "Above 1 brightens the cooler part of the range", "Gamma", a.gamma.toFixed(2)) +
             range("sharpen", a.sharpen, "Brings out edges (an unsharp mask)", "Sharpening", Number(a.sharpen).toFixed(1)) +
             '<div class="ta-viewer-tone"><select class="form-control input-sm" ' + o.field("tone") + ' aria-label="Tone" ' +
-            'title="Equalized spreads the colours over the temperatures the whole ' + o.whole + ' has most of">' +
-            '<option value="linear"' + (a.equalize ? "" : " selected") + ">Linear</option>" +
-            (o.equalize ? '<option value="equalize"' + (a.equalize ? " selected" : "") + ">Equalized</option>" : "") + "</select>" +
+            'title="Stepped draws flat bands of a fixed width, so each colour is one span of temperatures">' +
+            '<option value="linear"' + (stepped ? "" : " selected") + ">Linear</option>" +
+            (o.stepped ? '<option value="stepped"' + (stepped ? " selected" : "") + ">Stepped</option>" : "") + "</select>" +
+            (stepped ? '<input type="number" min="0" step="any" class="form-control input-sm dt-step-field" ' + o.field("step") +
+                ' aria-label="Band width" title="Each band\'s width; empty for Auto" placeholder="Auto ' + bandText(o.bands && o.bands.auto) + '" value="' +
+                (a.step > 0 ? a.step : "") + '"><span class="dt-step-unit">' + (o.unit || "") + "</span>" : "") +
             '<button type="button" class="btn btn-default btn-sm" ' + o.field("reset") + ' title="The Auto range, no adjustments">Reset</button></div>';
     }
 
     var api = {colorCss: colorCss, paletteCss: paletteCss, gradientCss: gradientCss, scaleTicks: scaleTicks, rangeTicks: rangeTicks,
                SLIDERS: SLIDERS, defaultAdjust: defaultAdjust, adjusted: adjusted, adjustQuery: adjustQuery, toneShares: toneShares,
-               adjustShares: adjustShares, slidRange: slidRange, spanRange: spanRange, shiftRange: shiftRange, spanButtonsHtml: spanButtonsHtml, sliderPositions: sliderPositions, sliderGamma: sliderGamma,
+               adjustShares: adjustShares, autoStep: autoStep, bandsOf: bandsOf, stepsOf: stepsOf, typedStep: typedStep, tonedShare: tonedShare,
+               slidRange: slidRange, spanRange: spanRange, shiftRange: shiftRange, spanButtonsHtml: spanButtonsHtml, sliderPositions: sliderPositions, sliderGamma: sliderGamma,
                gammaSlider: gammaSlider, imageControlsHtml: imageControlsHtml};
     root.ThermalScale = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

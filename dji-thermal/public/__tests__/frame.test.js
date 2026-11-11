@@ -34,7 +34,7 @@ const FRAMES = {
 const INFO = {frame: "a_T.JPG", width: 2, height: 1, unit: "C", distance_source: "rangefinder", notes: [], offset: 0, offset_known: true,
               params: {distance: 18.1, humidity: 50, emissivity: 0.91, reflection: 22.8, ambient_temp: 22.8},
               recorded: {distance: 5, lrf: 18.1, humidity: 50, emissivity: 0.91, reflection: 22.8, ambient: 22.8},
-              changes: {}, stats: {min: 15, max: 15, mean: 15, percentiles: [15, 15], histogram: {counts: [1], edges: [15, 16]}}};
+              changes: {}, stats: {min: 15, max: 15, mean: 15, percentiles: [15, 15]}};
 
 describe("the frame page's helpers", () => {
     afterEach(() => window.localStorage.clear());

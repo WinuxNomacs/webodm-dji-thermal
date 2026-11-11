@@ -1,4 +1,5 @@
 const Recolour = require("../recolour.js");
+const Scale = require("../scale.js");
 const fixtures = require("./fixtures/colouring.json");
 
 // The fixtures' values as a value tile decodes them
@@ -12,8 +13,9 @@ describe("colouring a value tile", () => {
 
     test.each(fixtures.cases.map((c) => [c.name, c]))("draws %s exactly as the server does", (_name, c) => {
         const out = new Uint8ClampedArray(inner * inner * 4);
+        const steps = c.bands ? Scale.stepsOf({width: c.bands[0], origin: c.bands[1]}, c.range) : null;
         Recolour.colour(fixtureTile(c.sigma), {colors: fixtures.palettes[c.palette], range: c.range, shares: c.shares || null,
-                                               sharpen: c.sharpen || 0, isotherm: c.isotherm || null, seams: !!c.seams}, out);
+                                               steps, sharpen: c.sharpen || 0, isotherm: c.isotherm || null, seams: !!c.seams}, out);
         expect(Array.from(out)).toEqual(c.rgba);
     });
 
@@ -31,29 +33,28 @@ describe("colouring a value tile", () => {
 });
 
 describe("the tone curve", () => {
-    test("equalizes from the server's histogram as the server does", () => {
-        const e = fixtures.equalization;
-        const curve = Recolour.equalization(fixtures.histogram, e.range[0], e.range[1]);
-        const shares = Recolour.curveShares(e.range[0], e.range[1], {gamma: 1}, curve);
+    test("is gamma's alone, and none (linear) without it", () => {
+        const shares = Recolour.drawnShares(0, 10, {gamma: 2});
         expect(shares).toHaveLength(Recolour.CURVE_SAMPLES);
-        shares.forEach((s, i) => expect(s).toBeCloseTo(e.shares[i], 12));
-        expect(Recolour.drawnShares(e.range[0], e.range[1], {gamma: 1, equalize: true}, fixtures.histogram)).toEqual(shares);
-    });
-
-    test("is gamma's alone without equalization, and none (linear) without adjustments", () => {
-        const shares = Recolour.drawnShares(0, 10, {gamma: 2, equalize: false});
         expect(shares[16]).toBeCloseTo(Math.sqrt(0.25), 12);
-        expect(Recolour.drawnShares(0, 10, {gamma: 1, equalize: false})).toBeNull();
+        expect(Recolour.drawnShares(0, 10, {gamma: 1, tone: "stepped"})).toBeNull();
+    });
+});
+
+describe("Stepped's bands", () => {
+    test("give each share the share at the middle of its band, clipped to the range", () => {
+        const steps = {start: 0.05, width: 0.2};
+        expect([0, 0.05, 0.2, 0.26, 0.99, 1].map((u) => Recolour.banded(u, steps)))
+            .toEqual([0, 0.15, 0.15, 0.35, 0.95, 0.95].map((x) => expect.closeTo(x, 12)));
+        expect(Recolour.banded(0.37, null)).toBe(0.37);
     });
 
-    test("equalizes nothing from a histogram with no values in the range", () => {
-        expect(Recolour.equalization({counts: [5, 5], edges: [0, 1, 2]}, 10, 20)).toBeNull();
-        expect(Recolour.equalization({counts: null, edges: null}, 0, 1)).toBeNull();
-    });
-
-    test("interpolates as numpy does, at repeated points too", () => {
-        const xs = [0, 1, 1, 2], ys = [0, 0.25, 0.75, 1];
-        expect([-1, 0.5, 1, 1.5, 3].map((x) => Recolour.interp(x, xs, ys))).toEqual([0, 0.125, 0.75, 0.875, 1]);
+    test("make a palette of flat runs, one colour a band", () => {
+        const colors = [0x000000FF, 0xFFFFFFFF];
+        const palette = Recolour.tonedPalette(colors, null, false, {start: 0, width: 0.5});
+        const reds = new Set();
+        for (let i = 0; i < palette.length; i += 3) reds.add(palette[i]);
+        expect(reds.size).toBe(2);
     });
 });
 

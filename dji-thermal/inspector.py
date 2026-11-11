@@ -14,7 +14,6 @@ REGION_MAX_SIZE = 4096        # pixels along the longer side; a larger region is
 PERCENTILES = (2, 98)
 HISTOGRAM_BINS = 64
 MAX_HISTOGRAM_BINS = 255
-HISTOGRAM_FILE = 'histogram.json'     # the orthophoto's histogram, in the task's thermal folder, for the equalization
 # dji-thermal-cli's no-data marker: absolute zero, in each unit (a mosaic's pixels at or below it hold none)
 ABSOLUTE_ZERO = {'C': -273.15, 'F': -459.67, 'K': 0.0}
 # As dji-thermal-ui measures: a line's strip either side of it, a region's surroundings (m), a profile's samples
@@ -318,21 +317,19 @@ def tile(task, z, x, y, colors, low, high, size=256, crop=False, adjust=None):
     """
     A tile of the thermal orthophoto as WebODM's map draws it (its first band, bilinear, over low..high °C, within the
     task's crop when crop), in a palette (encoded colours: colouring's), drawn with the adjustments as a workset's
-    mosaics are (colouring.parse_adjust's; equalized from the whole orthophoto's histogram), as PNG bytes; None outside
-    the orthophoto. Where it has no data comes from its alpha band.
+    mosaics are (colouring.parse_adjust's), as PNG bytes; None outside the orthophoto. Where it has no data comes from
+    its alpha band.
     """
     from . import colouring, mosaics
     adjust = adjust or mosaics.NO_ADJUST
-    curve = None
-    if adjust['equalize']:
-        curve = colouring.equalization(histogram(task), low, high)
-    shares = colouring.curve_shares(low, high, adjust, curve) if adjust['equalize'] or adjust['gamma'] != 1.0 else None
+    shares = colouring.curve_shares(low, high, adjust) if adjust['gamma'] != 1.0 else None
     margin = colouring.MARGIN if adjust['sharpen'] > 0 else 0
     found = _tile_values(task, z, x, y, size, crop, margin)
     if found is None:
         return None
     values, sigma = found
-    rgba = colouring.colour(values, colors, (low, high), shares, adjust['sharpen'], sigma=sigma, margin=margin)
+    rgba = colouring.colour(values, colors, (low, high), shares, adjust['sharpen'], sigma=sigma, margin=margin,
+                            bands=adjust['bands'])
     return mosaics.png(rgba)
 
 
@@ -371,28 +368,6 @@ def _tile_values(task, z, x, y, size, crop, margin):
     read_z = z - 1 if size == 512 else z
     drawn = mosaics.tile_pixel_m(read_z, y) * mosaics.TILE_SIZE / size
     return values, colouring.sharpen_sigma(pixel, drawn)
-
-
-def histogram(task):
-    """The thermal orthophoto's histogram (colouring.value_histogram), for the equalization: read once, at most
-    REGION_MAX_SIZE pixels a side, and kept in the task's thermal folder"""
-    from . import colouring, datasets
-    return colouring.kept_histogram(thermal_orthophoto(task), _overview_values, datasets.data_path(task, HISTOGRAM_FILE))
-
-
-def _overview_values(raster):
-    """A raster's first band, NaN where it has no data, read at most REGION_MAX_SIZE pixels a side"""
-    import numpy as np
-    import rasterio
-    from rasterio.windows import Window
-
-    with rasterio.open(raster) as src:
-        scale = max(1.0, max(src.width, src.height) / REGION_MAX_SIZE)
-        shape = (max(1, int(src.height / scale)), max(1, int(src.width / scale)))
-        window = Window(0, 0, src.width, src.height)
-        values = src.read(1, out_shape=shape).astype(np.float64)
-        values[~_valid(src, window, shape)] = np.nan
-    return values
 
 
 def isotherm(task, z, x, y, low, high, rgb, size=256, crop=False):

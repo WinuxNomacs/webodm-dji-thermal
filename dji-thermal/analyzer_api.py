@@ -888,7 +888,7 @@ class MosaicTile(DatasetView):
     def get(self, request, pk, cid, tab, z, x, y):
         """
         A PNG tile of a viewer tab: temperatures and view angles over rescale=min,max with color_map (one of the
-        viewer's palettes), the adjustments (gamma, equalize=1 on temperatures, sharpen) and on temperatures an isotherm
+        viewer's palettes), the adjustments (gamma, sharpen, stepped=width,origin on temperatures) and on temperatures an isotherm
         (above,T, below,T or between,A,B: its temperatures in the palette, the rest in grey), the source frames as the
         temperatures with lines between the frames. The viewer's URL carries the mosaics' build time, so a tile is
         cached until they are built again.
@@ -937,14 +937,14 @@ def mosaic_range(request):
 
 
 def mosaic_adjust(request, tab):
-    """A viewer request's adjustments (colouring.parse_adjust), equalize only on temperatures and their differences"""
+    """A viewer request's adjustments (colouring.parse_adjust), bands only on temperatures and their differences"""
     from . import colouring
     try:
         adjust = colouring.parse_adjust(request.query_params)
     except ValueError as e:
         raise ValidationError({'error': str(e)}) from None
-    if adjust['equalize'] and not mosaics.in_unit(tab):
-        raise ValidationError({'equalize': "Only temperatures can be equalized"})
+    if adjust['bands'] and not mosaics.in_unit(tab):
+        raise ValidationError({'stepped': "Only temperatures can be drawn in bands"})
     return adjust
 
 
@@ -961,20 +961,9 @@ class MosaicValues(DatasetView):
                                              'private, max-age=86400')
 
 
-class MosaicHistogram(DatasetView):
-    def get(self, request, pk, cid, tab):
-        """A temperature tab's histogram (in its unit; Intensify's of its differences), for the browser's equalization
-        (inspector_api.histogram_response)"""
-        task = get_conversion(request, pk, cid)
-        tab_raster(task, cid, tab)
-        if not mosaics.in_unit(tab):
-            raise ValidationError({'equalize': "Only temperatures can be equalized"})
-        return inspector_api.histogram_response(mosaics.histogram(task, cid, tab))
-
-
 class MosaicCurve(DatasetView):
     def get(self, request, pk, cid, tab):
-        """How a viewer tab's images are drawn over rescale=min,max with gamma and equalize=1, for the legend: the
+        """How a viewer tab's images are drawn over rescale=min,max with gamma, for the legend: the
         palette's share at colouring.CURVE_SAMPLES values evenly across the range"""
         from . import colouring
         task = get_conversion(request, pk, cid)

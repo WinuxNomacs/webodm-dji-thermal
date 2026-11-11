@@ -73,7 +73,7 @@ def tile_range(request):
 
 
 def tile_adjust(request):
-    """A tile's adjustments (?gamma=, ?equalize=1, ?sharpen=: colouring.parse_adjust)"""
+    """A tile's adjustments (?gamma=, ?sharpen=, ?stepped=width,origin: colouring.parse_adjust)"""
     try:
         return colouring.parse_adjust(request.query_params)
     except ValueError as e:
@@ -84,7 +84,7 @@ class InspectorTiles(InspectorView):
     def get(self, request, pk=None, project_pk=None, z="", x="", y=""):
         """A tile of the thermal orthophoto in a palette (?palette=: one of DJI's or of WebODM's colour maps), with the
         parameters of WebODM's tiles the map keeps (rescale (°C), size (256 or 512) and crop) and the adjustments the
-        mosaics are drawn with (gamma, equalize, sharpen)"""
+        mosaics are drawn with (gamma, sharpen, bands)"""
         task = self.thermal_task(request, pk)
         colors = palette_colors(request.query_params.get('palette') or '')
         if colors is None:
@@ -107,14 +107,6 @@ def values_response(found, cache_control, margin=colouring.MARGIN):
     response['X-Sharpen-Sigma'] = repr(sigma)
     response['Cache-Control'] = cache_control
     return response
-
-
-def histogram_response(histogram):
-    """A raster's histogram for the browser's equalization (colouring.equalization): {counts, edges}, both null when it
-    has no values"""
-    counts, edges = histogram if histogram is not None else (None, None)
-    return Response({'counts': None if counts is None else [int(c) for c in counts],
-                     'edges': None if edges is None else [float(e) for e in edges]})
 
 
 class InspectorValues(InspectorView):
@@ -140,21 +132,13 @@ class InspectorValues(InspectorView):
         return response
 
 
-class InspectorHistogram(InspectorView):
-    def get(self, request, pk=None, project_pk=None):
-        """The thermal orthophoto's histogram (°C), for the browser's equalization (histogram_response)"""
-        return histogram_response(inspector.histogram(self.thermal_task(request, pk)))
-
-
 class InspectorCurve(InspectorView):
     def get(self, request, pk=None, project_pk=None):
-        """The palette's share at values evenly across ?rescale= (°C) as the tiles are drawn with the adjustments (the
-        equalization from the orthophoto's histogram), for the legend: {shares}"""
-        task = self.thermal_task(request, pk)
+        """The palette's share at values evenly across ?rescale= (°C) as the tiles are drawn with gamma, for the legend:
+        {shares}"""
+        self.thermal_task(request, pk)
         low, high = tile_range(request)
-        adjust = tile_adjust(request)
-        curve = colouring.equalization(inspector.histogram(task), low, high) if adjust['equalize'] else None
-        return Response({'shares': colouring.curve_shares(low, high, adjust, curve)})
+        return Response({'shares': colouring.curve_shares(low, high, tile_adjust(request))})
 
 
 def isotherm_request(request):

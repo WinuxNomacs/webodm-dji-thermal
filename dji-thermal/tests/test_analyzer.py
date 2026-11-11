@@ -963,17 +963,20 @@ class TestMosaics(AnalyzerTestCase):
         for bad in ("above", "between,2,1", "near,3", "above,x"):
             with self.assertRaises(ValueError, msg=bad):
                 colouring.parse_isotherm(bad)
-        # The equalization's curve rises from 0 to 1, steepest where most values are
-        values = np.concatenate([np.full(900, 20.0), np.linspace(10, 30, 100)])
-        curve = colouring.equalization(colouring.value_histogram(values, (10, 30)), 10, 30)
-        self.assertEqual((curve[1][0], curve[1][-1]), (0.0, 1.0))
-        self.assertTrue(np.all(np.diff(curve[1]) >= 0))
-        self.assertGreater(np.interp(20.1, *curve) - np.interp(19.9, *curve), 0.5)
-        # The adjustments checked, none by default; the unsharp mask's sigma in the pixels drawn
-        self.assertEqual(colouring.parse_adjust({}), {"gamma": 1.0, "equalize": False, "sharpen": 0.0})
-        self.assertEqual(colouring.parse_adjust({"gamma": "2", "equalize": "1", "sharpen": "1.5"}),
-                         {"gamma": 2.0, "equalize": True, "sharpen": 1.5})
-        for bad in ({"gamma": "9"}, {"gamma": "x"}, {"sharpen": "-1"}, {"equalize": "2"}):
+        # Stepped: every value in a band drawn in the colour at the band's middle, the edges at whole multiples of the
+        # width from its origin; the top of the range, on an edge, in the palette's last colour as values above it are
+        grey = [(i << 24) | (i << 16) | (i << 8) | 255 for i in range(256)]
+        out = colouring.colour(np.array([[0.0, 0.4, 1.9, 2.0, 3.99, 9.99, 10.0, 12.0]]), grey, (0, 10), bands=(2.0, 0.0))
+        self.assertEqual(out[0, :, 0].tolist(), [26, 26, 26, 77, 77, 230, 255, 255])
+        self.assertEqual(colouring.band_steps(10, 30, (2.0, 0.0)), (-0.5, 0.1))
+        self.assertEqual(colouring.band_steps(10, 30, None), None)
+        # The adjustments checked, none by default (a view kept from before Stepped, with equalize, drawn Linear); the
+        # unsharp mask's sigma in the pixels drawn
+        self.assertEqual(colouring.parse_adjust({}), {"gamma": 1.0, "sharpen": 0.0, "bands": None})
+        self.assertEqual(colouring.parse_adjust({"gamma": "2", "equalize": "1", "sharpen": "1.5", "stepped": "0.5,-17.5"}),
+                         {"gamma": 2.0, "sharpen": 1.5, "bands": (0.5, -17.5)})
+        for bad in ({"gamma": "9"}, {"gamma": "x"}, {"sharpen": "-1"}, {"stepped": "2"}, {"stepped": "0,1"}, {"stepped": "x,1"},
+                    {"stepped": "nan,0"}):
             with self.assertRaises(ValueError, msg=bad):
                 colouring.parse_adjust(bad)
         self.assertEqual(colouring.sharpen_sigma(0.02, 0.01), 2.0)
@@ -1156,7 +1159,7 @@ class TestMosaics(AnalyzerTestCase):
 
     @skip_without("DJI_THERMAL_FLIGHT_DIR")
     def check_intensify(self, task, cid, v, centre, first, here):
-        """The Intensify tab of a flight's mosaics: differences about 0, drawn, read and equalized as a temperature tab's,
+        """The Intensify tab of a flight's mosaics: differences about 0, drawn, read and stepped as a temperature tab's,
         with the harmonized temperature beside the difference; not a download, nor a tab measured as temperatures"""
         import numpy as np
         tab = next(t for t in v["tabs"] if t["tab"] == "intensify")
@@ -1173,10 +1176,9 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual((p["temperature"], p["frame"]), (harmonized["temperature"], harmonized["frame"]))
         self.assertLess(abs(p["difference"]), 10)
         t = web_mercator_tile(centre["lon"], centre["lat"], tab["maxzoom"])
-        style = {"color_map": v["difference_palette"], "rescale": "-2,2", "equalize": 1, "isotherm": "below,-0.5"}
+        style = {"color_map": v["difference_palette"], "rescale": "-2,2", "stepped": "0.5,0", "isotherm": "below,-0.5"}
         tile = self.client.get(self.url(task, cid, "/intensify/tiles/{}/{}/{}.png".format(t.z, t.x, t.y)), style)
         self.assertEqual((tile.status_code, tile["Content-Type"]), (status.HTTP_200_OK, "image/png"))
-        self.assertEqual(self.client.get(self.url(task, cid, "/intensify/histogram")).status_code, status.HTTP_200_OK)
         # The frames window: the frame's own differences from their surroundings, about 0 too
         values = mosaics.frame_values(task, cid, "intensify", first["index"])
         self.assertTrue(np.isfinite(values[here]))
@@ -1240,16 +1242,16 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual(Image.open(io.BytesIO(tile.content)).size, (256, 256))
         self.assertEqual(self.client.get(tile_url, {"color_map": "pink"}).status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.client.get(tile_url, {"rescale": "5,1"}).status_code, status.HTTP_400_BAD_REQUEST)
-        # Drawn with gamma and Equalized: the same pixels clear, other colours; sharpened, others again
+        # Drawn with gamma and in Stepped's bands: the same pixels clear, other colours; sharpened, others again
         import numpy as np
         style = {"color_map": "inferno", "rescale": "{},{}".format(lo, hi)}
         drawn = lambda r: np.asarray(Image.open(io.BytesIO(r.content)).convert("RGBA"))
         plain = drawn(tile)
-        toned = self.client.get(tile_url, dict(style, gamma=2, equalize=1))
+        toned = self.client.get(tile_url, dict(style, gamma=2, stepped="1,0"))
         self.assertEqual(toned.status_code, status.HTTP_200_OK)
         self.assertEqual((drawn(toned)[..., 3] > 0).tolist(), (plain[..., 3] > 0).tolist())
         self.assertFalse(np.array_equal(drawn(toned)[..., :3], plain[..., :3]))
-        sharp = self.client.get(tile_url, dict(style, gamma=2, equalize=1, sharpen=3))
+        sharp = self.client.get(tile_url, dict(style, gamma=2, stepped="1,0", sharpen=3))
         self.assertEqual(sharp.status_code, status.HTTP_200_OK)
         self.assertFalse(np.array_equal(drawn(sharp)[..., :3], drawn(toned)[..., :3]))
         self.assertEqual(self.client.get(tile_url, dict(style, gamma=9)).status_code, status.HTTP_400_BAD_REQUEST)
@@ -1259,29 +1261,24 @@ class TestMosaics(AnalyzerTestCase):
         self.assertFalse(np.array_equal(drawn(iso)[..., :3], plain[..., :3]))
         self.assertEqual(self.client.get(tile_url, dict(style, isotherm="between,5,1")).status_code, status.HTTP_400_BAD_REQUEST)
         angles_url = self.url(task, cid, "/view_angle/tiles/{}/{}/{}.png".format(t.z, t.x, t.y))
-        self.assertEqual(self.client.get(angles_url, {"rescale": "0,20", "equalize": 1}).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.get(angles_url, {"rescale": "0,20", "stepped": "2,0"}).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.get(tile_url, dict(style, stepped="0,0")).status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.client.get(angles_url, {"rescale": "0,20", "isotherm": "above,5"}).status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.client.get(angles_url, {"rescale": "0,20", "gamma": 2, "sharpen": 3}).status_code, status.HTTP_200_OK)
-        # The colour scale's curve: linear without adjustments, Equalized from the mosaic's histogram, kept in a file
-        # and read again from it
+        # The colour scale's curve: linear without adjustments, gamma's with it (Stepped's bands drawn by the browser)
         linear = self.client.get(self.url(task, cid, "/harmonized/curve"), {"rescale": style["rescale"]}).data["shares"]
         self.assertEqual(len(linear), colouring.CURVE_SAMPLES)
         self.assertAlmostEqual(linear[32], 0.5)
-        curve = self.client.get(self.url(task, cid, "/harmonized/curve"), {"rescale": style["rescale"], "equalize": 1}).data["shares"]
-        self.assertEqual((len(curve), curve[0], curve[-1]), (colouring.CURVE_SAMPLES, 0.0, 1.0))
-        self.assertNotAlmostEqual(curve[32], 0.5, places=2)
-        self.assertEqual(self.client.get(self.url(task, cid, "/view_angle/curve"), {"rescale": "0,20", "equalize": 1}).status_code,
+        curve = self.client.get(self.url(task, cid, "/harmonized/curve"), {"rescale": style["rescale"], "gamma": 2}).data["shares"]
+        self.assertAlmostEqual(curve[16], 0.5)
+        self.assertEqual(self.client.get(self.url(task, cid, "/view_angle/curve"), {"rescale": "0,20", "stepped": "2,0"}).status_code,
                          status.HTTP_400_BAD_REQUEST)
-        self.assertTrue(os.path.isfile(mosaics.path(task, cid, mosaics.VIEWER_DIR, mosaics.HISTOGRAM_FILE.format("harmonized"))))
-        kept = mosaics.histogram(task, cid, "harmonized")
-        colouring._histograms.clear()
-        with mock.patch.object(mosaics, "temperatures", side_effect=AssertionError("read again")):
-            self.assertEqual(mosaics.histogram(task, cid, "harmonized")[0].tolist(), kept[0].tolist())
+        self.assertEqual(self.client.get(self.url(task, cid, "/harmonized/histogram")).status_code, status.HTTP_404_NOT_FOUND)
         # The source frames: the temperatures in the palette, with black and white lines where frames meet (white is
         # not in inferno), the whole mosaic in one tile
         whole = web_mercator_tile(lon, lat, tab["minzoom"])
         # The values the browser colours: the tile's, with a margin, cached until the mosaics are built again; the
-        # source frames' seams flagged, both sides; the equalization's histogram of temperatures only
+        # source frames' seams flagged, both sides
         values = self.client.get(self.url(task, cid, "/harmonized/values/{}/{}/{}.png".format(t.z, t.x, t.y)))
         self.assertEqual((values.status_code, values["Content-Type"]), (status.HTTP_200_OK, "image/png"))
         self.assertEqual((values["X-Values-Margin"], values["Cache-Control"]), (str(colouring.MARGIN), "private, max-age=86400"))
@@ -1296,9 +1293,6 @@ class TestMosaics(AnalyzerTestCase):
         self.assertEqual(set(np.unique(np.asarray(Image.open(io.BytesIO(framed.content)))[..., 2]).tolist()), {0, 1, 2})
         self.assertEqual(self.client.get(self.url(task, cid, "/harmonized/values/{}/0/0.png".format(t.z))).status_code,
                          status.HTTP_404_NOT_FOUND)
-        h = self.client.get(self.url(task, cid, "/harmonized/histogram")).data
-        self.assertEqual((h["counts"], h["edges"]), (kept[0].tolist(), kept[1].tolist()))
-        self.assertEqual(self.client.get(self.url(task, cid, "/view_angle/histogram")).status_code, status.HTTP_400_BAD_REQUEST)
         frames_tile = self.client.get(self.url(task, cid, "/source_frame/tiles/{}/{}/{}.png".format(whole.z, whole.x, whole.y)),
                                       {"color_map": "inferno", "rescale": "{},{}".format(lo, hi)})
         self.assertEqual(frames_tile.status_code, status.HTTP_200_OK)
