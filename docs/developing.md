@@ -27,7 +27,7 @@ Everything the plugin ships is in `dji-thermal/` (the plugin's id, and the relea
 | `analysis.py` | The analysis job: dji-thermal-cli's check and WebODM plan over a dataset's photos. |
 | `conversions.py` | Worksets: their settings (checked in `parse_settings`), the conversion job (`convert`), the outputs' names, the palettes (`palettes()`, `COLORMAPS`), and each user's saved defaults and display preferences. |
 | `mosaics.py` | A workset's mosaics: the build job (`make`), and what the mosaic viewer reads (tiles, values, palettes). |
-| `intensify.py` | Each pixel's difference from its surroundings (the median over about 2 m): the mosaic viewer's Intensify tab, and the ΔT from surroundings under the cursor (the viewer, the Thermal Inspector; the frame page works it out in `frame.js`). |
+| `intensify.py` | Each pixel's difference from its surroundings (the median over about 2 m): the mosaic viewer's Intensify tab. And Pointer Info's ΔT from surroundings, a point less the median within a circle of the user's radius (`disc`, `raster_difference`, `parse_radius`; the viewer, the Thermal Inspector; the frame page works it out in `frame.js` `surroundingsAt`). |
 | `colouring.py` | How tiles and frames are drawn: range, tone curve, equalization, sharpening, isotherm. |
 | `frames.py`, `frames_api.py` | The frame page: one frame as the workset measured it, or measured again with other values. |
 | `conversion_tasks.py` | A WebODM task made from a workset's temperature TIFFs. |
@@ -63,10 +63,10 @@ Keep the work in plain functions that take data and return HTML strings or value
 | `main.js`, `units.js` | Loaded on every WebODM page (`include_js_files`): DJI Thermal Task's button, the task panel's buttons, the Administration link, loading the Inspector on map pages; the temperature unit. Keep them small. They run on every page of WebODM. |
 | `analyzer_core.js` | What the Analyzer's pages share: formatting, statuses, uploads in batches, reading the server's answers (`readJson`, `errorText`, `unreachable`), the dialog, and Pointer Info's Temperature On Pointer (`bindPointerTemperature`, `pointerLabel`) for the viewer and the frame page. |
 | `datasets.js`, `dataset.js`, `conversions.js` | The datasets list, a dataset's page, and its Worksets tab. |
-| `viewer.js` | The mosaic viewer. |
+| `viewer.js` | The mosaic viewer, and Pointer Info's Delta T From Surroundings slider for it and the frame page (`bindSurroundings`). |
 | `frame.js` | The frame page (it reuses the Inspector's statistics and forms). |
 | `inspector.js` | The Thermal Inspector on WebODM's map. |
-| `regions.js` | Drawing shapes on a Leaflet map, and the measuring tools' list (`TOOLS`). |
+| `regions.js` | Drawing shapes on a Leaflet map, the measuring tools' list (`TOOLS`), and Delta T From Surroundings' radius, slider and circle around the pointer (`RADIUS`, `surroundingsHtml`, `SurroundingsCircle`) for the three pages with Pointer Info. |
 | `scale.js`, `recolour.js`, `frames.js` | Shared by the mosaic viewer and the Inspector: colour scales, the range's D-pad and the Image controls, tiles coloured in the browser, and the window of the frames that saw a point. |
 | `picture_viewer.js` | The full-page picture viewer. |
 | `thermal/` | DJI Thermal Task's panel and the project page's workset progress: JSX and ES modules, built by WebODM's webpack into `public/build/` (untracked). |
@@ -101,7 +101,7 @@ run the same way.
   `images/`), and its worksets under `thermal/conversions/<id>/` (settings, job, results, `output/`, mosaics). It
   counts toward the project owner's quota and is deleted with the task. The docstrings of `datasets.py`,
   `conversions.py`, `mosaics.py` and `measurements.py` list every file.
-- **A user's preferences** (the unit, the palette, Temperature On Pointer, the Workset Creation Settings' saved defaults): WebODM's `UserDataStore`
+- **A user's preferences** (the unit, the palette, Temperature On Pointer, Delta T From Surroundings' radius, the Workset Creation Settings' saved defaults): WebODM's `UserDataStore`
   (`conversions.preferences_store`).
 - **The administrator's default unit**: WebODM's `GlobalDataStore` (`conversions.default_unit`).
 - **DJI's own SDK**: the plugin's persistent folder (`sdk.py`).

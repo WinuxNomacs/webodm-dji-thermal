@@ -265,7 +265,8 @@ over WebODM's base layers:
   Slopes, the sun's side and gradients across a roof drop to about 0, so a narrow cooler or warmer feature (a seam
   letting air in, a leak) stands out wherever it is, in its own palette, blue-white-red (blue below its
   surroundings, red above), over a range centred on 0. Its numbers are differences, not temperatures, in your unit:
-  the readout gives the difference and the harmonized temperature, its isotherm takes differences (e.g. below -1.5),
+  the readout gives the harmonized temperature and its ΔT from surroundings (within Pointer Info's circle, below),
+  its isotherm takes differences (e.g. below -1.5),
   and its frames are the frames' own differences. Anything 2 m wide or more fades out. The temperatures are not
   changed: it is a view, not in the downloads nor the Thermal Inspector. Mosaics built before the plugin had it show
   it once built again (**Build again**);
@@ -284,8 +285,10 @@ over WebODM's base layers:
 - an **Isotherm** on the temperature tabs and Intensify (above, below or between temperatures, or differences): its pixels keep the palette and the
   rest turns grey, on the map and in the frames' pictures;
 - **Pointer Info**: the temperature, frame, frame pixel and view angle under the cursor, with **ΔT from surroundings** on the
-  temperature tabs: the temperature less the median of the pixels within about 2 m around it (on Harmonized the
-  value Intensify draws), so a spot cooler or warmer than the ground beside it reads as such whatever the range;
+  temperature tabs and Intensify: the temperature less the median of the pixels within a circle around it, so a spot
+  cooler or warmer than the ground beside it reads as such whatever the range. The **Delta T From Surroundings**
+  slider sets the circle's radius (0.25 to 10 m, 1 m until you move it, then kept with your preferences, for the
+  frame page and the Thermal Inspector too), drawn as a thin circle around the pointer (or the point a click kept);
   ticking **Temperature On Pointer** (off until you tick it, then kept with your preferences, as on the frame page
   and in the Thermal Inspector) also shows the temperature in a small label beside the pointer, wherever there is one,
   and makes the pointer a plain arrow over the map rather than the hand (still the hand while dragging);
@@ -314,8 +317,9 @@ its detail pane: the frame page of the newest workset that converted):
 - the frame, zoomed and moved like a map, coloured in your browser from its temperatures (opening in the workset's
   palette, else yours) with the mosaic viewer's palette, range, **Image** and **Isotherm** controls (Equalized from the frame's own histogram), following them as
   they move;
-- **Pointer Info**: the temperature of the pixel under the cursor, and its **ΔT from surroundings** (the median of the frame's pixels
-  within about 2 m around it, from the distance it was measured at and its camera's focal length; for both
+- **Pointer Info**: the temperature of the pixel under the cursor, and its **ΔT from surroundings** (the pixel less the
+  median of the frame's pixels within the **Delta T From Surroundings** circle, drawn around the pointer, its radius
+  in metres turned into pixels from the distance the frame was measured at and its camera's focal length; for both
   measurements with Measure again); **Temperature On Pointer** shows the temperature beside the pointer too, each
   pane its own;
 - **Measure**: the Thermal Inspector's tools in the frame's pixels: a pin (a pixel's temperature), a line (a strip 1
@@ -392,8 +396,9 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
 
 - **Hover**: the temperature under the cursor, in the panel under **Pointer Info** and beside the pointer (unless
   **Temperature On Pointer** is cleared, which is kept with your preferences, for the Analyzer's pages too), with its **ΔT from surroundings** in the
-  panel (the temperature less the median of the orthophoto's pixels within about 2 m around it, inside the crop;
-  with Manual Corrections, the point and its surroundings both corrected); outside the task's crop, outside the
+  panel (the temperature less the median of the orthophoto's pixels within the circle drawn around the pointer, inside
+  the crop, its radius set by the **Delta T From Surroundings** slider under Pointer Info and kept with your
+  preferences; with Manual Corrections, the point and its surroundings both corrected); outside the task's crop, outside the
   orthophoto and where it has no data it says so.
 - **Pin**: a click pins the point with its temperature, labelled P1, P2…, shown on the map instead of WebODM's
   popup. The pins are listed in the panel (click one to go to it), can be hidden and shown together, removed, and

@@ -56,7 +56,7 @@
     var UNIT_SCALE = {C: 1, F: 1.8, K: 1};
     var UNIT_ZERO = {C: 0, F: 32, K: 273.15};   // 0 °C in each unit
 
-    // The user's display preferences ({unit, palette, pointer_temperature}, null for not chosen), as the page was
+    // The user's display preferences ({unit, palette, pointer_temperature, surroundings_m}, null for not chosen), as the page was
     // given them (analyzer_pages.common, in #ta-display)
     var display = readDisplay();
     function readDisplay() {
@@ -67,7 +67,8 @@
     }
     function displayOf(p) {
         return {unit: (p && p.unit) || null, palette: (p && p.palette) || null,
-                pointer_temperature: p && typeof p.pointer_temperature === "boolean" ? p.pointer_temperature : null};
+                pointer_temperature: p && typeof p.pointer_temperature === "boolean" ? p.pointer_temperature : null,
+                surroundings_m: p && typeof p.surroundings_m === "number" ? p.surroundings_m : null};
     }
     function preferences() { return display; }
 

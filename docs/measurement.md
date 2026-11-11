@@ -89,15 +89,20 @@ a range centred on 0, cooler features show blue and warmer ones red, and an isot
 
 ![The mosaic viewer's Intensify tab](images/mosaic-intensify.png)
 
-It is a view: the temperatures, the TIFFs and the downloads stay as they are, and the readout gives both the
-difference and the harmonized temperature. Something as wide as the neighbourhood or wider (a whole wet patch several
+It is a view: the temperatures, the TIFFs and the downloads stay as they are, and the readout gives the harmonized
+temperature and its ΔT from surroundings (below). Something as wide as the neighbourhood or wider (a whole wet patch several
 metres across) fades out, and the edge between two surfaces at different temperatures shows a band of each colour
 along it. Mosaics built before the plugin had it show it once built again.
 
-The same difference is under the cursor wherever a temperature is: **ΔT from surroundings** in Pointer Info, on the mosaic viewer's
-temperature tabs, on the frame page and in the Thermal Inspector's Hover reading, the point less the median of the
-pixels within about 2 m around it (the frame page works out a frame pixel's ground size from the distance it was
-measured at and the camera's focal length). It needs no Intensify mosaic, so it works on mosaics built before it too.
+A difference like it is under the cursor wherever a temperature is: **ΔT from surroundings** in Pointer Info, on the
+mosaic viewer's temperature tabs and Intensify, on the frame page and in the Thermal Inspector's Hover reading: the
+point less the median of the pixels within a circle around it, drawn as a thin circle around the pointer. The
+**Delta T From Surroundings** slider under Pointer Info sets its radius, from 0.25 to 10 m (1 m until you move it,
+about Intensify's neighbourhood; then kept with your preferences, for every page): a small circle compares a spot
+with what is right beside it, a large one with the whole roof face. The circle always holds the pixels beside the
+point, however small. The frame page works out a frame pixel's ground size from the distance it was measured at and
+the camera's focal length. It needs no Intensify mosaic, so it works on mosaics built before it too; on Intensify it
+is worked out from the harmonized mosaic, so it follows the slider while the picture stays drawn over 2 m.
 
 ## Trying other values on one frame
 

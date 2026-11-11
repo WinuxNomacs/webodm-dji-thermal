@@ -9,13 +9,14 @@
     var scale = root.ThermalScale || (typeof require !== "undefined" ? require("./scale") : null);
     var Frames = root.ThermalFrames || (typeof require !== "undefined" ? require("./frames") : null);
     var Recolour = root.ThermalRecolour || (typeof require !== "undefined" ? require("./recolour") : null);
+    var Regions = root.ThermalRegions || (typeof require !== "undefined" ? require("./regions") : null);
     var pipHtml = Frames.pipHtml;
     var gradientCss = scale.gradientCss, scaleTicks = scale.scaleTicks, rangeTicks = scale.rangeTicks;
     var esc = function (t) { return core.escapeHtml(t); };
     var POLL_MS = 2000;
     var HOVER_MS = 120;         // the readout asks for the point the cursor rests on, not every point it crosses
     var READOUT_HINT = "Move the cursor over the mosaic; a click keeps the values there and opens the frames that saw it.";
-    var DELTA_LABEL = "ΔT from surroundings";   // a point's temperature less the median around it (about 2 m)
+    var DELTA_LABEL = "ΔT from surroundings";   // a point's temperature less the median within the user's circle
     var TAB_LABELS = {as_converted: "Mosaic", harmonized: "Harmonized", intensify: "Intensify", source_frame: "Source frame",
                       view_angle: "View angle"};
     var TAB_HINTS = {
@@ -236,8 +237,8 @@
         if (!res || !res.valid) return '<span class="ta-message">' + (res && res.reason === "outside_raster" ?
             "Outside the mosaic." : "No data here.") + "</span>" + follow;
         var rows = [["Temperature", res.temperature === null || res.temperature === undefined ? "no data" : core.formatTemp(res.temperature, unit)]];
-        // The temperature less its surroundings' (about 2 m around): on Intensify first, what it draws, then the
-        // harmonized mosaic's temperature; on the temperature tabs after the temperature
+        // The temperature less its surroundings' (within Delta T From Surroundings' circle): on Intensify first, then
+        // the harmonized mosaic's temperature; on the temperature tabs after the temperature
         if (res.difference !== undefined) {
             var delta = [DELTA_LABEL, res.difference === null ? "no data" : core.formatDelta(res.difference, unit, 2, true)];
             if (isDifference(tab)) rows.unshift(delta); else rows.push(delta);
@@ -408,6 +409,27 @@
         });
     }
 
+    // Pointer Info's Delta T From Surroundings (#ta-surroundings: its slider, regions.js's): the circle's radius (m) as
+    // the user chose it, each move passed to onChange and, once let go, saved as their preference for every page (the
+    // Inspector's too)
+    function bindSurroundings(doc, fetchFn, api, csrf, onChange) {
+        var el = doc.getElementById("ta-surroundings"), radius = Regions.radiusOf(core.preferences().surroundings_m);
+        if (!el) return radius;
+        function draw() { el.innerHTML = Regions.surroundingsHtml(radius, core.userUnit(), 'id="ta-surroundings-radius"'); }
+        draw();
+        el.addEventListener("input", function (e) {
+            if (e.target.type !== "range") return;
+            radius = Number(e.target.value);
+            el.querySelector(".dt-surroundings-value").textContent = Regions.formatRadius(radius, core.userUnit());
+            onChange(radius);
+        });
+        el.addEventListener("change", function (e) {
+            if (e.target.type === "range") core.saveDisplay(fetchFn, api, csrf, {surroundings_m: radius}).catch(function () {});
+        });
+        doc.addEventListener("onUnitSystemChanged", draw);
+        return radius;
+    }
+
     // ctx: {doc, fetchFn, loadLeaflet (resolves to Leaflet), basemaps (WebODM's)}
     function init(ctx) {
         var doc = ctx.doc, fetchFn = ctx.fetchFn;
@@ -429,6 +451,20 @@
         });
         var label = null;
         core.plainPointer($("ta-viewer-map"), pointerOn);
+        // Delta T From Surroundings: the circle's radius (m), the circle around the pointer (or the point a click kept)
+        var circle = null, radius = bindSurroundings(doc, fetchFn, page.getAttribute("data-api"), csrf, function (r) {
+            radius = r;
+            if (!pinned) return;
+            circleAt(pinned);
+            if (hover) root.clearTimeout(hover);
+            hover = root.setTimeout(function () { readout(pinned); }, HOVER_MS);
+        });
+        // On the tabs that say a point's difference from its surroundings
+        function circleAt(latlng) {
+            if (!circle) return;
+            if (latlng && inUnit(tab)) circle.show(latlng, radius);
+            else circle.hide();
+        }
 
         function status(s) {
             $("ta-viewer-status").className = "ta-status" + (s.cls ? " " + s.cls : "");
@@ -489,9 +525,11 @@
                 L.control.layers(bases.layers, {}, {position: "topright"}).addTo(map);
                 L.control.scale({imperial: false}).addTo(map);
                 label = core.pointerLabel(doc, $("ta-viewer-map"));
+                circle = new Regions.SurroundingsCircle(L, map);
                 // The readout follows the pointer, unless a click kept it; the temperature beside the pointer always does
                 map.on("mousemove", function (e) {
                     if (hover) root.clearTimeout(hover);
+                    if (!pinned) circleAt(e.latlng);
                     if (pinned && !pointerOn) return;
                     hover = root.setTimeout(function () { readout(e.latlng, e.containerPoint); }, HOVER_MS);
                 });
@@ -499,6 +537,7 @@
                     if (hover) root.clearTimeout(hover);
                     pointed++;
                     label.hide();
+                    if (!pinned) circleAt(null);
                 });
                 map.on("click", function (e) { pin(e.latlng); });
                 pickLayer = L.layerGroup().addTo(map);
@@ -515,7 +554,7 @@
         function readout(latlng, at) {
             var askedTab = tab, kept = pinned, panel = !(at && kept);
             var n = panel ? ++asked : asked, p = at ? ++pointed : pointed;
-            return fetchFn(base + "/mosaics/" + tab + "/point?lon=" + latlng.lng + "&lat=" + latlng.lat, {credentials: "same-origin"})
+            return fetchFn(base + "/mosaics/" + tab + "/point?lon=" + latlng.lng + "&lat=" + latlng.lat + "&radius=" + radius, {credentials: "same-origin"})
                 .then(core.readJson, core.unreachable).then(function (r) {
                     if (askedTab !== tab) return;
                     if (at && p === pointed && label) {
@@ -534,6 +573,7 @@
             pinned = latlng;
             pinLayer.clearLayers();
             L.circleMarker(latlng, {radius: 6, color: "#000", weight: 1, fillColor: "#fff", fillOpacity: 1}).addTo(pinLayer);
+            circleAt(latlng);
             readout(latlng);
             select(latlng);
         }
@@ -543,6 +583,7 @@
             pinned = null;
             asked++;
             if (pinLayer) pinLayer.clearLayers();
+            circleAt(null);
             $("ta-viewer-readout").innerHTML = '<span class="ta-message">' + esc(READOUT_HINT) + "</span>";
         }
 
@@ -689,6 +730,7 @@
             e.preventDefault();
             tab = a.getAttribute("data-tab");
             if (label) label.hide();
+            circleAt(pinned);
             renderTab();
             var f = pick && pick.frames[pick.at];
             if (pick) select(pick.latlng, f && f.index);
@@ -755,7 +797,7 @@
                baseLayers: baseLayers, loadLeaflet: loadLeaflet, init: init, adjustQuery: adjustQuery, toneShares: toneShares,
                slidRange: slidRange, sliderPositions: sliderPositions, sliderGamma: sliderGamma, gammaSlider: gammaSlider,
                SLIDERS: SLIDERS, imageHtml: imageHtml, isothermParam: isothermParam, isothermHtml: isothermHtml,
-               bindControls: bindControls, DELTA_LABEL: DELTA_LABEL, isTemperature: isTemperature, isDifference: isDifference, inUnit: inUnit, shownTemp: shownTemp};
+               bindControls: bindControls, bindSurroundings: bindSurroundings, DELTA_LABEL: DELTA_LABEL, isTemperature: isTemperature, isDifference: isDifference, inUnit: inUnit, shownTemp: shownTemp};
     root.ThermalAnalyzerViewer = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

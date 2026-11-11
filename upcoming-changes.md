@@ -3,31 +3,6 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R11. Delta T From Surroundings, over a radius the user picks** (the user, 2026-11-11, in `new.md`): "Under
-  Pointer Info, add a slider to configure "Delta T From Surroundings", this enables a feature where a user
-  configurable circumference from the hovered/selected pixel has its Delta T calculated against the pixels within
-  the surrounding circumference area. The circumference area should be visible to the user as a thin circle outline
-  around the tip of the pointer indicating the pixels within the circle are included in the circumference. The data
-  is then displayed underneath the Pointer Info are of the detail pane."
-  Builds on R6's "ΔT from surroundings" row (the pixel less the median of a square about 2 m wide:
-  `intensify.SIZE_M`, `window_difference`, `raster_difference`; `mosaics.point`, `inspector.point`; `frame.js`
-  `surroundingsAt` with `frames.info`'s `pixel_m`), R10's Pointer Info sections (`viewer.html`, `frame.html`, the
-  Inspector's `panelHtml`) and the display preferences (`conversions.py` `parse_display`, `analyzer_core.js`
-  `saveDisplay`).
-  - **Proposed**: a "Delta T From Surroundings" slider under Pointer Info, in metres, setting a radius; the row
-    becomes the pixel less the median of the pixels within that circle (a disc, not R6's square); the radius kept
-    as a display preference `surroundings_m` (range-checked, as `legend`); a thin circle following the pointer's tip
-    (`L.circle` in metres on the viewer and the Inspector, in frame pixels through `pixel_m` on the frame page),
-    shown only where the row is; the server's point requests take the radius. Tests: Jest (the slider, the circle,
-    the preference), Django (the disc's difference, the radius parameter, the preference's check). Docs: README,
-    quickstart-worksets, quickstart-inspector, measurement, api, developing.md; screenshots showing Pointer Info
-    retaken.
-  - **Decided** (the user, 2026-11-11): it **replaces** R6's fixed 2 m square (one "ΔT from surroundings" row, over
-    the circle; the slider starts at 1 m radius, about today's 2 m window); on **all three** pages (the mosaic
-    viewer, the frame page, the Thermal Inspector).
-  - **Open, settled while building**: the slider's range and step (proposed 0.25 to 10 m, step 0.25); on the
-    viewer's Harmonized tab, the row follows the slider, worked out from the harmonized mosaic (proposed), while
-    the Intensify tab's raster stays built at 2 m.
 - **R12. A "Delta T" measuring tool** (the user, 2026-11-11, in `new.md`): "Add a measurement tool to the Thermal
   Inspector and Analyzer UI called "Delta T", it will allow the user to place 2 points on the map and the Delta T
   will be calculated between the 2 points that can be saved same as a box, line, etc..."
@@ -51,6 +26,51 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R11. Delta T From Surroundings, over a radius the user picks** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "Under
+  Pointer Info, add a slider to configure "Delta T From Surroundings", this enables a feature where a user
+  configurable circumference from the hovered/selected pixel has its Delta T calculated against the pixels within
+  the surrounding circumference area. The circumference area should be visible to the user as a thin circle outline
+  around the tip of the pointer indicating the pixels within the circle are included in the circumference. The data
+  is then displayed underneath the Pointer Info are of the detail pane."
+  Builds on R6's "ΔT from surroundings" row (the pixel less the median of a square about 2 m wide:
+  `intensify.SIZE_M`, `window_difference`, `raster_difference`; `mosaics.point`, `inspector.point`; `frame.js`
+  `surroundingsAt` with `frames.info`'s `pixel_m`), R10's Pointer Info sections (`viewer.html`, `frame.html`, the
+  Inspector's `panelHtml`) and the display preferences (`conversions.py` `parse_display`, `analyzer_core.js`
+  `saveDisplay`).
+  - **Proposed**: a "Delta T From Surroundings" slider under Pointer Info, in metres, setting a radius; the row
+    becomes the pixel less the median of the pixels within that circle (a disc, not R6's square); the radius kept
+    as a display preference `surroundings_m` (range-checked, as `legend`); a thin circle following the pointer's tip
+    (`L.circle` in metres on the viewer and the Inspector, in frame pixels through `pixel_m` on the frame page),
+    shown only where the row is; the server's point requests take the radius. Tests: Jest (the slider, the circle,
+    the preference), Django (the disc's difference, the radius parameter, the preference's check). Docs: README,
+    quickstart-worksets, quickstart-inspector, measurement, api, developing.md; screenshots showing Pointer Info
+    retaken.
+  - **Decided** (the user, 2026-11-11): it **replaces** R6's fixed 2 m square (one "ΔT from surroundings" row, over
+    the circle; the slider starts at 1 m radius, about today's 2 m window); on **all three** pages (the mosaic
+    viewer, the frame page, the Thermal Inspector).
+  - **Settled while building**: the slider goes from 0.25 to 10 m in steps of 0.25 (shown in feet with °F); on
+    Harmonized and Intensify the row is worked out from the harmonized mosaic, so it follows the slider, while
+    Intensify's picture stays drawn over 2 m.
+  - **Built** (2026-11-11, `r11-surroundings-radius`): `intensify.py` (`RADIUS_M`, `parse_radius`, `disc`,
+    `disc_difference`, and `raster_difference` over the disc, replacing `window_difference` and `half_window`);
+    `inspector_api.point_query` (lon, lat and `radius`, 400 outside its range) for the Inspector's and the
+    viewer's point requests; `inspector.point` and `mosaics.point` take `radius_m`; `frames.info` no longer sends
+    `size_m`; `conversions.py` (`surroundings_m` in `display` and `parse_display`, `radius_error`). `regions.js`
+    (`RADIUS`, `radiusOf`, `formatRadius`, `surroundingsHtml`, `SurroundingsCircle`, now loaded on the viewer
+    too), `viewer.js` (`bindSurroundings`, shared with the frame page; the circle follows the pointer, or stays on
+    the point a click kept, which is read again as the slider moves; none on View angle), `frame.js`
+    (`radiusPixels`, `surroundingsAt` over the disc, a circle on each pane), `inspector.js` (the slider under
+    Pointer Info, `correctedReadout`, the circle hidden where there is no difference and while a region is drawn,
+    the point last hovered read again when the slider is let go), the templates, `analyzer.css`, `inspector.css`.
+    Tests: Jest 317 (a test per page, regions' radius and circle on real Leaflet), Django 224 on 4.0.0 and 3.3.2
+    (`skipped=1`), Ruff, ESLint. Live on :8002, read only (the preference's PUT answered in the browser): the
+    viewer (+0.50 °C at 1 m, +0.89 °C at 3 m on a kept point; Intensify +1.40 °C from the harmonized mosaic; no
+    circle on View angle), the frame page, the Inspector on HomerunObliqueII (-1.39 °C at 1 m, read again at
+    5 m); the requests carry `&radius=`; no console errors but the dev livereload. Docs: README,
+    quickstart-worksets, quickstart-inspector, measurement, api, developing.md; 11 screenshots retaken
+    (mosaic-viewer, mosaic-intensify, mosaic-frames, frame-page, frame-measure-again, the six Inspector ones, on
+    the Roof Sample task: `DT_DOCS_MAP` is `/map/project/1/task/27fcf631-…/`). On Intensify's blue-white-red the
+    white circle is faint over the white areas.
 - **R10. Pointer Info, and the temperature beside the pointer** (built 2026-11-10; the user, 2026-11-10, in `new.md`): "Would it be
   possible to add a feature as a checkbox directly under the "Under the cursor" section, named "Temperature On
   Pointer" that's disabled by default, though when enabled displays the current hovered pixel's temperature in a

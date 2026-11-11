@@ -54,10 +54,10 @@ def _measured(values, unit):
     return np.isfinite(values) & (values > ABSOLUTE_ZERO.get(unit, ABSOLUTE_ZERO['C']) + 1)
 
 
-def point(task, lon, lat):
+def point(task, lon, lat, radius_m=intensify.RADIUS_M):
     """The temperature at a point (lon/lat): {coordinates, valid, temperature, difference, reason}, reason 'excluded'
     (outside the crop), 'outside_raster' or 'nodata' when there is none; difference: the temperature less its
-    surroundings' (intensify.raster_difference, the crop's pixels only)"""
+    surroundings' within radius_m (intensify.raster_difference, the crop's pixels only)"""
     import rasterio
     from rasterio.warp import transform
 
@@ -87,7 +87,8 @@ def point(task, lon, lat):
             crs = src.crs
             metre = crs.linear_units_factor[1] if crs.is_projected else DEGREE_M
             out['difference'] = intensify.raster_difference(src, row, col, value, abs(src.res[0]) * metre,
-                                                            lambda w, data: _usable(src, w, data.shape, crop))
+                                                            lambda w, data: _usable(src, w, data.shape, crop),
+                                                            radius_m=radius_m)
     if not valid:
         out['reason'] = 'nodata'
         return out
