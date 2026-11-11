@@ -14,6 +14,31 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R20. The overlays' own divider: horizontal, and either side** (built 2026-11-11; the user, 2026-11-11): "Is it possible to change
+  the side by side comparison divider from vertical to horizontal when the control is right clicked? Is it also
+  possible to add a control that allows the user to pick which side of the divider the compared ortho appears
+  upon?" Builds on R14/R15's Swipe under Mosaic Overlays and Ortho Overlays (today WebODM's split control,
+  `PluginsAPI.Map.sideBySideChanged`: always vertical, the swiped layer always on the right; no hook changes either),
+  and R17/R19's readings and measurements that follow the divider (`shownAt`, `shownClip`, `updateCrossLines`).
+  - **Decided** (the user, 2026-11-11): **the plugin's own divider** for its overlays (WebODM's own Swipe in its
+    layer panel keeps WebODM's); right-clicking its handle turns it horizontal or vertical, **and a small button**
+    does too; **beside each overlay's Swipe button**, a control choosing its side (right or left; below or above).
+  - Proposed: one divider for every swiped overlay (a line and a round handle, dragged), each overlay clipped to its
+    side; the divider's orientation and place shared; WebODM's own Swipe and the plugin's never both at once (each
+    turns the other off, through `sideBySideChanged` and `onSideBySideChanged`); `shownClip` extended to a divider
+    across (top and bottom). Tests: Jest (clips each side and orientation, right-click, the buttons, WebODM's Swipe
+    turning it off, measurements ending at a horizontal divider). Docs: README, quickstart-inspector (its screenshot
+    retaken).
+  - **Decided while building** (the user, 2026-11-11): "because this slider control may be reused by our other webodm
+    plugins, ensure its shareable and extensible in design": the divider is its own module.
+  - **Built**: `public/split.js` and `split.css` (`SplitDivider.create(L, map, opts)`: `add(layer, side)`, `remove`,
+    `setSide`, `turn`, `setPosition`, `on("change")`, `destroy`; options for its class, title, handle and right-click;
+    the clip exported; no class or name of this plugin), loaded by `main.js`; `inspector.js` uses it for the overlays'
+    Swipe (`swipe`, `swapSide`, `turnSplit`, the side and turn buttons in `layerControlsHtml`), turns WebODM's own
+    Swipe off (`leaveWebodmSwipe`) and its own off when WebODM's comes on (`onWebodmSwipe`); `shownClip` knows a
+    divider across. Tests: `__tests__/split.test.js`, and `inspector.test.js` "swipes an overlay with its own
+    divider…"; checked live on the HomerunObliqueII task. Docs: README, quickstart-inspector (`inspector-mosaics.png`
+    retaken), developing.
 - **R19. ΔT across two orthophotos** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "Would it be possible for the "Delta T"
   measurement tool to function across 2 orthophotos? Idea being if I select a point on the left orthophoto and a
   point on the right orthophoto, it calculates the delta between them. The line between the dots would only appear

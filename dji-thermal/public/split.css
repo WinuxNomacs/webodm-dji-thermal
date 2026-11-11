@@ -1,0 +1,13 @@
+/* split.js: a divider on a Leaflet map (a white line across it and a round handle on it, dragged, right-clicked to
+   turn), above the map's panes and below its controls. Shared: no class here belongs to one plugin */
+.split-divider { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 500; pointer-events: none; overflow: hidden; }
+.split-divider-line { position: absolute; background: #fff; box-shadow: 0 0 3px rgba(0, 0, 0, 0.5); }
+.split-divider-vertical .split-divider-line { top: 0; bottom: 0; width: 4px; margin-left: -2px; }
+.split-divider-across .split-divider-line { left: 0; right: 0; height: 4px; margin-top: -2px; }
+.split-divider-handle {
+    position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.5); pointer-events: auto; display: flex; align-items: center;
+    justify-content: center; color: #555; font-size: 18px; touch-action: none; user-select: none;
+}
+.split-divider-vertical .split-divider-handle { top: 50%; cursor: ew-resize; }
+.split-divider-across .split-divider-handle { left: 50%; cursor: ns-resize; }

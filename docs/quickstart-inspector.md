@@ -117,8 +117,12 @@ Once it's laid, it's listed below the button, list open or closed, with its cont
 - Choose **Mosaic**, **Harmonized** or **Source frame**. It's drawn in your palette, over its own 2nd to 98th
   percentile.
 - The slider sets its opacity.
-- **Swipe** puts it on the right of WebODM's divider, with WebODM's layers on the left: drag the divider to compare
-  it with a task's orthophoto or surface model. Choose that layer in WebODM's layer panel.
+- **Swipe** puts it on one side of a divider, with WebODM's layers on the other: drag the divider's round handle to
+  compare it with a task's orthophoto or surface model. Choose that layer in WebODM's layer panel.
+- While it's swiped, the button beside **Swipe** says which side it's on (**Right** or **Left**): click it to move it
+  to the other side. The small button next to it turns the divider horizontal (the sides become **Below** and
+  **Above**) or vertical again; so does a right-click on the divider's handle.
+- WebODM's own Swipe, in its layer panel, has a divider of its own: turning one on turns the other off.
 - The magnifier zooms to it.
 
 Hover, pins, regions, the isotherm and the legend read the topmost thermal layer, the mosaic or a task's thermal
@@ -138,8 +142,8 @@ above WebODM's layers and listed below the button with its opacity, **Swipe** an
 - A **thermal** orthophoto is read as its own task's: hover, pins, regions, ΔT, the isotherm, the colour scale and the
   Image section read and draw it, in your palette. A measurement made on it is saved on that task.
 - An **RGB** orthophoto is a picture, drawn as WebODM draws it, for context.
-- To compare two flights, lay one and **Swipe** it: the readings follow WebODM's divider, so the cursor reads the
-  overlay on its right and your task's orthophoto on its left.
+- To compare two flights, lay one and **Swipe** it: the readings follow the divider, so the cursor reads the
+  overlay on its side and your task's orthophoto on the other, horizontal divider or vertical.
 - A **ΔT across the divider** compares the two flights: click its first spot on one side and its second on the other,
   and each spot is read from the layer showing where you clicked it. The list names both layers ("first → second").
   Each dot shows only where its own layer does, and the line between them only while both dots show, so dragging the

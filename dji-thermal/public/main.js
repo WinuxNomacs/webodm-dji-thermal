@@ -13,7 +13,7 @@ PluginsAPI.Dashboard.addNewTaskButton(
 // The Thermal Inspector's scripts, loaded on a map page only (WebODM loads include_js_files on every page), in order
 // (inspector.js uses the others), at main.js's own version (plugin.py include_js_files). Resolves once they ran.
 window.DjiThermalMapScripts = (function(){
-    var NAMES = ["scale.js", "recolour.js", "regions.js", "frames.js", "inspector.js"];
+    var NAMES = ["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "inspector.js"];
     var me = document.currentScript && document.currentScript.src || "";
     var base = me ? me.replace(/main\.js(\?.*)?$/, "") : "/plugins/dji-thermal/";
     var query = (/\?v=[^&]*/.exec(me) || [""])[0];
@@ -38,7 +38,7 @@ window.DjiThermalMapScripts = (function(){
 
 // The Thermal Inspector on WebODM's 2D map (inspector.js, with frames.js's source frames window), with WebODM's Leaflet:
 // its button shows when the map has a thermal orthophoto or the project has workset mosaics
-PluginsAPI.Map.willAddControls(["leaflet", "dji-thermal/inspector.css", "dji-thermal/frames.css"], function(args, L){
+PluginsAPI.Map.willAddControls(["leaflet", "dji-thermal/inspector.css", "dji-thermal/split.css", "dji-thermal/frames.css"], function(args, L){
     window.DjiThermalMapScripts().then(function(){
         if (window.ThermalInspector) window.ThermalInspector.create(args, L);
     }, function(e){

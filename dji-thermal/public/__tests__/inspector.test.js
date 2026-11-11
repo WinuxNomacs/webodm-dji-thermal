@@ -1266,7 +1266,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(s.button().style.display).toBe("none");
     });
 
-    it("lays a workset's mosaic on the map in the user's palette, reads it in °C and swipes it with WebODM's split control", async () => {
+    it("lays a workset's mosaic on the map in the user's palette, reads it in °C and swipes it with the Inspector's divider", async () => {
         const map = leafletMap(THERMAL_TASK);
         const point = jest.fn(() => jsonResponse({valid: true, temperature: 104, unit: "F", frame: "DJI_0001_T.JPG"}));
         const region = jest.fn(() => jsonResponse({valid: true, reason: null, pixel_size: 0.1, resampled: false, statistics: {
@@ -1306,8 +1306,10 @@ describe("the Thermal Inspector's workset mosaics", () => {
         change(panel().querySelector('[data-act="mosaic-opacity"]'), "40");
         expect(layer.options.opacity).toBe(0.4);
         panel().querySelector('[data-act="mosaic-swipe"]').click();
-        expect(plugins.Map.sideBySideChanged).toHaveBeenLastCalledWith(layer, true);
-        // Its isotherm is clipped as WebODM's divider clips it
+        expect(plugins.Map.sideBySideChanged).not.toHaveBeenCalled();
+        expect(map.el.querySelector(".split-divider")).not.toBe(null);
+        expect(layer.getContainer().style.clip).not.toBe("");
+        // Its isotherm is clipped as the divider clips it
         change(panel().querySelector('[data-act="isotherm-mode"]'), "above");
         const overlay = ins.overlays().find(o => o.layer === layer).overlay;
         expect(valuesOf(overlay)).toContain(BASE + "harmonized/values/");
@@ -1315,9 +1317,9 @@ describe("the Thermal Inspector's workset mosaics", () => {
         layer.getContainer().style.clip = "rect(0px, 500px, 400px, 200px)";
         await flush();
         expect(overlay.getContainer().style.clip).toBe("rect(0px, 500px, 400px, 200px)");
-        // Lifted while swiped: off WebODM's split control first
+        // Lifted while swiped: the divider goes with it
         change(panel().querySelector('[data-act="mosaic-on"]'), false);
-        expect(plugins.Map.sideBySideChanged).toHaveBeenLastCalledWith(layer, false);
+        expect(map.el.querySelector(".split-divider")).toBe(null);
         expect(map.hasLayer(layer)).toBe(false);
         expect(laid().length).toBe(0);
         map.remove();
@@ -1353,7 +1355,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
     it("lays another task's thermal orthophoto from Ortho Overlays and reads it as that task's, an RGB one only drawn", async () => {
         const map = leafletMap(THERMAL_TASK);
         const point = jest.fn(() => jsonResponse({valid: true, temperature: 33.25}));
-        const {ins, plugins, panel} = begin(map, [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}],
+        const {ins, panel} = begin(map, [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}],
                                             Object.assign({"GET /api/plugins/dji-thermal/projects/2/tasks/therm-3/inspector/point": point}, ORTHO_ROUTES));
         await ins.orthosReady;
         ins.open();
@@ -1384,7 +1386,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
         change(panel().querySelector('[data-ortho="therm-3"] [data-act="ortho-opacity"]'), "60");
         expect(layer.options.opacity).toBe(0.6);
         panel().querySelector('[data-act="ortho-swipe"]').click();
-        expect(plugins.Map.sideBySideChanged).toHaveBeenLastCalledWith(layer, true);
+        expect(map.el.querySelector(".split-divider")).not.toBe(null);
 
         // The RGB one is drawn, never read
         change(panel().querySelector('.dt-inspector-checklist [data-ortho="rgb-4"] [data-act="ortho-on"]'), true);
@@ -1394,9 +1396,9 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(inspector.thermalLayers(map).map(t => t.task)).toEqual(["abc-1", "therm-3"]);
         expect(panel().querySelector('[data-overlays="ortho"]').textContent).toContain("2 of 2 shown");
 
-        // Lifted while swiped: off WebODM's split control first
+        // Lifted while swiped: the divider goes with it
         change(panel().querySelector('.dt-inspector-checklist [data-ortho="therm-3"] [data-act="ortho-on"]'), false);
-        expect(plugins.Map.sideBySideChanged).toHaveBeenLastCalledWith(layer, false);
+        expect(map.el.querySelector(".split-divider")).toBe(null);
         expect(map.hasLayer(layer)).toBe(false);
         expect(inspector.thermalLayers(map).map(t => t.task)).toEqual(["abc-1"]);
         map.remove();
@@ -1455,7 +1457,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
 
     it("draws a layer's measurements only where it shows: its own clip, less a layer swiped over one side of it", () => {
         const el = clip => ({style: {clip}});
-        const B = 10000000, view = {left: -20, right: 980};
+        const B = 10000000, view = {left: -20, right: 980, top: -20, bottom: 860};
         // Nothing clipped: drawn everywhere
         expect(inspector.shownClip([{container: el(""), z: 14, own: true}, {container: el(""), z: 15}], view)).toBe("");
         // The layer on the left of WebODM's divider: up to the divider, where the swiped one above starts
@@ -1468,6 +1470,11 @@ describe("the Thermal Inspector's workset mosaics", () => {
         // A layer above clipped on both sides (not WebODM's divider) cuts nothing
         expect(inspector.shownClip([{container: el(""), z: 14, own: true}, {container: el("rect(0px, 600px, 50px, 400px)"), z: 15}], view)).toBe("");
         expect(inspector.shownClip([], view)).toBe("");
+        // A divider across: the layer above it up to the divider, where the one swiped below starts; and the other way
+        expect(inspector.shownClip([{container: el(""), z: 14, own: true}, {container: el("rect(400px, 980px, 860px, -20px)"), z: 1001}], view))
+            .toBe(`rect(${-B}px, ${B}px, 400px, ${-B}px)`);
+        expect(inspector.shownClip([{container: el(""), z: 14, own: true}, {container: el("rect(-20px, 980px, 400px, -20px)"), z: 1001}], view))
+            .toBe(`rect(400px, ${B}px, ${B}px, ${-B}px)`);
         // Read back as a browser writes it: Chrome puts the large numbers in exponent notation
         expect(inspector.clipOf(el("rect(-1e+07px, 503.5px, 1e+07px, -1e+07px)"))).toEqual({top: -B, right: 503.5, bottom: B, left: -B});
         expect(inspector.clipOf(el("rect(-8px 1003px 672px 216.4px)"))).toEqual({top: -8, right: 1003, bottom: 672, left: 216.4});
@@ -1577,6 +1584,84 @@ describe("the Thermal Inspector's workset mosaics", () => {
         await new Promise(r => setTimeout(r, 40));
         expect(Object.values(map.getPanes()).some(pane => pane.style.clip.includes("1e+07px"))).toBe(true);
         expect(across().options.opacity).toBe(0);
+        map.remove();
+    });
+
+    it("swipes an overlay with its own divider: either side, upright or across, turned by a right-click or a button", async () => {
+        const map = leafletMap(THERMAL_TASK);
+        // WebODM's plugin API: its split control's event, heard by everyone listening (its own layer panel too)
+        const heard = [];
+        const api = {Map: {onHandleClick: jest.fn(), onSideBySideChanged: f => heard.push(f),
+                           sideBySideChanged: jest.fn((l, side) => heard.forEach(f => f(l, side)))}};
+        const {ins, panel} = begin(map, [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}], ORTHO_ROUTES, {pluginsApi: api});
+        await ins.orthosReady;
+        ins.open();
+        openOverlays(panel(), "ortho");
+        change(panel().querySelector('[data-ortho="therm-3"] [data-act="ortho-on"]'), true);
+        await flush(); await flush();
+        const overlay = orthoLayers(map)[0], row = () => panel().querySelector('.dt-inspector-overlay-controls').closest("[data-ortho]");
+        map.getSize = () => L.point(1000, 800);
+        map.getContainer().getBoundingClientRect = () => ({left: 0, top: 0, width: 1000, height: 800});
+        map.setView([0.5, 0.5], 18, {animate: false});
+        const nw = map.containerPointToLayerPoint([0, 0]);
+        const rect = (t, r, b, l) => `rect(${nw.y + t}px, ${nw.x + r}px, ${nw.y + b}px, ${nw.x + l}px)`;
+        const clip = () => overlay.getContainer().style.clip, split = () => map.el.querySelector(".split-divider");
+        expect(row().querySelector('[data-act="ortho-side"]')).toBe(null);      // only while swiped
+        row().querySelector('[data-act="ortho-swipe"]').click();
+        // On the right of an upright divider in the middle, WebODM's layers on the left
+        expect(split().className).toContain("split-divider-vertical");
+        expect(clip()).toBe(rect(0, 1000, 800, 500));
+        expect(row().querySelector('[data-act="ortho-side"]').textContent.trim()).toBe("Right");
+        expect(inspector.thermalLayerAt(map, map.containerPointToLatLng([550, 400])).task).toBe("therm-3");
+        expect(inspector.thermalLayerAt(map, map.containerPointToLatLng([450, 400])).task).toBe("abc-1");
+        // Its side: the left
+        row().querySelector('[data-act="ortho-side"]').click();
+        expect(clip()).toBe(rect(0, 500, 800, 0));
+        expect(row().querySelector('[data-act="ortho-side"]').textContent.trim()).toBe("Left");
+        expect(inspector.thermalLayerAt(map, map.containerPointToLatLng([450, 400])).task).toBe("therm-3");
+        // The small button turns the divider across: the overlay above it
+        row().querySelector('[data-act="ortho-orient"]').click();
+        expect(split().className).toContain("split-divider-across");
+        expect(clip()).toBe(rect(0, 1000, 400, 0));
+        expect(row().querySelector('[data-act="ortho-side"]').textContent.trim()).toBe("Above");
+        expect(inspector.thermalLayerAt(map, map.containerPointToLatLng([500, 350])).task).toBe("therm-3");
+        expect(inspector.thermalLayerAt(map, map.containerPointToLatLng([500, 450])).task).toBe("abc-1");
+        // A right-click on its handle turns it upright again
+        const handle = split().querySelector(".split-divider-handle");
+        const menu = new MouseEvent("contextmenu", {bubbles: true, cancelable: true});
+        handle.dispatchEvent(menu);
+        expect(menu.defaultPrevented).toBe(true);
+        expect(split().className).toContain("split-divider-vertical");
+        expect(clip()).toBe(rect(0, 500, 800, 0));
+        // Dragged by its handle, the map not panned meanwhile; it keeps its place as the map moves
+        handle.dispatchEvent(new MouseEvent("mousedown", {bubbles: true, cancelable: true, button: 0, clientX: 500, clientY: 400}));
+        expect(map.dragging.enabled()).toBe(false);
+        document.dispatchEvent(new MouseEvent("mousemove", {bubbles: true, cancelable: true, clientX: 300, clientY: 400}));
+        document.dispatchEvent(new MouseEvent("mouseup", {bubbles: true}));
+        expect(map.dragging.enabled()).toBe(true);
+        expect(clip()).toBe(rect(0, 300, 800, 0));
+        expect(handle.style.left).toBe("300px");
+        map.panBy([40, 0], {animate: false});
+        const moved = map.containerPointToLayerPoint([0, 0]);
+        expect(clip()).toBe(`rect(${moved.y}px, ${moved.x + 300}px, ${moved.y + 800}px, ${moved.x}px)`);
+        // WebODM's own Swipe turned on (its layer panel's): the Inspector's divider goes
+        const webodm = {};
+        api.Map.sideBySideChanged(webodm, true);
+        expect(split()).toBe(null);
+        expect(clip()).toBe("");
+        expect(row().querySelector('[data-act="ortho-swipe"]').className).toContain("btn-default");
+        // and the Inspector's Swipe turns WebODM's off, as its layer panel does when another layer is swiped
+        api.Map.sideBySideChanged.mockClear();
+        row().querySelector('[data-act="ortho-swipe"]').click();
+        expect(api.Map.sideBySideChanged.mock.calls).toEqual([[overlay, true], [overlay, false]]);
+        expect(split()).not.toBe(null);
+        await flush();
+        expect(clip()).toBe(`rect(${moved.y}px, ${moved.x + 300}px, ${moved.y + 800}px, ${moved.x}px)`);      // its side and place kept
+        // Not again while WebODM's is off
+        api.Map.sideBySideChanged.mockClear();
+        row().querySelector('[data-act="ortho-swipe"]').click();
+        row().querySelector('[data-act="ortho-swipe"]').click();
+        expect(api.Map.sideBySideChanged).not.toHaveBeenCalled();
         map.remove();
     });
 
