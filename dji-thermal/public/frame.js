@@ -205,46 +205,15 @@
         return isNaN(v) ? null : v;
     }
 
-    // The circle of Delta T From Surroundings in a frame's pixels: radius (m) at pixel_m metres a pixel (the frame's
-    // info), its neighbours at least (as intensify.disc); null when its ground resolution isn't known
-    function radiusPixels(info, radius) {
-        return info && info.pixel_m > 0 ? Math.max(1, (radius || Regions.RADIUS.value) / info.pixel_m) : null;
-    }
-
-    // A frame's value at a pixel less the median of the values within radius (m) of it (as the mosaic viewer's), null
-    // where it has none or its ground resolution isn't known
-    function surroundingsAt(tile, x, y, info, radius) {
-        var v = valueAt(tile, x, y), px = radiusPixels(info, radius);
-        if (v === null || px === null) return null;
-        var half = Math.floor(px), col = Math.floor(x), row = Math.floor(y), around = [];
-        for (var r = Math.max(0, row - half); r <= Math.min(tile.height - 1, row + half); r++) {
-            for (var c = Math.max(0, col - half); c <= Math.min(tile.width - 1, col + half); c++) {
-                var a = tile.values[r * tile.width + c];
-                if (!isNaN(a) && (r - row) * (r - row) + (c - col) * (c - col) <= px * px) around.push(a);
-            }
-        }
-        around.sort(function (p, q) { return p - q; });
-        var n = around.length, median = n % 2 ? around[(n - 1) / 2] : (around[n / 2 - 1] + around[n / 2]) / 2;
-        return v - median;
-    }
-
-    // The values under the cursor (point: {x, y, inside}): as converted, and with the parameters changed beside it;
-    // each one's difference from its surroundings within radius (m; infos: the frames' figures, their ground resolution)
-    function readoutHtml(point, tiles, unit, infos, radius) {
+    // The values under the cursor (point: {x, y, inside}): as converted, and with the parameters changed beside it
+    function readoutHtml(point, tiles, unit) {
         if (!point) return '<span class="ta-message">' + READOUT_HINT + "</span>";
         if (!point.inside) return '<span class="ta-message">Outside the frame.</span>';
-        infos = infos || [];
-        var delta = function (i, label) {
-            var d = surroundingsAt(tiles[i], point.x, point.y, infos[i] || infos[0], radius);
-            if (d !== null) rows.push([label, core.formatDelta(d, unit, 2, true)]);
-        };
         var t = valueAt(tiles[0], point.x, point.y), rows = [["x, y", Math.floor(point.x) + ", " + Math.floor(point.y)],
             [tiles[1] ? "As converted" : "Temperature", t === null ? "no data" : core.formatTemp(t, unit)]];
-        delta(0, Viewer.DELTA_LABEL);
         if (tiles[1]) {
             var c = valueAt(tiles[1], point.x, point.y);
             rows.push(["Parameters changed", c === null ? "no data" : core.formatTemp(c, unit)]);
-            delta(1, Viewer.DELTA_LABEL + ", changed");
             if (c !== null && t !== null) rows.push(["Difference", core.formatDelta(c - t, unit, 2, true)]);
         }
         return '<table class="table table-condensed ta-viewer-values"><tbody>' + rows.map(function (r) {
@@ -414,11 +383,6 @@
         });
         function plain() { [0, 1].forEach(function (i) { core.plainPointer($("ta-frame-map-" + i), pointerOn); }); }
         plain();
-        // Delta T From Surroundings: the circle's radius (m), and each pane's circle around the pointer
-        var circles = [null, null], radius = Viewer.bindSurroundings(doc, fetchFn, page.getAttribute("data-api"), csrf, function (r) {
-            radius = r;
-            showReadout();
-        });
         // The tools: the one on, the shapes drawn on each frame (kept while the page is open), the one shown in full,
         // the measurements saved on the frame and the form naming one
         var tool = null, drawTool = null, drawn = {}, counts = {}, shownItem = null, saved = [], savedShown = null, form = null;
@@ -479,17 +443,15 @@
             var map = maps[i] = L.map($("ta-frame-map-" + i), {crs: L.CRS.Simple, minZoom: -4, maxZoom: 6, zoomSnap: 0.25,
                                                               attributionControl: false, keyboard: false});
             labels[i] = core.pointerLabel(doc, $("ta-frame-map-" + i));
-            circles[i] = new Regions.SurroundingsCircle(L, map);
             map.on("mousemove", function (e) {
                 var x = e.latlng.lng, y = -e.latlng.lat, t = tiles[0];
                 point = {x: x, y: y, inside: !!t && x >= 0 && y >= 0 && x < t.width && y < t.height};
                 showReadout();
-                circlesAt(point.inside ? e.latlng : null);
                 // The pane's own temperature there: as converted, or with the parameters changed
                 var value = pointerOn ? valueAt(tiles[i], x, y) : null;
                 labels[i].show(value === null ? "" : core.formatTemp(value, unit()), e.containerPoint);
             });
-            map.on("mouseout", function () { point = null; showReadout(); labels[i].hide(); circlesAt(null); });
+            map.on("mouseout", function () { point = null; showReadout(); labels[i].hide(); });
             if (i === 0) {
                 map.on("click", function (e) {
                     if (tool === "pin") add("pin", {type: "Point", coordinates: [e.latlng.lng, -e.latlng.lat]}, null);
@@ -527,16 +489,7 @@
             }
         }
 
-        function showReadout() { $("ta-frame-readout").innerHTML = readoutHtml(point, tiles, unit(), infos, radius); }
-        // The circle on both panes (they move together), where the frame's ground resolution is known
-        function circlesAt(latlng) {
-            var px = radiusPixels(infos[0], radius);
-            circles.forEach(function (c, i) {
-                if (!c) return;
-                if (latlng && px !== null && tiles[i]) c.show(latlng, px);
-                else c.hide();
-            });
-        }
+        function showReadout() { $("ta-frame-readout").innerHTML = readoutHtml(point, tiles, unit()); }
 
         function items() { return drawn[frame] || (drawn[frame] = []); }
         function limits() { return style ? isothermLimits(style.isotherm && style.isotherm.value, unit()) : null; }
@@ -967,7 +920,7 @@
 
     var api = {CHANGES: CHANGES, listFrames: listFrames, frameTag: frameTag, changesQuery: changesQuery, frameApiUrl: frameApiUrl,
                listHtml: listHtml, thumbsUrl: thumbsUrl, changeStarts: changeStarts, readChanges: readChanges, changesTyped: changesTyped,
-               newWorksetUrl: newWorksetUrl, paramsHtml: paramsHtml, infoHtml: infoHtml, valueAt: valueAt, radiusPixels: radiusPixels, surroundingsAt: surroundingsAt, readoutHtml: readoutHtml,
+               newWorksetUrl: newWorksetUrl, paramsHtml: paramsHtml, infoHtml: infoHtml, valueAt: valueAt, readoutHtml: readoutHtml,
                downloadHtml: downloadHtml, canvasOverlay: canvasOverlay, timeText: timeText, toPixels: toPixels, circlePixels: circlePixels,
                isothermLimits: isothermLimits, changesText: changesText, measureHtml: measureHtml, savedHtml: savedHtml, init: init};
     root.ThermalAnalyzerFrame = api;

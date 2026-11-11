@@ -991,13 +991,23 @@ def png_response(content):
     return response
 
 
+def point_query(request):
+    """The lon and lat of a viewer request's query"""
+    try:
+        lon, lat = float(request.query_params.get('lon')), float(request.query_params.get('lat'))
+    except (TypeError, ValueError):
+        raise ValidationError({'error': "lon and lat are required"}) from None
+    if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+        raise ValidationError({'error': "Coordinates out of range"})
+    return lon, lat
+
+
 class MosaicPoint(DatasetView):
     def get(self, request, pk, cid, tab):
         """A viewer tab's values at a point (lon, lat): temperature, source frame and view angle"""
         task = get_conversion(request, pk, cid)
         tab_raster(task, cid, tab)
-        lon, lat, radius = inspector_api.point_query(request)
-        return Response(mosaics.point(task, cid, tab, lon, lat, radius_m=radius))
+        return Response(mosaics.point(task, cid, tab, *point_query(request)))
 
 
 def temperature_raster(task, cid, tab):
@@ -1049,7 +1059,7 @@ class MosaicFrames(DatasetView):
         false for mosaics built without the frames' models (built again, they have them)"""
         task = get_conversion(request, pk, cid)
         tab_raster(task, cid, tab)
-        frames = mosaics.frames_at(task, cid, tab, *inspector_api.point_query(request)[:2])
+        frames = mosaics.frames_at(task, cid, tab, *point_query(request))
         return Response({'frames': frames or [], 'models': frames is not None})
 
 

@@ -13,8 +13,7 @@ from rest_framework.response import Response
 from app.api.tasks import TaskNestedView
 from app.models import Project
 
-from . import colouring, conversion_tasks, conversions, converter, correction, datasets, inspector, intensify, measurements
-from . import mosaics
+from . import colouring, conversion_tasks, conversions, converter, correction, datasets, inspector, measurements, mosaics
 from . import webodm_versions
 
 # The mosaics' tabs laid on the map: those of temperatures (View angle stays in the Analyzer's viewer)
@@ -32,28 +31,17 @@ class InspectorView(TaskNestedView):
         return task
 
 
-def point_query(request):
-    """A point request's lon and lat (the mosaic viewer's, the Thermal Inspector's), and its radius (m) for the
-    difference from the surroundings (intensify.RADIUS_M when not sent)"""
-    try:
-        lon, lat = float(request.query_params.get('lon')), float(request.query_params.get('lat'))
-    except (TypeError, ValueError):
-        raise ValidationError({'error': "lon and lat are required"}) from None
-    if not (-180 <= lon <= 180 and -90 <= lat <= 90):
-        raise ValidationError({'error': "Coordinates out of range"})
-    try:
-        radius = intensify.parse_radius(request.query_params.get('radius'))
-    except ValueError as e:
-        raise ValidationError({'error': "radius: {}".format(e)}) from None
-    return lon, lat, radius
-
-
 class InspectorPoint(InspectorView):
     def get(self, request, pk=None, project_pk=None):
-        """The temperature (°C) at ?lon=&lat=, its difference from the surroundings within &radius= (m)"""
+        """The temperature (°C) at ?lon=&lat="""
         task = self.thermal_task(request, pk)
-        lon, lat, radius = point_query(request)
-        return Response(inspector.point(task, lon, lat, radius_m=radius))
+        try:
+            lon, lat = float(request.query_params.get('lon')), float(request.query_params.get('lat'))
+        except (TypeError, ValueError):
+            raise ValidationError({'error': "lon and lat are required"}) from None
+        if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+            raise ValidationError({'error': "Coordinates out of range"})
+        return Response(inspector.point(task, lon, lat))
 
 
 def tile_params(request):

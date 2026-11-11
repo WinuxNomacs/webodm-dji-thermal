@@ -142,10 +142,8 @@
         if (t.mosaic) return mosaicBase(t.mosaic) + "/mosaics/" + t.mosaic.tab + "/" + what;
         return API + "projects/" + t.project + "/tasks/" + t.task + "/inspector/" + what;
     }
-    // radius: Delta T From Surroundings' (m)
-    function pointUrl(t, latlng, radius) {
-        return inspectorUrl(t, "point") + "?lon=" + Number(latlng.lng).toFixed(8) + "&lat=" + Number(latlng.lat).toFixed(8) +
-            (radius ? "&radius=" + radius : "");
+    function pointUrl(t, latlng) {
+        return inspectorUrl(t, "point") + "?lon=" + Number(latlng.lng).toFixed(8) + "&lat=" + Number(latlng.lat).toFixed(8);
     }
     // The colours of a palette for the legend: the task's, or for a mosaic the project's
     function paletteUrl(t, name) {
@@ -723,10 +721,7 @@
         if (!r) return '<span class="text-muted">Move the cursor over a thermal layer.' + (frames ? " Click it to see the frames that saw the point." : "") + "</span>";
         if (r.error) return '<span class="text-danger">' + escapeHtml(r.error) + "</span>";
         if (!r.valid) return '<span class="text-muted">' + escapeHtml(REASONS[r.reason] || "No temperature here") + "</span>";
-        // The temperature less its surroundings' (within Delta T From Surroundings' circle), as the mosaic viewer's says it
-        var d = typeof r.difference === "number" ? ' <span class="dt-inspector-delta">ΔT from surroundings ' +
-            escapeHtml(formatSigned(r.difference, unit)) + "</span>" : "";
-        return '<span class="dt-inspector-temp">' + escapeHtml(formatTemp(r.temperature, unit)) + "</span>" + d;
+        return '<span class="dt-inspector-temp">' + escapeHtml(formatTemp(r.temperature, unit)) + "</span>";
     }
 
     // state: the panel's (its pins, form, what can be saved and the corrected temperatures)
@@ -914,7 +909,7 @@
             (state.notice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.notice) + "</div>" : "") +
             '<div class="dt-inspector-pointer"><strong>Pointer Info</strong>' +
             '<label class="dt-inspector-check"><input type="checkbox" data-act="pointer-temperature"' + (state.pointerTemperature ? " checked" : "") +
-            "> Temperature On Pointer</label>" + Regions.surroundingsHtml(state.surroundings, unit, 'data-act="surroundings"') + "</div>" +
+            "> Temperature On Pointer</label></div>" +
             '<div class="dt-inspector-readout">' + readoutHtml(state.readout, unit, state.frames) + "</div>" +
             (options.length ? '<label class="dt-inspector-label">Palette <select class="form-control input-sm" data-act="palette">' +
                 options.map(function (o) {
@@ -961,12 +956,12 @@
         var state = {open: false, mode: "hover", readout: null, pins: loadPins(storage, key), pinsVisible: true,
                      regions: regions, regionsVisible: true, shown: regions.length ? regions[regions.length - 1].id : null,
                      notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
-                     legendVisible: false, pointerTemperature: true, surroundings: Regions.RADIUS.value, mosaics: null, laid: {}, frames: false, pick: null,
+                     legendVisible: false, pointerTemperature: true, mosaics: null, laid: {}, frames: false, pick: null,
                      correction: {on: false}, correctionNotice: "", sources: {}, onMap: [], savedVisible: true,
                      savedShown: null, form: null, savable: {}, scale: null, rangeError: ""};
         var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
         var search = deps.search !== undefined ? deps.search : root.location && root.location.search;
-        var container, panel, frameBox, panelMove, legendMove, frameMove, framesMoved = false, cursor, circle, hovered = null, pinLayer, regionLayer, savedLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
+        var container, panel, frameBox, panelMove, legendMove, frameMove, framesMoved = false, cursor, pinLayer, regionLayer, savedLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
         var profileMarker = null, profileAt = null;     // the point of the profile hovered, on the map
         var pickSeq = 0;                    // the frames asked for last
         var overlays = [], colors = {};     // the isotherm's layer over each thermal layer; each palette's colours
@@ -1603,23 +1598,14 @@
 
         // The temperature at a point of a thermal layer, in °C (a mosaic's in its unit; a frame's alone isn't one)
         function query(t, latlng) {
-            return fetchFn(pointUrl(t, latlng, state.surroundings), {credentials: "same-origin"}).then(readJson).then(function (r) {
+            return fetchFn(pointUrl(t, latlng), {credentials: "same-origin"}).then(readJson).then(function (r) {
                 if (!r.ok) return {error: (r.data && (r.data.error || r.data.detail)) || "Could not read the temperature"};
                 if (t.mosaic) {
                     var c = typeof r.data.temperature === "number" ? toCelsius(r.data.temperature, t.mosaic.unit) : null;
-                    // A difference in °C: scaled, never shifted
-                    var d = typeof r.data.difference === "number" ? (t.mosaic.unit === "F" ? r.data.difference / 1.8 : r.data.difference) : null;
-                    return assign({}, r.data, {temperature: c, difference: d, valid: c !== null, reason: c !== null ? null : r.data.reason || "nodata"});
+                    return assign({}, r.data, {temperature: c, valid: c !== null, reason: c !== null ? null : r.data.reason || "nodata"});
                 }
                 return r.data;
             }, function () { return {error: "Could not read the temperature"}; });
-        }
-
-        // A point's reading (query's) corrected as its layer is, the point and its surroundings alike
-        function correctedReadout(t, r) {
-            var fix = fixFor(t);
-            return fix && r && r.valid ? assign({}, r, {temperature: corrected(r.temperature, fix),
-                difference: typeof r.difference === "number" ? corrected(r.temperature, fix) - corrected(r.temperature - r.difference, fix) : r.difference}) : r;
         }
 
         function onMove(e) {
@@ -1627,20 +1613,16 @@
             var t = thermalLayerAt(map, e.latlng);
             if (timer) clearTimeout(timer);
             var mine = ++seq;
-            hovered = t ? {t: t, latlng: e.latlng} : null;
             if (!t) {
                 state.readout = null;
                 cursor.style.display = "none";
-                circle.hide();
                 return renderReadout();
             }
-            // Delta T From Surroundings' circle around the pointer, but while a region is drawn
-            if (!SHAPES[state.mode]) circle.show(e.latlng, state.surroundings);
             timer = setTimeout(function () {
                 query(t, e.latlng).then(function (r) {
                     if (mine !== seq || !state.open) return;
-                    if (!(r && typeof r.difference === "number")) circle.hide();
-                    state.readout = correctedReadout(t, r);
+                    var fix = fixFor(t);
+                    state.readout = fix && r && r.valid ? assign({}, r, {temperature: corrected(r.temperature, fix)}) : r;
                     renderReadout();
                     // The temperature the panel shows, corrected as it is
                     var text = state.pointerTemperature && r && r.valid ? formatTemp(state.readout.temperature) : "";
@@ -1659,30 +1641,6 @@
             seq++;
             if (timer) clearTimeout(timer);
             cursor.style.display = "none";
-            circle.hide();
-        }
-
-        // Delta T From Surroundings: the circle's radius as the slider moves, then saved as the user's preference (for
-        // the Analyzer's pages too; never from a public map) and the point last hovered read again over it
-        function slideSurroundings(target) {
-            state.surroundings = Number(target.value);
-            var shown = target.parentNode && target.parentNode.querySelector(".dt-surroundings-value");
-            if (shown) shown.textContent = Regions.formatRadius(state.surroundings, userUnit());
-        }
-        function chooseSurroundings(target) {
-            slideSurroundings(target);
-            var at = hovered, mine = ++seq;
-            if (at) {
-                query(at.t, at.latlng).then(function (r) {
-                    if (mine !== seq || !state.open) return;
-                    state.readout = correctedReadout(at.t, r);
-                    renderReadout();
-                });
-            }
-            if (publicMap) return;
-            fetchFn(API + "display", {method: "PUT", credentials: "same-origin",
-                headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken(doc)},
-                body: JSON.stringify({surroundings_m: state.surroundings})}).catch(function () {});
         }
 
         // A click while pinning pins the point and is not WebODM's (no popup), nor is one while drawing
@@ -2102,7 +2060,6 @@
             var what = e.target.getAttribute("data-act") || "";
             if (what === "palette") choosePalette(e.target.value);
             else if (what === "pointer-temperature") choosePointerTemperature(e.target.checked);
-            else if (what === "surroundings") chooseSurroundings(e.target);
             else if (what.indexOf("isotherm-") === 0) isothermInput(what.slice("isotherm-".length), e.target.value);
             else if (what.indexOf("range-") === 0 || what.indexOf("image-") === 0) onScaleInput(what, e.target);
             else if (what.indexOf("correction-") === 0) {
@@ -2127,8 +2084,6 @@
             setMode("hover");
             state.open = false;
             state.readout = null;
-            hovered = null;
-            circle.hide();
             container.classList.remove("open");
             plainPointer();
             onOut();
@@ -2172,7 +2127,6 @@
                     if (field && state.form) state.form[field] = e.target.value;
                     // While a slider moves, the tiles, the scale, the boxes and the legend follow
                     if (/^image-(brightness|contrast|gamma|sharpen)$/.test((e.target.getAttribute && e.target.getAttribute("data-act")) || "")) slide(e.target);
-                    else if (e.target.getAttribute && e.target.getAttribute("data-act") === "surroundings") slideSurroundings(e.target);
                 });
                 panel.addEventListener("keydown", function (e) {
                     if (e.key === "Enter" && e.target.getAttribute && e.target.getAttribute("data-form") === "name") submitForm();
@@ -2200,7 +2154,6 @@
         map.addControl(new LegendControl());
         cursor = L.DomUtil.create("div", "dt-inspector-cursor", map.getContainer());
         cursor.style.display = "none";
-        circle = new Regions.SurroundingsCircle(L, map);
         savedLayer = L.layerGroup().addTo(map);
         regionLayer = L.layerGroup().addTo(map);
         pinLayer = L.layerGroup().addTo(map);
@@ -2233,7 +2186,6 @@
                 state.legendVisible = !r.ok || r.data.legend !== false;
                 // On unless the user cleared it, here or on the Analyzer's pages
                 state.pointerTemperature = !r.ok || r.data.pointer_temperature !== false;
-                if (r.ok) state.surroundings = Regions.radiusOf(r.data.surroundings_m);
                 plainPointer();
                 if (!r.ok) return renderLegend();
                 state.display = r.data;

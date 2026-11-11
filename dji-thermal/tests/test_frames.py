@@ -139,11 +139,6 @@ class TestFramePage(AnalyzerTestCase):
         info = self.client.get(self.url(task, cid, "frame"), {"frame": rel}).data
         self.assertEqual((info["width"], info["height"]), (640, 512))
         self.assertAlmostEqual(info["params"]["emissivity"], 0.95, places=6)
-        # A pixel's ground width, for its difference from the surroundings within the user's radius: the distance over
-        # the focal length in pixels
-        self.assertNotIn("size_m", info)
-        self.assertGreater(info["pixel_m"], 0.005)
-        self.assertLess(info["pixel_m"], 1)
         tiff = next(f for f in conversions.results(task, cid)["files"] if f["path"] == rel)["outputs"][0]
         with rasterio.open(conversions.output_path(task, cid) + "/" + tiff) as src:
             converted = src.read(1).astype(np.float64)

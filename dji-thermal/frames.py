@@ -175,8 +175,7 @@ def measure(task, cid, rel, changes=None):
 def info(task, cid, rel, changes=None):
     """What the page shows of a frame (measure's, its values summed up): {frame, width, height, unit, params,
     recorded, distance_source, notes, offset, offset_known, changes, stats: {min, max, mean, percentiles, histogram
-    (the equalization's, colouring.value_histogram)} or None without values, pixel_m (pixel_size: the page measures a
-    point's difference from its surroundings over the user's radius with it)}"""
+    (the equalization's, colouring.value_histogram)} or None without values}"""
     import numpy as np
 
     from . import colouring
@@ -190,22 +189,7 @@ def info(task, cid, rel, changes=None):
                  'percentiles': [float(p) for p in np.percentile(found, mosaics.PERCENTILES)],
                  'histogram': {'counts': counts.tolist(), 'edges': edges.tolist()}}
     return dict(m, frame=rel, width=int(values.shape[1]), height=int(values.shape[0]), unit=unit_of(task, cid),
-                recorded=recorded(task, rel, cid), changes=changes or {}, stats=stats,
-                pixel_m=pixel_size(frame_path(task, rel, cid), values.shape, m['params'].get('distance')))
-
-
-def pixel_size(path, shape, distance):
-    """The ground width of a frame's pixel straight ahead (m): the distance it was measured at over its focal length
-    in pixels (dji-thermal-cli's read_pose, for the measured size: shape, rows by columns); None when either is
-    unknown"""
-    if not distance or distance <= 0:
-        return None
-    try:
-        with open(path, 'rb') as f:
-            pose, _why = converter.library().mosaic.read_pose(f.read(), (int(shape[1]), int(shape[0])))
-    except Exception:  # noqa: BLE001 - a frame without a pose has no ground resolution
-        return None
-    return float(distance) / pose.focal_px if pose is not None and pose.focal_px else None
+                recorded=recorded(task, rel, cid), changes=changes or {}, stats=stats)
 
 
 def values_png(task, cid, rel, changes=None):

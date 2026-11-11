@@ -28,12 +28,8 @@
    crosshair (set on the map itself) still wins */
 body:not(.leaflet-dragging) .leaflet-container.dt-pointer-plain.leaflet-grab { cursor: default; }
 .dt-inspector-pointer label { display: block; font-weight: normal; margin: 2px 0 4px; }
-.dt-inspector-pointer .dt-surroundings-field input { display: block; width: 100%; margin-top: 2px; }
-.dt-inspector-pointer .dt-surroundings-value { float: right; opacity: .7; }
-.dt-surroundings-circle { filter: drop-shadow(0 0 1px #000); }
 .dt-inspector-readout { min-height: 22px; margin-bottom: 6px; }
 .dt-inspector-temp { font-size: 16px; font-weight: bold; }
-.dt-inspector-delta { display: block; color: #555; }
 .dt-inspector-label { display: block; font-weight: normal; margin-bottom: 6px; }
 .dt-inspector-section { border-top: 1px solid #ddd; padding-top: 6px; }
 .dt-inspector-pins { margin: 4px 0; }

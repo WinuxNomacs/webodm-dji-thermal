@@ -22,7 +22,6 @@ from app.models import Project, Task
 from app.tests.classes import BootTestCase
 
 inspector = importlib.import_module("coreplugins.dji-thermal.inspector")
-intensify = importlib.import_module("coreplugins.dji-thermal.intensify")
 colouring = importlib.import_module("coreplugins.dji-thermal.colouring")
 converter = importlib.import_module("coreplugins.dji-thermal.converter")
 conversions = importlib.import_module("coreplugins.dji-thermal.conversions")
@@ -145,39 +144,6 @@ class TestInspector(BootTestCase):
         self.assertEqual(self.point(0, 0).data['reason'], 'outside_raster')
         self.assertEqual(self.client.get(self.url(self.task, "point"), {'lon': 'east'}).status_code,
                          status.HTTP_400_BAD_REQUEST)
-
-    def test_a_point_says_its_difference_from_the_median_of_the_pixels_with_data_within_the_radius_asked_for(self):
-        def point(col, radius=None):
-            query = {'lon': lonlat(col, 40)[0], 'lat': lonlat(col, 40)[1]}
-            return self.client.get(self.url(self.task, "point"), dict(query, radius=radius) if radius is not None else query)
-        # On a plane the median within a circle around a pixel is its own value, however wide
-        self.assertAlmostEqual(point(50).data['difference'], 0, places=4)
-        self.assertAlmostEqual(point(50, 5).data['difference'], 0, places=4)
-        # Beside the edge without data, the circle holds more pixels warmer than it: the wider, the more (pixels of
-        # 0.5 m; 1 m until a radius is asked for)
-        self.assertAlmostEqual(point(11).data['difference'], -0.125, places=4)
-        self.assertAlmostEqual(point(11, 1).data['difference'], -0.125, places=4)
-        self.assertAlmostEqual(point(11, 3).data['difference'], -1.75, places=4)
-        # Never fewer than the pixels beside it, however small
-        self.assertAlmostEqual(point(11, 0.25).data['difference'], 0, places=4)
-        self.assertNotIn('difference', point(5).data)
-        for radius in ('wide', 0.1, 11):
-            res = point(50, radius)
-            self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST, radius)
-            self.assertIn('radius', res.data['error'])
-
-    def test_a_disc_holds_the_pixels_within_its_radius_and_the_pixels_beside_its_centre_at_least(self):
-        inside, half = intensify.disc(0.5, 1)
-        self.assertEqual(half, 2)
-        self.assertEqual(inside.astype(int).tolist(), [[0, 0, 1, 0, 0], [0, 1, 1, 1, 0], [1, 1, 1, 1, 1],
-                                                        [0, 1, 1, 1, 0], [0, 0, 1, 0, 0]])
-        self.assertEqual(intensify.disc(5, 1)[0].astype(int).tolist(), [[0, 1, 0], [1, 1, 1], [0, 1, 0]])
-        self.assertEqual(intensify.disc(None)[1], 1)
-        self.assertEqual(intensify.parse_radius(None), intensify.RADIUS_M)
-        self.assertEqual(intensify.parse_radius("2.5"), 2.5)
-        for bad in (True, "nan", "inf", "wide", 0.2, 10.5):
-            with self.assertRaises(ValueError):
-                intensify.parse_radius(bad)
 
     def test_a_point_outside_the_tasks_crop_is_excluded(self):
         self.crop(40, 30, 60, 50)

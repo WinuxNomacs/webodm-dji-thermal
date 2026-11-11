@@ -579,7 +579,7 @@ class TestConversionSettings(AnalyzerTestCase):
         self.assertEqual(self.client_for("testuser2").get(url).data["palette"], None)
         self.assertContains(self.client.get("/plugins/dji-thermal/"),
                             '<script id="ta-display" type="application/json">{"unit": null, "default_unit": "C", "palette": "magma", "legend": true, '
-                            '"pointer_temperature": null, "surroundings_m": null}')
+                            '"pointer_temperature": null}')
         self.client.put(url, {"palette": None}, format="json")
         self.assertEqual(self.client.get(url).data["palette"], None)
 
@@ -621,23 +621,6 @@ class TestConversionSettings(AnalyzerTestCase):
         self.client.put(url, {"legend": True}, format="json")
         self.assertEqual((self.client.get(url).data["palette"], self.client.get(url).data["legend"]), ("magma", True))
 
-    def test_delta_t_from_surroundings_radius_is_unset_until_the_user_moves_its_slider_then_kept_for_every_page(self):
-        url = "/api/plugins/dji-thermal/display"
-        # Unset: the pages use 1 m
-        self.assertIsNone(self.client.get(url).data["surroundings_m"])
-        for bad in ("2", True, 0.1, 10.5, None):
-            res = self.client.put(url, {"surroundings_m": bad}, format="json")
-            self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST, bad)
-            self.assertIn("surroundings_m", res.data)
-        self.assertIsNone(self.client.get(url).data["surroundings_m"])
-        self.assertEqual(self.client.put(url, {"surroundings_m": 2.5}, format="json").data["surroundings_m"], 2.5)
-        self.assertEqual(self.client.put(url, {"surroundings_m": 3}, format="json").data["surroundings_m"], 3)
-        # Saving the other preferences keeps it, and the pages are given it
-        self.client.put(url, {"palette": "magma", "pointer_temperature": True}, format="json")
-        self.assertEqual(self.client.get(url).data["surroundings_m"], 3)
-        self.assertContains(self.client.get("/plugins/dji-thermal/"), '"surroundings_m": 3}')
-        self.assertIsNone(self.client_for("testuser2").get(url).data["surroundings_m"])
-
     def test_temperature_on_pointer_is_unset_until_the_user_ticks_or_clears_it_then_kept_for_every_page(self):
         url = "/api/plugins/dji-thermal/display"
         # Unset: each page has its own default (off on the Analyzer's pages, on in the Thermal Inspector)
@@ -648,7 +631,7 @@ class TestConversionSettings(AnalyzerTestCase):
         # Saving the other preferences keeps it, and the pages are given it
         self.client.put(url, {"palette": "magma", "legend": False}, format="json")
         self.assertTrue(self.client.get(url).data["pointer_temperature"])
-        self.assertContains(self.client.get("/plugins/dji-thermal/"), '"pointer_temperature": true, ')
+        self.assertContains(self.client.get("/plugins/dji-thermal/"), '"pointer_temperature": true}')
         self.assertFalse(self.client.put(url, {"pointer_temperature": False}, format="json").data["pointer_temperature"])
         self.assertFalse(self.client.get(url).data["pointer_temperature"])
         self.assertIsNone(self.client_for("testuser2").get(url).data["pointer_temperature"])
@@ -1189,17 +1172,6 @@ class TestMosaics(AnalyzerTestCase):
         self.assertTrue(p["valid"], p)
         self.assertEqual((p["temperature"], p["frame"]), (harmonized["temperature"], harmonized["frame"]))
         self.assertLess(abs(p["difference"]), 10)
-        # Pointer Info on Intensify says the harmonized mosaic's difference within the radius asked for, as Harmonized
-        # does; on Mosaic the as converted mosaic's own; none on View angle
-        self.assertEqual(harmonized["difference"], p["difference"])
-        wide = dict(centre, radius=5)
-        self.assertEqual(self.client.get(self.url(task, cid, "/intensify/point"), wide).data["difference"],
-                         self.client.get(self.url(task, cid, "/harmonized/point"), wide).data["difference"])
-        converted = self.client.get(self.url(task, cid, "/as_converted/point"), centre).data
-        self.assertLess(abs(converted["difference"]), 10)
-        self.assertEqual(self.client.get(self.url(task, cid, "/as_converted/point"), dict(centre, radius=20)).status_code,
-                         status.HTTP_400_BAD_REQUEST)
-        self.assertNotIn("difference", self.client.get(self.url(task, cid, "/view_angle/point"), centre).data)
         t = web_mercator_tile(centre["lon"], centre["lat"], tab["maxzoom"])
         style = {"color_map": v["difference_palette"], "rescale": "-2,2", "equalize": 1, "isotherm": "below,-0.5"}
         tile = self.client.get(self.url(task, cid, "/intensify/tiles/{}/{}/{}.png".format(t.z, t.x, t.y)), style)
@@ -1237,15 +1209,6 @@ class TestMosaics(AnalyzerTestCase):
         # A mosaic smaller than the neighbourhood, and one pixel
         self.assertEqual(intensify.differences(np.full((3, 4), 7.0), 0.5).tolist(), np.zeros((3, 4)).tolist())
         self.assertTrue(np.isnan(intensify.differences(np.array([[np.nan]]), 0.1)).all())
-        # Pointer Info: a point less the median of the pixels within a radius of it, what the array has of them
-        self.assertAlmostEqual(intensify.disc_difference(roof, 151, 100, 0.05), -2.5, delta=0.1)
-        self.assertAlmostEqual(intensify.disc_difference(roof, 151, 100, 0.05, radius_m=3), -2.5, delta=0.1)
-        self.assertAlmostEqual(intensify.disc_difference(roof, 60, 100, 0.05), 0, delta=0.05)
-        # The smallest circle (0.25 m: 5 pixels) still reaches past the seam, 3 pixels wide
-        self.assertAlmostEqual(intensify.disc_difference(roof, 151, 100, 0.05, radius_m=0.25), -2.45, delta=0.05)
-        # The corner: only the quarter of its circle the mosaic has, all of it cooler up the gradient
-        self.assertAlmostEqual(intensify.disc_difference(roof, 299, 499, 0.05), 0.25, delta=0.05)
-        self.assertIsNone(intensify.disc_difference(roof, 10, 10, 0.05))
 
     def test_a_flights_frames_make_mosaics_shown_on_a_map_and_downloaded(self):
         frames = flight_frames(6)
