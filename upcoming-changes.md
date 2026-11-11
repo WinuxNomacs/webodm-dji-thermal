@@ -9,6 +9,30 @@
   opacity, Swipe and zoom) and `panelHtml`'s order (it sits under Image, above Saved measurements).
   - **Decided** (the user, 2026-11-11): last in the panel; a collapsed button ("Mosaic Overlays: 1 of 5 shown")
     opening a checklist of the mosaics; **the checked ones' controls listed below the dropdown**.
+  - Design note: the dropdown is built as one reusable piece (button, checklist, controls below), so R15 uses it
+    too.
+- **R15. Ortho Overlays** (the user, 2026-11-11, in `new.md`): "would it be possible to add a "Ortho Overlays"
+  feature akin to how "Mosaic Overlays" works for mosaics, but using Orthophotos from within the same project?"
+  Builds on R14's dropdown and on Mosaic Overlays (`inspector.js` `mosaicsHtml`, `layMosaic`, `liftMosaic`, `swipe`,
+  `zoomTo`) and on `thermalLayer`, which reads any thermal orthophoto (its first band LWIR) through its task's
+  Inspector API. WebODM's project map (`/map/project/<id>/`) already shows every task's orthophoto with its own
+  layer panel; this is for a single task's map.
+  - **Decided** (the user, 2026-11-11): **both** RGB and thermal orthophotos listed; a laid **thermal** one gives
+    **readings** (pointer, pins, regions, ΔT) so tasks can be compared; **its own dropdown** ("Ortho Overlays:
+    1 of 3 shown"), under Mosaic Overlays at the bottom of the Thermal Inspector's panel; built **after R14**, on
+    its dropdown.
+  - Proposed: the project's other tasks with an orthophoto (WebODM's `GET /api/projects/<p>/tasks/`: completed,
+    `orthophoto.tif` in `available_assets`; the map's own task left out), each ticked one laid above WebODM's
+    layers with opacity, Swipe (WebODM's split control) and Zoom to, as a laid mosaic is. An RGB one drawn from
+    WebODM's own orthophoto tiles as WebODM draws it; a thermal one drawn from its task's value tiles in the
+    Inspector's palette, range and Image settings, and recognised by `thermalLayer` as that task's thermal layer, so
+    the pointer, a click's frames, pins, regions and ΔT read it (measurements saved on the task they were made
+    on). Readings follow the topmost thermal layer under the pointer, as now. Kept in the page's link as laid
+    mosaics are (`dt-mosaic`), as `dt-ortho=<task>`. Tests: Jest (the list, laying and lifting, a thermal overlay
+    read, an RGB one not); a live check on two tasks of one project. Docs: README, quickstart-inspector (and its
+    screenshot), developing.
+  - Open, settled while building: how a ΔT whose two points fall on two different tasks' layers reads (proposed:
+    allowed, each point read from the layer it is on, the saved pair kept on the first point's task).
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
