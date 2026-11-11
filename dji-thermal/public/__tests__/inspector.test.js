@@ -1412,6 +1412,56 @@ describe("the Thermal Inspector's workset mosaics", () => {
         map.remove();
     });
 
+    it("draws a layer's measurements only where it shows: its own clip, less a layer swiped over one side of it", () => {
+        const el = clip => ({style: {clip}});
+        const B = 10000000, view = {left: -20, right: 980};
+        // Nothing clipped: drawn everywhere
+        expect(inspector.shownClip([{container: el(""), z: 14, own: true}, {container: el(""), z: 15}], view)).toBe("");
+        // The layer on the left of WebODM's divider: up to the divider, where the swiped one above starts
+        expect(inspector.shownClip([{container: el(""), z: 14, own: true}, {container: el("rect(-20px, 980px, 860px, 480px)"), z: 1001}], view))
+            .toBe(`rect(${-B}px, 480px, ${B}px, ${-B}px)`);
+        // The swiped one: its own clip, its isotherm (clipped alike, above it) changing nothing; one below never cuts
+        expect(inspector.shownClip([{container: el("rect(-20px, 980px, 860px, 480px)"), z: 1001, own: true},
+                                    {container: el("rect(-20px, 980px, 860px, 480px)"), z: 1002}, {container: el("rect(0px, 100px, 50px, 0px)"), z: 14}], view))
+            .toBe("rect(-20px, 980px, 860px, 480px)");
+        // A layer above clipped on both sides (not WebODM's divider) cuts nothing
+        expect(inspector.shownClip([{container: el(""), z: 14, own: true}, {container: el("rect(0px, 600px, 50px, 400px)"), z: 15}], view)).toBe("");
+        expect(inspector.shownClip([], view)).toBe("");
+    });
+
+    it("ends a measurement read on the map's layer at WebODM's divider when another is swiped over its right", async () => {
+        const map = leafletMap(THERMAL_TASK);
+        const {ins, panel} = begin(map, [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}],
+                                   Object.assign({"GET /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/point": {valid: true, temperature: 20}}, ORTHO_ROUTES));
+        await ins.orthosReady;
+        ins.open();
+        openOverlays(panel(), "ortho");
+        change(panel().querySelector('[data-ortho="therm-3"] [data-act="ortho-on"]'), true);
+        await flush(); await flush();
+        const overlay = orthoLayers(map)[0];
+        // A map 1000 pixels wide, its pin at 300; swiped: the overlay right of the divider (at 310) to the view's edge
+        map.getSize = () => L.point(1000, 800);
+        const nw = map.containerPointToLayerPoint([0, 0]), x = nw.x + 300;
+        const swiped = left => `rect(${nw.y}px, ${nw.x + 1000}px, ${nw.y + 800}px, ${left}px)`;
+        overlay.getContainer().style.clip = swiped(x + 10);
+        ins.setMode("pin");
+        ins.click({latlng: map.containerPointToLatLng([300, 400])});
+        await flush(); await flush();
+        await new Promise(r => setTimeout(r, 40));
+        const pane = map.getPane("dtMeasure0");
+        expect(pane.querySelector("path")).not.toBe(null);          // the pin, in its layer's pane
+        expect(pane.style.clip).toBe(`rect(-10000000px, ${x + 10}px, 10000000px, -10000000px)`);
+        // The divider dragged: the pane follows
+        overlay.getContainer().style.clip = swiped(x - 30);
+        await new Promise(r => setTimeout(r, 40));
+        expect(pane.style.clip).toBe(`rect(-10000000px, ${x - 30}px, 10000000px, -10000000px)`);
+        // Not swiped: drawn everywhere again
+        overlay.getContainer().style.clip = "";
+        await new Promise(r => setTimeout(r, 40));
+        expect(pane.style.clip).toBe("");
+        map.remove();
+    });
+
     it("opens with the mosaic a link asks for laid on the map", async () => {
         const map = leafletMap();
         const {ins, panel, laid} = begin(map, [], {}, {search: "?dt-mosaic=d-1%2Fabc123def456/harmonized"});

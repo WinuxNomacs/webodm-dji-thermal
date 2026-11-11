@@ -138,6 +138,9 @@ above WebODM's layers and listed below the button with its opacity, **Swipe** an
 - To compare two flights, lay one and **Swipe** it: the readings follow WebODM's divider, so the cursor reads the
   overlay on its right and your task's orthophoto on its left. A ΔT is read from the layer under the middle of its two
   points.
+- Pins, regions, lines and ΔTs, saved ones too, are drawn only where the layer they were read on shows: one read on
+  your task's orthophoto ends at the divider. Drag the divider to see more of it. The same goes for a swiped workset
+  mosaic.
 
 On a project's map, WebODM already shows every task, in its own layer panel, so the list is empty there. If your task
 has no thermal orthophoto but another in the project does, the Inspector's button shows so you can lay it.
