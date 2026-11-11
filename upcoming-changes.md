@@ -39,6 +39,9 @@
     panes' clips). Test: `__tests__/inspector.test.js` "reads a ΔT across WebODM's divider from both layers, unsaved,
     its line shown only while both spots show"; checked live on the HomerunObliqueII task with a workset mosaic
     swiped. Docs: README, quickstart-inspector, developing.
+  - **Fixed** (the user, 2026-11-11): with the divider left of both spots, the line still showed from the overlay's
+    spot. Chrome writes a pane's large clip in exponent notation (`rect(-1e+07px, …)`), which `clipOf` didn't read,
+    so the map layer's spot counted as shown; `clipOf` now reads it (test: the same ΔT test, clicked overlay first).
 - **R18. One "Measurements" section** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "Would it not be sensible to combine
   "Pinned Points" and "Regions and lines" under a single "Measurements" section?" Builds on `inspector.js`
   `pinsHtml` and `regionsHtml` (each its list and its Hide/Show, CSV and Remove all) and `panelHtml`'s order.
