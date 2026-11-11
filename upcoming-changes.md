@@ -3,7 +3,18 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R15. Ortho Overlays** (the user, 2026-11-11, in `new.md`): "would it be possible to add a "Ortho Overlays"
+- **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
+  release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
+  macOS"); Apple Silicon was checked without a Mac.
+
+**Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
+
+**Done**
+- **R15. Ortho Overlays** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "would it be possible to add a "Ortho Overlays"
   feature akin to how "Mosaic Overlays" works for mosaics, but using Orthophotos from within the same project?"
   Builds on R14's dropdown and on Mosaic Overlays (`inspector.js` `mosaicsHtml`, `layMosaic`, `liftMosaic`, `swipe`,
   `zoomTo`) and on `thermalLayer`, which reads any thermal orthophoto (its first band LWIR) through its task's
@@ -23,19 +34,20 @@
     mosaics are (`dt-mosaic`), as `dt-ortho=<task>`. Tests: Jest (the list, laying and lifting, a thermal overlay
     read, an RGB one not); a live check on two tasks of one project. Docs: README, quickstart-inspector (and its
     screenshot), developing.
-  - Open, settled while building: how a ΔT whose two points fall on two different tasks' layers reads (proposed:
-    allowed, each point read from the layer it is on, the saved pair kept on the first point's task).
-- **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
-  release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
-  macOS"); Apple Silicon was checked without a Mac.
-
-**Later**
-- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
-  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
-
-**Done**
+  - Settled while building: a ΔT is read from the layer under the middle of its two points, as before (the server
+    reads both spots on one raster); to compare two tasks, an overlay is swiped and **the readings follow WebODM's
+    divider** (`shownAt`: a layer clipped away at a point isn't read there; mosaics too). Not kept in the link: nothing
+    links to it (`dt-mosaic` is only read, from the Analyzer's "Open on WebODM's map"). A map without temperatures
+    shows the Inspector's button when the project has another task's thermal orthophoto to lay.
+  - Built (2026-11-11, `r15-ortho-overlays`): `inspector.js` `orthosOf` (WebODM's task list), `orthoUrl` (as WebODM's
+    map), `orthosHtml` on R14's `overlaysHtml`, `layerControlsHtml` (shared with Mosaic Overlays), `layOrtho` /
+    `liftOrtho` / `onOrthoInput`, `overlayZ`, `shownAt` in `thermalLayerAt`. `inspector.test.js` (5: the list and
+    URLs; a thermal overlay read as its task's and an RGB one only drawn, opacity, Swipe, lifted; a failed load; the
+    button on a map without temperatures; readings each side of the divider). README, index, quickstart-inspector
+    (new section 5, the later ones renumbered and their links), developing; `inspector.png` and `inspector-line.png`
+    retaken. Checked live (read only) on a project with an RGB and two thermal tasks: both laid, the other thermal
+    task's value tiles and measurements loaded, swiped, the cursor read the map's task left of the divider (15.64 °C)
+    and the overlay's right of it (42.32 °C); no page errors.
 - **R14. Mosaic Overlays at the bottom, as a dropdown** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "move Mosaic Overlays to
   the bottom of the Thermal Inspector. Also make it a collapsible multi-select dropdown instead of the infinitely
   growing list." Builds on `inspector.js` `mosaicsHtml` (a checkbox per workset mosaic, the checked ones' tab,

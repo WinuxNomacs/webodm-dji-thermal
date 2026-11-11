@@ -130,10 +130,20 @@
         return found.sort(function (a, b) { return ((a.layer.options || {}).zIndex || 0) - ((b.layer.options || {}).zIndex || 0); });
     }
 
+    // Whether a layer shows at a point: not where WebODM's divider (Swipe) clips it away. leaflet-side-by-side clips
+    // the layer's container to rect(top, right, bottom, left) in the map's layer pixels
+    function shownAt(map, layer, latlng) {
+        var c = layer.getContainer && layer.getContainer();
+        var m = /rect\(\s*(-?[\d.]+)px,?\s*(-?[\d.]+)px,?\s*(-?[\d.]+)px,?\s*(-?[\d.]+)px\s*\)/.exec((c && c.style && c.style.clip) || "");
+        if (!m || !map.latLngToLayerPoint) return true;
+        var p = map.latLngToLayerPoint(latlng);
+        return p.x >= Number(m[4]) && p.x <= Number(m[2]) && p.y >= Number(m[1]) && p.y <= Number(m[3]);
+    }
+
     function thermalLayerAt(map, latlng) {
         var at = thermalLayers(map).filter(function (t) {
             var bounds = t.layer.options && t.layer.options.bounds;
-            return !bounds || bounds.contains(latlng);
+            return (!bounds || bounds.contains(latlng)) && shownAt(map, t.layer, latlng);
         });
         return at.length ? at[at.length - 1] : null;
     }
@@ -319,16 +329,59 @@
                         name: escapeHtml(m.dataset.name) + ' <span class="text-muted">›</span> ' + escapeHtml(m.workset.name)};
             }),
             controls: function (i) {
-                var laid = i.laid, info = laid.layer.__dtMosaic;
-                return '<div class="dt-inspector-overlay-controls"><select class="form-control input-sm" data-act="mosaic-tab" title="Which mosaic">' +
+                var info = i.laid.layer.__dtMosaic;
+                return layerControlsHtml("mosaic", i.laid, '<select class="form-control input-sm" data-act="mosaic-tab" title="Which mosaic">' +
                     i.mosaic.tabs.map(function (t) {
                         return '<option value="' + t.tab + '"' + (t.tab === info.tab ? " selected" : "") + ">" + escapeHtml(MOSAIC_TABS[t.tab] || t.tab) + "</option>";
-                    }).join("") + "</select>" +
-                    '<input type="range" min="0" max="100" step="5" value="' + laid.opacity + '" data-act="mosaic-opacity" title="Opacity: ' + laid.opacity + '%">' +
-                    '<button type="button" class="btn btn-' + (laid.swipe ? "primary" : "default") + ' btn-xs" data-act="mosaic-swipe" title="' +
-                    (laid.swipe ? "Stop swiping" : "Show it on the right of a divider, WebODM's layers on the left") + '"><i class="fa fa-columns"></i> Swipe</button>' +
-                    '<a href="javascript:void(0)" data-act="mosaic-zoom" title="Zoom to it"><i class="fa fa-search-plus"></i></a></div>';
+                    }).join("") + "</select>");
             }});
+    }
+
+    // A laid overlay's controls (data-act="<kind>-..."): what comes first (a mosaic's tab), its opacity, Swipe (WebODM's
+    // split control) and Zoom to; while its orthophoto's details load, or when they can't be, a line saying so
+    function layerControlsHtml(kind, laid, first) {
+        if (laid.error) return '<div class="text-danger dt-inspector-hint">' + escapeHtml(laid.error) + "</div>";
+        if (!laid.layer) return '<div class="text-muted dt-inspector-hint">Loading…</div>';
+        return '<div class="dt-inspector-overlay-controls">' + (first || "") +
+            '<input type="range" min="0" max="100" step="5" value="' + laid.opacity + '" data-act="' + kind + '-opacity" title="Opacity: ' + laid.opacity + '%">' +
+            '<button type="button" class="btn btn-' + (laid.swipe ? "primary" : "default") + ' btn-xs" data-act="' + kind + '-swipe" title="' +
+            (laid.swipe ? "Stop swiping" : "Show it on the right of a divider, WebODM's layers on the left") + '"><i class="fa fa-columns"></i> Swipe</button>' +
+            '<a href="javascript:void(0)" data-act="' + kind + '-zoom" title="Zoom to it"><i class="fa fa-search-plus"></i></a></div>';
+    }
+
+    // The panel's Ortho Overlays: the orthophotos of the project's other tasks, RGB or thermal, each laid on the map by
+    // its tickbox; once laid, its opacity, Swipe and Zoom to. A thermal one is read as its task's thermal layer is
+    function orthosHtml(state) {
+        return overlaysHtml({kind: "ortho", title: "Ortho Overlays", open: !!(state.overlaysOpen || {}).ortho,
+            items: (state.orthos || []).map(function (o) {
+                return {id: o.id, laid: (state.orthoLaid || {})[o.id],
+                        name: '<i class="fa ' + (o.thermal ? "fa-thermometer-half" : "fa-image") + '" title="' + (o.thermal ? "Thermal" : "RGB") +
+                              '"></i> ' + escapeHtml(o.name)};
+            }),
+            controls: function (i) { return layerControlsHtml("ortho", i.laid); }});
+    }
+
+    // The project's other tasks with an orthophoto, from WebODM's task list (completed, orthophoto.tif among their
+    // assets, not on the map already): {id, name, thermal (its first band LWIR), task (as WebODM's map keeps it)}
+    function orthosOf(list, onMap) {
+        return (list || []).filter(function (task) {
+            return task && task.status === 40 && (task.available_assets || []).indexOf("orthophoto.tif") !== -1 && onMap.indexOf(String(task.id)) === -1;
+        }).map(function (task) {
+            var bands = task.orthophoto_bands || [];
+            var name = task.name || "Task " + String(task.id).slice(0, 8);
+            return {id: String(task.id), name: name, thermal: !!bands[0] && String(bands[0].description || "").toLowerCase() === "lwir",
+                    task: {id: String(task.id), name: name, orthophoto_bands: bands, crop: task.crop || null}};
+        });
+    }
+
+    // An orthophoto's tile URL from its metadata, as WebODM's map builds it: a thermal one in Celsius over its 2nd to 98th
+    // percentile (as WebODM's Thermal layer), at 512 pixels, cropped as its task is
+    function orthoUrl(mres, o) {
+        var url = mres.tiles[0];
+        var s = mres.statistics && mres.statistics["1"];
+        if (o.thermal && s && s.percentiles) url = withParam(url, "rescale", s.percentiles[0] + "," + s.percentiles[1]);
+        url = withParam(url, "size", "512");
+        return o.task.crop ? withParam(url, "crop", "1") : url;
     }
 
     // A tile URL with one parameter set (or removed, with no value), its others kept
@@ -992,7 +1045,7 @@
             '<div class="dt-inspector-section"><strong>Pinned points</strong>' + pinsHtml(state, unit) + "</div>" +
             '<div class="dt-inspector-section"><strong>Regions and lines</strong>' + regionsHtml(state, unit) + "</div>" +
             ((state.onMap || []).length ? '<div class="dt-inspector-section"><strong>Saved measurements</strong>' + savedHtml(state, unit) + "</div>" : "") +
-            mosaicsHtml(state);
+            mosaicsHtml(state) + orthosHtml(state);
     }
 
     function csrfToken(doc) {
@@ -1025,7 +1078,7 @@
         var state = {open: false, mode: "hover", readout: null, pins: loadPins(storage, key), pinsVisible: true,
                      regions: regions, regionsVisible: true, shown: regions.length ? regions[regions.length - 1].id : null,
                      notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
-                     legendVisible: false, pointerTemperature: true, mosaics: null, laid: {}, overlaysOpen: {}, frames: false, pick: null,
+                     legendVisible: false, pointerTemperature: true, mosaics: null, laid: {}, orthos: null, orthoLaid: {}, overlaysOpen: {}, frames: false, pick: null,
                      correction: {on: false}, correctionNotice: "", sources: {}, onMap: [], savedVisible: true,
                      savedShown: null, form: null, savable: {}, scale: null, rangeError: ""};
         var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
@@ -1944,12 +1997,72 @@
             var info = laidMosaic(project, m, tab, state.palette, state.display);
             var b = info.bounds;
             var layer = drawnFromValues(L.gridLayer({maxZoom: 26, maxNativeZoom: (info.maxzoom || 20) + 1, minZoom: 0, tileSize: 256,
-                zIndex: MOSAIC_Z + Object.keys(state.laid).length, bounds: b ? L.latLngBounds([[b[1], b[0]], [b[3], b[2]]]) : undefined}));
+                zIndex: overlayZ(), bounds: b ? L.latLngBounds([[b[1], b[0]], [b[3], b[2]]]) : undefined}));
             layer.__dtMosaic = info;
             state.laid[id] = {layer: layer, opacity: 100, swipe: false};
             layer.addTo(map);
             showButton();
             return state.laid[id];
+        }
+
+        // Above WebODM's layers, each overlay laid above the ones before
+        function overlayZ() { return MOSAIC_Z + Object.keys(state.laid).length + Object.keys(state.orthoLaid).length; }
+
+        // An orthophoto of another task laid on the map, once its metadata came (WebODM's, as its map asks): drawn from
+        // WebODM's tiles as WebODM draws it; a thermal one marked as WebODM marks its layers, so the Inspector watches,
+        // colours and reads it as that task's thermal layer (onLayerAdd), its measurements saved on that task
+        function layOrtho(o) {
+            if (state.orthoLaid[o.id]) return state.orthoLaid[o.id];
+            var laid = state.orthoLaid[o.id] = {layer: null, opacity: 100, swipe: false, error: ""};
+            var q = (o.thermal ? ["formula=Celsius", "bands=L", "color_map=magma"] : []).concat(o.task.crop ? ["crop=1"] : []);
+            var failed = function () {
+                if (state.orthoLaid[o.id] !== laid) return;
+                laid.error = "Could not load this orthophoto";
+                render();
+            };
+            fetchFn("/api/projects/" + project + "/tasks/" + o.id + "/orthophoto/metadata" + (q.length ? "?" + q.join("&") : ""),
+                    {credentials: "same-origin"}).then(readJson).then(function (r) {
+                if (state.orthoLaid[o.id] !== laid) return;        // lifted meanwhile
+                if (!r.ok || !r.data || !r.data.tiles || !r.data.tiles[0]) return failed();
+                var mres = r.data, b = mres.bounds && mres.bounds.value, zoom = mres.maxzoom || 20;
+                var layer = L.tileLayer(orthoUrl(mres, o), {bounds: b ? L.latLngBounds([[b[1], b[0]], [b[3], b[2]]]) : undefined,
+                    minZoom: 0, maxZoom: zoom + 99, maxNativeZoom: zoom - 1, tileSize: 512, tms: mres.scheme === "tms", detectRetina: true,
+                    zIndex: overlayZ()});
+                layer[META] = {task: assign({project: Number(project)}, o.task), raster: true, type: o.thermal ? "plant" : "orthophoto",
+                               name: o.thermal ? "Thermal" : "Orthophoto"};
+                layer[TILE_META] = mres;
+                layer.__dtOrtho = o.id;
+                laid.layer = layer;
+                layer.setOpacity(laid.opacity / 100);
+                layer.addTo(map);
+                showButton();
+                zoomTo(laid);
+                render();
+            }, failed);
+            return laid;
+        }
+
+        function liftOrtho(id) {
+            var laid = state.orthoLaid[id];
+            if (!laid) return;
+            if (laid.swipe) swipe(laid, false);
+            delete state.orthoLaid[id];
+            if (laid.layer) map.removeLayer(laid.layer);
+            showButton();
+        }
+
+        function onOrthoInput(row, what, value) {
+            var o = (state.orthos || []).filter(function (x) { return x.id === row.getAttribute("data-ortho"); })[0];
+            if (!o) return;
+            var laid = state.orthoLaid[o.id];
+            if (what === "on") {
+                if (value) layOrtho(o);
+                else liftOrtho(o.id);
+            } else if (!laid || !laid.layer) return;
+            else if (what === "opacity") { laid.opacity = Number(value); laid.layer.setOpacity(laid.opacity / 100); }
+            else if (what === "swipe") swipe(laid, !laid.swipe);
+            else if (what === "zoom") return zoomTo(laid);
+            render();
         }
 
         function liftMosaic(id) {
@@ -1969,7 +2082,7 @@
         }
 
         function zoomTo(laid) {
-            var b = laid.layer.options.bounds;
+            var b = laid.layer && laid.layer.options.bounds;
             if (b) map.fitBounds(b);
         }
 
@@ -1992,7 +2105,8 @@
         // Analyzer's "Open on WebODM's map"; kept while the panel is open, so a mosaic lifted there can be laid again).
         // An RGB map of a project with mosaics has none.
         function showButton() {
-            container.style.display = hasThermal(args.tiles) || Object.keys(state.laid).length || state.open ? "" : "none";
+            container.style.display = hasThermal(args.tiles) || Object.keys(state.laid).length || state.open ||
+                (state.orthos || []).some(function (o) { return o.thermal; }) ? "" : "none";
         }
 
         // Without a palette of the user's own, the map opens in the topmost orthophoto's task's (chosen in DJI Thermal
@@ -2026,6 +2140,8 @@
             var what = act && act.getAttribute("data-act");
             var mrow = e.target.closest("[data-mosaic]");
             if (mrow && (what === "mosaic-swipe" || what === "mosaic-zoom")) return onMosaicInput(mrow, what.slice("mosaic-".length));
+            var orow = e.target.closest("[data-ortho]");
+            if (orow && (what === "ortho-swipe" || what === "ortho-zoom")) return onOrthoInput(orow, what.slice("ortho-".length));
             if (what === "overlays-toggle") {
                 var kind = act.getAttribute("data-overlays");
                 state.overlaysOpen[kind] = !state.overlaysOpen[kind];
@@ -2167,6 +2283,9 @@
             }
             else if (what.indexOf("mosaic-") === 0) {
                 onMosaicInput(e.target.closest("[data-mosaic]"), what.slice("mosaic-".length), what === "mosaic-on" ? e.target.checked : e.target.value);
+            }
+            else if (what.indexOf("ortho-") === 0) {
+                onOrthoInput(e.target.closest("[data-ortho]"), what.slice("ortho-".length), what === "ortho-on" ? e.target.checked : e.target.value);
             }
         }
 
@@ -2325,10 +2444,24 @@
             } else render();
         }, function () { state.mosaics = []; });
 
+        // The orthophotos of the project's other tasks (WebODM's task list) for Ortho Overlays. On a map without
+        // temperatures whose project has a thermal one to lay, the preferences now and the button shown
+        var orthosReady = !project ? Promise.resolve() : mosaicsReady.then(function () {
+            return fetchFn("/api/projects/" + project + "/tasks/", {credentials: "same-origin"}).then(readJson);
+        }).then(function (r) {
+            state.orthos = orthosOf(r && r.ok && Array.isArray(r.data) ? r.data : [], tasks);
+            var thermal = state.orthos.some(function (o) { return o.thermal; });
+            return (thermal && !temperatures && !state.display ? loadDisplay() : Promise.resolve());
+        }, function () { state.orthos = []; }).then(function () {
+            showButton();
+            render();
+        });
+
         // A region drawn before its statistics came (the page left) is read again
         state.regions.forEach(function (r) { if (!r.statistics && !r.reason) measure(r); });
 
-        return {control: control, state: state, open: open, close: close, ready: ready, mosaicsReady: mosaicsReady, click: onClick, setMode: setMode,
+        return {control: control, state: state, open: open, close: close, ready: ready, mosaicsReady: mosaicsReady, orthosReady: orthosReady,
+                click: onClick, setMode: setMode,
                 legend: function () { return legend; }, overlays: function () { return overlays; }};
     }
 
@@ -2353,7 +2486,7 @@
                framesSource: framesSource, fromCelsius: fromCelsius, corrected: corrected, uncorrected: uncorrected,
                rawIsotherm: rawIsotherm, keptRange: keptRange, correctionHtml: correctionHtml, forgetCorrections: forgetCorrections,
                savedHtml: savedHtml, savedCsv: savedCsv, savedGeoJson: savedGeoJson, formHtml: formHtml, pinsHtml: pinsHtml,
-               mosaicsHtml: mosaicsHtml, toCelsius: toCelsius, movable: movable, adjustOf: adjustOf, autoRange: autoRange,
+               mosaicsHtml: mosaicsHtml, orthosHtml: orthosHtml, orthosOf: orthosOf, orthoUrl: orthoUrl, shownAt: shownAt, toCelsius: toCelsius, movable: movable, adjustOf: adjustOf, autoRange: autoRange,
                scaleHtml: scaleHtml, imageHtml: imageHtml, create: create};
     root.ThermalInspector = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

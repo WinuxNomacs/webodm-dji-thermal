@@ -15,8 +15,8 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
   pinned points, the statistics of regions and lines drawn on it (with their surroundings and ΔT, and a line's
   profile), the ΔT between two spots clicked, measurements saved for everyone who can view the project, an approximate correction for another
   emissivity and reflected temperature, isotherms, the map's palette, colour range and image adjustments (as the
-  mosaic viewer's), and its legend. It also lays the Analyzer's workset mosaics on the map, to compare them with the
-  project's own layers, and shows the frames that saw a point clicked.
+  mosaic viewer's), and its legend. It also lays the Analyzer's workset mosaics and the project's other orthophotos on
+  the map, to compare them with the task's own layers, and shows the frames that saw a point clicked.
 
 Temperatures are computed with [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/), a pure-Python
 implementation of DJI's Thermal SDK: no native library and no outside service. An administrator can have DJI's own
@@ -32,14 +32,16 @@ SDK compute them instead (see [DJI's own Thermal SDK](#djis-own-thermal-sdk)).
   palette and the measurement values, leave out oblique frames, and compare worksets side by side; then make a WebODM
   task from the one you pick, or try several in one task: [Worksets, mosaics and a task](docs/quickstart-worksets.md).
 - **Compare mosaics and orthophotos, adjusting them in real time.** Lay a workset's mosaic on WebODM's map, swipe it
-  against a task's orthophoto, and change the palette, range, brightness, contrast, gamma and isotherm as you watch:
-  [Mosaic Overlays](docs/quickstart-inspector.md#4-mosaic-overlays-on-the-map) and
+  against a task's orthophoto, or lay another flight's orthophoto from the same project and read both, and change the
+  palette, range, brightness, contrast, gamma and isotherm as you watch:
+  [Mosaic Overlays](docs/quickstart-inspector.md#4-mosaic-overlays-on-the-map),
+  [Ortho Overlays](docs/quickstart-inspector.md#5-ortho-overlays-on-the-map) and
   [Colours, legend and isotherms](docs/quickstart-inspector.md#3-colours-legend-and-isotherms).
 - **Analyze your results.** The temperature under the cursor, pins, lines with their profile, regions with their
   statistics, histogram, surroundings and ΔT, the ΔT between two spots, isotherms, measurements saved for the project, and a correction for
   another emissivity: [Measuring on the map](docs/quickstart-inspector.md).
 - **Trace a temperature back to its photos.** The frames that saw a point on the map, each one measured in its own
-  pixels or measured again with other values: [The frames that saw a point](docs/quickstart-inspector.md#5-the-frames-that-saw-a-point)
+  pixels or measured again with other values: [The frames that saw a point](docs/quickstart-inspector.md#6-the-frames-that-saw-a-point)
   and [One frame at a time](docs/quickstart-worksets.md#one-frame-at-a-time).
 - **Clean a dataset.** The hottest frames first, the frames without GPS, noisy frames or files removed, oblique
   frames left out: [Read the summary](docs/quickstart-analyzer.md#2-read-the-summary) and
@@ -472,6 +474,12 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   legend read the topmost thermal layer, a mosaic or an orthophoto. They are the plugin's layers, not entries of
   WebODM's layer panel (a plugin can't add those), and are laid again on each visit; the workset's **Open on
   WebODM's map** opens the project's map with its mosaic laid. Not on WebODM's public maps.
+- **Ortho Overlays**: on a task's map, the orthophotos of the project's other finished tasks, thermal or RGB, in a
+  dropdown of their own under Mosaic Overlays, laid and controlled as the mosaics are (opacity, **Swipe**, zoom to).
+  A thermal one is read as its task's thermal layer (hover, pins, regions, ΔT, isotherm, scale, Image), its
+  measurements saved on that task; an RGB one is drawn as WebODM draws it. The readings follow WebODM's divider:
+  with an overlay swiped, the cursor reads the layer shown on its side. A map without temperatures shows the
+  Inspector's button when the project has another task's thermal orthophoto to lay.
 - **Source frames**: a click in Hover (or a pin dropped, or a pin's name clicked in the panel) on a workset mosaic, or
   on the orthophoto of a task processed from a workset whose mosaics are built, opens the window of the frames that
   saw that point beside the panel, as in the mosaic viewer: one at a time with a crosshair on the point, its outline

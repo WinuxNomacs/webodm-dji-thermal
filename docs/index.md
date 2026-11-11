@@ -28,14 +28,16 @@ a pure-Python version of DJI's Thermal SDK. The plugin calls no outside service.
   palette and the measurement values, leave out oblique frames, and compare worksets side by side; then make a WebODM
   task from the one you pick, or try several in one task: [Worksets, mosaics and a task](quickstart-worksets.md).
 - **Compare mosaics and orthophotos, adjusting them in real time.** Lay a workset's mosaic on WebODM's map, swipe it
-  against a task's orthophoto, and change the palette, range, brightness, contrast, gamma and isotherm as you watch:
-  [Mosaic Overlays](quickstart-inspector.md#4-mosaic-overlays-on-the-map) and
+  against a task's orthophoto, or lay another flight's orthophoto from the same project and read both, and change the
+  palette, range, brightness, contrast, gamma and isotherm as you watch:
+  [Mosaic Overlays](quickstart-inspector.md#4-mosaic-overlays-on-the-map),
+  [Ortho Overlays](quickstart-inspector.md#5-ortho-overlays-on-the-map) and
   [Colours, legend and isotherms](quickstart-inspector.md#3-colours-legend-and-isotherms).
 - **Analyze your results.** The temperature under the cursor, pins, lines with their profile, regions with their
   statistics, histogram, surroundings and ΔT, isotherms, measurements saved for the project, and a correction for
   another emissivity: [Measuring on the map](quickstart-inspector.md).
 - **Trace a temperature back to its photos.** The frames that saw a point on the map, each one measured in its own
-  pixels or measured again with other values: [The frames that saw a point](quickstart-inspector.md#5-the-frames-that-saw-a-point)
+  pixels or measured again with other values: [The frames that saw a point](quickstart-inspector.md#6-the-frames-that-saw-a-point)
   and [One frame at a time](quickstart-worksets.md#one-frame-at-a-time).
 - **Clean a dataset.** The hottest frames first, the frames without GPS, noisy frames or files removed, oblique
   frames left out: [Read the summary](quickstart-analyzer.md#2-read-the-summary) and
