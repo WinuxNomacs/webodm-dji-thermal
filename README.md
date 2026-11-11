@@ -277,10 +277,11 @@ over WebODM's base layers:
   (raising or lowering it by a tenth of its width, never past the image's hottest or coldest temperature) and **Auto**
   in the middle (the 2nd to 98th percentile);
 - how the image is drawn (**Image**): **Brightness** and **Contrast** (which move and narrow the range), **Gamma**,
-  **Sharpening** (an unsharp mask), **Linear** or **Stepped** (temperatures and Intensify's differences only: the
-  colours in flat bands, each a band of temperatures of one width, so a colour reads as a temperature span; the width
-  Auto, a round one giving 10 to 20 bands over the range, or typed in the field beside it, in your unit, the bands'
-  edges on its whole multiples) and **Reset**, drawn into the tiles and the frames' pictures, with the colour
+  **Sharpening** (an unsharp mask), **Linear** or **Banded** (temperatures and Intensify's differences only: the
+  colours in flat bands, each a band of temperatures of one width, so a colour reads as a temperature span; the field
+  beside it holds the width in your unit, at first Auto's, a round one giving 10 to 20 bands over the range that
+  follows the range, until you type or step another (emptied, it is Auto's again); the bands' edges on its whole
+  multiples) and **Reset**, drawn into the tiles and the frames' pictures, with the colour
   scale drawn to match; the temperatures stay as they are. The map follows the sliders, the range and the isotherm as
   they change, with no waiting: the browser colours each tile from its temperatures, which the server sends once (the
   frames' pictures are drawn again once a slider is let go of). The temperature tabs share them, and each visit starts
@@ -314,7 +315,7 @@ its detail pane: the frame page of the newest workset that converted):
   mosaic** (where a frame opened from a mosaic starts) or **Oblique** (those the mosaics left out, and why); the
   frame and the list are in the page's address, to link to;
 - the frame, zoomed and moved like a map, coloured in your browser from its temperatures (opening in the workset's
-  palette, else yours) with the mosaic viewer's palette, range, **Image** and **Isotherm** controls (Stepped too), following them as
+  palette, else yours) with the mosaic viewer's palette, range, **Image** and **Isotherm** controls (Banded too), following them as
   they move;
 - **Pointer Info**: the temperature of the pixel under the cursor (for both measurements with Measure again);
   **Temperature On Pointer** shows the temperature beside the pointer too, each
@@ -444,7 +445,7 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   WebODM's layer panel sets, kept in step both ways (WebODM's panel shows a range set in the Inspector once the page
   is loaded again).
 - **Image**: the mosaic viewer's controls for how the topmost thermal layer is drawn: Brightness and Contrast (moving
-  and narrowing the range from Auto's), Gamma, Linear or Stepped (with Manual Corrections, bands of corrected
+  and narrowing the range from Auto's), Gamma, Linear or Banded (with Manual Corrections, bands of corrected
   temperatures) and Sharpening,
   and Reset. The map follows them as they move, with the colour scale, the range and the isotherm: the thermal layers
   (the task's orthophoto, in any palette, and the mosaics laid on the map) are coloured in your browser from their

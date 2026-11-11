@@ -234,11 +234,8 @@
             " stay as they are.</p></details>";
     }
 
-    // Auto's band width as the range changes, in the width's field (when it is shown and empty)
-    function stepHint($, bands) {
-        var field = $("ta-viewer-step");
-        if (field && bands) field.placeholder = "Auto " + Number(bands.auto.toPrecision(6));
-    }
+    // Auto's band width as the range changes, in the width's field (when it is shown and no width is typed)
+    function stepHint($, bands) { scale.showAutoStep($("ta-viewer-step"), bands); }
 
     // The button that lets go of the point a click kept
     function followHtml() {

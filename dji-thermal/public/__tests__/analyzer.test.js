@@ -3154,11 +3154,14 @@ describe("the mosaic viewer", () => {
         expect(scale.gradientCss([0x000000ff, 0xffffffff]).match(/rgb\(/g).length).toBe(16);
     });
 
-    it("bands Stepped at a round width giving 10 to 20 bands, a typed one in the user's unit, edges on its whole multiples", () => {
+    it("bands Banded at a round width giving 10 to 20 bands, a typed one in the user's unit, edges on its whole multiples", () => {
         const scale = require("../scale");
         expect([40, 41, 8, 0.9, 100].map(scale.autoStep)).toEqual([2, 2.5, 0.5, 0.05, 5]);
         expect(scale.bandsOf({tone: "linear"}, [10, 30])).toBeNull();
-        expect(scale.bandsOf({tone: "stepped"}, [10, 30])).toEqual({width: 1, origin: -0, shown: 1, auto: 1});
+        expect(scale.bandsOf({tone: "stepped"}, [10, 30])).toEqual({width: 1, origin: -0, shown: 1, auto: 1, typed: false});
+        expect(scale.bandsOf({tone: "stepped", step: 5}, [10, 30]).typed).toBe(true);
+        // The field's arrows step by a round increment for the width's size, landing on its whole multiples
+        expect([2.5, 5, 10, 0.5, 0.05, 25].map(scale.stepIncrement)).toEqual([1, 1, 10, 0.1, 0.01, 10]);
         // °C values shown in °F: 1 °F wide bands are 1/1.8 °C, their edges on whole °F (0 °F is -17.78 °C)
         const f = scale.bandsOf({tone: "stepped", step: 1}, [10, 30], {scale: 1.8, offset: 32});
         expect([f.width, f.origin, f.shown, f.auto]).toEqual([1 / 1.8, -32 / 1.8, 1, 2]);
@@ -3184,7 +3187,7 @@ describe("the mosaic viewer", () => {
         expect(viewer.isothermParam("above", "104", "", "C", "harmonized")).toEqual({value: "above,40"});
     });
 
-    it("draws the image as the Image section says: the sliders, Stepped, Reset, and the frames' pictures too", async () => {
+    it("draws the image as the Image section says: the sliders, Banded, Reset, and the frames' pictures too", async () => {
         const L = fakeLeaflet();
         const at = "?lon=10.0005&lat=45.0005";
         const fetchFn = server({[C9 + "/mosaics"]: VIEWER,
@@ -3226,13 +3229,16 @@ describe("the mosaic viewer", () => {
         slide("ta-viewer-sharpen", "2", false);
         expect(tile().sharpen).toBe(2);
 
-        // Stepped: Auto's bands (2 °C over 27.8 °C, edges on whole multiples), the tiles and the colour bar in them,
-        // no requests; a typed width stays as the range moves, and empty is Auto again
+        // Banded: Auto's bands (2 °C over 27.8 °C, edges on whole multiples), the tiles and the colour bar in them,
+        // no requests, Auto's width in the field as a value; a typed width stays as the range moves, and empty is Auto
+        // again
         expect($("ta-viewer-step")).toBeNull();
         $("ta-viewer-tone").value = "stepped";
         change($("ta-viewer-tone"));
         await ticks();
-        expect($("ta-viewer-step").placeholder).toBe("Auto 2");
+        expect($("ta-viewer-tone").selectedOptions[0].textContent).toBe("Banded");
+        expect($("ta-viewer-step").value).toBe("2");
+        expect([$("ta-viewer-step").step, $("ta-viewer-step").min]).toEqual(["1", "1"]);
         expect(tile().steps.width).toBeCloseTo(2 / 27.8, 12);
         expect(tile().steps.start).toBeCloseTo(1.6 / 27.8, 12);
         expect(tile().shares[16]).toBeCloseTo(0.5, 12);

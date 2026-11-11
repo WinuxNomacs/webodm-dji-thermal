@@ -14,6 +14,23 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R16. Banded, and the band width a value to step** (built 2026-11-11; the user, 2026-11-11): "Would it make more
+  sense for Stepped to be named Banded? ... I just wonder if Banded doesn't better align with the setting for
+  bandwidth. Also make the actual value default to 5 so the user can step it up and down in the control without
+  having to enter a value first."
+  - **Decided** (the user, 2026-11-11): the field holds **Auto's width as a value** (5 on their range in °F), steppable
+    at once, following the range until changed; emptied, Auto's again (not a fixed 5, which gives one band on a
+    narrow range).
+  - Built (`banded-label`): "Banded" in the tone list and its tooltip (the internal names `tone=stepped`, the
+    server's `stepped=` and the step field stay, so links and the API keep working); `scale.js` `showAutoStep`
+    (the field follows Auto's width while no width is typed, not while focused; `bandsOf` gives `typed`),
+    `stepIncrement` (the arrows step by 1 for 2.5 or 5, 0.1 for 0.5, from that increment up, so 2.5 steps to 3, 4,
+    down to 1); the Inspector's panel keeps a number or text field's focus as it is drawn again, so the arrows step
+    on. Tests: analyzer.test.js (typed, stepIncrement, the field's value, step and min), inspector.test.js (the value
+    following the range, a typed one staying, emptied back to Auto's, the focus kept). README, palettes,
+    quickstart-worksets, quickstart-inspector, developing; `inspector-image.png` retaken. Checked live (read only):
+    the viewer and the Inspector show "Banded" and 2.5 (Auto's); ArrowUp gave 3 then 4, ArrowDown stopped at 1; no
+    page errors. A click on the spinner's own arrows couldn't be exercised headless.
 - **R15. Ortho Overlays** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "would it be possible to add a "Ortho Overlays"
   feature akin to how "Mosaic Overlays" works for mosaics, but using Orthophotos from within the same project?"
   Builds on R14's dropdown and on Mosaic Overlays (`inspector.js` `mosaicsHtml`, `layMosaic`, `liftMosaic`, `swipe`,
