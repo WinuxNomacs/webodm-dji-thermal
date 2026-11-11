@@ -3,7 +3,18 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R20. The overlays' own divider: horizontal, and either side** (the user, 2026-11-11): "Is it possible to change
+- **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
+  release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
+  macOS"); Apple Silicon was checked without a Mac.
+
+**Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
+
+**Done**
+- **R20. The overlays' own divider: horizontal, and either side** (built 2026-11-11; the user, 2026-11-11): "Is it possible to change
   the side by side comparison divider from vertical to horizontal when the control is right clicked? Is it also
   possible to add a control that allows the user to pick which side of the divider the compared ortho appears
   upon?" Builds on R14/R15's Swipe under Mosaic Overlays and Ortho Overlays (today WebODM's split control,
@@ -18,17 +29,16 @@
     across (top and bottom). Tests: Jest (clips each side and orientation, right-click, the buttons, WebODM's Swipe
     turning it off, measurements ending at a horizontal divider). Docs: README, quickstart-inspector (its screenshot
     retaken).
-- **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
-  release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
-  macOS"); Apple Silicon was checked without a Mac.
-
-**Later**
-- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
-  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
-
-**Done**
+  - **Decided while building** (the user, 2026-11-11): "because this slider control may be reused by our other webodm
+    plugins, ensure its shareable and extensible in design": the divider is its own module.
+  - **Built**: `public/split.js` and `split.css` (`SplitDivider.create(L, map, opts)`: `add(layer, side)`, `remove`,
+    `setSide`, `turn`, `setPosition`, `on("change")`, `destroy`; options for its class, title, handle and right-click;
+    the clip exported; no class or name of this plugin), loaded by `main.js`; `inspector.js` uses it for the overlays'
+    Swipe (`swipe`, `swapSide`, `turnSplit`, the side and turn buttons in `layerControlsHtml`), turns WebODM's own
+    Swipe off (`leaveWebodmSwipe`) and its own off when WebODM's comes on (`onWebodmSwipe`); `shownClip` knows a
+    divider across. Tests: `__tests__/split.test.js`, and `inspector.test.js` "swipes an overlay with its own
+    divider…"; checked live on the HomerunObliqueII task. Docs: README, quickstart-inspector (`inspector-mosaics.png`
+    retaken), developing.
 - **R19. ΔT across two orthophotos** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "Would it be possible for the "Delta T"
   measurement tool to function across 2 orthophotos? Idea being if I select a point on the left orthophoto and a
   point on the right orthophoto, it calculates the delta between them. The line between the dots would only appear

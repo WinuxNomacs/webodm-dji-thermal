@@ -400,7 +400,7 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   (its own pixel, as a pin reads it), **ΔT**, the second's less the first's (corrected with Manual Corrections), and
   the distance between them; the map shows a thin line between the spots, labelled at the second with its ΔT. A ΔT
   is listed under Measurements, kept in your browser, saved like a region and exported in the CSV (with
-  **first_spot** and **second_spot** columns). With an overlay swiped, a ΔT can span WebODM's divider: each spot is
+  **first_spot** and **second_spot** columns). With an overlay swiped, a ΔT can span the divider: each spot is
   read from the layer showing where it was clicked, the list names both layers, each dot shows with its own layer
   and the line only while both dots show. Such a ΔT isn't saved; it stays in the panel until the page is left.
 - **Pin**: a click pins the point with its temperature, labelled P1, P2…, shown on the map instead of WebODM's
@@ -474,8 +474,11 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   project; shown only when one has built mosaics), last in the panel: a dropdown ("Mosaic Overlays: 1 of 5 shown")
   opens their checklist, each tickbox laying one on the map above WebODM's layers, and the laid ones are listed below
   it with their controls: **Mosaic**, **Harmonized** or **Source
-  frame**, in your palette over its own 2nd to 98th percentile, with its opacity, **Swipe** (WebODM's own divider:
-  the mosaic on the right, WebODM's layers on the left) and zoom to it. Hover, pins, regions, the isotherm and the
+  frame**, in your palette over its own 2nd to 98th percentile, with its opacity, **Swipe** (the Inspector's own
+  divider: the mosaic on one side, WebODM's layers on the other) and zoom to it. While swiped, a button beside Swipe
+  chooses its side (**Right** or **Left**; **Below** or **Above**), and a small button turns the divider horizontal
+  or vertical, as a right-click on its handle does; drag the handle to move it. WebODM's own Swipe (in its layer
+  panel) and the Inspector's take turns: turning one on turns the other off. Hover, pins, regions, the isotherm and the
   legend read the topmost thermal layer, a mosaic or an orthophoto. They are the plugin's layers, not entries of
   WebODM's layer panel (a plugin can't add those), and are laid again on each visit; the workset's **Open on
   WebODM's map** opens the project's map with its mosaic laid. Not on WebODM's public maps.
@@ -484,8 +487,8 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   A thermal one is read as its task's thermal layer (hover, pins, regions, ΔT, isotherm, scale, Image), its
   measurements saved on that task; an RGB one is drawn as WebODM draws it. The readings follow WebODM's divider:
   with an overlay swiped, the cursor reads the layer shown on its side, and each measurement (pins, regions, lines,
-  ΔT, saved ones) is drawn only where the layer it was read on shows, ending at the divider (a swiped mosaic too); a
-  ΔT across the divider compares the two layers.
+  ΔT, saved ones) is drawn only where the layer it was read on shows, ending at the divider (a swiped mosaic too,
+  and a horizontal divider alike); a ΔT across the divider compares the two layers.
   A map without temperatures shows the
   Inspector's button when the project has another task's thermal orthophoto to lay.
 - **Source frames**: a click in Hover (or a pin dropped, or a pin's name clicked in the panel) on a workset mosaic, or

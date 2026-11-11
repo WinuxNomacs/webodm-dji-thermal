@@ -70,7 +70,7 @@ body:not(.leaflet-dragging) .leaflet-container.dt-pointer-plain.leaflet-grab { c
 }
 .dt-inspector-overlay { margin: 4px 0; }
 .dt-inspector-overlay-name { display: block; font-weight: normal; margin: 0; }
-.dt-inspector-overlay-controls { display: flex; align-items: center; gap: 6px; margin: 2px 0 4px; }
+.dt-inspector-overlay-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 2px 0 4px; }
 .dt-inspector-overlay-controls select { width: auto; padding: 2px; }
 .dt-inspector-overlay-controls input[type="range"] { flex: 1; min-width: 30px; }
 .dt-inspector-overlay-controls .btn { padding: 1px 6px; }

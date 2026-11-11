@@ -144,25 +144,25 @@ test("the Thermal Inspector is added to every map, with WebODM's Leaflet, its sc
     document.head.innerHTML = "";
     loadMain();
     const [deps, add] = global.PluginsAPI.Map.willAddControls.mock.calls[0];
-    expect(deps).toEqual(["leaflet", "dji-thermal/inspector.css", "dji-thermal/frames.css"]);
+    expect(deps).toEqual(["leaflet", "dji-thermal/inspector.css", "dji-thermal/split.css", "dji-thermal/frames.css"]);
     window.ThermalInspector = {create: jest.fn()};
     add({tiles: []}, "L");
     await new Promise(r => setTimeout(r, 0));
     // Each script added once the one before it ran
     const loaded = [];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
         const scripts = document.head.querySelectorAll("script");
         expect(scripts.length).toBe(i + 1);
         loaded.push(scripts[i].getAttribute("src"));
         scripts[i].onload();
         await new Promise(r => setTimeout(r, 0));
     }
-    expect(loaded).toEqual(["scale.js", "recolour.js", "regions.js", "frames.js", "inspector.js"].map(n => "/plugins/dji-thermal/" + n));
+    expect(loaded).toEqual(["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "inspector.js"].map(n => "/plugins/dji-thermal/" + n));
     expect(window.ThermalInspector.create).toHaveBeenCalledWith({tiles: []}, "L");
     // A second map on the page: not loaded again
     add({tiles: []}, "L");
     await new Promise(r => setTimeout(r, 0));
-    expect(document.head.querySelectorAll("script").length).toBe(5);
+    expect(document.head.querySelectorAll("script").length).toBe(6);
     expect(window.ThermalInspector.create).toHaveBeenCalledTimes(2);
     delete window.ThermalInspector;
 });

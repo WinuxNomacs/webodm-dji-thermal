@@ -67,6 +67,7 @@ Keep the work in plain functions that take data and return HTML strings or value
 | `frame.js` | The frame page (it reuses the Inspector's statistics and forms). |
 | `inspector.js` | The Thermal Inspector on WebODM's map. |
 | `regions.js` | Drawing shapes on a Leaflet map, and the measuring tools' list (`TOOLS`). |
+| `split.js`, `split.css` | A divider on a Leaflet map showing layers on one side of it, upright or across (the overlays' Swipe in the Inspector). Shared: it needs only Leaflet and knows nothing of this plugin, so another WebODM plugin can take both files as they are; its API is in its header (`create(L, map, opts)`, `add(layer, side)`, `turn()`, `on("change")`, the exported `clip`). |
 | `scale.js`, `recolour.js`, `frames.js` | Shared by the mosaic viewer and the Inspector: colour scales, the range's D-pad and the Image controls, tiles coloured in the browser, and the window of the frames that saw a point. |
 | `picture_viewer.js` | The full-page picture viewer. |
 | `thermal/` | DJI Thermal Task's panel and the project page's workset progress: JSX and ES modules, built by WebODM's webpack into `public/build/` (untracked). |
@@ -210,7 +211,7 @@ the frame page's Measure section (`frame.js`). Both draw with `regions.js`. A ne
 GeoJSON `Polygon` or `LineString` needs no change to how it is measured: `inspector.raster_region` and
 `frames.region` measure any of those. ΔT is the exception: its two spots are read as pins (`inspector.delta` from
 `inspector_api.delta_values` on the map, `frames.delta` on a frame), asked for with `shape: "delta"`. A ΔT whose
-spots were clicked on two layers (either side of WebODM's divider; `DrawTool`'s `onPoint` reports each click) keeps
+spots were clicked on two layers (either side of a divider; `DrawTool`'s `onPoint` reports each click) keeps
 their source keys (`sources`) and is read in the browser instead, each spot from its own layer's `point`
 (`measureAcross`); `acrossLayers` tells it apart (not saveable, not kept in `localStorage`).
 

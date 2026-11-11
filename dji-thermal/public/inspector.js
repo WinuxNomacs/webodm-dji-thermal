@@ -31,6 +31,7 @@
     var SQ_FT_PER_SQ_M = 10.7639104;
     var FT_PER_M = 3.2808399;
     var Regions = root.ThermalRegions || (typeof require !== "undefined" ? require("./regions.js") : null);
+    var Split = root.SplitDivider || (typeof require !== "undefined" ? require("./split.js") : null);
     // The shapes drawn (regions.js's tools but the pin): their icons and names
     var SHAPES = {}, SHAPE_NAMES = {};
     Object.keys(Regions.TOOLS).forEach(function (k) {
@@ -149,10 +150,11 @@
         return m ? {top: Number(m[1]), right: Number(m[2]), bottom: Number(m[3]), left: Number(m[4])} : null;
     }
 
-    // Where a layer shows, as a clip: its own clip, less each clipped layer above it that covers one side of it (WebODM's
-    // divider: a layer on its right is clipped to the right; the one on the left shows only left of it). "" when
-    // nothing clips it. layers: [{container, z, own}] the map's raster layers (own: this one); view: {left, right} the map's
-    // visible part, in the same pixels (the divider clips a layer to the view's edge on its other side)
+    // Where a layer shows, as a clip: its own clip, less each clipped layer above it that covers one side of it (a
+    // divider: a layer on its right is clipped to the right; the one on the left shows only left of it; alike above and
+    // below a divider across). "" when nothing clips it. layers: [{container, z, own}] the map's raster layers (own: this
+    // one); view: {left, right, top, bottom} the map's visible part, in the same pixels (a divider clips a layer to the
+    // view's edge on its other side)
     function shownClip(layers, view) {
         var own = layers.filter(function (l) { return l.own; })[0];
         if (!own) return "";
@@ -162,8 +164,14 @@
             var o = !l.own && l.z > own.z && clipOf(l.container);
             if (!o) return;
             var toRight = o.right >= Math.min(r.right, view.right) - 1, toLeft = o.left <= Math.max(r.left, view.left) + 1;
-            if (toRight && !toLeft && o.left > r.left) { r.right = Math.min(r.right, o.left); cut = true; }
-            else if (toLeft && !toRight && o.right < r.right) { r.left = Math.max(r.left, o.right); cut = true; }
+            var toBottom = o.bottom >= Math.min(r.bottom, view.bottom) - 1, toTop = o.top <= Math.max(r.top, view.top) + 1;
+            if (toTop && toBottom) {
+                if (toRight && !toLeft && o.left > r.left) { r.right = Math.min(r.right, o.left); cut = true; }
+                else if (toLeft && !toRight && o.right < r.right) { r.left = Math.max(r.left, o.right); cut = true; }
+            } else if (toLeft && toRight) {
+                if (toBottom && !toTop && o.top > r.top) { r.bottom = Math.min(r.bottom, o.top); cut = true; }
+                else if (toTop && !toBottom && o.bottom < r.bottom) { r.top = Math.max(r.top, o.bottom); cut = true; }
+            }
         });
         return cut ? "rect(" + [r.top, r.right, r.bottom, r.left].join("px, ") + "px)" : "";
     }
@@ -361,19 +369,26 @@
                 return layerControlsHtml("mosaic", i.laid, '<select class="form-control input-sm" data-act="mosaic-tab" title="Which mosaic">' +
                     i.mosaic.tabs.map(function (t) {
                         return '<option value="' + t.tab + '"' + (t.tab === info.tab ? " selected" : "") + ">" + escapeHtml(MOSAIC_TABS[t.tab] || t.tab) + "</option>";
-                    }).join("") + "</select>");
+                    }).join("") + "</select>", !state.split || state.split.vertical);
             }});
     }
 
-    // A laid overlay's controls (data-act="<kind>-..."): what comes first (a mosaic's tab), its opacity, Swipe (WebODM's
-    // split control) and Zoom to; while its orthophoto's details load, or when they can't be, a line saying so
-    function layerControlsHtml(kind, laid, first) {
+    // A laid overlay's controls (data-act="<kind>-..."): what comes first (a mosaic's tab), its opacity, Swipe (the
+    // Inspector's divider) and, while swiped, its side of the divider and the divider's direction, then Zoom to; while
+    // its orthophoto's details load, or when they can't be, a line saying so. vertical: the divider's direction
+    function layerControlsHtml(kind, laid, first, vertical) {
         if (laid.error) return '<div class="text-danger dt-inspector-hint">' + escapeHtml(laid.error) + "</div>";
         if (!laid.layer) return '<div class="text-muted dt-inspector-hint">Loading…</div>';
+        vertical = vertical !== false;
+        var side = Split.sideName(laid.side, vertical), other = Split.sideName(laid.side === "before" ? "after" : "before", vertical).toLowerCase();
         return '<div class="dt-inspector-overlay-controls">' + (first || "") +
             '<input type="range" min="0" max="100" step="5" value="' + laid.opacity + '" data-act="' + kind + '-opacity" title="Opacity: ' + laid.opacity + '%">' +
             '<button type="button" class="btn btn-' + (laid.swipe ? "primary" : "default") + ' btn-xs" data-act="' + kind + '-swipe" title="' +
-            (laid.swipe ? "Stop swiping" : "Show it on the right of a divider, WebODM's layers on the left") + '"><i class="fa fa-columns"></i> Swipe</button>' +
+            (laid.swipe ? "Stop swiping" : "Show it on one side of a divider, WebODM's layers on the other") + '"><i class="fa fa-columns"></i> Swipe</button>' +
+            (laid.swipe ? '<button type="button" class="btn btn-default btn-xs dt-inspector-side" data-act="' + kind + '-side" title="It shows ' + side.toLowerCase() +
+                " of the divider: click to show it " + other + '"><i class="fa fa-exchange-alt' + (vertical ? "" : " fa-rotate-90") + '"></i> ' + side + "</button>" +
+                '<button type="button" class="btn btn-default btn-xs" data-act="' + kind + '-orient" aria-label="Turn the divider" title="Turn the divider ' +
+                (vertical ? "horizontal" : "vertical") + ' (or right-click its handle)"><i class="fa ' + (vertical ? "fa-grip-lines-vertical" : "fa-grip-lines") + '"></i></button>' : "") +
             '<a href="javascript:void(0)" data-act="' + kind + '-zoom" title="Zoom to it"><i class="fa fa-search-plus"></i></a></div>';
     }
 
@@ -386,7 +401,7 @@
                         name: '<i class="fa ' + (o.thermal ? "fa-thermometer-half" : "fa-image") + '" title="' + (o.thermal ? "Thermal" : "RGB") +
                               '"></i> ' + escapeHtml(o.name)};
             }),
-            controls: function (i) { return layerControlsHtml("ortho", i.laid); }});
+            controls: function (i) { return layerControlsHtml("ortho", i.laid, "", !state.split || state.split.vertical); }});
     }
 
     // The project's other tasks with an orthophoto, from WebODM's task list (completed, orthophoto.tif among their
@@ -1114,7 +1129,8 @@
                      notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
                      legendVisible: false, pointerTemperature: true, mosaics: null, laid: {}, orthos: null, orthoLaid: {}, overlaysOpen: {}, frames: false, pick: null,
                      correction: {on: false}, correctionNotice: "", sources: {}, onMap: [], savedVisible: true,
-                     savedShown: null, form: null, savable: {}, scale: null, rangeError: ""};
+                     savedShown: null, form: null, savable: {}, scale: null, rangeError: "",
+                     split: {vertical: true, at: 0.5}};
         var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
         var search = deps.search !== undefined ? deps.search : root.location && root.location.search;
         var container, panel, frameBox, panelMove, legendMove, frameMove, framesMoved = false, cursor, pinLayer, regionLayer, savedLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
@@ -1570,7 +1586,7 @@
                     return {container: l.getContainer(), z: (l.options || {}).zIndex || 0, own: l === t.layer};
                 });
                 var nw = map.containerPointToLayerPoint([0, 0]), se = map.containerPointToLayerPoint(map.getSize());
-                pane.style.clip = shownClip(layers, {left: nw.x, right: se.x});
+                pane.style.clip = shownClip(layers, {left: nw.x, right: se.x, top: nw.y, bottom: se.y});
             });
             updateCrossLines();
         }
@@ -2212,6 +2228,8 @@
             } else if (!laid || !laid.layer) return;
             else if (what === "opacity") { laid.opacity = Number(value); laid.layer.setOpacity(laid.opacity / 100); }
             else if (what === "swipe") swipe(laid, !laid.swipe);
+            else if (what === "side") swapSide(laid);
+            else if (what === "orient") return turnSplit();
             else if (what === "zoom") return zoomTo(laid);
             render();
         }
@@ -2225,11 +2243,57 @@
             showButton();
         }
 
-        // On the right of WebODM's split control (PluginsAPI.Map.sideBySideChanged, as its own layer panel does)
+        // -- the overlays' divider ------------------------------------------------------------------------------------
+        // The overlays swiped are shown on their side of the Inspector's own divider (split.js, not WebODM's split
+        // control, which is always upright with its layer on the right): laid.side "after" (right or below) or
+        // "before" (left or above). WebODM's own Swipe (its layer panel's) and this one are never both shown: each
+        // turns the other off
+        var webodmSwiped = [];
+        var split = Split.create(L, map, {doc: doc, vertical: state.split.vertical, at: state.split.at});
+        split.on("change", function (e) {
+            state.split.vertical = e.vertical;
+            state.split.at = e.at;
+            if (e.reason === "turn") render();      // the side buttons say Right/Left or Below/Above
+        });
+        function allLaid() {
+            var all = [];
+            Object.keys(state.laid).forEach(function (k) { all.push(state.laid[k]); });
+            Object.keys(state.orthoLaid).forEach(function (k) { all.push(state.orthoLaid[k]); });
+            return all;
+        }
         function swipe(laid, on) {
-            if (!plugins || !plugins.Map || !plugins.Map.sideBySideChanged) return;
             laid.swipe = on;
-            plugins.Map.sideBySideChanged(laid.layer, on);
+            if (!laid.side) laid.side = "after";
+            if (!laid.layer) return;
+            if (on) {
+                leaveWebodmSwipe(laid);
+                split.add(laid.layer, laid.side);
+            } else split.remove(laid.layer);
+        }
+        function swapSide(laid) {
+            laid.side = laid.side === "before" ? "after" : "before";
+            if (laid.swipe) split.setSide(laid.layer, laid.side);
+        }
+        function turnSplit() { split.turn(); }
+        // WebODM's own Swipe on: off, the way its layer panel turns it off when another layer is swiped (each of its
+        // layers sided turns itself off when it hears of another), the overlay then taken off WebODM's split again
+        function leaveWebodmSwipe(laid) {
+            if (!webodmSwiped.length || !plugins || !plugins.Map || !plugins.Map.sideBySideChanged) return;
+            var z = (laid.layer.options || {}).zIndex;
+            plugins.Map.sideBySideChanged(laid.layer, true);
+            plugins.Map.sideBySideChanged(laid.layer, false);
+            if (z !== undefined && laid.layer.setZIndex) laid.layer.setZIndex(z);     // brought to the front there
+            webodmSwiped = [];
+            setTimeout(split.update, 0);        // after WebODM's split control is gone, with whatever it clipped
+        }
+        function onWebodmSwipe(layer, side) {
+            if (allLaid().some(function (l) { return l.layer === layer; })) return;     // the Inspector's own call
+            webodmSwiped = webodmSwiped.filter(function (l) { return l !== layer; });
+            if (side) webodmSwiped.push(layer);
+            if (side && allLaid().some(function (l) { return l.swipe; })) {
+                allLaid().forEach(function (l) { if (l.swipe) swipe(l, false); });
+                render();
+            }
         }
 
         function zoomTo(laid) {
@@ -2248,6 +2312,8 @@
             else if (what === "tab") restyleMosaic(laid.layer, {tab: value});
             else if (what === "opacity") { laid.opacity = Number(value); laid.layer.setOpacity(laid.opacity / 100); }
             else if (what === "swipe") swipe(laid, !laid.swipe);
+            else if (what === "side") swapSide(laid);
+            else if (what === "orient") return turnSplit();
             else if (what === "zoom") return zoomTo(laid);
             render();
         }
@@ -2290,9 +2356,9 @@
             var act = e.target.closest("[data-act]");
             var what = act && act.getAttribute("data-act");
             var mrow = e.target.closest("[data-mosaic]");
-            if (mrow && (what === "mosaic-swipe" || what === "mosaic-zoom")) return onMosaicInput(mrow, what.slice("mosaic-".length));
+            if (mrow && /^mosaic-(swipe|side|orient|zoom)$/.test(what)) return onMosaicInput(mrow, what.slice("mosaic-".length));
             var orow = e.target.closest("[data-ortho]");
-            if (orow && (what === "ortho-swipe" || what === "ortho-zoom")) return onOrthoInput(orow, what.slice("ortho-".length));
+            if (orow && /^ortho-(swipe|side|orient|zoom)$/.test(what)) return onOrthoInput(orow, what.slice("ortho-".length));
             if (what === "overlays-toggle") {
                 var kind = act.getAttribute("data-overlays");
                 state.overlaysOpen[kind] = !state.overlaysOpen[kind];
@@ -2535,6 +2601,7 @@
         map.on("layerremove", onLayerRemove);
         // The panes' clips follow the layers' (WebODM's divider sets them as it is dragged and the map moves)
         map.on("layeradd layerremove moveend zoomend", queueClips);
+        if (plugins && plugins.Map && plugins.Map.onSideBySideChanged) plugins.Map.onSideBySideChanged(onWebodmSwipe);
         if (root.MutationObserver && map.getPane && map.getPane("tilePane")) {
             new root.MutationObserver(function (changes) {
                 var tiles = map.getPane("tilePane");
