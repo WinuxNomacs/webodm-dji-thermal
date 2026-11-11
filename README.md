@@ -479,7 +479,9 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   dropdown of their own under Mosaic Overlays, laid and controlled as the mosaics are (opacity, **Swipe**, zoom to).
   A thermal one is read as its task's thermal layer (hover, pins, regions, ΔT, isotherm, scale, Image), its
   measurements saved on that task; an RGB one is drawn as WebODM draws it. The readings follow WebODM's divider:
-  with an overlay swiped, the cursor reads the layer shown on its side. A map without temperatures shows the
+  with an overlay swiped, the cursor reads the layer shown on its side, and each measurement (pins, regions, lines,
+  ΔT, saved ones) is drawn only where the layer it was read on shows, ending at the divider (a swiped mosaic too).
+  A map without temperatures shows the
   Inspector's button when the project has another task's thermal orthophoto to lay.
 - **Source frames**: a click in Hover (or a pin dropped, or a pin's name clicked in the panel) on a workset mosaic, or
   on the orthophoto of a task processed from a workset whose mosaics are built, opens the window of the frames that

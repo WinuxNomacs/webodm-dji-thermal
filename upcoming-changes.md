@@ -14,6 +14,22 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R17. Measurements follow WebODM's divider** (built 2026-11-11; the user, 2026-11-11, with a screenshot of a ΔT read
+  on the left orthophoto drawn across the divider over the right one): "Can the comparison slider also pertain to the
+  inspector measurements/controls? ... I would expect the line to end at the comparison control border, indicating
+  that it's over the left orthophoto. If the user needs to see more of it, they would move the comparison slider
+  accordingly."
+  - Built (`measurements-follow-divider`): `inspector.js` each thermal layer's measurements (pins, regions, lines,
+    ΔT, saved ones, their labels and hottest/coldest dots) in a Leaflet pane of their own (`paneOf`/`inPane`, by
+    `layerSource` key; a region or ΔT records its layer's key when measured, `r.source`), clipped by `shownClip` to
+    where that layer shows: its own clip, less a clipped layer above it reaching one edge of the view (WebODM's
+    divider); kept current by a MutationObserver on the tile pane's layer containers and the map's moves.
+    `clipOf` shared with `shownAt`. Regions measured before keep no key and are drawn unclipped as before.
+    Tests: `shownClip` (nothing clipped, the left layer cut at the divider, the swiped one keeping its own clip, a
+    layer clipped on both sides cutting nothing), a pin read on the map's layer ending at the divider and following
+    it as it moves, unclipped once not swiped. README, quickstart-inspector. Checked live (read only) on project 12:
+    a ΔT from left of the divider to right of it drawn up to the divider only; the divider dragged past its second
+    spot, the whole ΔT and its label shown; no page errors.
 - **R16. Banded, and the band width a value to step** (built 2026-11-11; the user, 2026-11-11): "Would it make more
   sense for Stepped to be named Banded? ... I just wonder if Banded doesn't better align with the setting for
   bandwidth. Also make the actual value default to 5 so the user can step it up and down in the control without

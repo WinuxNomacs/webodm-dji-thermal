@@ -133,11 +133,35 @@
     // Whether a layer shows at a point: not where WebODM's divider (Swipe) clips it away. leaflet-side-by-side clips
     // the layer's container to rect(top, right, bottom, left) in the map's layer pixels
     function shownAt(map, layer, latlng) {
-        var c = layer.getContainer && layer.getContainer();
-        var m = /rect\(\s*(-?[\d.]+)px,?\s*(-?[\d.]+)px,?\s*(-?[\d.]+)px,?\s*(-?[\d.]+)px\s*\)/.exec((c && c.style && c.style.clip) || "");
-        if (!m || !map.latLngToLayerPoint) return true;
+        var r = clipOf(layer.getContainer && layer.getContainer());
+        if (!r || !map.latLngToLayerPoint) return true;
         var p = map.latLngToLayerPoint(latlng);
-        return p.x >= Number(m[4]) && p.x <= Number(m[2]) && p.y >= Number(m[1]) && p.y <= Number(m[3]);
+        return p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom;
+    }
+
+    // An element's clip: {top, right, bottom, left} in pixels, or null without one
+    function clipOf(el) {
+        var m = /rect\(\s*(-?[\d.]+)px,?\s*(-?[\d.]+)px,?\s*(-?[\d.]+)px,?\s*(-?[\d.]+)px\s*\)/.exec((el && el.style && el.style.clip) || "");
+        return m ? {top: Number(m[1]), right: Number(m[2]), bottom: Number(m[3]), left: Number(m[4])} : null;
+    }
+
+    // Where a layer shows, as a clip: its own clip, less each clipped layer above it that covers one side of it (WebODM's
+    // divider: a layer on its right is clipped to the right; the one on the left shows only left of it). "" when
+    // nothing clips it. layers: [{container, z, own}] the map's raster layers (own: this one); view: {left, right} the map's
+    // visible part, in the same pixels (the divider clips a layer to the view's edge on its other side)
+    function shownClip(layers, view) {
+        var own = layers.filter(function (l) { return l.own; })[0];
+        if (!own) return "";
+        var BIG = 1e7, r = clipOf(own.container), cut = !!r;
+        r = r || {top: -BIG, right: BIG, bottom: BIG, left: -BIG};
+        layers.forEach(function (l) {
+            var o = !l.own && l.z > own.z && clipOf(l.container);
+            if (!o) return;
+            var toRight = o.right >= Math.min(r.right, view.right) - 1, toLeft = o.left <= Math.max(r.left, view.left) + 1;
+            if (toRight && !toLeft && o.left > r.left) { r.right = Math.min(r.right, o.left); cut = true; }
+            else if (toLeft && !toRight && o.right < r.right) { r.left = Math.max(r.left, o.right); cut = true; }
+        });
+        return cut ? "rect(" + [r.top, r.right, r.bottom, r.left].join("px, ") + "px)" : "";
     }
 
     function thermalLayerAt(map, latlng) {
@@ -1497,14 +1521,55 @@
             if (el) el.innerHTML = readoutHtml(state.readout, userUnit(), state.frames);
         }
 
+        // -- measurements drawn where their layer shows -----------------------------------------------------------
+        // Each thermal layer's measurements (pins, regions, lines, ΔT, saved ones) go in a pane of their own, clipped
+        // to where that layer shows (shownClip), so with an overlay swiped a ΔT read on the left layer ends at the
+        // divider. Panes by the layer's source key (layerSource's); a measurement without one is drawn as before
+        var panes = {}, clipsQueued = false;
+        function paneOf(key) {
+            if (!key || !map.createPane) return undefined;
+            if (!panes[key]) {
+                panes[key] = "dtMeasure" + Object.keys(panes).length;
+                map.createPane(panes[key]).style.zIndex = 640;     // above WebODM's overlays and markers
+                updateClips();
+            }
+            return panes[key];
+        }
+        // Leaflet options in a key's pane (none: Leaflet's own)
+        function inPane(key, options) {
+            var pane = paneOf(key);
+            return pane ? assign({}, options, {pane: pane}) : options;
+        }
+        function updateClips() {
+            var tiles = map.getPane && map.getPane("tilePane");
+            Object.keys(panes).forEach(function (key) {
+                var pane = map.getPane(panes[key]);
+                if (!pane) return;      // the map is gone
+                var t = thermalLayers(map, true).filter(function (x) { return layerSource(x).key === key; }).pop();
+                var layers = !t ? [] : Object.keys(map._layers || {}).map(function (k) { return map._layers[k]; }).filter(function (l) {
+                    var c = l.getContainer && l.getContainer();
+                    return c && c.parentNode === tiles && !(l.isHidden && l.isHidden()) && (l.options || {}).opacity !== 0;
+                }).map(function (l) {
+                    return {container: l.getContainer(), z: (l.options || {}).zIndex || 0, own: l === t.layer};
+                });
+                var nw = map.containerPointToLayerPoint([0, 0]), se = map.containerPointToLayerPoint(map.getSize());
+                pane.style.clip = shownClip(layers, {left: nw.x, right: se.x});
+            });
+        }
+        function queueClips() {
+            if (clipsQueued) return;
+            clipsQueued = true;
+            (root.requestAnimationFrame || function (f) { return setTimeout(f, 0); })(function () { clipsQueued = false; updateClips(); });
+        }
+
         function drawPins() {
             pinLayer.clearLayers();
             if (!state.pinsVisible) return;
             state.pins.forEach(function (p) {
-                var marker = L.circleMarker([p.lat, p.lng], {radius: 5, color: "#fff", weight: 2, fillColor: "#d9534f", fillOpacity: 1});
+                var marker = L.circleMarker([p.lat, p.lng], inPane(p.source, {radius: 5, color: "#fff", weight: 2, fillColor: "#d9534f", fillOpacity: 1}));
                 var c = pinTemp(p);
                 marker.bindTooltip(p.label + (c === null || c === undefined ? "" : ": " + formatTemp(c)),
-                                   {permanent: true, direction: "right", className: "dt-inspector-tip"});
+                                   inPane(p.source, {permanent: true, direction: "right", className: "dt-inspector-tip"}));
                 pinLayer.addLayer(marker);
             });
         }
@@ -1524,8 +1589,8 @@
 
         function extremeMarker(r, which) {
             var s = r.statistics, loc = s[which + "_location"], hot = which === "max";
-            return L.circleMarker([loc[1], loc[0]], {radius: 4, color: "#fff", weight: 2, fillColor: hot ? "#d9534f" : "#337ab7", fillOpacity: 1})
-                .bindTooltip(r.label + (hot ? " hottest: " : " coldest: ") + formatTemp(s[which]), {direction: "top", className: "dt-inspector-tip"});
+            return L.circleMarker([loc[1], loc[0]], inPane(r.source, {radius: 4, color: "#fff", weight: 2, fillColor: hot ? "#d9534f" : "#337ab7", fillOpacity: 1}))
+                .bindTooltip(r.label + (hot ? " hottest: " : " coldest: ") + formatTemp(s[which]), inPane(r.source, {direction: "top", className: "dt-inspector-tip"}));
         }
 
         function drawRegions() {
@@ -1534,16 +1599,16 @@
             state.regions.forEach(function (r) {
                 var style = r.id === state.shown ? Regions.STYLE : {color: Regions.STYLE.color, weight: 1, opacity: 0.8, fillOpacity: 0.05};
                 if (r.shape === "delta") {
-                    return deltaLayers(latLngs(r), style.color, r.label + (typeof r.delta_t === "number" ? ": ΔT " + formatSigned(r.delta_t) : ""), "dt-inspector-tip")
+                    return deltaLayers(latLngs(r), style.color, r.label + (typeof r.delta_t === "number" ? ": ΔT " + formatSigned(r.delta_t) : ""), "dt-inspector-tip", r.source)
                         .forEach(function (l) { regionLayer.addLayer(l); });
                 }
-                var shape = r.circle ? L.circle([r.circle.lat, r.circle.lng], assign({radius: r.circle.radius, interactive: false}, style)) :
-                    r.shape === "line" ? L.polyline(latLngs(r), assign({interactive: false}, style, {weight: style.weight + 1})) :
-                    L.polygon(latLngs(r), assign({interactive: false}, style));
+                var shape = r.circle ? L.circle([r.circle.lat, r.circle.lng], inPane(r.source, assign({radius: r.circle.radius, interactive: false}, style))) :
+                    r.shape === "line" ? L.polyline(latLngs(r), inPane(r.source, assign({interactive: false}, style, {weight: style.weight + 1}))) :
+                    L.polygon(latLngs(r), inPane(r.source, assign({interactive: false}, style)));
                 regionLayer.addLayer(shape);
                 // A line's label at its start, off the points its profile finds along it
-                var labelled = r.shape !== "line" ? shape : L.circleMarker(latLngs(r)[0], {radius: 3, color: style.color, weight: 2, fillColor: "#fff", fillOpacity: 1, interactive: false});
-                labelled.bindTooltip(r.label, {permanent: true, direction: r.shape === "line" ? "left" : "center", className: "dt-inspector-tip"});
+                var labelled = r.shape !== "line" ? shape : L.circleMarker(latLngs(r)[0], inPane(r.source, {radius: 3, color: style.color, weight: 2, fillColor: "#fff", fillOpacity: 1, interactive: false}));
+                labelled.bindTooltip(r.label, inPane(r.source, {permanent: true, direction: r.shape === "line" ? "left" : "center", className: "dt-inspector-tip"}));
                 if (labelled !== shape) regionLayer.addLayer(labelled);
                 if (r.statistics) {
                     regionLayer.addLayer(extremeMarker(r, "min"));
@@ -1552,12 +1617,13 @@
             });
         }
 
-        // A ΔT on the map: a thin line between its spots, a dot at each (the first hollow), the label at the second
-        function deltaLayers(points, color, label, className) {
-            var dot = function (p, fill) { return L.circleMarker(p, {radius: 4, color: color, weight: 2, fillColor: fill, fillOpacity: 1, interactive: false}); };
+        // A ΔT on the map: a thin line between its spots, a dot at each (the first hollow), the label at the second; in
+        // the pane of the layer it was read on (key)
+        function deltaLayers(points, color, label, className, key) {
+            var dot = function (p, fill) { return L.circleMarker(p, inPane(key, {radius: 4, color: color, weight: 2, fillColor: fill, fillOpacity: 1, interactive: false})); };
             var second = dot(points[1], color);
-            second.bindTooltip(label, {permanent: true, direction: "right", className: className});
-            return [L.polyline(points, {color: color, weight: 1.5, opacity: 0.95, dashArray: "4 3", interactive: false}), dot(points[0], "#fff"), second];
+            second.bindTooltip(label, inPane(key, {permanent: true, direction: "right", className: className}));
+            return [L.polyline(points, inPane(key, {color: color, weight: 1.5, opacity: 0.95, dashArray: "4 3", interactive: false})), dot(points[0], "#fff"), second];
         }
 
         function regionsChanged() {
@@ -1583,18 +1649,18 @@
             savedLayer.clearLayers();
             if (!state.savedVisible) return;
             savedItems(assign({}, state, {onMap: sourcesOnMap()})).forEach(function (i) {
-                var m = i.m, style = i.key === state.savedShown ? assign({}, SAVED_STYLE, {weight: 3}) : SAVED_STYLE, shape;
+                var m = i.m, style = i.key === state.savedShown ? assign({}, SAVED_STYLE, {weight: 3}) : SAVED_STYLE, shape, key = i.source.key;
                 if (m.shape === "pin") {
                     var c = m.geometry.coordinates;
-                    shape = L.circleMarker([c[1], c[0]], {radius: 5, color: "#fff", weight: 2, fillColor: SAVED_STYLE.color, fillOpacity: 1, interactive: false});
+                    shape = L.circleMarker([c[1], c[0]], inPane(key, {radius: 5, color: "#fff", weight: 2, fillColor: SAVED_STYLE.color, fillOpacity: 1, interactive: false}));
                 } else if (m.shape === "delta") {
                     var v = m.values || {};
                     return deltaLayers(savedLatLngs(m), SAVED_STYLE.color, m.name + (typeof v.delta_t === "number" ? ": ΔT " + formatSigned(v.delta_t) : ""),
-                                       "dt-inspector-tip dt-inspector-saved-tip").forEach(function (l) { savedLayer.addLayer(l); });
-                } else if (m.circle) shape = L.circle([m.circle.lat, m.circle.lng], assign({radius: m.circle.radius, interactive: false}, style));
-                else if (m.shape === "line") shape = L.polyline(savedLatLngs(m), assign({interactive: false}, style, {weight: style.weight + 1}));
-                else shape = L.polygon(savedLatLngs(m), assign({interactive: false}, style));
-                shape.bindTooltip(m.name, {permanent: true, direction: m.shape === "pin" ? "right" : "center", className: "dt-inspector-tip dt-inspector-saved-tip"});
+                                       "dt-inspector-tip dt-inspector-saved-tip", key).forEach(function (l) { savedLayer.addLayer(l); });
+                } else if (m.circle) shape = L.circle([m.circle.lat, m.circle.lng], inPane(key, assign({radius: m.circle.radius, interactive: false}, style)));
+                else if (m.shape === "line") shape = L.polyline(savedLatLngs(m), inPane(key, assign({interactive: false}, style, {weight: style.weight + 1})));
+                else shape = L.polygon(savedLatLngs(m), inPane(key, assign({interactive: false}, style)));
+                shape.bindTooltip(m.name, inPane(key, {permanent: true, direction: m.shape === "pin" ? "right" : "center", className: "dt-inspector-tip dt-inspector-saved-tip"}));
                 savedLayer.addLayer(shape);
             });
         }
@@ -1696,6 +1762,7 @@
             }
             r.loading = true;
             r.error = null;
+            r.source = layerSource(t).key;      // drawn where that layer shows
             var iso = limitsKey(state.isotherm), fix = fixFor(t);
             return fetchFn(inspectorUrl(t, "region"), {method: "POST", credentials: "same-origin",
                 headers: {"Content-Type": "application/json", "X-CSRFToken": csrfToken(doc)},
@@ -2390,6 +2457,14 @@
         map.on("mouseout", onOut);
         map.on("layeradd", onLayerAdd);
         map.on("layerremove", onLayerRemove);
+        // The panes' clips follow the layers' (WebODM's divider sets them as it is dragged and the map moves)
+        map.on("layeradd layerremove moveend zoomend", queueClips);
+        if (root.MutationObserver && map.getPane && map.getPane("tilePane")) {
+            new root.MutationObserver(function (changes) {
+                var tiles = map.getPane("tilePane");
+                if (changes.some(function (c) { return c.target.parentNode === tiles; })) queueClips();
+            }).observe(map.getPane("tilePane"), {attributes: true, attributeFilter: ["style"], subtree: true});
+        }
         thermalLayers(map, true).forEach(function (t) { watch(t); });
         drawIsotherms();
         if (plugins && plugins.Map && plugins.Map.onHandleClick) plugins.Map.onHandleClick(onClick);
@@ -2491,7 +2566,7 @@
                framesSource: framesSource, fromCelsius: fromCelsius, corrected: corrected, uncorrected: uncorrected,
                rawIsotherm: rawIsotherm, keptRange: keptRange, correctionHtml: correctionHtml, forgetCorrections: forgetCorrections,
                savedHtml: savedHtml, savedCsv: savedCsv, savedGeoJson: savedGeoJson, formHtml: formHtml, pinsHtml: pinsHtml,
-               mosaicsHtml: mosaicsHtml, orthosHtml: orthosHtml, orthosOf: orthosOf, orthoUrl: orthoUrl, shownAt: shownAt, toCelsius: toCelsius, movable: movable, adjustOf: adjustOf, autoRange: autoRange,
+               mosaicsHtml: mosaicsHtml, orthosHtml: orthosHtml, orthosOf: orthosOf, orthoUrl: orthoUrl, shownAt: shownAt, shownClip: shownClip, toCelsius: toCelsius, movable: movable, adjustOf: adjustOf, autoRange: autoRange,
                scaleHtml: scaleHtml, imageHtml: imageHtml, create: create};
     root.ThermalInspector = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
