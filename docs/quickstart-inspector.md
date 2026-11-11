@@ -104,7 +104,7 @@ WebODM's Metric/Imperial units. See [Palettes and units](palettes.md).
 
 ## 4. Mosaic Overlays on the map
 
-**Mosaic Overlays**, at the bottom of the panel, holds the mosaics of every workset in the project's datasets; it is
+**Mosaic Overlays**, at the bottom of the panel (under Ortho Overlays on a task's map), holds the mosaics of every workset in the project's datasets; it is
 there only when a workset has built mosaics. Its button says how many are shown ("Mosaic Overlays: 1 of 5 shown");
 click it to open the list, and tick one to lay it on the map, above WebODM's layers. The list stays open while you
 tick, and closes with the button again. Or open the map from the workset's **Open on WebODM's map**, which lays it
@@ -134,7 +134,7 @@ model; until then, look at the mosaics in the Analyzer's [mosaic viewer](quickst
 
 ## 5. Ortho Overlays on the map
 
-On a task's map, **Ortho Overlays**, under Mosaic Overlays at the bottom of the panel, holds the orthophotos of the
+On a task's map, **Ortho Overlays**, near the bottom of the panel just above Mosaic Overlays, holds the orthophotos of the
 project's other finished tasks: thermal ones (a thermometer beside the name) and RGB ones (a picture). It works as
 Mosaic Overlays does: its button says how many are shown, opens the list, and each one you tick is laid on the map
 above WebODM's layers and listed below the button with its opacity, **Swipe** and the magnifier.

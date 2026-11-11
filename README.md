@@ -471,7 +471,7 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   over each thermal layer, hidden with it, within the task's crop; the legend marks the part painted. Kept in your
   browser for the same tasks; Off removes it.
 - **Mosaic Overlays**: the mosaics of the Analyzer's worksets in the project's datasets (for those who can view the
-  project; shown only when one has built mosaics), last in the panel: a dropdown ("Mosaic Overlays: 1 of 5 shown")
+  project; shown only when one has built mosaics), last in the panel, under Ortho Overlays: a dropdown ("Mosaic Overlays: 1 of 5 shown")
   opens their checklist, each tickbox laying one on the map above WebODM's layers, and the laid ones are listed below
   it with their controls: **Mosaic**, **Harmonized** or **Source
   frame**, in your palette over its own 2nd to 98th percentile, with its opacity, **Swipe** (the Inspector's own
@@ -483,7 +483,7 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   WebODM's layer panel (a plugin can't add those), and are laid again on each visit; the workset's **Open on
   WebODM's map** opens the project's map with its mosaic laid. Not on WebODM's public maps.
 - **Ortho Overlays**: on a task's map, the orthophotos of the project's other finished tasks, thermal or RGB, in a
-  dropdown of their own under Mosaic Overlays, laid and controlled as the mosaics are (opacity, **Swipe**, zoom to).
+  dropdown of their own above Mosaic Overlays, laid and controlled as the mosaics are (opacity, **Swipe**, zoom to).
   A thermal one is read as its task's thermal layer (hover, pins, regions, ΔT, isotherm, scale, Image), its
   measurements saved on that task; an RGB one is drawn as WebODM draws it. The readings follow WebODM's divider:
   with an overlay swiped, the cursor reads the layer shown on its side, and each measurement (pins, regions, lines,
