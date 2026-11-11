@@ -3,6 +3,33 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **R18. One "Measurements" section** (the user, 2026-11-11, in `new.md`): "Would it not be sensible to combine
+  "Pinned Points" and "Regions and lines" under a single "Measurements" section?" Builds on `inspector.js`
+  `pinsHtml` and `regionsHtml` (each its list and its Hide/Show, CSV and Remove all) and `panelHtml`'s order.
+  - **Decided** (the user, 2026-11-11): **one list, one set of buttons**: pins, ΔTs, rectangles, circles, polygons
+    and lines in one list in the order made, each with its tool's icon; one Hide/Show, one CSV (all of them, with a
+    shape column, as Saved measurements' CSV) and one Remove all; the section "Measurements", above "Saved
+    measurements".
+  - Proposed: the selected region's statistics and a line's profile still shown under the list; the pins' and
+    regions' browser storage kept as it is (no data moved). Tests: Jest (the one list in order, the buttons, the CSV).
+    Docs: README, quickstart-inspector and its screenshots.
+- **R19. ΔT across two orthophotos** (the user, 2026-11-11, in `new.md`): "Would it be possible for the "Delta T"
+  measurement tool to function across 2 orthophotos? Idea being if I select a point on the left orthophoto and a
+  point on the right orthophoto, it calculates the delta between them. The line between the dots would only appear
+  when both dots are visible on screen at the same time, in order to avoid confusion." Builds on R12's ΔT (read on
+  the server on one raster, the layer under its middle: `measure`, the `region` endpoint's `shape: delta`), R15's
+  overlays and readings that follow WebODM's divider (`thermalLayerAt`, `shownAt`), and R17's panes clipped to where
+  each layer shows.
+  - **Decided** (the user, 2026-11-11): each spot read from **the layer showing where it is clicked** (left of the
+    divider the map's layer, right of it the swiped overlay); **a ΔT across two layers is not saveable** (kept in
+    the panel for this visit; one on a single layer saves as now); on the map **each dot shows with its own layer**,
+    the line only while both dots show, the label with the second dot; the value always in the panel.
+  - Proposed: the layer of each spot found at its click (`thermalLayerAt`) and kept with it (`sources: [a, b]`); on
+    one layer, read as now; on two, each spot read from its layer's `point` endpoint (corrected for its own layer
+    when Manual Corrections are on), ΔT = second − first in the browser; the list row and the panel's details name
+    both layers. The dots drawn each in its layer's pane; the line in a pane of its own shown only while both dots
+    are inside their layers' visible clips. Tests: Jest (two layers read, ΔT, no Save, the line shown and hidden as
+    the divider moves). Docs: README, quickstart-inspector.
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
