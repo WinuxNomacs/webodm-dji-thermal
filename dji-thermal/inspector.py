@@ -89,6 +89,40 @@ def point(task, lon, lat):
     return out
 
 
+def delta(readings, length=None):
+    """
+    A ΔT's figures from its two spots' readings [(temperature or None, why there is none)], each a single pixel as a
+    pin reads it: {valid, reason (the first missing spot's), first, second, delta_t (second less first), reasons (each
+    spot's), length}
+    """
+    (first, why_first), (second, why_second) = readings
+    valid = first is not None and second is not None
+    return {'valid': valid, 'reason': None if valid else (why_first if first is None else why_second) or 'nodata',
+            'first': first, 'second': second, 'delta_t': second - first if valid else None,
+            'reasons': [None if first is not None else why_first or 'nodata',
+                        None if second is not None else why_second or 'nodata'],
+            'length': length}
+
+
+def delta_ends(geometry):
+    """A ΔT's two spots ([x, y] or [lon, lat]) from its GeoJSON line, None when it isn't a line of two distinct points"""
+    coordinates = geometry.get('coordinates') if isinstance(geometry, dict) and geometry.get('type') == 'LineString' else None
+    try:
+        ends = [(float(c[0]), float(c[1])) for c in coordinates]
+    except (TypeError, ValueError, IndexError):
+        return None
+    if len(ends) != 2 or ends[0] == ends[1] or not all(math.isfinite(v) for e in ends for v in e):
+        return None
+    return ends
+
+
+def ground_distance(a, b):
+    """The distance (m) between two points (lon, lat) on the ground, along the sphere Leaflet measures on"""
+    lon1, lat1, lon2, lat2 = (math.radians(v) for v in (a[0], a[1], b[0], b[1]))
+    h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
+    return 2 * 6371000 * math.asin(min(1.0, math.sqrt(h)))
+
+
 def region(task, geometry, percentiles=PERCENTILES, bins=HISTOGRAM_BINS, isotherm=None, correction=None):
     """
     The statistics of the temperatures inside a polygon or along a line (GeoJSON geometry, lon/lat), within the task's

@@ -94,8 +94,8 @@ difference and the harmonized temperature. Something as wide as the neighbourhoo
 metres across) fades out, and the edge between two surfaces at different temperatures shows a band of each colour
 along it. Mosaics built before the plugin had it show it once built again.
 
-To compare two spots exactly, use the **ΔT** tool on the frame page or in the Thermal Inspector (see
-[Measuring](#delta-t-two-spots) below).
+To compare two spots exactly, use the **ΔT** tool in the Thermal Inspector
+([Measuring on the map](quickstart-inspector.md)) or on the frame page: each spot is read as its own pixel.
 
 ## Trying other values on one frame
 

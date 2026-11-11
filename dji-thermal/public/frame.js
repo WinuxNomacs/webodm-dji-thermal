@@ -235,8 +235,8 @@
     }
 
     // The tools drawn on the frame, as the Thermal Inspector's (regions.js): [shape, icon, name]
-    var TOOLS = ["pin", "line", "rectangle", "circle", "polygon"].map(function (k) { return [k, Regions.TOOLS[k].icon, Regions.TOOLS[k].name]; });
-    var LABELS = {pin: "P", line: "L"};         // a pin's label, P1…, a line's L1…, the rest R1…
+    var TOOLS = ["delta", "pin", "line", "rectangle", "circle", "polygon"].map(function (k) { return [k, Regions.TOOLS[k].icon, Regions.TOOLS[k].name]; });
+    var LABELS = {pin: "P", line: "L", delta: "D"};     // a pin's label, P1…, a line's L1…, a ΔT's D1…, the rest R1…
     var REASONS = {outside_raster: "Outside the frame", nodata: "No data here", too_few_points: "A polygon needs three corners",
                    self_intersecting: "The polygon's edges cross", no_area: "The polygon has no area", line_too_short: "A line needs two points"};
     var CIRCLE_SEGMENTS = 64;
@@ -280,11 +280,18 @@
         }).join(", ");
     }
 
-    // A measurement's value in a list: a pin's temperature, a region's or line's mean (°C)
+    // A ΔT's figures (frames.delta's, °C): with its ΔT
+    function isDelta(res) { return !!res && res.delta_t !== undefined; }
+
+    // A measurement's value in a list: a pin's temperature, a region's or line's mean, a ΔT's ΔT (°C)
     function itemValue(res, unit, loading) {
         if (loading) return '<span class="text-muted">…</span>';
         if (!res) return "";
         if (res.error) return '<span class="text-danger">' + esc(res.error) + "</span>";
+        if (isDelta(res)) {
+            return typeof res.delta_t === "number" ? esc(core.formatDelta(res.delta_t, "C", 2, true)) + ' <span class="text-muted">ΔT</span>' :
+                '<span class="text-muted">' + esc(REASONS[res.reason] || "none") + "</span>";
+        }
         var s = res.statistics;
         if (!s) return '<span class="text-muted">' + esc(REASONS[res.reason] || "none") + "</span>";
         return s.count === 1 && !res.profile ? esc(core.formatTemp(s.mean, "C", 2)) : esc(core.formatTemp(s.mean, "C", 2)) + ' <span class="text-muted">mean</span>';
@@ -294,6 +301,7 @@
     function detailHtml(res, Inspector) {
         if (!res) return "";
         if (res.error) return '<div class="text-danger">' + esc(res.error) + "</div>";
+        if (isDelta(res)) return Inspector.statisticsHtml(Object.assign({shape: "delta"}, res), Inspector.userUnit(), true, true);
         if (!res.statistics) return '<div class="text-muted">' + esc(REASONS[res.reason] || "No temperatures here") + "</div>";
         if (res.statistics.count === 1 && !res.profile) return "";
         return Inspector.statisticsHtml(res, Inspector.userUnit(), true, true);
@@ -303,18 +311,21 @@
     // changed, message}), the one shown in full
     function measureHtml(state, Inspector) {
         var tools = '<div class="btn-group btn-group-sm dt-inspector-modes" role="group" aria-label="Draw">' + TOOLS.map(function (t) {
+            var delta = t[0] === "delta";
             return '<button type="button" class="btn btn-default' + (state.tool === t[0] ? " active" : "") + '" data-tool="' + t[0] + '" title="' +
-                t[2] + '"' + (state.tool === t[0] ? ' aria-pressed="true"' : "") + '><i class="' + t[1] + '"></i></button>';
+                (delta ? "ΔT: click two spots, the second's temperature less the first's" : t[2]) + '"' + (state.tool === t[0] ? ' aria-pressed="true"' : "") +
+                '><i class="' + t[1] + '"></i>' + (delta ? " " + t[2] : "") + "</button>";
         }).join("") + "</div>";
         var hint = state.message ? '<div class="text-danger dt-inspector-hint">' + esc(state.message) + "</div>" :
             state.tool === "pin" ? '<div class="text-muted dt-inspector-hint">Click the frame to pin a pixel.</div>' :
+            state.tool === "delta" ? '<div class="text-muted dt-inspector-hint">Click the first spot, then the second: ΔT is the second\'s temperature less the first\'s. Esc cancels.</div>' :
             state.tool ? '<div class="text-muted dt-inspector-hint">' + (state.tool === "polygon" || state.tool === "line" ?
                 "Click each point; double-click or Enter to finish, Esc to cancel." : "Press and drag on the frame; Esc to cancel.") + "</div>" : "";
         var items = state.items, shown = items.filter(function (i) { return i.id === state.shown; })[0];
         var rows = items.length ? '<table class="table table-condensed dt-inspector-pins dt-inspector-regions"><tbody>' + items.map(function (i) {
             return '<tr data-item="' + i.id + '"' + (i === shown ? ' class="active"' : "") + '><td><i class="' + TOOLS.filter(function (t) { return t[0] === i.shape; })[0][1] +
                 '"></i> <a href="javascript:void(0)" data-act="show">' + esc(i.label) + "</a></td><td>" + itemValue(i.res, "C", i.loading) +
-                '</td><td class="text-right">' + (state.canChange && i.res && i.res.statistics ?
+                '</td><td class="text-right">' + (state.canChange && i.res && (i.res.statistics || (isDelta(i.res) && typeof i.res.delta_t === "number")) ?
                     '<a href="javascript:void(0)" data-act="save" title="Save it, named, for everyone who can view the project"><i class="fa fa-save"></i></a>' : "") +
                 '<a href="javascript:void(0)" data-act="remove" title="Remove"><i class="fa fa-times"></i></a></td></tr>';
         }).join("") + "</tbody></table>" : '<div class="text-muted dt-inspector-hint">Choose a tool, then draw on the frame to read its temperatures.</div>';
@@ -507,8 +518,8 @@
         // The shapes on both panes: those drawn (the one shown bolder) and those saved (dashed, green)
         function drawShapes() {
             if (!L) return;
-            var shapes = items().map(function (i) { return {g: i.geometry, circle: i.circle, shown: i.id === shownItem, color: "#ff9800"}; })
-                .concat(saved.map(function (m) { return {g: m.geometry, circle: m.circle, shown: m.id === savedShown, color: "#2e7d32", dash: "5 4"}; }));
+            var shapes = items().map(function (i) { return {g: i.geometry, circle: i.circle, shape: i.shape, shown: i.id === shownItem, color: "#ff9800"}; })
+                .concat(saved.map(function (m) { return {g: m.geometry, circle: m.circle, shape: m.shape, shown: m.id === savedShown, color: "#2e7d32", dash: "5 4"}; }));
             [0, 1].forEach(function (i) {
                 if (!maps[i]) return;
                 if (!groups[i]) groups[i] = L.layerGroup().addTo(maps[i]);
@@ -517,6 +528,15 @@
                     var o = {color: sh.color, weight: sh.shown ? 3 : 2, dashArray: sh.dash, fillOpacity: sh.shown ? 0.15 : 0.05, interactive: false};
                     var g = sh.g;
                     if (!g) return;
+                    // A ΔT: a thin dashed line between its spots, a dot at each (the first hollow)
+                    if (sh.shape === "delta") {
+                        var ends = g.coordinates.map(latLng);
+                        L.polyline(ends, {color: sh.color, weight: sh.shown ? 2 : 1.5, dashArray: "4 3", interactive: false}).addTo(groups[i]);
+                        ends.forEach(function (e, n) {
+                            L.circleMarker(e, {radius: 4, color: sh.color, weight: 2, fillColor: n ? sh.color : "#fff", fillOpacity: 1, interactive: false}).addTo(groups[i]);
+                        });
+                        return;
+                    }
                     var layer = g.type === "Point" ? L.circleMarker(latLng(g.coordinates), {radius: 5, color: "#000", weight: 1, fillColor: sh.color, fillOpacity: 1, interactive: false}) :
                         sh.circle ? L.circle([sh.circle.lat, sh.circle.lng], Object.assign({radius: sh.circle.radius}, o)) :
                         g.type === "LineString" ? L.polyline(g.coordinates.map(latLng), o) : L.polygon(g.coordinates[0].map(latLng), o);
@@ -530,7 +550,7 @@
             var mine = item.asked = (item.asked || 0) + 1, rel = frame;
             item.loading = true;
             item.with = measuredWith();
-            var body = {frame: rel, changes: changes, geometry: item.geometry, isotherm: limits()};
+            var body = {frame: rel, changes: changes, geometry: item.geometry, isotherm: limits(), shape: item.shape === "delta" ? "delta" : undefined};
             return fetchFn(base + "/frame/region", {method: "POST", credentials: "same-origin",
                                                     headers: {"Content-Type": "application/json", "X-CSRFToken": csrf}, body: JSON.stringify(body)})
                 .then(core.readJson).then(function (r) {

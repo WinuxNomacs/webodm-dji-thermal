@@ -1404,6 +1404,14 @@ class TestMosaics(AnalyzerTestCase):
         area = self.client.post(saved_url, {"name": "Area", "shape": "rectangle", "tab": "harmonized", "geometry": square},
                                 format="json").data
         self.assertEqual(area["values"]["statistics"]["count"], st["count"])
+        # A ΔT across the point: each spot as a pin reads it, live and saved
+        across = {"type": "LineString", "coordinates": [[lon, lat], [lon + d, lat]]}
+        live = self.client.post(self.url(task, cid, "/harmonized/region"), {"geometry": across, "shape": "delta"}, format="json").data
+        self.assertAlmostEqual(live["first"], p["temperature"], places=3)
+        kept = self.client.post(saved_url, {"name": "Across", "shape": "delta", "tab": "harmonized", "geometry": across}, format="json")
+        self.assertEqual(kept.status_code, status.HTTP_201_CREATED, kept.data)
+        self.assertEqual({k: kept.data["values"][k] for k in ("first", "second", "delta_t")}, {k: live[k] for k in ("first", "second", "delta_t")})
+        self.client.delete("{}/{}".format(saved_url, kept.data["id"]))
         self.assertEqual(self.client.post(saved_url, dict(pin, tab="view_angle"), format="json").status_code,
                          status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.client.patch("{}/{}".format(saved_url, area["id"]), {"name": "Roof"}, format="json").data["name"],

@@ -279,6 +279,26 @@ def region(values, geometry, percentiles=inspector.PERCENTILES, bins=inspector.H
     return out
 
 
+def delta(values, geometry):
+    """A ΔT drawn on a frame's values (a line of two points, in pixels): each spot its pixel's value, as a pin's
+    (inspector.delta), its length in pixels
+    :raises FrameError: not a line of two points"""
+    import numpy as np
+    ends = inspector.delta_ends(geometry)
+    if ends is None:
+        raise FrameError("A ΔT is a line of two spots")
+
+    def read(x, y):
+        row, col = math.floor(y), math.floor(x)
+        if not (0 <= row < values.shape[0] and 0 <= col < values.shape[1]):
+            return None, 'outside_raster'
+        v = float(values[row, col])
+        return (v, None) if np.isfinite(v) else (None, 'nodata')
+
+    return dict(inspector.delta([read(*e) for e in ends], math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1])),
+                pixel_size=1.0)
+
+
 def _profile(line, values):
     """A line's values every pixel along it, at most inspector.MAX_SAMPLES of them"""
     import numpy as np

@@ -205,10 +205,11 @@ download). A tab whose values are differences of temperatures goes in `DIFFERENC
 
 ### A measuring tool
 
-The measuring tools (pin, line, rectangle, circle, polygon) are on the Thermal Inspector's panel (`inspector.js`) and
+The measuring tools (ΔT, pin, line, rectangle, circle, polygon) are on the Thermal Inspector's panel (`inspector.js`) and
 the frame page's Measure section (`frame.js`). Both draw with `regions.js`. A new shape that reaches the server as a
 GeoJSON `Polygon` or `LineString` needs no change to how it is measured: `inspector.raster_region` and
-`frames.region` measure any of those.
+`frames.region` measure any of those. ΔT is the exception: its two spots are read as pins (`inspector.delta` from
+`inspector_api.delta_values` on the map, `frames.delta` on a frame), asked for with `shape: "delta"`.
 
 1. `regions.js`: add it to `TOOLS` (its icon and name), and teach `DrawTool` to draw it (`opts.shape`), turning
    what was drawn into GeoJSON as `circleRing` does for a circle.

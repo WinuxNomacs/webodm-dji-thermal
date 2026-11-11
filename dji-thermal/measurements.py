@@ -9,9 +9,9 @@ list replaced whole under the folder's lock:
                                                                      in its pixels; see frames_api)
 
 so they are shared and deleted with the task or the workset (a frame's with the frame, removed from the workset). Each is {id, name, comment, shape (pin, rectangle,
-circle, polygon or line), geometry (GeoJSON, lon/lat: a point for a pin), circle ({lat, lng, radius}) for a circle,
-tab (a mosaic's), values (a pin's {valid, temperature, measured, reason}; a region's as inspector.raster_region finds
-them), isotherm ({low, high} °C, or null), correction (correction.described, or null), created_at, created_by}.
+circle, polygon, line or delta), geometry (GeoJSON, lon/lat: a point for a pin, a line of two for a ΔT), circle ({lat, lng, radius}) for a circle,
+tab (a mosaic's), values (a pin's {valid, temperature, measured, reason}; a ΔT's as inspector.delta finds them, with
+measured: its two spots' as measured; a region's as inspector.raster_region finds them), isotherm ({low, high} °C, or null), correction (correction.described, or null), created_at, created_by}.
 """
 import os
 import uuid
@@ -20,7 +20,7 @@ from . import conversions, datasets
 
 FILE = 'measurements.json'
 FRAMES_FILE = 'frame-measurements.json'
-SHAPES = ('pin', 'rectangle', 'circle', 'polygon', 'line')
+SHAPES = ('pin', 'rectangle', 'circle', 'polygon', 'line', 'delta')
 MAX_NAME = 255
 MAX_COMMENT = 2000
 

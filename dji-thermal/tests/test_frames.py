@@ -7,6 +7,7 @@ The flight test reads R-JPEGs from DJI_THERMAL_FLIGHT_DIR and is skipped without
 import contextlib
 import importlib
 import io
+import math
 from unittest import mock
 
 import numpy as np
@@ -54,6 +55,19 @@ class TestShapesOnAFrame(AnalyzerTestCase):
         self.assertEqual(line["profile"]["values"][30], 50.0)
         self.assertEqual(line["profile"]["values"][0], 20.0)
         self.assertEqual(line["profile"]["points"][0], [5.0, 15.5])
+
+    def test_a_delta_t_is_the_second_spots_pixel_less_the_firsts_with_its_length_in_pixels(self):
+        line = {"type": "LineString", "coordinates": [[5.5, 15.5], [35.2, 15.9]]}
+        d = frames.delta(self.values, line)
+        self.assertEqual((d["valid"], d["first"], d["second"], d["delta_t"], d["reasons"]), (True, 20.0, 50.0, 30.0, [None, None]))
+        self.assertAlmostEqual(d["length"], math.hypot(29.7, 0.4))
+        # A spot on no data, or off the frame: no ΔT
+        off = frames.delta(self.values, {"type": "LineString", "coordinates": [[3, 0.5], [100, 100]]})
+        self.assertEqual((off["valid"], off["reason"], off["delta_t"], off["reasons"]), (False, "nodata", None, ["nodata", "outside_raster"]))
+        for wrong in ({"type": "LineString", "coordinates": [[1, 1], [2, 2], [3, 3]]}, {"type": "LineString", "coordinates": [[1, 1], [1, 1]]},
+                      {"type": "Point", "coordinates": [1, 1]}):
+            with self.assertRaises(frames.FrameError):
+                frames.delta(self.values, wrong)
 
     def test_shapes_off_the_frame_or_on_no_data_measure_nothing(self):
         self.assertEqual(frames.region(self.values, square(100, 100, 110, 110))["reason"], "outside_raster")
@@ -177,6 +191,17 @@ class TestFramePage(AnalyzerTestCase):
         r2 = self.client.post(self.url(task, cid, "frame/region"), dict(region, changes={"emissivity": 0.7}),
                               format="json").data
         self.assertNotAlmostEqual(r2["statistics"]["mean"], r["statistics"]["mean"], places=1)
+        # A ΔT: the second spot's pixel less the first's
+        delta = {"frame": rel, "shape": "delta", "geometry": {"type": "LineString", "coordinates": [[100.5, 100.5], [300.5, 200.5]]}}
+        d = self.client.post(self.url(task, cid, "frame/region"), delta, format="json").data
+        self.assertAlmostEqual(d["first"], float(values[100, 100]), places=5)
+        self.assertAlmostEqual(d["delta_t"], float(values[200, 300] - values[100, 100]), places=5)
+        kept = self.client.post(self.url(task, cid, "frame/measurements"), dict(delta, name="Joint", isotherm={"low": 20, "high": None}),
+                                format="json")
+        self.assertEqual(kept.status_code, status.HTTP_201_CREATED, kept.data)
+        self.assertEqual((kept.data["shape"], kept.data["isotherm"]), ("delta", None))
+        self.assertAlmostEqual(kept.data["values"]["delta_t"], d["delta_t"], places=5)
+        self.client.delete(self.url(task, cid, "frame/measurements/" + kept.data["id"]))
 
         # Downloads: CSV and a float TIFF of the same values
         csv = self.client.get(self.url(task, cid, "frame/download"), {"frame": rel, "kind": "csv"})

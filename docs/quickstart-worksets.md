@@ -139,8 +139,10 @@ cursor.
 
 ![The frame page, a rectangle measured on the frame](images/frame-page.png)
 
-**Measure** has the Thermal Inspector's tools, in the frame's pixels: **Pin**, **Line**, **Rectangle**, **Circle** and
-**Polygon**. Click a row for its statistics (a line's profile, a region's histogram, the surroundings and ΔT). Those
+**Measure** has the Thermal Inspector's tools, in the frame's pixels: **ΔT**, **Pin**, **Line**, **Rectangle**, **Circle**
+and **Polygon**. With **ΔT**, click a first pixel, then a second: it gives each one's temperature and the second's
+less the first's. Click a row for its statistics (a ΔT's two spots, a line's profile, a region's histogram, the
+surroundings and ΔT). Those
 who can change the project can **Save** one: it stays with the workset, under **Saved on this frame**, for everyone
 who can view the project.
 

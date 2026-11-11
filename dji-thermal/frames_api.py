@@ -124,6 +124,8 @@ def frame_region(task, cid, data):
         {k: v for k, v in data.items() if k != 'correction'})
     m = measured(lambda: frames.measure(task, cid, rel, changes))
     celsius = inspector.to_celsius(m['values'], frames.unit_of(task, cid))
+    if inspector_api.is_delta(data):
+        return measured(lambda: frames.delta(celsius, geometry)), rel, changes
     return measured(lambda: frames.region(celsius, geometry, percentiles, bins, isotherm)), rel, changes
 
 
@@ -167,9 +169,9 @@ class WorksetFrameMeasurements(DatasetView):
             raise ValidationError({'error': str(e)}) from None
         shape = data.get('shape')
         if shape not in measurements.SHAPES:
-            raise ValidationError({'error': "Not a pin, a region or a line"})
+            raise ValidationError({'error': "Not a pin, a region, a line or a ΔT"})
         values, rel, changes = frame_region(task, cid, data)
-        isotherm = inspector_api.region_isotherm(data.get('isotherm'))
+        isotherm = None if shape == 'delta' else inspector_api.region_isotherm(data.get('isotherm'))
         record = {'name': name, 'comment': comment, 'shape': shape, 'frame': rel, 'changes': changes,
                   'geometry': data.get('geometry'), 'values': values,
                   'isotherm': {'low': isotherm[0], 'high': isotherm[1]} if isotherm else None}

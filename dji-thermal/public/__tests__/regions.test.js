@@ -118,4 +118,20 @@ describe("drawing a region", () => {
         expect(tool.isActive()).toBe(false);
         expect(shapes(map)).toBe(0);
     });
+    it("finishes a ΔT on its second spot, as a line of two, whatever Enter, a double-click or a click twice there", () => {
+        draw("delta");
+        map.fire("click", {latlng: at(map, 10, 10)});
+        key("Enter");
+        map.fire("dblclick", {latlng: at(map, 10, 10)});
+        map.fire("click", {latlng: at(map, 10, 10)});
+        expect(calls.finish).toEqual([]);
+        expect(calls.invalid).toEqual([]);
+        map.fire("click", {latlng: at(map, 80, 40)});
+        expect(calls.finish.length).toBe(1);
+        const g = calls.finish[0].geometry;
+        expect(g.type).toBe("LineString");
+        expect(g.coordinates).toEqual([[at(map, 10, 10).lng, at(map, 10, 10).lat], [at(map, 80, 40).lng, at(map, 80, 40).lat]]);
+        expect(tool.isActive()).toBe(false);
+        expect(regions.TOOLS.delta.name).toBe("ΔT");
+    });
 });

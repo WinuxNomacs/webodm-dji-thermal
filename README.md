@@ -13,7 +13,7 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
   in its pixels, or measured again with other values), and makes a WebODM task from the workset you choose.
 - **Thermal Inspector**, on WebODM's 2D map of a task with a thermal orthophoto: the temperature under the cursor,
   pinned points, the statistics of regions and lines drawn on it (with their surroundings and ΔT, and a line's
-  profile), measurements saved for everyone who can view the project, an approximate correction for another
+  profile), the ΔT between two spots clicked, measurements saved for everyone who can view the project, an approximate correction for another
   emissivity and reflected temperature, isotherms, the map's palette, colour range and image adjustments (as the
   mosaic viewer's), and its legend. It also lays the Analyzer's workset mosaics on the map, to compare them with the
   project's own layers, and shows the frames that saw a point clicked.
@@ -36,7 +36,7 @@ SDK compute them instead (see [DJI's own Thermal SDK](#djis-own-thermal-sdk)).
   [Mosaic Overlays](docs/quickstart-inspector.md#4-mosaic-overlays-on-the-map) and
   [Colours, legend and isotherms](docs/quickstart-inspector.md#3-colours-legend-and-isotherms).
 - **Analyze your results.** The temperature under the cursor, pins, lines with their profile, regions with their
-  statistics, histogram, surroundings and ΔT, isotherms, measurements saved for the project, and a correction for
+  statistics, histogram, surroundings and ΔT, the ΔT between two spots, isotherms, measurements saved for the project, and a correction for
   another emissivity: [Measuring on the map](docs/quickstart-inspector.md).
 - **Trace a temperature back to its photos.** The frames that saw a point on the map, each one measured in its own
   pixels or measured again with other values: [The frames that saw a point](docs/quickstart-inspector.md#5-the-frames-that-saw-a-point)
@@ -315,10 +315,11 @@ its detail pane: the frame page of the newest workset that converted):
 - **Pointer Info**: the temperature of the pixel under the cursor (for both measurements with Measure again);
   **Temperature On Pointer** shows the temperature beside the pointer too, each
   pane its own;
-- **Measure**: the Thermal Inspector's tools in the frame's pixels: a pin (a pixel's temperature), a line (a strip 1
+- **Measure**: the Thermal Inspector's tools in the frame's pixels: **ΔT** (two pixels clicked: each one's
+  temperature and the second's less the first's, with the distance between them in pixels), a pin (a pixel's temperature), a line (a strip 1
   pixel either side of it, with its profile; hovering the profile marks its point), a rectangle, a circle or a
   polygon (the statistics, the surroundings, a ring 3 to 10 pixels wide, and ΔT, the isotherm's share and a
-  histogram), labelled P1…, L1…, R1…, kept while the page is open and measured again when the isotherm or the
+  histogram), labelled D1…, P1…, L1…, R1…, kept while the page is open and measured again when the isotherm or the
   parameters change;
 - **Saved on this frame**: a measurement's Save (for those who can change the project) names it, with an optional
   comment, and keeps it with the workset, with the parameters it was measured with; everyone who can view the project
@@ -390,6 +391,11 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
 - **Hover**: the temperature under the cursor, in the panel under **Pointer Info** and beside the pointer (unless
   **Temperature On Pointer** is cleared, which is kept with your preferences, for the Analyzer's pages too); outside the task's crop, outside the
   orthophoto and where it has no data it says so.
+- **ΔT**, beside Hover: click a first spot, then a second, labelled D1, D2…. The panel gives each spot's temperature
+  (its own pixel, as a pin reads it), **ΔT**, the second's less the first's (corrected with Manual Corrections), and
+  the distance between them; the map shows a thin line between the spots, labelled at the second with its ΔT. A ΔT
+  is listed with the regions, kept in your browser, saved like them and exported in their CSV (with **first_spot**
+  and **second_spot** columns).
 - **Pin**: a click pins the point with its temperature, labelled P1, P2…, shown on the map instead of WebODM's
   popup. The pins are listed in the panel (click one to go to it), can be hidden and shown together, removed, and
   downloaded as CSV (latitude, longitude, temperature). They are kept in your browser for the same tasks.

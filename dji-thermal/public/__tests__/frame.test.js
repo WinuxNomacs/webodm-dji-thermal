@@ -104,7 +104,9 @@ describe("the frame page", () => {
         L.polygon = (points, opts) => layer({polygon: points, opts});
         L.map = (el, opts) => {
             const handlers = {};
-            const m = {el, opts, layers: [], center: [0, 0], zoom: 0, on(ev, f) { (handlers[ev] = handlers[ev] || []).push(f); return m; },
+            const toggle = () => ({enabled: () => true, enable() {}, disable() {}});
+            const m = {el, opts, layers: [], center: [0, 0], zoom: 0, dragging: toggle(), doubleClickZoom: toggle(),
+                       on(ev, f) { (handlers[ev] = handlers[ev] || []).push(f); return m; },
                        off() { return m; }, getContainer: () => el,
                        fire(ev, e) { (handlers[ev] || []).forEach(f => f(e)); }, fitBounds(b) { m.fitted = b; },
                        invalidateSize() {}, removeLayer(l) { m.layers = m.layers.filter(x => x !== l); },
@@ -131,6 +133,9 @@ describe("the frame page", () => {
             calls.push([url, opts]);
             const body = opts && opts.body ? JSON.parse(opts.body) : null;
             if (url === BASE + "/frames") return json(FRAMES);
+            if (url === BASE + "/frame/region" && body.shape === "delta") {
+                return json({valid: true, reason: null, first: 15, second: 17.25, delta_t: 2.25, reasons: [null, null], length: 5, pixel_size: 1});
+            }
             if (url === BASE + "/frame/region") {
                 const point = body.geometry.type === "Point";
                 return json({valid: true, reason: null, pixel_size: 1, statistics: {count: point ? 1 : 4, min: 15, max: 15, mean: point ? 15 : 16, std: 0,
@@ -139,7 +144,8 @@ describe("the frame page", () => {
             if (url.startsWith(BASE + "/frame/measurements")) {
                 if (opts && opts.method === "POST") {
                     const m = Object.assign({id: "aaaaaaaaaaa" + (saved.length + 1), created_by: "admin", created_at: "2026-11-01T10:00:00Z",
-                                             values: {valid: true, statistics: {count: 1, mean: 15}}}, body);
+                                             values: body.shape === "delta" ? {valid: true, first: 15, second: 17.25, delta_t: 2.25, length: 5} :
+                                                 {valid: true, statistics: {count: 1, mean: 15}}}, body);
                     saved.push(m);
                     return json(m, 201);
                 }
@@ -441,6 +447,36 @@ describe("the frame page", () => {
         expect(document.querySelector("#ta-frame-measure [data-item]")).toBeNull();
         expect($("ta-frame-saved").textContent).toContain("Hot spot");
         expect($("ta-frame-saved").textContent).toContain("As converted. Saved by admin");
+    });
+
+    it("measures ΔT between two pixels clicked with ΔT, first of the tools, and saves it like the others", async () => {
+        const {server, L} = await start();
+        const tools = [...document.querySelectorAll("#ta-frame-measure [data-tool]")];
+        expect(tools.map(b => b.getAttribute("data-tool"))).toEqual(["delta", "pin", "line", "rectangle", "circle", "polygon"]);
+        expect(tools[0].textContent.trim()).toBe("ΔT");
+        tools[0].click();
+        expect($("ta-frame-measure").textContent).toContain("Click the first spot, then the second");
+        L.maps[0].fire("click", {latlng: {lat: -0.5, lng: 0.5}});
+        L.maps[0].fire("click", {latlng: {lat: -0.5, lng: 5.5}});
+        await settle();
+        const region = server.calls.filter(c => c[0] === BASE + "/frame/region").pop();
+        expect(JSON.parse(region[1].body)).toEqual({frame: "a_T.JPG", changes: {}, geometry: {type: "LineString", coordinates: [[0.5, 0.5], [5.5, 0.5]]},
+                                                    isotherm: null, shape: "delta"});
+        const text = $("ta-frame-measure").textContent;
+        ["D1", "+2.25 °C ΔT", "First spot15.00 °C", "Second spot17.25 °C", "ΔT+2.25 °C", "Distance5.0 px"].forEach(t => expect(text).toContain(t));
+        // Drawn on both panes: a line between the spots and a dot at each
+        const drawn = L.maps[0].layers.filter(l => l.clearLayers).pop().layers;
+        expect(drawn.filter(l => l.line).length).toBe(1);
+        expect(drawn.filter(l => l.marker).map(l => l.marker)).toEqual([[-0.5, 0.5], [-0.5, 5.5]]);
+        document.querySelector("[data-item] [data-act=save]").click();
+        document.querySelector("[data-form=name]").value = "Joint";
+        document.querySelector("[data-act=form-save]").click();
+        await settle();
+        const post = server.calls.filter(c => c[0] === BASE + "/frame/measurements" && c[1] && c[1].method === "POST").pop();
+        expect(JSON.parse(post[1].body)).toEqual(expect.objectContaining({name: "Joint", shape: "delta", geometry: {type: "LineString", coordinates: [[0.5, 0.5], [5.5, 0.5]]}}));
+        expect($("ta-frame-saved").textContent).toContain("Joint");
+        expect($("ta-frame-saved").textContent).toContain("+2.25 °C ΔT");
+        expect($("ta-frame-saved").textContent).toContain("Second spot17.25 °C");
     });
 
     it("measures the shapes again when the isotherm or the parameters change, the isotherm's limits in °C", async () => {

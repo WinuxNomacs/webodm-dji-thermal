@@ -278,6 +278,43 @@ def region_isotherm(value):
     return tuple(limits)
 
 
+def delta_values(data, point, baseline):
+    """A ΔT asked in a request's data ({geometry: a line of two points (lon/lat), correction}): each spot read with
+    point(lon, lat) (its temperature in °C, or None, and why), corrected as the layer is; inspector.delta's figures,
+    with measured: the two spots as measured, and correction (correction.described, or None)
+    :raises ValidationError: not a line of two points, or a correction the layer can't take"""
+    geometry = data.get('geometry')
+    if isinstance(geometry, dict) and geometry.get('type') == 'Feature':
+        geometry = geometry.get('geometry')
+    ends = inspector.delta_ends(geometry)
+    if ends is None:
+        raise ValidationError({'error': "A ΔT is a line of two spots"})
+    if not all(-180 <= lon <= 180 and -90 <= lat <= 90 for lon, lat in ends):
+        raise ValidationError({'error': "Coordinates out of range"})
+    try:
+        wanted = correction.parse(data.get('correction'))
+    except ValueError as e:
+        raise ValidationError({'error': str(e)}) from None
+    fix = layer_correction(wanted, baseline)
+    measured = [point(lon, lat) for lon, lat in ends]
+    readings = [((correction.value(t, *fix) if fix else t) if t is not None else None, why) for t, why in measured]
+    out = inspector.delta(readings, inspector.ground_distance(*ends))
+    return dict(out, measured=[t for t, _why in measured], correction=correction.described(*fix) if fix else None,
+                geometry={'type': 'LineString', 'coordinates': [list(e) for e in ends]})
+
+
+def is_delta(data):
+    return isinstance(data, dict) and data.get('shape') == 'delta'
+
+
+def task_point(task):
+    """A point of the task's thermal orthophoto read for a pin or a ΔT: point(lon, lat) -> (°C or None, why)"""
+    def point(lon, lat):
+        found = inspector.point(task, lon, lat)
+        return (found['temperature'] if found['valid'] else None), found['reason']
+    return point
+
+
 def region_response(read):
     """read() (a region's statistics) as the response, its refusals as errors"""
     try:
@@ -290,8 +327,13 @@ def region_response(read):
 
 class InspectorRegion(InspectorView):
     def post(self, request, pk=None, project_pk=None):
-        """The statistics of the temperatures (°C) inside a polygon or along a line (region_request)"""
+        """The statistics of the temperatures (°C) inside a polygon or along a line (region_request); a ΔT's figures
+        for {shape: "delta"} (delta_values)"""
         task = self.thermal_task(request, pk)
+        if is_delta(request.data):
+            out = delta_values(request.data, task_point(task), lambda: correction.task_baseline(task))
+            out.pop('geometry')
+            return Response(out)
         geometry, percentiles, bins, isotherm, wanted = region_request(request)
         fix = layer_correction(wanted, lambda: correction.task_baseline(task))
         return region_response(lambda: inspector.region(task, geometry, percentiles, bins, isotherm, fix))
@@ -370,8 +412,8 @@ def saved_list(path, baseline, can_change, palette=''):
 
 def saved_record(data, point, region, baseline):
     """A measurement to save from a request's data ({name, comment, shape, geometry, circle, isotherm, correction}),
-    measured here: a pin with point(lon, lat) (its temperature in °C, or None, and why), a region or line with
-    region(geometry, percentiles, bins, isotherm, correction)"""
+    measured here: a pin or a ΔT's spots with point(lon, lat) (its temperature in °C, or None, and why), a region or
+    line with region(geometry, percentiles, bins, isotherm, correction)"""
     data = data if isinstance(data, dict) else {}
     try:
         name, comment = measurements.name_of(data.get('name')), measurements.comment_of(data.get('comment'))
@@ -379,8 +421,13 @@ def saved_record(data, point, region, baseline):
         raise ValidationError({'error': str(e)}) from None
     shape = data.get('shape')
     if shape not in measurements.SHAPES:
-        raise ValidationError({'error': "Not a pin, a region or a line"})
+        raise ValidationError({'error': "Not a pin, a region, a line or a ΔT"})
     geometry = data.get('geometry')
+    if shape == 'delta':
+        values = delta_values(data, point, baseline)
+        described = values.pop('correction')
+        record = {'geometry': values.pop('geometry'), 'isotherm': None}
+        return dict(record, name=name, comment=comment, shape=shape, values=values, correction=described)
     if shape == 'pin':
         coordinates = geometry.get('coordinates') if isinstance(geometry, dict) and geometry.get('type') == 'Point' else None
         try:
@@ -461,14 +508,9 @@ class InspectorMeasurements(InspectorMeasurementsView):
                           request.user.has_perm('change_project', task.project), conversion_tasks.task_palette(task))
 
     def post(self, request, pk=None, project_pk=None):
-        """A pin, region or line measured and saved (saved_record)"""
+        """A pin, region, line or ΔT measured and saved (saved_record)"""
         task = self.editable_task(request, pk)
-
-        def point(lon, lat):
-            found = inspector.point(task, lon, lat)
-            return (found['temperature'] if found['valid'] else None), found['reason']
-
-        record = saved_record(request.data, point, lambda *a: inspector.region(task, *a),
+        record = saved_record(request.data, task_point(task), lambda *a: inspector.region(task, *a),
                               lambda: correction.task_baseline(task))
         return Response(measurements.add(task, measurements.task_path(task), record, request.user), status=201)
 

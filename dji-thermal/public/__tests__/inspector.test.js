@@ -401,7 +401,7 @@ describe("the Thermal Inspector's regions", () => {
         expect(saved[0]).toMatchObject({label: "R1", shape: "rectangle", statistics: {mean: 30}});
         expect(saved[0].loading).toBeUndefined();
         expect(inspector.regionsCsv(saved, "F").split("\n")[1]).toBe(
-            "R1,rectangle,400,100.000,,50.000,122.000,86.000,9.000,85.100,53.600,118.400,78.800,7.200,,0.50010000,0.49990000,0.50020000,0.49980000");
+            "R1,rectangle,400,100.000,,50.000,122.000,86.000,9.000,85.100,53.600,118.400,78.800,7.200,,0.50010000,0.49990000,0.50020000,0.49980000,,");
         window.localStorage.setItem("unit_system", "imperial");
         expect(inspector.statisticsHtml(saved[0], "F")).toContain("1076 ft²");
         panel().querySelector('[data-region] [data-act="remove"]').click();
@@ -543,6 +543,74 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         ticks.forEach(([at, label]) => expect(at).toBeCloseTo((inspector.uncorrected(label, half) - 10) / 30 * 100, 0));
     });
 
+    it("measures ΔT between two spots clicked after choosing ΔT beside Hover, the second's temperature less the first's", async () => {
+        const map = leafletMap();
+        const DELTA = {valid: true, reason: null, first: 20, second: 26.5, delta_t: 6.5, reasons: [null, null], length: 2.31, measured: [20, 26.5], correction: null};
+        const {ins, fetchFn, panel} = start(map, {[REGION]: DELTA}, {L});
+        const posts = () => calls(fetchFn, "POST").map(c => JSON.parse(c[1].body));
+        ins.open();
+        const modes = [...panel().querySelectorAll(".dt-inspector-modes [data-mode]")].map(b => b.getAttribute("data-mode"));
+        expect(modes.slice(0, 3)).toEqual(["hover", "delta", "pin"]);
+        expect(panel().querySelector('[data-mode="delta"]').textContent.trim()).toBe("ΔT");
+        panel().querySelector('[data-mode="delta"]').click();
+        expect(panel().textContent).toContain("Click the first spot, then the second");
+        map.fire("click", {latlng: L.latLng(0.5, 0.5)});
+        expect(posts(fetchFn)).toEqual([]);
+        map.fire("click", {latlng: L.latLng(0.5, 0.50002)});
+        await flush(); await flush();
+        expect(posts(fetchFn)).toEqual([{geometry: {type: "LineString", coordinates: [[0.5, 0.5], [0.50002, 0.5]]}, shape: "delta", isotherm: null, correction: null}]);
+        expect(ins.state.mode).toBe("hover");
+        const shown = panel().querySelector(".dt-inspector-shown");
+        ["D1", "ΔT", "First spot20.00 °C", "Second spot26.50 °C", "ΔT+6.50 °C", "Distance2.3 m"].forEach(t => expect(shown.textContent).toContain(t));
+        expect(shown.textContent).not.toContain("Mean");
+        expect(panel().querySelector("[data-region]").textContent).toContain("+6.50 °C ΔT");
+        const tips = [];
+        map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) tips.push([l.getTooltip()._content, l.getLatLng()]); });
+        expect(tips).toEqual([["D1: ΔT +6.50 °C", L.latLng(0.5, 0.50002)]]);     // at the second spot
+        expect(inspector.regionsCsv(ins.state.regions, "F").split("\n")[1]).toBe("D1,delta,,,2.310,,,,,,,,,11.700,,,,,,68.000,79.700");
+
+        // A spot with no temperature: no ΔT, and which one says why
+        const missing = Object.assign({}, DELTA, {valid: false, reason: "nodata", second: null, delta_t: null, reasons: [null, "nodata"]});
+        expect(inspector.statisticsHtml(Object.assign({shape: "delta"}, missing), "C")).toContain("No data here");
+        map.remove();
+    });
+
+    it("saves a ΔT like the other measurements, listed with its ΔT and both spots in the CSV", async () => {
+        const map = leafletMap();
+        const DELTA = {valid: true, reason: null, first: 20, second: 18, delta_t: -2, reasons: [null, null], length: 3, measured: [20, 18]};
+        let saved = null;
+        const {ins, fetchFn, panel} = start(map, {
+            [REGION]: DELTA,
+            ["GET " + SAVED]: {measurements: [], can_change: true, baseline: BASELINE},
+            ["POST " + SAVED]: (url, opts) => {
+                saved = Object.assign({}, JSON.parse(opts.body), {id: "0123456789ab", values: DELTA, created_by: "ana", created_at: "2026-11-11T10:00:00Z"});
+                return jsonResponse(saved);
+            }
+        }, {L});
+        await ins.ready; await flush();
+        ins.open();
+        panel().querySelector('[data-mode="delta"]').click();
+        map.fire("click", {latlng: L.latLng(0.5, 0.5)});
+        map.fire("click", {latlng: L.latLng(0.50002, 0.5)});
+        await flush(); await flush();
+        panel().querySelector('[data-region] [data-act="save"]').click();
+        type(panel().querySelector('[data-form="name"]'), "Vent");
+        panel().querySelector('[data-act="form-save"]').click();
+        await flush(); await flush();
+        const body = JSON.parse(calls(fetchFn, "POST").filter(c => c[0] === SAVED)[0][1].body);
+        expect(body).toMatchObject({name: "Vent", shape: "delta", geometry: {type: "LineString", coordinates: [[0.5, 0.5], [0.5, 0.50002]]}});
+        expect(ins.state.regions).toEqual([]);
+        expect(panel().querySelector("[data-saved]").textContent).toContain("-2.00 °C ΔT");
+        const shown = panel().querySelector('[data-profile-of="saved"]').textContent;
+        ["Vent", "ΔT", "First spot20.00 °C", "Second spot18.00 °C", "ΔT-2.00 °C"].forEach(t => expect(shown).toContain(t));
+        const tips = [];
+        map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) tips.push(l.getTooltip()._content); });
+        expect(tips).toContain("Vent: ΔT -2.00 °C");
+        expect(inspector.savedCsv([{source: {name: "Roof survey"}, m: saved}], "C").split("\n")[1]).toMatch(
+            /^Vent,,delta,Roof survey,,2026-11-11T10:00:00Z,ana,,,,,,3,,,,,,,,,-2,,,,,,,,20,18$/);
+        map.remove();
+    });
+
     it("saves a region named, with a comment, for everyone who can view the project; renames, deletes and exports it", async () => {
         const map = leafletMap();
         let saved = null;
@@ -582,7 +650,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         expect(tips).toContain("Warm roof");
 
         const item = {source: {name: "Roof survey"}, m: saved};
-        expect(inspector.savedCsv([item], "C").split("\n")[1]).toMatch(/^Warm roof,Above the boiler,rectangle,Roof survey,,2026-11-01T10:00:00Z,ana,,,,400,100,,10,50,30,5,29.5,12,48,26,4,,,,,,,$/);
+        expect(inspector.savedCsv([item], "C").split("\n")[1]).toMatch(/^Warm roof,Above the boiler,rectangle,Roof survey,,2026-11-01T10:00:00Z,ana,,,,400,100,,10,50,30,5,29.5,12,48,26,4,,,,,,,,,$/);
         const geo = JSON.parse(inspector.savedGeoJson([item], "F"));
         expect(geo.features[0].geometry).toEqual(saved.geometry);
         expect(geo.features[0].properties).toMatchObject({name: "Warm roof", mean_f: 86, delta_t_f: 7.2});
