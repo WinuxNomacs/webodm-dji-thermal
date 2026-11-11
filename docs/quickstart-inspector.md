@@ -124,7 +124,24 @@ The mosaics are the plugin's layers, not entries of WebODM's layer panel, and yo
 the map. WebODM shows a project's map only once one of its tasks has finished with an orthophoto or an elevation
 model; until then, look at the mosaics in the Analyzer's [mosaic viewer](quickstart-worksets.md#3-the-mosaics).
 
-## 5. The frames that saw a point
+## 5. Ortho Overlays on the map
+
+On a task's map, **Ortho Overlays**, under Mosaic Overlays at the bottom of the panel, holds the orthophotos of the
+project's other finished tasks: thermal ones (a thermometer beside the name) and RGB ones (a picture). It works as
+Mosaic Overlays does: its button says how many are shown, opens the list, and each one you tick is laid on the map
+above WebODM's layers and listed below the button with its opacity, **Swipe** and the magnifier.
+
+- A **thermal** orthophoto is read as its own task's: hover, pins, regions, ΔT, the isotherm, the colour scale and the
+  Image section read and draw it, in your palette. A measurement made on it is saved on that task.
+- An **RGB** orthophoto is a picture, drawn as WebODM draws it, for context.
+- To compare two flights, lay one and **Swipe** it: the readings follow WebODM's divider, so the cursor reads the
+  overlay on its right and your task's orthophoto on its left. A ΔT is read from the layer under the middle of its two
+  points.
+
+On a project's map, WebODM already shows every task, in its own layer panel, so the list is empty there. If your task
+has no thermal orthophoto but another in the project does, the Inspector's button shows so you can lay it.
+
+## 6. The frames that saw a point
 
 On a workset mosaic, or on the orthophoto of a task processed from a workset whose mosaics are built, a click in
 **Hover** opens the frames that saw that point, beside the panel. Dropping a pin, or clicking a pin's name in the
@@ -145,7 +162,7 @@ panel, opens them too.
 
 On other layers a click in Hover is WebODM's own: its popup with the task's downloads.
 
-## 6. Saving measurements
+## 7. Saving measurements
 
 If you can change the project, each pin, region and line in the panel has a save button (the floppy disk). It opens
 a small form: give the measurement a name (it starts as P1, R1 or L1) and, if you like, a comment, then **Save**.
@@ -166,7 +183,7 @@ leaves your own lists and appears under **Saved measurements**:
 
 Saved measurements go with their task or workset: deleting either deletes them.
 
-## 7. Correcting for another emissivity
+## 8. Correcting for another emissivity
 
 The temperatures were measured with the emissivity and reflected temperature the camera recorded, or those set in
 DJI Thermal Task or the workset (see [Measurement settings](measurement.md)). To see what a surface would measure with

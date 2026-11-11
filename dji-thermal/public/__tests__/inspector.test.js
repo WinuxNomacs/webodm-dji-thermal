@@ -1282,6 +1282,136 @@ describe("the Thermal Inspector's workset mosaics", () => {
         map.remove();
     });
 
+    // The project's tasks as WebODM's task list gives them: the map's own (abc-1), another thermal one, an RGB one, one
+    // still running and one without an orthophoto
+    const TASKS = "GET /api/projects/2/tasks/";
+    const TASK_LIST = [
+        {id: "abc-1", name: "On the map", status: 40, available_assets: ["orthophoto.tif"], orthophoto_bands: THERMAL_TASK.orthophoto_bands},
+        {id: "therm-3", name: "Spring flight", status: 40, available_assets: ["orthophoto.tif", "dsm.tif"], orthophoto_bands: THERMAL_TASK.orthophoto_bands, crop: null},
+        {id: "rgb-4", name: "Visible", status: 40, available_assets: ["orthophoto.tif"], orthophoto_bands: RGB_TASK.orthophoto_bands},
+        {id: "run-5", name: "Running", status: 20, available_assets: [], orthophoto_bands: []},
+        {id: "dsm-6", name: "Surface only", status: 40, available_assets: ["dsm.tif"], orthophoto_bands: []}];
+    const metadata = (task, stats) => ({tiles: ["/api/projects/2/tasks/" + task + "/orthophoto/tiles/{z}/{x}/{y}.png" + (stats ? "?formula=Celsius&bands=L&color_map=magma" : "")],
+                                        bounds: {value: BOUNDS}, maxzoom: 22, scheme: "xyz", statistics: stats ? {"1": {min: 5, max: 60, percentiles: [12.5, 41]}} : undefined});
+    const ORTHO_ROUTES = {[TASKS]: TASK_LIST, [LIST]: {mosaics: []},
+                          "GET /api/projects/2/tasks/therm-3/orthophoto/metadata": metadata("therm-3", true),
+                          "GET /api/projects/2/tasks/rgb-4/orthophoto/metadata": metadata("rgb-4", false)};
+    const orthoLayers = map => Object.values(map._layers).filter(l => l.__dtOrtho);
+
+    it("lists the project's other completed tasks with an orthophoto for Ortho Overlays, thermal or RGB", () => {
+        const orthos = inspector.orthosOf(TASK_LIST, ["abc-1"]);
+        expect(orthos.map(o => [o.id, o.name, o.thermal])).toEqual([["therm-3", "Spring flight", true], ["rgb-4", "Visible", false]]);
+        expect(orthos[0].task).toEqual({id: "therm-3", name: "Spring flight", orthophoto_bands: THERMAL_TASK.orthophoto_bands, crop: null});
+        // Drawn as WebODM's map draws them: a thermal one over its 2nd to 98th percentile, at 512 pixels, cropped as its task
+        expect(inspector.orthoUrl(metadata("therm-3", true), orthos[0]))
+            .toBe("/api/projects/2/tasks/therm-3/orthophoto/tiles/{z}/{x}/{y}.png?formula=Celsius&bands=L&color_map=magma&rescale=12.5%2C41&size=512");
+        expect(inspector.orthoUrl(metadata("rgb-4", false), Object.assign({}, orthos[1], {task: {crop: {type: "Polygon"}}})))
+            .toBe("/api/projects/2/tasks/rgb-4/orthophoto/tiles/{z}/{x}/{y}.png?size=512&crop=1");
+    });
+
+    it("lays another task's thermal orthophoto from Ortho Overlays and reads it as that task's, an RGB one only drawn", async () => {
+        const map = leafletMap(THERMAL_TASK);
+        const point = jest.fn(() => jsonResponse({valid: true, temperature: 33.25}));
+        const {ins, plugins, panel} = begin(map, [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}],
+                                            Object.assign({"GET /api/plugins/dji-thermal/projects/2/tasks/therm-3/inspector/point": point}, ORTHO_ROUTES));
+        await ins.orthosReady;
+        ins.open();
+        // Its own dropdown, after Mosaic Overlays (none here), the map's own task left out
+        const button = panel().querySelector('[data-act="overlays-toggle"][data-overlays="ortho"]');
+        expect(button.textContent).toContain("Ortho Overlays: 0 of 2 shown");
+        openOverlays(panel(), "ortho");
+        expect(panel().querySelector(".dt-inspector-checklist").textContent).toContain("Spring flight");
+        expect(panel().querySelector('[data-ortho="therm-3"] .fa-thermometer-half')).not.toBe(null);
+        expect(panel().querySelector('[data-ortho="rgb-4"] .fa-image')).not.toBe(null);
+
+        change(panel().querySelector('.dt-inspector-checklist [data-ortho="therm-3"] [data-act="ortho-on"]'), true);
+        await flush(); await flush();
+        const layer = orthoLayers(map)[0];
+        expect(layer.options.zIndex).toBeGreaterThan(100);
+        expect(layer[META].task.id).toBe("therm-3");
+        // A thermal layer of its task, drawn from its values in the user's palette
+        expect(inspector.thermalLayers(map).map(t => t.task)).toEqual(["abc-1", "therm-3"]);
+        expect(valuesOf(layer)).toMatch(/^\/api\/plugins\/dji-thermal\/projects\/2\/tasks\/therm-3\/inspector\/values\//);
+        expect(inspector.paletteOf(layer._url)).toBe("ironred");
+        // The pointer reads it, the topmost
+        map.fire("mousemove", {latlng: L.latLng(0.5, 0.5)});
+        await new Promise(r => setTimeout(r, 120));
+        await flush();
+        expect(point.mock.calls[0][0]).toContain("/projects/2/tasks/therm-3/inspector/point?lon=0.50000000&lat=0.50000000");
+        expect(panel().querySelector(".dt-inspector-readout").textContent).toBe("33.25 °C");
+        // Opacity and Swipe, as a mosaic's
+        change(panel().querySelector('[data-ortho="therm-3"] [data-act="ortho-opacity"]'), "60");
+        expect(layer.options.opacity).toBe(0.6);
+        panel().querySelector('[data-act="ortho-swipe"]').click();
+        expect(plugins.Map.sideBySideChanged).toHaveBeenLastCalledWith(layer, true);
+
+        // The RGB one is drawn, never read
+        change(panel().querySelector('.dt-inspector-checklist [data-ortho="rgb-4"] [data-act="ortho-on"]'), true);
+        await flush(); await flush();
+        const rgb = orthoLayers(map).find(l => l.__dtOrtho === "rgb-4");
+        expect(rgb._url).toBe("/api/projects/2/tasks/rgb-4/orthophoto/tiles/{z}/{x}/{y}.png?size=512");
+        expect(inspector.thermalLayers(map).map(t => t.task)).toEqual(["abc-1", "therm-3"]);
+        expect(panel().querySelector('[data-overlays="ortho"]').textContent).toContain("2 of 2 shown");
+
+        // Lifted while swiped: off WebODM's split control first
+        change(panel().querySelector('.dt-inspector-checklist [data-ortho="therm-3"] [data-act="ortho-on"]'), false);
+        expect(plugins.Map.sideBySideChanged).toHaveBeenLastCalledWith(layer, false);
+        expect(map.hasLayer(layer)).toBe(false);
+        expect(inspector.thermalLayers(map).map(t => t.task)).toEqual(["abc-1"]);
+        map.remove();
+    });
+
+    it("says so when an orthophoto's details can't be loaded", async () => {
+        const map = leafletMap(THERMAL_TASK);
+        const {ins, panel} = begin(map, [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}],
+                                   Object.assign({}, ORTHO_ROUTES, {"GET /api/projects/2/tasks/rgb-4/orthophoto/metadata": () => jsonResponse({detail: "Not found"}, false)}));
+        await ins.orthosReady;
+        ins.open();
+        openOverlays(panel(), "ortho");
+        change(panel().querySelector('[data-ortho="rgb-4"] [data-act="ortho-on"]'), true);
+        expect(panel().textContent).toContain("Loading…");
+        await flush(); await flush();
+        expect(panel().textContent).toContain("Could not load this orthophoto");
+        expect(orthoLayers(map).length).toBe(0);
+        map.remove();
+    });
+
+    it("shows its button on a map without temperatures when the project has another task's thermal orthophoto to lay", async () => {
+        const rgb = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, RGB_TASK)}}];
+        let s = begin(leafletMap(), rgb, ORTHO_ROUTES);
+        await s.ins.orthosReady;
+        expect(s.button().style.display).toBe("");
+        expect(s.fetchFn.mock.calls.filter(c => c[0].endsWith("/display")).length).toBe(1);
+        // only RGB ones: none
+        s = begin(leafletMap(), rgb, Object.assign({}, ORTHO_ROUTES, {[TASKS]: TASK_LIST.filter(t => !t.orthophoto_bands.some(b => b.description === "lwir"))}));
+        await s.ins.orthosReady;
+        expect(s.button().style.display).toBe("none");
+        // WebODM's public maps: not asked for
+        s = begin(leafletMap(), rgb, ORTHO_ROUTES, {path: "/public/task/1f0a/map/"});
+        await s.ins.orthosReady;
+        expect(s.fetchFn.mock.calls.some(c => c[0] === "/api/projects/2/tasks/")).toBe(false);
+    });
+
+    it("reads the layer each side of WebODM's divider shows, not the one it clips away", async () => {
+        const map = leafletMap(THERMAL_TASK);
+        const {ins} = begin(map, [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}], ORTHO_ROUTES);
+        await ins.orthosReady;
+        ins.open();
+        openOverlays(map.el.querySelector(".dt-inspector-panel"), "ortho");
+        change(map.el.querySelector('[data-ortho="therm-3"] [data-act="ortho-on"]'), true);
+        await flush(); await flush();
+        const layer = orthoLayers(map)[0];
+        const at = map.latLngToLayerPoint(L.latLng(0.5, 0.5));
+        // Swiped: the overlay on the divider's right, clipped to it as leaflet-side-by-side does
+        layer.getContainer().style.clip = "rect(-1000px, 5000px, 5000px, " + (at.x + 10) + "px)";
+        expect(inspector.thermalLayerAt(map, L.latLng(0.5, 0.5)).task).toBe("abc-1");
+        layer.getContainer().style.clip = "rect(-1000px, 5000px, 5000px, " + (at.x - 10) + "px)";
+        expect(inspector.thermalLayerAt(map, L.latLng(0.5, 0.5)).task).toBe("therm-3");
+        layer.getContainer().style.clip = "";
+        expect(inspector.thermalLayerAt(map, L.latLng(0.5, 0.5)).task).toBe("therm-3");
+        map.remove();
+    });
+
     it("opens with the mosaic a link asks for laid on the map", async () => {
         const map = leafletMap();
         const {ins, panel, laid} = begin(map, [], {}, {search: "?dt-mosaic=d-1%2Fabc123def456/harmonized"});
