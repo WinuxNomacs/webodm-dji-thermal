@@ -3,18 +3,6 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R12. A "Delta T" measuring tool** (the user, 2026-11-11, in `new.md`): "Add a measurement tool to the Thermal
-  Inspector and Analyzer UI called "Delta T", it will allow the user to place 2 points on the map and the Delta T
-  will be calculated between the 2 points that can be saved same as a box, line, etc..."
-  Builds on `regions.js` `TOOLS` (Pin, Line, Rectangle, Circle, Polygon), shared by the Thermal Inspector
-  (`inspector.js` modes, saved measurements, CSV) and the frame page (`frame.js` `TOOLS`, `savedHtml`).
-  - **Proposed**: a Delta T tool beside the others; two clicks place A and B; the panel shows A's and B's
-    temperatures and ΔT = B − A (corrected where a correction is set); drawn as two labelled markers joined by a
-    thin line; saved, listed, shown again and exported to CSV like the other measurements (shape `delta`). Tests:
-    Jest (placing, the figures, saving), Django (the saved shape's check). Docs: README, quickstart-inspector,
-    measurement, api, developing.md; screenshots retaken where the tools show.
-  - **Decided** (the user, 2026-11-11): on the **Thermal Inspector and the frame page** (the mosaic viewer has no
-    drawing tools); each point read as a **single pixel**, as Pin reads it.
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
@@ -26,7 +14,28 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
-- **R11. Delta T From Surroundings, over a radius the user picks** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "Under
+- **R12. The ΔT tool** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "Add a measurement tool to the Thermal
+  Inspector and Analyzer UI called "Delta T", it will allow the user to place 2 points on the map and the Delta T
+  will be calculated between the 2 points that can be saved same as a box, line, etc..."; then (the user,
+  2026-11-11): "There is a "ΔT from surroundings" in the Thermal Inspector and UI which is not useful as is. Add a
+  measuring tool next to the Hover button called "ΔT". When a user activates it, they can click 2 points on the map
+  and the Delta T will be calculated for the 2 points. The user should be allowed to save delta t pairs just like
+  pins, box etc..."
+  - **Decided** (the user, 2026-11-11): on the **Thermal Inspector and the frame page**; each spot a **single
+    pixel**, as Pin reads it; ΔT = second − first, corrected where a correction is set; the button named **ΔT**,
+    right after Hover (first of the frame page's tools, which has no Hover); Pointer Info's **ΔT from surroundings**
+    (R6) with R11's slider and circle **removed everywhere** (the mosaic viewer, the frame page, the Inspector).
+  - Built: `regions.js` `TOOLS.delta` and `DrawTool` (`shape: "delta"`, finished by its second click);
+    `inspector.js` (the mode after Hover, a `delta` region measured with `shape: "delta"`, `deltaHtml`, its line and
+    dots on the map, saved, listed, `regionsCsv`/`savedRows` `first_spot`/`second_spot` columns); `frame.js` (first
+    tool, `isDelta`, drawn on both panes); server `inspector.delta`, `delta_ends`, `ground_distance`,
+    `inspector_api.delta_values` (the Inspector's and the mosaics' `region` and `measurements`), `frames.delta`
+    (`frames_api.frame_region`), `measurements.SHAPES`. Removed: `intensify` disc/radius, `mosaics.point`'s and
+    `inspector.point`'s difference, the `radius` parameter, `surroundings_m`, `frames.info`'s `pixel_m`/`size_m`, the
+    viewer's `bindSurroundings`, `Regions.SurroundingsCircle`. Tests: `regions.test.js`, `inspector.test.js`,
+    `frame.test.js`, `test_inspector.py`, `test_frames.py`, `test_analyzer.py`. Docs: README, quickstart-inspector,
+    quickstart-worksets, measurement, api, developing.
+- **R11. Delta T From Surroundings, over a radius the user picks** (built 2026-11-11, removed the same day with R6's row: R12; the user, 2026-11-11, in `new.md`): "Under
   Pointer Info, add a slider to configure "Delta T From Surroundings", this enables a feature where a user
   configurable circumference from the hovered/selected pixel has its Delta T calculated against the pixels within
   the surrounding circumference area. The circumference area should be visible to the user as a thin circle outline
