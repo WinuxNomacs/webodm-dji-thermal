@@ -106,7 +106,8 @@
     function sameLatLng(a, b) { return a.lat === b.lat && a.lng === b.lng; }
 
     // A shape being drawn: opts {shape: "rectangle" | "circle" | "polygon" | "line" | "delta", onFinish({geometry, layer, circle}),
-    // onCancel(), onInvalid(reason)}. The finished layer is the caller's; circle is {lat, lng, radius} for circles.
+    // onCancel(), onInvalid(reason), onPoint(latlng, index) (each point clicked, as it is)}. The finished layer is the
+    // caller's; circle is {lat, lng, radius} for circles.
     function DrawTool(L, map, opts) {
         var self = this;
         var doc = opts.doc || root.document;
@@ -181,6 +182,7 @@
                 return onPolyFinish();
             }
             vertices.push(e.latlng);
+            if (opts.onPoint) opts.onPoint(e.latlng, vertices.length - 1);
             if (two && vertices.length === 2) return onPolyFinish();
             redrawPolygon();
         }

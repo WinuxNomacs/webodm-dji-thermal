@@ -400,7 +400,9 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   (its own pixel, as a pin reads it), **ΔT**, the second's less the first's (corrected with Manual Corrections), and
   the distance between them; the map shows a thin line between the spots, labelled at the second with its ΔT. A ΔT
   is listed under Measurements, kept in your browser, saved like a region and exported in the CSV (with
-  **first_spot** and **second_spot** columns).
+  **first_spot** and **second_spot** columns). With an overlay swiped, a ΔT can span WebODM's divider: each spot is
+  read from the layer showing where it was clicked, the list names both layers, each dot shows with its own layer
+  and the line only while both dots show. Such a ΔT isn't saved; it stays in the panel until the page is left.
 - **Pin**: a click pins the point with its temperature, labelled P1, P2…, shown on the map instead of WebODM's
   popup. Pins are listed under Measurements (click one to go to it), with their latitude, longitude and temperature
   in the CSV.
@@ -482,7 +484,8 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   A thermal one is read as its task's thermal layer (hover, pins, regions, ΔT, isotherm, scale, Image), its
   measurements saved on that task; an RGB one is drawn as WebODM draws it. The readings follow WebODM's divider:
   with an overlay swiped, the cursor reads the layer shown on its side, and each measurement (pins, regions, lines,
-  ΔT, saved ones) is drawn only where the layer it was read on shows, ending at the divider (a swiped mosaic too).
+  ΔT, saved ones) is drawn only where the layer it was read on shows, ending at the divider (a swiped mosaic too); a
+  ΔT across the divider compares the two layers.
   A map without temperatures shows the
   Inspector's button when the project has another task's thermal orthophoto to lay.
 - **Source frames**: a click in Hover (or a pin dropped, or a pin's name clicked in the panel) on a workset mosaic, or

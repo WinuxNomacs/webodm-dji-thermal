@@ -3,7 +3,18 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R19. ΔT across two orthophotos** (the user, 2026-11-11, in `new.md`): "Would it be possible for the "Delta T"
+- **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
+  release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
+  macOS"); Apple Silicon was checked without a Mac.
+
+**Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
+
+**Done**
+- **R19. ΔT across two orthophotos** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "Would it be possible for the "Delta T"
   measurement tool to function across 2 orthophotos? Idea being if I select a point on the left orthophoto and a
   point on the right orthophoto, it calculates the delta between them. The line between the dots would only appear
   when both dots are visible on screen at the same time, in order to avoid confusion." Builds on R12's ΔT (read on
@@ -20,17 +31,14 @@
     both layers. The dots drawn each in its layer's pane; the line in a pane of its own shown only while both dots
     are inside their layers' visible clips. Tests: Jest (two layers read, ΔT, no Save, the line shown and hidden as
     the divider moves). Docs: README, quickstart-inspector.
-- **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
-  release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
-  macOS"); Apple Silicon was checked without a Mac.
-
-**Later**
-- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
-  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
-
-**Done**
+  - **Built**: `regions.js` `DrawTool` reports each click (`onPoint`); `inspector.js` keeps a ΔT's two layers'
+    source keys and names (`sources`, `layers`) when they differ, reads each spot from its own layer's `point`
+    (`measureAcross`, corrected per layer, measured again when the correction changes), offers no Save for it and
+    keeps it out of `localStorage` (`acrossLayers`); each dot in its layer's pane, the line in an unclipped pane of its
+    own, shown only while both spots are on screen inside their layers' clips (`updateCrossLines`, run with the
+    panes' clips). Test: `__tests__/inspector.test.js` "reads a ΔT across WebODM's divider from both layers, unsaved,
+    its line shown only while both spots show"; checked live on the HomerunObliqueII task with a workset mosaic
+    swiped. Docs: README, quickstart-inspector, developing.
 - **R18. One "Measurements" section** (built 2026-11-11; the user, 2026-11-11, in `new.md`): "Would it not be sensible to combine
   "Pinned Points" and "Regions and lines" under a single "Measurements" section?" Builds on `inspector.js`
   `pinsHtml` and `regionsHtml` (each its list and its Hide/Show, CSV and Remove all) and `panelHtml`'s order.
