@@ -1653,6 +1653,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(map.dragging.enabled()).toBe(false);
         document.dispatchEvent(new MouseEvent("mousemove", {bubbles: true, cancelable: true, clientX: 300, clientY: 400}));
         document.dispatchEvent(new MouseEvent("mouseup", {bubbles: true}));
+        await flush();      // the click a browser sends with the mouseup is swallowed, not a later one
         expect(map.dragging.enabled()).toBe(true);
         expect(clip()).toBe(rect(0, 300, 800, 0));
         expect(handle.style.left).toBe("300px");

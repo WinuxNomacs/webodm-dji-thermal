@@ -103,13 +103,28 @@
             if (e.cancelable) e.preventDefault();
             fire("change", "move");
         }
-        function endDrag() {
+        function endDrag(e) {
             doc.removeEventListener("mousemove", moveTo);
             doc.removeEventListener("mouseup", endDrag);
             doc.removeEventListener("touchmove", moveTo);
             doc.removeEventListener("touchend", endDrag);
             if (dragging && dragging.pan && map.dragging) map.dragging.enable();
+            if (dragging && e && e.type === "mouseup") swallowClick();
             dragging = null;
+        }
+        // The click a browser sends after a mouse button let go off the handle (to the element holding both the handle
+        // and where it was let go: the map) isn't the map's: a drag of the divider never clicks what lies under it.
+        // The click comes in the same task as the mouseup, so the listener goes after it either way
+        function swallowClick() {
+            var win = doc.defaultView || root;
+            function stop(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                off();
+            }
+            function off() { win.removeEventListener("click", stop, true); }
+            win.addEventListener("click", stop, true);
+            setTimeout(off, 0);
         }
         function startDrag(e) {
             if (e.button !== undefined && e.button !== 0) return;
