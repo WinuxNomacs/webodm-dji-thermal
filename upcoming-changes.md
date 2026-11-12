@@ -28,7 +28,10 @@
   over 3.1 m); a dataset analyzed, a harmonized workset with mosaics (40 converted, 3 not thermal, 45 s), the viewer
   (Harmonized, Intensify, a point's frames), the frame page, a task from the workset processed (237 s, 7.8 to
   31.7 °C). No console errors but 3.3.2's dev livereload. The check's project deleted (its tasks removed first), the
-  plugin removed.
+  plugin removed. Then on native Windows 4.0.0 (`C:\WebODM`, started by the user, through the reverse tunnel): pip
+  installing numpy 2.5.4 and Pillow 13.0.0, no webpack; the Thermal Task processed (211 s, 10.6 to 35.3 °C), ΔT read
+  (-0.34 °C over 3.1 m); the workset (40 converted, 3 not thermal, 82 s) and its task (240 s, 8.1 to 31.0 °C); no
+  console errors. Its project deleted, the plugin removed, the tunnel stopped.
 - **R24. Release review: fixes found on the way** (the user, 2026-11-12: "The code is nearing release. Review the
   project for bugs and potential ui experience breakdowns that can negatively impact the user. Fix any obvious bugs
   along the way but plan anything more involved in planned phases"). Reviewed: the server's permissions, inputs,
