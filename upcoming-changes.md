@@ -14,6 +14,12 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R23. Fix: letting go of the divider off its handle clicked the map** (reported from TweakUI, 2026-11-12: "When I
+  let go of the divider and the pointer's not over the divider when I release the mouse, it selects a pixel"). The
+  browser sends a click to the element holding both the handle and where the mouse was let go (the map), and the map
+  isn't being dragged, so Leaflet took it for a click (WebODM's layer popup; the Inspector's reading). `split.js`
+  swallows that one click (`swallowClick`, a capture listener for the mouseup's task). Tests: `split.test.js` "doesn't
+  click the map when the mouse is let go off the handle after a drag"; `inspector.test.js` waits a tick after its drag.
 - **R22. The divider takes turns with other plugins', and re-clips a layer put back** (built 2026-11-12; asked from
   TweakUI, 2026-11-12, which reuses `split.js` and `split.css` for its Other Tasks comparison; approved by the user).
   The Inspector's Swipe told WebODM's split event only while WebODM's own Swipe was on (`leaveWebodmSwipe`), so

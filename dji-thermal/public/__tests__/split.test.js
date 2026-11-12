@@ -84,6 +84,24 @@ describe("the split divider", () => {
         map.remove();
     });
 
+    it("doesn't click the map when the mouse is let go off the handle after a drag, but the next click does", async () => {
+        const map = leafletMap(), a = layer(map), clicks = [];
+        map.on("click", () => clicks.push("map"));
+        const split = SplitDivider.create(L, map).add(a);
+        const handle = split.element().querySelector(".split-divider-handle");
+        handle.dispatchEvent(new MouseEvent("mousedown", {bubbles: true, cancelable: true, button: 0, clientX: 500, clientY: 400}));
+        document.dispatchEvent(new MouseEvent("mousemove", {bubbles: true, cancelable: true, clientX: 300, clientY: 400}));
+        // Let go over the map: the browser then clicks the element holding both, the map's
+        map.getContainer().dispatchEvent(new MouseEvent("mouseup", {bubbles: true, clientX: 300, clientY: 400}));
+        map.getContainer().dispatchEvent(new MouseEvent("click", {bubbles: true, cancelable: true, clientX: 300, clientY: 400}));
+        expect(clicks).toEqual([]);
+        expect(split.position()).toBe(0.3);
+        await new Promise(r => setTimeout(r, 0));
+        map.getContainer().dispatchEvent(new MouseEvent("click", {bubbles: true, cancelable: true, clientX: 300, clientY: 400}));
+        expect(clicks).toEqual(["map"]);
+        map.remove();
+    });
+
     it("clips a layer of its put back on the map, whose container is a new one", () => {
         const map = leafletMap(), a = layer(map);
         SplitDivider.create(L, map).add(a);
