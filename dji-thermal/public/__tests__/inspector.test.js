@@ -1881,6 +1881,21 @@ describe("the Thermal Inspector's workset mosaics", () => {
     });
 });
 
+describe("the panel's height", () => {
+    test("stops above the map's bottom, and above the bottom-left controls only where it reaches them (a phone)", () => {
+        const map = document.createElement("div");
+        map.innerHTML = '<div class="leaflet-bottom leaflet-left"><div class="zoom"></div><div class="empty"></div></div>';
+        Object.defineProperty(map, "clientHeight", {value: 800});
+        const rect = (r) => () => Object.assign({top: 0, left: 0, right: 0, height: 0}, r);
+        map.getBoundingClientRect = rect({top: 100});
+        map.querySelector(".zoom").getBoundingClientRect = rect({top: 680, left: 10, right: 44, height: 120});
+        // Beside the controls (a wide map): 60px above the map's bottom
+        expect(inspector.panelBottom(map, 600)).toBe(740);
+        // Over them: 8px above the zoom buttons' top
+        expect(inspector.panelBottom(map, 40)).toBe(572);
+    });
+});
+
 describe("the Thermal Inspector's colour scale and Image section", () => {
     const PALETTE = "GET /api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/palette";
     const PLUGIN = "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/tiles/";

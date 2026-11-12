@@ -143,4 +143,42 @@ describe("a Leaflet layer drawn from value tiles", () => {
         expect(canvas.ctx.puts).toBe(3);
         create.mockRestore();
     });
+
+    test("fetches a tile once for two layers drawn from the same values (an isotherm over its layer), and lets go of it with the last", async () => {
+        const headers = {"X-Values-Offset": "10", "X-Values-Step": "1", "X-Values-Margin": "0", "X-Sharpen-Sigma": "1"};
+        const fetchFn = jest.fn((url, opts) => (url.endsWith("/slow") ? new Promise((resolve) => { opts.signal.addEventListener("abort", () => resolve({status: 404})); }) :
+            Promise.resolve({status: 200, ok: true, headers: {get: (k) => headers[k]}, blob: () => Promise.resolve("blob")})));
+        window.createImageBitmap = jest.fn(() => Promise.resolve({width: 2, height: 1}));
+        const create = jest.spyOn(document, "createElement").mockImplementation(() => {
+            const c = fakeCanvas();
+            c.ctx.getImageData = () => ({data: new Uint8ClampedArray([0, 0, 0, 255, 0, 10, 0, 255])});
+            c.parentNode = document.body;
+            return c;
+        });
+        const layerOf = () => { const handlers = {}; return {handlers, getTileSize: () => ({x: 2, y: 1}), on(ev, f) { handlers[ev] = f; return this; }}; };
+        const style = {colors: [0x000000ff, 0xffffffff], range: [10, 20], shares: null, sharpen: 0, isotherm: null};
+        const url = (c) => "/values/" + c.z + (c.slow ? "/slow" : "");
+        const below = layerOf(), above = layerOf();
+        Recolour.drawFromValues(below, {url, style: () => style, fetchFn});
+        Recolour.drawFromValues(above, {url, style: () => ({paint: [255, 0, 0], isotherm: [15, 3e38]}), fetchFn});
+
+        const a = below.createTile({z: 3}, jest.fn()), b = above.createTile({z: 3}, jest.fn());
+        await new Promise((r) => setTimeout(r, 0));
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+        expect(a.__dtTile).toBe(b.__dtTile);
+
+        const slowBelow = below.createTile({z: 4, slow: true}, jest.fn()), slowAbove = above.createTile({z: 4, slow: true}, jest.fn());
+        expect(fetchFn).toHaveBeenCalledTimes(2);
+        below.handlers.tileunload({tile: slowBelow});
+        expect(fetchFn.mock.calls[1][1].signal.aborted).toBe(false);
+        above.handlers.tileunload({tile: slowAbove});
+        expect(fetchFn.mock.calls[1][1].signal.aborted).toBe(true);
+
+        // Let go of by both: asked for again when wanted again
+        below.handlers.tileunload({tile: a});
+        above.handlers.tileunload({tile: b});
+        below.createTile({z: 3}, jest.fn());
+        expect(fetchFn).toHaveBeenCalledTimes(3);
+        create.mockRestore();
+    });
 });

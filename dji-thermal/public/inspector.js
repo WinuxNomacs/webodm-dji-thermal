@@ -281,6 +281,18 @@
         info.adjust = adjustOf(t.layer._url);
         return {base: mosaicBase(info), tab: info.tab, query: mosaicQuery(info), orthophoto: true};
     }
+    // How far down the map (px from its top) the panel may reach: 60px above its bottom, and above the bottom-left
+    // controls it would cover from left (px, the panel's left edge on the page)
+    function panelBottom(mapEl, left) {
+        var box = mapEl.getBoundingClientRect(), bottom = mapEl.clientHeight - 60;
+        var corner = mapEl.querySelector(".leaflet-bottom.leaflet-left");
+        [].forEach.call(corner ? corner.children : [], function (c) {
+            var r = c.getBoundingClientRect();
+            if (r.height && r.right > left) bottom = Math.min(bottom, r.top - box.top - 8);
+        });
+        return bottom;
+    }
+
     // How an isotherm (°C) paints a thermal layer's values (in a mosaic's unit, °C on an orthophoto): recolour.js's
     // style, or null when it is off
     function isothermStyle(iso, unit) {
@@ -1163,8 +1175,9 @@
             panel.innerHTML = panelHtml(state);
             var again = act && panel.querySelector('[data-act="' + act + '"]');
             if (again) again.focus();
-            // Within the map, above its bottom controls
-            var room = map.getContainer().clientHeight - container.offsetTop - 60;
+            // Within the map, above its bottom controls, and above those on its left the panel reaches (a phone's map: the
+            // zoom buttons)
+            var room = panelBottom(map.getContainer(), panel.getBoundingClientRect().left) - container.offsetTop;
             if (room > 0) panel.style.maxHeight = Math.max(160, room) + "px";
             panelMove.keep();       // moved, and now taller: still inside the map
         }
@@ -2706,7 +2719,7 @@
                profileCsv: profileCsv, statisticsHtml: statisticsHtml, profileHtml: profileHtml, profileIndex: profileIndex,
                isothermLimits: isothermLimits, readoutHtml: readoutHtml,
                panelHtml: panelHtml, hasThermal: hasThermal, projectOf: projectOf, linkedMosaic: linkedMosaic, paletteKey: paletteKey,
-               mosaicRange: mosaicRange, laidMosaic: laidMosaic, mosaicValuesUrl: mosaicValuesUrl, isothermStyle: isothermStyle, valuesUrl: valuesUrl,
+               mosaicRange: mosaicRange, laidMosaic: laidMosaic, mosaicValuesUrl: mosaicValuesUrl, isothermStyle: isothermStyle, valuesUrl: valuesUrl, panelBottom: panelBottom,
                framesSource: framesSource, fromCelsius: fromCelsius, corrected: corrected, uncorrected: uncorrected,
                rawIsotherm: rawIsotherm, keptRange: keptRange, correctionHtml: correctionHtml, forgetCorrections: forgetCorrections,
                savedHtml: savedHtml, savedCsv: savedCsv, savedGeoJson: savedGeoJson, formHtml: formHtml, measurementsHtml: measurementsHtml,
