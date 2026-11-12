@@ -3,18 +3,6 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R25. A normalized Thermal Task whose upload fails keeps the photos sent** (found in the release review,
-  2026-11-12; to plan with the user). Normalized or harmonized, the Thermal Task button uploads every photo to the
-  task's dataset first (`thermal/upload.js` `startWorkset`, 10 a request, one request at a time); a request still
-  failing after its retries (a slow link timing out, the disk or quota full) removes the task **and its dataset, with
-  every photo already sent**: an hour's upload of a large flight is lost to one bad minute. The as-is path differs
-  (each photo converted on its own; a failed one is left out and listed).
-  - Proposed: on such a failure, keep the dataset and its photos (remove only the task, which has none yet), and
-    say so with a link: the dataset's page then creates the workset (Convert tab) and sends it to a task, as today;
-    the photos not sent are listed, to add from the dataset's **Add images**. Tests: `upload.test.js` (the dataset kept
-    on a failed batch, removed on cancel). Docs: quickstart-thermal-task, troubleshooting.
-  - **To decide**: keep the dataset on failure as proposed, or keep today's clean removal (nothing left behind) and
-    only offer to try again; and whether Cancel Upload keeps it too (proposed: Cancel removes both, as today).
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
@@ -43,9 +31,18 @@
     polygon and line: two clicks drew nothing and said nothing.
   Tests: `upload.test.js` (the leave warning; a gateway answer sent again after a wait), `inspector.test.js` "says how
   each tool draws while it is chosen". Docs: quickstart-thermal-task.
-  Noted, not changed: with an isotherm on, its overlay asks for each value tile a second time (answered 304 by the
-  browser's cache check: requests, not data); on a phone the Inspector's panel covers the map's zoom buttons while
-  open; zoomed far out, the value tiles 404 past the orthophoto's zoom range, as WebODM's own tiles do.
+  Then (the user, 2026-11-12: "correct the first 2 issues"):
+  - **An isotherm fetched its layer's value tiles again**: the layers drawn from the same values with the same fetch
+    share each tile, loaded or loading, and let go of it with the last (`recolour.js` `sharedValues`); the isotherm adds
+    no requests.
+  - **On a phone the Inspector's panel covered the map's zoom buttons**: it now stops above the bottom-left controls
+    it reaches (`inspector.js` `panelBottom`) and scrolls within.
+  Tests: `recolour.test.js` "fetches a tile once for two layers…", `inspector.test.js` "the panel's height".
+  Not changed (the user: not a concern): zoomed far out, the value tiles 404 past the orthophoto's zoom range, as
+  WebODM's own tiles do.
+  Decided, not built (the user, 2026-11-12): a normalized Thermal Task whose upload fails after its retries keeps
+  today's clean removal of the task **and** its dataset (made again from scratch), and Cancel Upload removes the
+  photos too.
 - **R23. Fix: letting go of the divider off its handle clicked the map** (reported from TweakUI, 2026-11-12: "When I
   let go of the divider and the pointer's not over the divider when I release the mouse, it selects a pixel"). The
   browser sends a click to the element holding both the handle and where the mouse was let go (the map), and the map

@@ -210,8 +210,35 @@
     // o.url(coords) gives a tile's values URL, o.style() how they are coloured now (colour's style, or null for none),
     // o.fetchFn fetches. layer.recolour() colours every tile again from its values, once a frame however often it is
     // called. Returns the layer.
+    // The value tiles loaded or loading, by fetchFn and URL, {promise, controller, users}: layers fetching the same
+    // tiles with the same fetchFn (a thermal layer and its isotherm) fetch each once; let go of when no tile uses it
+    var defaultFetch = null;
+    function sharedValues(fetchFn, url) {
+        var all = fetchFn.__dtTiles || (fetchFn.__dtTiles = {}), entry = all[url];
+        if (!entry) {
+            var controller = root.AbortController ? new root.AbortController() : null;
+            entry = all[url] = {controller: controller, users: 0, done: false};
+            entry.promise = fetchValues(url, fetchFn, controller && controller.signal).then(function (tile) {
+                entry.done = true;
+                return tile;
+            }, function (err) {
+                if (all[url] === entry) delete all[url];
+                throw err;
+            });
+        }
+        entry.users++;
+        return entry;
+    }
+    function releaseValues(fetchFn, url, entry) {
+        var all = fetchFn.__dtTiles || {};
+        if (--entry.users > 0) return;
+        if (all[url] === entry) delete all[url];
+        if (!entry.done && entry.controller) entry.controller.abort();
+    }
+
     function drawFromValues(layer, o) {
-        var doc = root.document, canvases = [], frame = null, fetchFn = o.fetchFn || root.fetch.bind(root);
+        var doc = root.document, canvases = [], frame = null;
+        var fetchFn = o.fetchFn || defaultFetch || (defaultFetch = root.fetch.bind(root));
         layer.__dtValues = o;
         var later = function (f) { return root.requestAnimationFrame ? root.requestAnimationFrame(f) : setTimeout(f, 16); };
         function draw(canvas) {
@@ -233,10 +260,10 @@
             var canvas = doc.createElement("canvas"), size = this.getTileSize();
             canvas.width = size.x;
             canvas.height = size.y;
-            var controller = root.AbortController ? new root.AbortController() : null;
-            canvas.__dtAbort = controller;
+            var url = o.url(coords), entry = sharedValues(fetchFn, url);
+            canvas.__dtRelease = function () { canvas.__dtRelease = null; releaseValues(fetchFn, url, entry); };
             canvases.push(canvas);
-            fetchValues(o.url(coords), fetchFn, controller && controller.signal).then(function (tile) {
+            entry.promise.then(function (tile) {
                 canvas.__dtTile = tile;
                 if (tile) draw(canvas);
                 // as Leaflet takes a loaded image (it removes those of another zoom still loading)
@@ -249,7 +276,7 @@
             return canvas;
         };
         function unload(canvas) {
-            if (!canvas.complete && canvas.__dtAbort) canvas.__dtAbort.abort();
+            if (canvas.__dtRelease) canvas.__dtRelease();
         }
         layer.on("tileunload", function (e) {
             var at = canvases.indexOf(e.tile);

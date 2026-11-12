@@ -68,7 +68,7 @@ Keep the work in plain functions that take data and return HTML strings or value
 | `inspector.js` | The Thermal Inspector on WebODM's map. |
 | `regions.js` | Drawing shapes on a Leaflet map, and the measuring tools' list (`TOOLS`). |
 | `split.js`, `split.css` | A divider on a Leaflet map showing layers on one side of it, upright or across (the overlays' Swipe in the Inspector). Shared: it needs only Leaflet and knows nothing of this plugin, so another WebODM plugin can take both files as they are; its API is in its header (`create(L, map, opts)`, `add(layer, side)`, `turn()`, `on("change")`, the exported `clip`). TweakUI copies both files as they are: a change here is copied there. A plugin using it tells WebODM's split event (`sideBySideChanged(layer, true)` then `false`) each time its divider starts, and ends its own when it hears another's, so the dividers take turns. |
-| `scale.js`, `recolour.js`, `frames.js` | Shared by the mosaic viewer and the Inspector: colour scales, the range's D-pad and the Image controls, tiles coloured in the browser, and the window of the frames that saw a point. |
+| `scale.js`, `recolour.js`, `frames.js` | Shared by the mosaic viewer and the Inspector: colour scales, the range's D-pad and the Image controls, tiles coloured in the browser (each value tile fetched once for the layers drawn from it), and the window of the frames that saw a point. |
 | `picture_viewer.js` | The full-page picture viewer. |
 | `thermal/` | DJI Thermal Task's panel and the project page's workset progress: JSX and ES modules, built by WebODM's webpack into `public/build/` (untracked). |
 
