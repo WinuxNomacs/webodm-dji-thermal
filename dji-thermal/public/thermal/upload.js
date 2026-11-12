@@ -28,11 +28,18 @@ export const NO_IMAGES = "None of the photos could be converted: the task was no
 // The task's hidden tag (conversion_tasks.THERMAL_TASK_TAG): its panel then offers a dataset for its photos (main.js)
 export const THERMAL_TASK_TAG = ".dji-thermal-task";
 
-// send() again when the server never answered it (dropped on the way, or timed out: no status), up to RETRIES times
+// A proxy's answer while WebODM restarts or is overloaded (502, 503, 504): as good as none, sent again after a wait
+export const GATEWAY_STATUSES = [502, 503, 504];
+export const GATEWAY_WAIT_MS = 3000;
+
+// send() again when the server never answered it (dropped on the way, or timed out: no status), or its proxy answered
+// for it, up to RETRIES times. Safe: every upload is kept by its name, a resent one replaces itself.
 export function retried(send, attempt = 0){
     return send().catch(e => {
-        if (e.status || attempt >= RETRIES) throw e;
-        return retried(send, attempt + 1);
+        const gateway = GATEWAY_STATUSES.indexOf(e.status) >= 0;
+        if ((e.status && !gateway) || attempt >= RETRIES) throw e;
+        const wait = gateway ? new Promise(resolve => setTimeout(resolve, GATEWAY_WAIT_MS * (attempt + 1))) : Promise.resolve();
+        return wait.then(() => retried(send, attempt + 1));
     });
 }
 

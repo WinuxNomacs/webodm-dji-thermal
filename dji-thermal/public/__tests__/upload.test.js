@@ -1,4 +1,4 @@
-import ThermalUpload, { NO_IMAGES, RETRIES, leaveWarning, taskData } from "../thermal/upload";
+import ThermalUpload, { GATEWAY_WAIT_MS, NO_IMAGES, RETRIES, leaveWarning, taskData } from "../thermal/upload";
 
 // jsdom's File has no text()
 function readText(file){
@@ -73,14 +73,14 @@ describe("a thermal task's upload", () => {
     test("a photo ignored or failed stays out with its reason, and the others make the task", async () => {
         const api = fakeApi({"DJI_0002_V.JPG": {status: "ignored", reason: "not a DJI thermal image"},
                              "DJI_0003_T.JPG": {status: "failed", reason: "bad thermal block"},
-                             "DJI_0004_T.JPG": failure("502 Bad Gateway", 502)});
+                             "DJI_0004_T.JPG": failure("500 Internal Server Error", 500)});
         const photos = ["DJI_0001_T.JPG", "DJI_0002_V.JPG", "DJI_0003_T.JPG", "DJI_0004_T.JPG"].map(photo);
         const result = await upload(api, photos).start();
 
         expect(result.converted).toEqual(["DJI_0001_T.tif"]);
         expect(result.ignored).toEqual([{name: "DJI_0002_V.JPG", reason: "not a DJI thermal image"}]);
         expect(result.failed).toEqual([{name: "DJI_0003_T.JPG", reason: "bad thermal block"},
-                                       {name: "DJI_0004_T.JPG", reason: "502 Bad Gateway"}]);
+                                       {name: "DJI_0004_T.JPG", reason: "500 Internal Server Error"}]);
         expect(api.commit).toHaveBeenCalled();
         expect(api.removeTask).not.toHaveBeenCalled();
     });
@@ -109,6 +109,23 @@ describe("a thermal task's upload", () => {
         expect(api.uploadToDataset).toHaveBeenCalledTimes(2);
         expect(api.removeTask).not.toHaveBeenCalled();
         expect(result).toMatchObject({workset: "w1"});
+    });
+
+    test("a batch WebODM's proxy answered for (WebODM restarting) is sent again after a wait", async () => {
+        const waits = [];
+        const timer = jest.spyOn(global, "setTimeout").mockImplementation((f, ms) => { waits.push(ms); f(); return 0; });
+        try {
+            const api = fakeApi();
+            api.uploadToDataset = jest.fn()
+                .mockImplementationOnce(() => Promise.reject(failure("502 Bad Gateway", 502)))
+                .mockImplementationOnce(() => Promise.reject(failure("503 Service Unavailable", 503)))
+                .mockImplementation(() => Promise.resolve({}));
+            const result = await upload(api, [photo("DJI_0001_T.JPG")], {frames: {normalize: true}}).start();
+            expect(api.uploadToDataset).toHaveBeenCalledTimes(3);
+            expect(waits).toEqual([GATEWAY_WAIT_MS, 2 * GATEWAY_WAIT_MS]);
+            expect(api.removeTask).not.toHaveBeenCalled();
+            expect(result).toMatchObject({workset: "w1"});
+        } finally { timer.mockRestore(); }
     });
 
     test("a batch the server refused is not sent again", async () => {
