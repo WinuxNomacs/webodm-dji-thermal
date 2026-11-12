@@ -1078,6 +1078,9 @@
             (state.mode === "delta" ? '<div class="text-muted dt-inspector-hint">Click the first spot, then the second: ΔT is the second\'s temperature less the first\'s. Esc cancels.</div>' : "") +
             (state.mode === "polygon" ? '<div class="text-muted dt-inspector-hint">Click the corners; double-click or Enter finishes, Esc cancels.</div>' : "") +
             (state.mode === "line" ? '<div class="text-muted dt-inspector-hint">Click the line\'s points; double-click or Enter finishes, Esc cancels.</div>' : "") +
+            (state.mode === "rectangle" || state.mode === "circle" ? '<div class="text-muted dt-inspector-hint">Press and drag on the map' +
+                (state.mode === "circle" ? " from the circle's centre" : "") + "; Esc cancels.</div>" : "") +
+            (state.mode === "pin" ? '<div class="text-muted dt-inspector-hint">Click the map to pin a point and its temperature.</div>' : "") +
             (state.notice ? '<div class="text-warning dt-inspector-hint">' + escapeHtml(state.notice) + "</div>" : "") +
             '<div class="dt-inspector-pointer"><strong>Pointer Info</strong>' +
             '<label class="dt-inspector-check"><input type="checkbox" data-act="pointer-temperature"' + (state.pointerTemperature ? " checked" : "") +

@@ -487,7 +487,7 @@
     // ODM options to tick and edit (options: [{name, value, reason, recommended}], the recommended ones ticked; picked:
     // readOptions' draft, to keep what was typed across a redraw)
     function optionsFormHtml(options, picked) {
-        return '<table class="table table-condensed ta-task-options"><thead><tr><th></th><th>Option</th><th>Value</th><th>Why</th></tr></thead><tbody>' +
+        return '<div class="ta-table-scroll"><table class="table table-condensed ta-task-options"><thead><tr><th></th><th>Option</th><th>Value</th><th>Why</th></tr></thead><tbody>' +
             options.map(function (o, i) {
                 var was = picked && picked[o.name];
                 var on = picked ? !!was : o.recommended;
@@ -498,7 +498,7 @@
                     (o.value === true ? '<span class="text-muted">on</span>' : '<input type="text" class="form-control input-sm" name="task-value-' + i +
                         '" value="' + esc(optionValue(v)) + '" aria-label="' + esc(o.name) + ' value">') +
                     "</td><td>" + esc(o.reason) + "</td></tr>";
-            }).join("") + "</tbody></table>";
+            }).join("") + "</tbody></table></div>";
     }
 
     // optionsFormHtml's fields: {draft (by name: {value}, or null when unticked), options ([{name, value}] ticked),

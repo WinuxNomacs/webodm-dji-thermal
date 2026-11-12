@@ -75,7 +75,9 @@ starts. Pick another preset to use your own. The thermal frames keep their size;
 **Review**, then **Start Processing**.
 
 Each photo is converted into a temperature image as it uploads, a few at a time. If a photo can't be converted,
-it's left out and the panel says why; the task processes the others.
+it's left out and the panel says why; the task processes the others. Keep the page open until the upload is done: leaving it
+asks first, as leaving would stop the upload half way. A request the server didn't answer (or WebODM restarting) is
+sent again.
 
 ## 4. Look at the result
 
