@@ -6,7 +6,7 @@ import { unitSystem } from 'webodm/classes/Units';
 import { _, interpolate } from 'webodm/classes/gettext';
 import MeasurementSettings from './MeasurementSettings';
 import { combineCameras, defaultUnit, requestData, startPalette, validate } from './measurement';
-import ThermalUpload from './upload';
+import ThermalUpload, { leaveWarning } from './upload';
 import serverApi from './serverApi';
 import { MAX_PITCH, PANEL_OPTIONS, byPitch, gimbalPitch, sameOptions } from './plan';
 
@@ -56,12 +56,17 @@ export default class ThermalTaskPanel extends React.Component {
         };
     }
 
+    // Leaving the page while the photos go up asks first (the upload is null once the task has them)
+    warnOnLeave = leaveWarning(() => !!this.upload);
+
     componentDidMount(){
         this.describeCameras();
+        window.addEventListener("beforeunload", this.warnOnLeave);
     }
 
     componentWillUnmount(){
         this.unmounted = true;
+        window.removeEventListener("beforeunload", this.warnOnLeave);
         clearTimeout(this.presetTimer);
         if (this.upload) this.upload.cancel();
     }

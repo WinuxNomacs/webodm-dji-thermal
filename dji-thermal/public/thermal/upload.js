@@ -36,6 +36,17 @@ export function retried(send, attempt = 0){
     });
 }
 
+// A beforeunload handler that asks before the page is left while busy() (an upload running): leaving would stop it half
+// way, a partial task left with some of the photos
+export function leaveWarning(busy){
+    return e => {
+        if (!busy()) return undefined;
+        e.preventDefault();
+        e.returnValue = "";
+        return "";
+    };
+}
+
 // The fields of WebODM's task creation (as its own upload, without resizing)
 export function taskData(taskInfo){
     return {

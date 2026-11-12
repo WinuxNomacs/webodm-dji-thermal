@@ -1,4 +1,4 @@
-import ThermalUpload, { NO_IMAGES, RETRIES, taskData } from "../thermal/upload";
+import ThermalUpload, { NO_IMAGES, RETRIES, leaveWarning, taskData } from "../thermal/upload";
 
 // jsdom's File has no text()
 function readText(file){
@@ -264,4 +264,17 @@ describe("a thermal task's upload", () => {
         expect(api.removeDataset).toHaveBeenCalledWith("d1");
         expect(api.removeTask).toHaveBeenCalledWith(7, "t1");
     });
+});
+
+test("leaving the page asks first while the photos go up, and not otherwise", () => {
+    let busy = true;
+    const warn = leaveWarning(() => busy);
+    const leaving = () => {
+        const e = new Event("beforeunload", {cancelable: true});
+        warn(e);
+        return e.defaultPrevented;
+    };
+    expect(leaving()).toBe(true);
+    busy = false;
+    expect(leaving()).toBe(false);
 });
