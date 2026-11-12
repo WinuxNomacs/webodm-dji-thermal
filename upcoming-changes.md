@@ -14,6 +14,24 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **Release 1.3.0** — 2026-11-12, `release/1.3.0` (the user: "cut the release and create the PR for webodm
+  maintainers to pull in the updated addin"): everything since 1.2.0 (R10 to R24: Pointer Info and Temperature On
+  Pointer, the ΔT tool, Banded in place of Equalized, Mosaic and Ortho Overlays as dropdowns, the overlays' own
+  divider, one Measurements section, the release review's fixes); manifest 1.3.0, `CHANGELOG.md` (README has no
+  version). Tests: Ruff, ESLint, Jest 341, Django 228 with `app.tests.test_plugins` on 4.0.0 and 3.3.2
+  (`skipped=1`). Zip: `dist/dji-thermal-1.3.0.zip` (`public/build` built against 4.0.0), sha256
+  `67fa7b07efbb4074e0d21f463b6cc168e3686873a6334026bc801f428cbdfbee`. Release check on Docker 3.3.2 (:8003,
+  recreated without the mount, then restored; :8002 left alone): installed through Administration > Plugins, pip
+  installing dji-thermal-cli 1.12.0, numpy 1.26.2 and Pillow 11.3.0, no webpack; the M4T flight's 40 thermal frames
+  and 3 RGB photos: a DJI Thermal Task processed (251 s; Auto range 15.5 to 25.9 °C, the layer -5.1 to 31.0 °C, a few
+  edge pixels from ODX's blending, the conversion code unchanged since 1.2.0), the Inspector's ΔT tool read (+0.07 °C
+  over 3.1 m); a dataset analyzed, a harmonized workset with mosaics (40 converted, 3 not thermal, 45 s), the viewer
+  (Harmonized, Intensify, a point's frames), the frame page, a task from the workset processed (237 s, 7.8 to
+  31.7 °C). No console errors but 3.3.2's dev livereload. The check's project deleted (its tasks removed first), the
+  plugin removed. Then on native Windows 4.0.0 (`C:\WebODM`, started by the user, through the reverse tunnel): pip
+  installing numpy 2.5.4 and Pillow 13.0.0, no webpack; the Thermal Task processed (211 s, 10.6 to 35.3 °C), ΔT read
+  (-0.34 °C over 3.1 m); the workset (40 converted, 3 not thermal, 82 s) and its task (240 s, 8.1 to 31.0 °C); no
+  console errors. Its project deleted, the plugin removed, the tunnel stopped.
 - **R24. Release review: fixes found on the way** (the user, 2026-11-12: "The code is nearing release. Review the
   project for bugs and potential ui experience breakdowns that can negatively impact the user. Fix any obvious bugs
   along the way but plan anything more involved in planned phases"). Reviewed: the server's permissions, inputs,

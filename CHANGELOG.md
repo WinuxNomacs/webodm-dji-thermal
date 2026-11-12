@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.3.0 (2026-11-12)
+
+For WebODM 3.3.2 and 4.0.0, in Docker (Linux, Windows, macOS) or from its native Windows installer.
+
+**New**
+
+- **The ΔT tool**, after Hover in the Thermal Inspector and first on the frame page: click two spots, read the
+  difference between them (second less first, corrected where a correction is set), save it, list it and export it
+  as boxes and lines are. In the Inspector the two spots may be on two orthophotos either side of the divider (that
+  ΔT is kept for the visit, not saved).
+- **Ortho Overlays** in the Thermal Inspector: the project's other orthophotos, RGB or thermal, laid over the map
+  with opacity, Swipe and Zoom to; a thermal one is read by the pointer and the measuring tools, so two flights can
+  be compared. **Mosaic Overlays** is now a dropdown (“1 of 5 shown”) too, both at the end of the panel.
+- **The overlays' own divider**: horizontal or vertical (its button, or a right-click on its handle), each overlay
+  on the side you pick; readings and measurements follow it, each drawn only where its layer shows, as they do with
+  WebODM's own divider.
+- **One Measurements section** in the Inspector: pins, ΔTs, boxes, circles, polygons and lines in one list, with one
+  Hide, one CSV (with a shape column) and one Remove all.
+- **Pointer Info** (was “Under the cursor”), with **Temperature On Pointer**: the temperature in a small label beside
+  the pointer, off unless ticked, kept with your preferences; on the mosaic viewer, the frame page and the Inspector.
+- **Banded** in the Image section, on every page: flat bands of a set width in your unit (Auto picks a round width,
+  steppable at once), for reading temperatures from colours.
+- Hover and Pin are icons with tooltips, all the Inspector's tools on one row, each saying how it draws.
+
+**Removed**
+
+- **Equalized** (the colours stretched by the histogram), not useful for measuring: a view saved with it opens Linear.
+- **ΔT from surroundings** under the cursor, replaced by the ΔT tool. Intensify stays.
+
+**Fixed and made sturdier**
+
+- A Thermal Task's upload is sent again when WebODM's proxy answers that it's restarting (502, 503, 504), and leaving
+  the dashboard during the upload asks first.
+- On a phone, the Analyzer's lists and tables scroll in their own box, not the whole page, and the Inspector's panel
+  stops above the map's zoom buttons.
+- With a correction set, the label beside the pointer shows the corrected temperature, as the panel does.
+- Letting go of a divider off its handle no longer clicks the map; the divider takes turns with other plugins'.
+- An isotherm reuses its layer's temperature tiles instead of fetching them again.
+
 ## 1.2.0 (2026-11-08)
 
 The plugin's name is now **DJI Thermal Analyzer** (its id and folder stay `dji-thermal`, so upgrading keeps its
