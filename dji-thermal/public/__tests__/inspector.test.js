@@ -452,6 +452,19 @@ describe("the Thermal Inspector's regions", () => {
         } finally { clock.mockRestore(); }
     });
 
+    it("says how each tool draws while it is chosen", () => {
+        const map = leafletMap();
+        const {ins, panel} = start(map, {}, {L});
+        ins.open();
+        const hint = m => { panel().querySelector(`[data-mode="${m}"]`).click(); return panel().querySelector(".dt-inspector-hint").textContent; };
+        expect(hint("rectangle")).toBe("Press and drag on the map; Esc cancels.");
+        expect(hint("circle")).toBe("Press and drag on the map from the circle's centre; Esc cancels.");
+        expect(hint("pin")).toContain("Click the map to pin a point");
+        expect(hint("polygon")).toContain("Click the corners");
+        panel().querySelector('[data-mode="hover"]').click();
+        expect(panel().textContent).not.toMatch(/Press and drag|Click the map to pin/);
+    });
+
     it("draws a line and shows its temperatures along it, each found on the map from its profile, and exports them", async () => {
         const map = leafletMap();
         const {ins, fetchFn, panel} = start(map, {[REGION]: LINE}, {L});
