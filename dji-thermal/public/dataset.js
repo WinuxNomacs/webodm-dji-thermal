@@ -493,11 +493,11 @@
     function optionsTable(options) {
         var keys = Object.keys(options || {});
         if (!keys.length) return '<p class="text-muted">None.</p>';
-        return '<table class="table table-condensed ta-options"><thead><tr><th>Option</th><th>Value</th><th>Why</th></tr></thead><tbody>' +
+        return '<div class="ta-table-scroll"><table class="table table-condensed ta-options"><thead><tr><th>Option</th><th>Value</th><th>Why</th></tr></thead><tbody>' +
             keys.map(function (k) {
                 var o = options[k];
                 return "<tr><td>" + core.optionHtml(k) + "</td><td>" + esc(o.value) + "</td><td>" + esc(o.reason) + "</td></tr>";
-            }).join("") + "</tbody></table>";
+            }).join("") + "</tbody></table></div>";
     }
 
     // The plan's ODM options, [{name, value, reason, recommended}]: the recommended ones first (conversion_tasks.plan_options)
