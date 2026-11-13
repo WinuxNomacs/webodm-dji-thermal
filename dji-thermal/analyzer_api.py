@@ -141,6 +141,8 @@ def detail(task, user, known_analysis=None):
     # What the conversions' settings are compared against, to list what each one changed
     out['defaults'] = conversions.DEFAULTS
     out['product_names'] = conversions.PRODUCT_NAMES
+    # The values the frames' cameras accept, for the Workset Creation Settings
+    out['ranges'] = conversions.camera_ranges(task)
     if out['can_change']:
         out['sharing'] = datasets.sharing(task.project)
     return out
@@ -574,6 +576,7 @@ class ConversionListCreate(DatasetView):
         if datasets.over_quota(task):
             raise ValidationError({'error': OVER_QUOTA})
         settings, errors = conversions.parse_settings(request.data.get('settings'))
+        errors = errors or conversions.range_errors(settings, conversions.camera_ranges(task))
         if errors:
             raise ValidationError(errors)
         cid = conversions.create(task, conversion_name(request, task), settings, request.user)

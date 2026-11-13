@@ -25,7 +25,9 @@ The settings are in sections, in the order of the work:
 - **Outputs**: which files to write (temperature TIFFs in °C, °F or K, colour PNGs, 16-bit grey, DJI R-JPEGs and
   others), their compression, and whether to build mosaics.
 - **Measurement**: the values the temperatures are computed with, in your unit. Left empty, each photo keeps its
-  recorded value; the recorded median shows under each field. **Unit of the files** sets the mosaics' unit and the
+  recorded value; the recorded median and the range the photos' cameras accept show under each field (the narrowest
+  range when the photos come from several cameras, once the dataset is analyzed). A value outside the range would be
+  refused for every frame, so **Create Workset** says so and doesn't start. **Unit of the files** sets the mosaics' unit and the
   frame page's downloads'. See [Measurement settings](measurement.md).
 - **Colours**, once a colour or 16-bit grey output is ticked: the palette and colour range of those pictures.
 - **Adjustments**: gimbal angle overrides, temperatures above or below a threshold replaced, and the location and

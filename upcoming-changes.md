@@ -20,6 +20,18 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R30. Out-of-range values refused before a workset starts** — 2026-11-13, `r30-workset-ranges` (the user: "Yes",
+  asked after R27 found the gap). A distance (or emissivity, humidity, reflected or ambient temperature) outside what
+  a camera accepts, typed in the Workset Creation Settings, was taken (the server only checked 0.1 to 1000 m), then
+  dji-thermal-cli refused every frame of that camera ("refused: distance=500 is outside [1, 300]"). The DJI Thermal
+  Task panel already checked the cameras' ranges, the frame page's Measure again refuses with the SDK's message, and
+  the rangefinder's own distance is clamped with a note. Now: `conversions.camera_ranges` (one frame described per
+  camera of the dataset's analysis, the narrowest range; cached by the analysis' stamp) and `range_errors`, checked
+  when a workset or a thermal task's conversion starts (`analyzer_api.py`, `api.py`), and sent with the dataset
+  (`ranges`); the form (`public/conversions.js` `rangeText`, `rangeProblem`) shows each field's range and refuses
+  on Create Workset. Before an analysis there are no ranges and nothing is checked (as before). Tests: Django
+  `TestConversions.test_a_value_the_frames_cameras_refuse_...`, Jest "shows the range the frames' cameras accept...".
+  Docs: README, `docs/quickstart-worksets.md`, the `workset-settings` screenshot.
 - **R27. The distance setting** — 2026-11-13, `r27-distance-docs`: not a bug; the docs now explain it. A user
   reported that with the recorded 5 m their temperatures matched a weather station, while with the rangefinder's
   distance or 20, 100 or 200 m they all read much lower. Measured on an M4T frame: the plugin (dji-thermal-cli 1.12.0)

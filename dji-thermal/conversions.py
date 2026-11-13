@@ -18,6 +18,7 @@ images. DJI's own SDK measures them when one is
 installed (sdk.current()).
 """
 
+import functools
 import math
 import os
 import shutil
@@ -304,6 +305,63 @@ def flight_medians(root, jpegs):
             if recorded.get(k) is not None:
                 v.append(float(recorded[k]))
     return tuple(float(statistics.median(v)) if v else None for v in values.values())
+
+
+RANGED = ('distance', 'humidity', 'emissivity', 'reflected_temp', 'ambient_temp')     # converter.describe's names
+
+
+@functools.lru_cache(maxsize=32)
+def _camera_ranges(root, stamp, paths):
+    found = {}
+    for path in paths:
+        try:
+            info = converter.describe(os.path.join(root, path))
+        except Exception:  # noqa: BLE001, S112 - a frame it can't read: its camera left out, as converting skips it
+            continue
+        for name, (low, high) in info['ranges'].items():
+            if name in RANGED:
+                was = found.get(name)
+                found[name] = [max(was[0], low), min(was[1], high)] if was else [float(low), float(high)]
+    return found
+
+
+def camera_ranges(task):
+    """
+    The values every camera of the dataset's thermal frames accepts, as its analysis lists them: {setting: [lowest,
+    highest]} (the narrowest when there are several cameras; temperatures in °C), one frame described per camera; {}
+    before an analysis. A setting no camera uses is left out.
+    """
+    rows = (datasets.analysis(task) or {}).get('files') or []
+    first = {}
+    for r in rows:
+        if r.get('kind') == 'thermal' and r.get('path'):
+            first.setdefault((r.get('model'), r.get('width'), r.get('height')), r['path'])
+    if not first:
+        return {}
+    return dict(_camera_ranges(datasets.images_path(task), datasets.analysis_stamp(task), tuple(sorted(first.values()))))
+
+
+def range_errors(settings, ranges):
+    """{setting: message} for the measurement values outside what the cameras accept (camera_ranges): dji-thermal-cli
+    would refuse every frame of those cameras. The message gives the range in the settings' unit."""
+    from .inspector import to_celsius
+    unit = settings.get('unit') or 'C'
+    errors = {}
+    for name in RANGED:
+        value, limits = settings.get(name), ranges.get(name)
+        if not limits or not isinstance(value, (int, float)) or isinstance(value, bool):
+            continue
+        celsius = to_celsius(float(value), unit) if name in TEMPERATURES else float(value)
+        if limits[0] - 1e-6 <= celsius <= limits[1] + 1e-6:
+            continue
+        low, high = limits
+        if name in TEMPERATURES:
+            shown = {'C': (low, high), 'F': (low * 1.8 + 32, high * 1.8 + 32), 'K': (low + 273.15, high + 273.15)}[unit]
+            text = "{:g} to {:g} {}".format(round(shown[0], 2), round(shown[1], 2), {'C': '°C', 'F': '°F', 'K': 'K'}[unit])
+        else:
+            text = "{:g} to {:g}{}".format(low, high, {'distance': ' m', 'humidity': ' %'}.get(name, ''))
+        errors[name] = "Outside what the photos' cameras accept: {}".format(text)
+    return errors
 
 
 def compact(report, root, out_dir, version="", thermal=None, damaged=None):
