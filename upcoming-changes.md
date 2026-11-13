@@ -2369,6 +2369,20 @@ Touch points in shared code (kept current while building):
 - `inspector.js`: exports four helpers it had (`isothermHtml`, `validCorrection`, `ISOTHERM_COLORS`, `REASONS`) for the
   3D panel; nothing in it changed.
 
+**R26's first step, measured** (2026-11-13, HomerunObliqueII, offline in NodeODX's image and in the browser):
+- The point cloud's points lie on the model: median 2 mm from its surface, 98.5 % within 5 cm, 99.1 % within 10 cm,
+  99.5 % within 25 cm (115k points sampled; every nearest spot holds a temperature). So a point takes its surface's
+  temperature as accurately as the model has it. The limit: **25 cm**; beyond it a point keeps ODX's grey and reads "no
+  temperature" (0.5 % here).
+- The model's textures against the orthophoto, where the surface faces up (72k points): median +0.31 °C, |median| 0.47 °C,
+  |p90| 1.6 °C, |p95| 2.3 °C. ODX textures the model and the orthophoto in separate runs, each patch from the photo it
+  picks, so the two can read a spot from different photos; neither is the truer. The docs say so.
+- In the browser, the 2 million points of the opening view (48 nodes): 16.8 s with one 25 cm search, 7.5 s with a 3 cm
+  search first (most points are within millimetres) and 25 cm for the rest. So the lookups run in a Web Worker, node by
+  node as Potree loads them, the page free meanwhile; restyling the points looked up is then a lookup of their texels.
+- WebODM doesn't load the textured model while the point cloud is shown: the plugin loads the GLB itself (WebODM's
+  GLTFLoader and DRACOLoader are on the page) for the index, its textures dropped.
+
 **Steps**, each on this branch (`thermal-3d`), with its tests:
 1. The server's model answers (Django tests on a small GLB and TIFFs made in the test; refusals: no GLB, RGB
    textures, a material count that doesn't match).
