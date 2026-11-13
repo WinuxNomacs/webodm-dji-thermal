@@ -9,6 +9,8 @@
 - **R26. The point cloud in the thermal palette**, each point's temperature taken from the model's surface; after
   R25, which it builds on. Details: "Up next: Thermal 3D".
   Both on one branch, `thermal-3d`, not merged until the user decides to keep or cut it (the user, 2026-11-13).
+- **R28. Source frames in 3D**: a click on the 3D model or point cloud shows the photo that coloured that spot, then
+  the others that saw it, ranked. On `thermal-3d` with R25/R26. Details: "Up next: Source frames in 3D".
 - **R27. The distance setting: how it's applied, and whether it changes temperatures** (the user, 2026-11-13, in
   `new.md`: "Plan for after this feature work to discuss a possible bug raised by a user regarding how the distance
   setting is applied and if it effects temperature?"). To discuss once R25/R26 are kept or cut. What's known now: the
@@ -21,8 +23,6 @@
   macOS"); Apple Silicon was checked without a Mac.
 
 **Later**
-- **Source frames in 3D** (the user, 2026-11-13: a later phase): a click on the 3D model or point cloud opens the
-  frames that saw that point, as on the 2D map, using its height. After R25 and R26.
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
 - **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
@@ -2383,6 +2383,45 @@ Touch points in shared code (kept current while building):
 - `dev/screenshots.js`: the `inspector-3d` and `inspector-3d-cloud` shots (`open3d`, `viewAt`), WebGL in software
   (SwiftShader) for every shot, and HEAD requests let through (Potree checks the point cloud with one); the `docs`
   skill says so, and that the 3D shots leave `thermal/model3d.json` cached.
+
+**Up next: Source frames in 3D (R28)** (the user, 2026-11-13: "Let's get source frames in 3D going"; asked which
+frames: "show the individual photo responsible for the pixel on the model or the list of source frames that witnessed
+the pixel by rank"; then chose "Identify + ranked").
+
+Checked (HomerunObliqueII): each task has ODM's refined cameras (`assets/odm_report/shots.geojson`: each photo's
+centre in the task's projection and its rotation, OpenSfM's axis-angle, world to camera; `assets/cameras.json`: the
+lens, `brown`) and its own temperature TIFFs (the task's folder). Projected with them, the model's points land on the
+right pixel: the photo closest to straight down reads a median 0.44 °C from the model, and offsetting the pixel by one
+either way only agrees worse (best at 0, 0). ODM doesn't keep which photo textured each face (texrecon runs with
+`--no_intermediate_results`; `odm_report/camera_mappings.npz` is only the undistortion maps), and its global seam
+leveling shifts each patch's values a little, so the model's value and its photo's differ slightly.
+
+Design:
+- **Which photo coloured a spot, inferred**: texrecon gives each connected patch of faces one photo, laid out as one
+  chart of the texture atlas. The chart of the clicked texel is matched against each photo that saw it (many of its
+  faces projected with ODM's cameras, the photo's values against the texture's); the photo that matches is the one,
+  with how sure the match is (the margin over the next). Worked out on the server once per task and cached.
+- **The window** (as 2D's, beside the panel): first the photo that coloured the spot, with a crosshair on the point,
+  its value and the model's; then the others that saw it, ranked by how squarely they faced the surface (the angle
+  between the view and the surface's normal), those the model hides from them left out (a ray from the point to the
+  camera through the mesh index); "Open this frame" (the Analyzer's frame page) when the task came from a workset.
+  On every thermal task with a 3D model; from the point cloud through each point's nearest surface. Drawn in the
+  palette and range, with Manual Corrections, as the model.
+- **First step, before anything is built on it**: measure on HomerunObliqueII how clearly the chart matching picks
+  one photo (the margin), and check it against texrecon's own choice where that can be had; stop and ask if it isn't
+  reliable.
+
+**R28's first step, measured** (2026-11-13, HomerunObliqueII, offline in WebODM's container): the OBJ's 946k faces
+fall into 10,664 charts (97 % of the faces in the 2,403 of 20 faces or more). Each chart's face centres projected into
+all 151 photos with ODM's cameras, the photos' values against the texture's:
+- No photo reproduces its chart: the best one differs by a median 0.38 °C (mean |diff|), and with its own offset taken
+  away still varies by 0.44 °C (std, photos sampled bilinearly); the next best, by 0.52 °C.
+- The best is at least twice as good as the next on 4.6 % of the faces, three times on 3.2 %.
+So which photo textured a spot can't be told from what ODM keeps: the photos of a surface agree with each other about as
+well as with the texture, which seam leveling has shifted and smoothed. **Stopped here for the user's decision.** Knowing
+it for certain needs ODM to keep texrecon's labeling (it runs with `--no_intermediate_results`): a change to ODM, not
+something the plugin can do.
+
 
 **R26's first step, measured** (2026-11-13, HomerunObliqueII, offline in NodeODX's image and in the browser):
 - The point cloud's points lie on the model: median 2 mm from its surface, 98.5 % within 5 cm, 99.1 % within 10 cm,
