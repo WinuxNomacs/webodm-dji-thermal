@@ -3,18 +3,9 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R25. The 3D model in the thermal palette, and a 3D Thermal Inspector** (reported 2026-11-13: a Thermal Task's 3D
-  model stays in grey while its orthophoto takes the palette chosen; the user: "do it right"). Details: "Up next:
-  Thermal 3D" below.
-- **R26. The point cloud in the thermal palette**, each point's temperature taken from the model's surface; after
-  R25, which it builds on. Details: "Up next: Thermal 3D".
-  Both on one branch, `thermal-3d`, not merged until the user decides to keep or cut it (the user, 2026-11-13).
-- **R28. Source frames in 3D**: a click on the 3D model or point cloud shows the photos that saw that spot, ranked,
-  each with its own temperature there. Built on `thermal-3d` with R25/R26 (2026-11-13). Details: "Up next: Source
-  frames in 3D".
 - **R27. The distance setting: how it's applied, and whether it changes temperatures** (the user, 2026-11-13, in
   `new.md`: "Plan for after this feature work to discuss a possible bug raised by a user regarding how the distance
-  setting is applied and if it effects temperature?"). To discuss once R25/R26 are kept or cut. What's known now: the
+  setting is applied and if it effects temperature?"). To discuss now that the 3D work is kept. What's known now: the
   conversion passes `distance` with the other measurement values to DJI's SDK through dji-thermal-cli (`converter.py`
   `PARAM_FIELDS`; `frames.py` also takes `lrf`/`embedded`), where it sets the atmosphere's effect; the Inspector's
   Manual Corrections take the atmosphere's transmission as 1 (`correction.py`), so distance plays no part there. To
@@ -22,8 +13,7 @@
 - **R29. The 2D map's source frames placed with ODM's cameras** (the user, 2026-11-13: "a worthwhile followup",
   after R27). On a WebODM orthophoto, the frames window places the point with the workset's camera models (the frames'
   GPS and gimbal, "the point can be a little off"); ODM's refined cameras (`shots.geojson`, `cameras.json`) put it on
-  the right pixel (measured for R28: best at no offset). Builds on R28's `frames3d.py` (`shots`, `project`), on
-  `thermal-3d`: if that branch is cut, that part comes over with this. Open: the point's height on a 2D map (the DSM,
+  the right pixel (measured for R28: best at no offset). Builds on R28's `frames3d.py` (`shots`, `project`). Open: the point's height on a 2D map (the DSM,
   or the orthophoto's ground), photos the terrain hides, and whether tasks not made from a workset get the window too
   (their own photos, as in 3D).
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
@@ -37,6 +27,14 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **Thermal 3D (R25, R26, R28)** — 2026-11-13, built on one branch, `thermal-3d`, kept by the user ("merge the 3d
+  branch") and merged whole: the model in the palette on WebODM's 3D page (the reported bug), the 3D Thermal
+  Inspector (Hover, ΔT, Pin, Measurements, palette, scale, Image, isotherm, legend, Manual Corrections, saved 2D pins),
+  the point cloud coloured from the model's nearest surface within 25 cm, and the photos that saw a spot. Code:
+  `model3d.py`, `model3d_api.py`, `frames3d.py`, `public/mesh_index.js`, `model3d.js`, `pointcloud3d.js`,
+  `pointcloud3d_worker.js`, `frames3d.js`, `inspector3d.js`, `inspector3d.css`; tests `tests/test_model3d.py` and
+  `public/__tests__/*3d*.test.js`, `mesh_index.test.js`. Validated end to end in the browser against the textures and
+  the 2D Inspector. Details: "Done: Thermal 3D".
 - **Release 1.3.0** — 2026-11-12, `release/1.3.0` (the user: "cut the release and create the PR for webodm
   maintainers to pull in the updated addin"): everything since 1.2.0 (R10 to R24: Pointer Info and Temperature On
   Pointer, the ΔT tool, Banded in place of Equalized, Mosaic and Ortho Overlays as dropdowns, the overlays' own
@@ -2281,7 +2279,7 @@
   `ignored/WebODM-Plugins` on their upstream `main`. Ruff passes; Jest and ESLint have nothing to check until
   `dji-thermal/public/` exists.
 
-## Up next: Thermal 3D
+## Done: Thermal 3D
 
 **The request** (reported to the user, 2026-11-13): "They created a thermal task and changed the thermal palette but
 the 3d model still appears in the original thermal palette while the 2d ortho takes the palette chosen at task
@@ -2393,7 +2391,7 @@ Touch points in shared code (kept current while building):
   (SwiftShader) for every shot, and HEAD requests let through (Potree checks the point cloud with one); the `docs`
   skill says so, and that the 3D shots leave `thermal/model3d.json` cached.
 
-**Up next: Source frames in 3D (R28)** (the user, 2026-11-13: "Let's get source frames in 3D going"; asked which
+**Source frames in 3D (R28)** (the user, 2026-11-13: "Let's get source frames in 3D going"; asked which
 frames: "show the individual photo responsible for the pixel on the model or the list of source frames that witnessed
 the pixel by rank"; then chose "Identify + ranked").
 
