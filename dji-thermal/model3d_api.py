@@ -51,3 +51,11 @@ class Model3DValues(Model3DView):
         response['ETag'] = etag
         response['Cache-Control'] = 'private, no-cache'
         return response
+
+
+class Model3DSaved(Model3DView):
+    def get(self, request, pk=None, project_pk=None):
+        """The pins saved on the task's thermal orthophoto, where they are in the model's coordinates
+        (model3d.saved_pins), to be shown on it, read only: {pins}"""
+        task = self.thermal_task(request, pk)
+        return Response({'pins': model3d.saved_pins(task)})

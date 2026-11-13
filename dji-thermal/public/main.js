@@ -40,7 +40,7 @@ window.DjiThermalScripts = (function(){
 
 // The Thermal Inspector's (2D map), and the 3D one's after them (it uses their helpers)
 var NAMES = ["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "inspector.js"];
-var NAMES_3D = ["model3d.js", "inspector3d.js"];
+var NAMES_3D = ["mesh_index.js", "model3d.js", "inspector3d.js"];
 window.DjiThermalMapScripts = function(){ return window.DjiThermalScripts(NAMES); };
 
 // The Thermal Inspector on WebODM's 2D map (inspector.js, with frames.js's source frames window), with WebODM's Leaflet:

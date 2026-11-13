@@ -242,3 +242,31 @@ def texture_path(task, name):
         if file and os.path.isfile(os.path.join(folder, os.path.basename(file))):
             return os.path.join(folder, os.path.basename(file))
     raise NotThermalModel("A texture of the 3D model isn't there")
+
+
+def saved_pins(task):
+    """
+    The pins saved on the task's thermal orthophoto (measurements.py), each with where it is in the model's coordinates
+    (the orthophoto's projection, as ODX's model and point cloud: x, y; the browser finds its height on the model):
+    [{id, name, comment, created_by, created_at, values, x, y}]
+    """
+    from rasterio.warp import transform
+
+    from . import measurements
+    pins = [m for m in measurements.listed(measurements.task_path(task)) if m.get('shape') == 'pin']
+    if not pins:
+        return []
+    crs = orthophoto_crs(task)
+    lons = [float(m['geometry']['coordinates'][0]) for m in pins]
+    lats = [float(m['geometry']['coordinates'][1]) for m in pins]
+    xs, ys = transform('EPSG:4326', crs, lons, lats)
+    keep = ('id', 'name', 'comment', 'created_by', 'created_at', 'values', 'correction')
+    return [dict({k: m.get(k) for k in keep}, x=float(x), y=float(y)) for m, x, y in zip(pins, xs, ys)]
+
+
+def orthophoto_crs(task):
+    """The task's thermal orthophoto's projection, which its model's coordinates are in"""
+    import rasterio
+
+    with rasterio.open(inspector.thermal_orthophoto(task)) as src:
+        return src.crs

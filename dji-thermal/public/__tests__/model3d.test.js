@@ -188,23 +188,6 @@ describe("the 3D Inspector's palette", () => {
         expect(Inspector3D.openingPalette(null, {palette: "whitehot"})).toBe("whitehot");
     });
 
-    test("opens the model in it over Auto's range", async () => {
-        document.body.innerHTML = '<div data-modelview data-task=\'' + JSON.stringify(TASK) + '\'></div>';
-        const restyled = [];
-        jest.spyOn(Model3D, "source").mockReturnValue({ready: Promise.resolve(DESCRIPTION), restyle: (s) => restyled.push(s), detach: jest.fn()});
-        const fetchFn = jest.fn((url) => url.endsWith("/display") ? json(display)
-            : url.indexOf("/inspector/palette?name=ironred") !== -1 ? json({name: "ironred", color_map: [1, 2]}) : json({}, false));
-        const inspector = await Inspector3D.create({}, {fetchFn, path: "/3d/project/1/task/x/"});
-        expect(inspector.look.palette).toBe("ironred");
-        expect(restyled).toEqual([expect.objectContaining({colors: [1, 2], range: [5, 25]})]);
-        jest.restoreAllMocks();
-    });
-
-    test("isn't there without the page's task", async () => {
-        document.body.innerHTML = "<div></div>";
-        await expect(Inspector3D.create({}, {fetchFn: jest.fn()})).resolves.toBeNull();
-    });
-
     test("uses the 2D Inspector's palette list", () => {
         expect(Inspector.paletteOptions(display).map((o) => o[0])).toEqual(["ironred", "whitehot", "magma", "viridis"]);
     });

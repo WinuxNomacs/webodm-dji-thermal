@@ -181,7 +181,7 @@ test("the 3D Thermal Inspector is added to the 3D page, after the 2D one's scrip
     const inspector = {toggle: jest.fn(), detach: jest.fn()};
     window.ThermalInspector3D = {create: jest.fn(() => Promise.resolve(inspector))};
     button.componentDidMount();
-    const names = ["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "inspector.js", "model3d.js", "inspector3d.js"];
+    const names = ["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "inspector.js", "mesh_index.js", "model3d.js", "inspector3d.js"];
     for (let i = 0; i < names.length; i++) {
         await new Promise(r => setTimeout(r, 0));
         const scripts = document.head.querySelectorAll("script");

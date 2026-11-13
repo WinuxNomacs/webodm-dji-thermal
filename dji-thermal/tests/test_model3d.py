@@ -180,6 +180,18 @@ class TestModel3D(BootTestCase):
                     b'dtc:Emissivity="0.95" dtc:ReflectedTemperatureC="23"/></x:xmpmeta>')
         self.assertEqual(self.client.get(self.url(self.task)).data['baseline'], {'emissivity': 0.95, 'reflected': 23.0})
 
+    def test_gives_the_saved_pins_where_they_are_in_the_models_coordinates(self):
+        from rasterio.warp import transform
+        lon, lat = transform('EPSG:32616', 'EPSG:4326', [400001.0], [4659999.0])
+        url = "/api/plugins/dji-thermal/projects/{}/tasks/{}/inspector/measurements".format(self.project.id, self.task.id)
+        self.client.post(url, {'name': "Vent", 'shape': 'pin', 'geometry': {'type': 'Point', 'coordinates': [lon[0], lat[0]]}},
+                         format="json")
+        pins = self.client.get(self.url(self.task, "/saved")).data['pins']
+        self.assertEqual([p['name'] for p in pins], ["Vent"])
+        self.assertAlmostEqual(pins[0]['x'], 400001.0, places=3)
+        self.assertAlmostEqual(pins[0]['y'], 4659999.0, places=3)
+        self.assertAlmostEqual(pins[0]['values']['temperature'], 20.0, places=4)
+
     def test_only_those_who_can_view_the_task_read_its_model_or_anyone_when_it_is_public(self):
         anonymous = APIClient()
         self.assertEqual(anonymous.get(self.url(self.task)).status_code, status.HTTP_404_NOT_FOUND)    # as WebODM's

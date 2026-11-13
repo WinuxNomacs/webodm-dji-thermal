@@ -6,7 +6,8 @@
 // A source answers the 3D Inspector's few questions; another (the point cloud: R26) answers the same ones:
 //   ready        a Promise of whether the source holds temperatures (its description, or null)
 //   shown()      whether it's on screen now (WebODM shows the model or the point cloud, one at a time)
-//   restyle(s)   colour it again with a recolour.js style ({colors, range, shares, steps, isotherm, ...}, °C)
+//   restyle(s)   colour it again with a recolour.js style ({colors, range, shares, steps, ...}, °C), with an isotherm
+//                painted over it (isothermPaint: {rgb, limits: [low, high], °C, either null}) or not
 //   reading(hit) the temperature at a hit of it ({object, uv, point}, as three.js's raycaster gives): {valid,
 //                temperature (°C), reason}
 //   objects()    what to cast rays at (three.js objects)
@@ -98,6 +99,20 @@
     }
     var NEIGHBOURS = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
 
+    // An isotherm painted over the colours, as the 2D map lays one over the orthophoto: the texels whose temperatures
+    // are within limits ([low, high], °C as the texture's, either null: open) in rgb
+    function paintIsotherm(values, rgba, isotherm) {
+        var lo = isotherm.limits[0], hi = isotherm.limits[1], rgb = isotherm.rgb;
+        for (var i = 0; i < values.length; i++) {
+            var v = values[i];
+            if (v !== v || (lo !== null && v < lo) || (hi !== null && v > hi)) continue;
+            rgba[i * 4] = rgb[0];
+            rgba[i * 4 + 1] = rgb[1];
+            rgba[i * 4 + 2] = rgb[2];
+        }
+        return rgba;
+    }
+
     // The texels without a temperature coloured as planned (fillPlan), and in EMPTY_RGB beyond
     function fill(rgba, plan) {
         for (var k = 0; k < plan.targets.length; k++) {
@@ -169,6 +184,7 @@
             }
             var ctx = e.canvas.getContext("2d"), image = ctx.createImageData(w, h);
             Recolour.colour(e.tile, style, image.data);
+            if (style.isothermPaint) paintIsotherm(e.tile.values, image.data, style.isothermPaint);
             if (!e.plan) e.plan = fillPlan(e.tile.values, w, h, DILATE);
             fill(image.data, e.plan);
             ctx.putImageData(image, 0, 0);
@@ -244,7 +260,7 @@
         };
     }
 
-    var api = {source: source, modelUrl: modelUrl, matchMaterials: matchMaterials, findModel: findModel, fillPlan: fillPlan, fill: fill,
+    var api = {source: source, modelUrl: modelUrl, matchMaterials: matchMaterials, findModel: findModel, fillPlan: fillPlan, fill: fill, paintIsotherm: paintIsotherm,
                texelIndex: texelIndex, EMPTY_RGB: EMPTY_RGB};
     root.ThermalModel3D = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

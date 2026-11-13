@@ -1,3 +1,33 @@
-/* The 3D Thermal Inspector (inspector3d.js) on WebODM's 3D page; its panel shares the 2D Inspector's styles
-   (inspector.css) */
+/* The 3D Thermal Inspector (inspector3d.js) on WebODM's 3D page: its panel and legend share the 2D Inspector's styles
+   (inspector.css), placed over the 3D view here, with the markers of its pins and ΔTs */
 .dt-inspector3d-button { min-width: 30px; }
+.dt-inspector3d { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 20; }
+.dt-inspector3d > * { pointer-events: auto; }
+.dt-inspector3d .dt-inspector3d-panel { right: 8px; top: 52px; max-height: calc(100% - 120px); }
+.dt-inspector3d .dt-inspector3d-legend { position: absolute; left: 8px; bottom: 56px; }
+.dt-inspector3d .dt-inspector-cursor { pointer-events: none; }
+/* Markers and lines follow the model's points on screen; they never take the pointer from the view */
+.dt-inspector3d .dt-inspector3d-markers, .dt-inspector3d .dt-inspector3d-lines {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible;
+}
+.dt-inspector3d-marker { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
+.dt-inspector3d-marker::before {
+    content: ""; position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%;
+    border: 2px solid #fff; background: #d9534f; box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+.dt-inspector3d-marker span {
+    position: absolute; left: 8px; top: -9px; padding: 0 4px; border-radius: 3px; white-space: nowrap;
+    background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 11px; line-height: 16px;
+}
+.dt-inspector3d-marker.dt-spot::before { background: #ff9800; }
+.dt-inspector3d-marker.dt-spot:not(.dt-spot-end) span { display: none; }
+.dt-inspector3d-marker.dt-saved::before { background: #2e7d32; border-style: dashed; }
+.dt-inspector3d-line { stroke: #fff; stroke-width: 2px; stroke-dasharray: 5 3; filter: drop-shadow(0 0 1px #000); }
+/* While Pin or ΔT is chosen: a crosshair over the view */
+canvas.dt-inspector3d-picking { cursor: crosshair; }
+/* A phone: the panel over the lower part of the view, the model above it (its top, with the reading, stays in view as
+   the rest scrolls), the legend above the panel */
+@media (max-width: 480px) {
+    .dt-inspector3d .dt-inspector3d-panel { left: 8px; right: 8px; width: auto; top: auto; bottom: 52px; max-height: 48%; }
+    .dt-inspector3d .dt-inspector3d-legend { bottom: auto; top: 52px; }
+}
