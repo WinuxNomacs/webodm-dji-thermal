@@ -19,6 +19,13 @@
   `PARAM_FIELDS`; `frames.py` also takes `lrf`/`embedded`), where it sets the atmosphere's effect; the Inspector's
   Manual Corrections take the atmosphere's transmission as 1 (`correction.py`), so distance plays no part there. To
   find out: the user's report itself, then measure what a change of distance does to a frame's temperatures.
+- **R29. The 2D map's source frames placed with ODM's cameras** (the user, 2026-11-13: "a worthwhile followup",
+  after R27). On a WebODM orthophoto, the frames window places the point with the workset's camera models (the frames'
+  GPS and gimbal, "the point can be a little off"); ODM's refined cameras (`shots.geojson`, `cameras.json`) put it on
+  the right pixel (measured for R28: best at no offset). Builds on R28's `frames3d.py` (`shots`, `project`), on
+  `thermal-3d`: if that branch is cut, that part comes over with this. Open: the point's height on a 2D map (the DSM,
+  or the orthophoto's ground), photos the terrain hides, and whether tasks not made from a workset get the window too
+  (their own photos, as in 3D).
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
