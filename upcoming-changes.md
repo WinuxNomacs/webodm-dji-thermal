@@ -9,6 +9,13 @@
 - **R26. The point cloud in the thermal palette**, each point's temperature taken from the model's surface; after
   R25, which it builds on. Details: "Up next: Thermal 3D".
   Both on one branch, `thermal-3d`, not merged until the user decides to keep or cut it (the user, 2026-11-13).
+- **R27. The distance setting: how it's applied, and whether it changes temperatures** (the user, 2026-11-13, in
+  `new.md`: "Plan for after this feature work to discuss a possible bug raised by a user regarding how the distance
+  setting is applied and if it effects temperature?"). To discuss once R25/R26 are kept or cut. What's known now: the
+  conversion passes `distance` with the other measurement values to DJI's SDK through dji-thermal-cli (`converter.py`
+  `PARAM_FIELDS`; `frames.py` also takes `lrf`/`embedded`), where it sets the atmosphere's effect; the Inspector's
+  Manual Corrections take the atmosphere's transmission as 1 (`correction.py`), so distance plays no part there. To
+  find out: the user's report itself, then measure what a change of distance does to a frame's temperatures.
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
