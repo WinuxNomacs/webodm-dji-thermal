@@ -2369,6 +2369,13 @@ Touch points in shared code (kept current while building):
 - `eslint.config.mjs`: `Int32Array`, `Uint32Array` and `Int16Array` among the ES5 files' globals.
 - `inspector.js`: exports four helpers it had (`isothermHtml`, `validCorrection`, `ISOTHERM_COLORS`, `REASONS`) for the
   3D panel; nothing in it changed.
+- Docs: `README.md` ("The Thermal Inspector" › "In 3D", the intro and "What you can do"), `docs/index.md`,
+  `docs/api.md` (the three routes), `docs/developing.md` (the map's rows, "The 3D view", the recipes "A tool in the 3D
+  Thermal Inspector" and "A source of temperatures in 3D"); the docs' own `docs/quickstart-3d.md` and its two
+  screenshots are the branch's.
+- `dev/screenshots.js`: the `inspector-3d` and `inspector-3d-cloud` shots (`open3d`, `viewAt`), WebGL in software
+  (SwiftShader) for every shot, and HEAD requests let through (Potree checks the point cloud with one); the `docs`
+  skill says so, and that the 3D shots leave `thermal/model3d.json` cached.
 
 **R26's first step, measured** (2026-11-13, HomerunObliqueII, offline in NodeODX's image and in the browser):
 - The point cloud's points lie on the model: median 2 mm from its surface, 98.5 % within 5 cm, 99.1 % within 10 cm,

@@ -30,9 +30,10 @@ kramdown-only syntax, which github.com shows as text.
    with 5+ decimals), no address or place name (dataset, project and task names included), no basemap (the
    script blocks every request outside WebODM, so maps show grey around the photos). Nor a camera's serial number
    (hidden by the script). A shot the script can't make safe is left out, and the page says so in words.
-4. The script is read only: it lets only GETs through, plus the login, `describe` and an Inspector region's
+4. The script is read only: it lets only GETs (and HEADs) through, plus the login, `describe` and an Inspector region's
    statistics, and logs anything it blocked. Pins and regions stay in its own browser profile, gone when it
-   closes. Nothing to clean up on the server.
+   closes. Nothing to clean up on the server, but the 3D shots' model description, cached in the task's folder
+   (`thermal/model3d.json`, made again when needed): delete it if it wasn't there before.
 5. Check the links (prints nothing when every link and image is there):
    ```bash
    for f in docs/*.md; do grep -o "](\([^)#:]*\))" "$f" | sed "s/^](//; s/)$//" | while read -r l; do [ -e "docs/$l" ] || echo "$f: $l is missing"; done; done

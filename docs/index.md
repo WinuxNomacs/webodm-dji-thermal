@@ -13,7 +13,8 @@ The DJI Thermal Analyzer plugin turns the radiometric thermal photos of a DJI dr
 - **Thermal Inspector**, on WebODM's map of a processed thermal task. It shows the temperature under the cursor,
   pinned points, the statistics of regions and lines (surroundings, ΔT, a line's profile), measurements saved for
   the project, a correction for another emissivity, isotherms and a legend, lays the Analyzer's mosaics on the map to
-  compare them with the project's own layers, and shows the frames that saw a point.
+  compare them with the project's own layers, and shows the frames that saw a point. On a task's 3D view, it
+  colours the model and the point cloud in your palette and reads their temperatures.
 
 Temperatures are computed on your WebODM server by [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/),
 a pure-Python version of DJI's Thermal SDK. The plugin calls no outside service.
@@ -36,6 +37,8 @@ a pure-Python version of DJI's Thermal SDK. The plugin calls no outside service.
 - **Analyze your results.** The temperature under the cursor, pins, lines with their profile, regions with their
   statistics, histogram, surroundings and ΔT, isotherms, measurements saved for the project, and a correction for
   another emissivity: [Measuring on the map](quickstart-inspector.md).
+- **Measure on the 3D model.** The textured model and the point cloud in your palette, from the temperatures the
+  model's textures hold, with the temperature under the pointer, pins and ΔTs on them: [Measuring on the 3D model](quickstart-3d.md).
 - **Trace a temperature back to its photos.** The frames that saw a point on the map, each one measured in its own
   pixels or measured again with other values: [The frames that saw a point](quickstart-inspector.md#6-the-frames-that-saw-a-point)
   and [One frame at a time](quickstart-worksets.md#one-frame-at-a-time).
@@ -59,6 +62,8 @@ Each one walks through a task from start to finish.
    (measured, or measured again with other values), and make a WebODM task from them.
 4. [Measuring on the map](quickstart-inspector.md): temperatures, points, regions and lines on the processed map,
    saved for the project and corrected for another emissivity.
+5. [Measuring on the 3D model](quickstart-3d.md): the textured model and the point cloud in your palette, with
+   temperatures, pins and ΔTs on them.
 
 ## Guides
 

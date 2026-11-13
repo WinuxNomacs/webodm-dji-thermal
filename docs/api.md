@@ -75,6 +75,9 @@ On a task with a thermal orthophoto, under `projects/<project>/tasks/<task>/insp
 | GET | `curve?rescale=` | How the tiles share the palette out over the range with `gamma`, for the legend. |
 | GET | `isotherm/<z>/<x>/<y>` | An isotherm's tiles. |
 | GET | `palette?name=` | A palette's colours, for the legend. |
+| GET | `model` | The task's textured 3D model as temperatures, for the 3D Thermal Inspector: its `version` (of ODM's textures), `unit` (`C`), `materials` (in the GLB's order: each `name`, `width` and `height`), `range` (`min`, `max`, `low` and `high`: the 2nd and 98th percentiles, without the empty space between the texture's patches), `baseline` and `palette` as `measurements` gives them. 404 when the model's textures aren't temperatures or don't match the GLB. |
+| GET | `model/<index>/values` | One material's temperatures (°C), its texture's size, as the `values` tiles (no margin; its ETag is the model's version). |
+| GET | `model/saved` | The pins saved on the task's orthophoto (as `measurements` lists them), each with its `x` and `y` in the model's coordinates (the orthophoto's projection): `{pins}`. |
 
 On a project, under `projects/<project>/inspector/`, for those who can view it:
 
