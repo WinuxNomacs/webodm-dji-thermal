@@ -10,31 +10,38 @@ PluginsAPI.Dashboard.addNewTaskButton(
     }
 );
 
-// The Thermal Inspector's scripts, loaded on a map page only (WebODM loads include_js_files on every page), in order
-// (inspector.js uses the others), at main.js's own version (plugin.py include_js_files). Resolves once they ran.
-window.DjiThermalMapScripts = (function(){
-    var NAMES = ["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "inspector.js"];
+// The plugin's scripts a page needs, loaded only there (WebODM loads include_js_files on every page), in order (each
+// uses those before it), at main.js's own version (plugin.py include_js_files), each once whichever page asks for it.
+// Resolves once they ran.
+window.DjiThermalScripts = (function(){
     var me = document.currentScript && document.currentScript.src || "";
     var base = me ? me.replace(/main\.js(\?.*)?$/, "") : "/plugins/dji-thermal/";
     var query = (/\?v=[^&]*/.exec(me) || [""])[0];
-    var loading = null;
+    var loaded = {};
     function one(name){
-        return new Promise(function(resolve, reject){
-            var s = document.createElement("script");
-            s.src = base + name + query;
-            s.onload = resolve;
-            s.onerror = function(){ reject(new Error("Could not load " + name)); };
-            document.head.appendChild(s);
-        });
-    }
-    return function(){
-        if (!loading){
-            loading = NAMES.reduce(function(p, name){ return p.then(function(){ return one(name); }); }, Promise.resolve());
-            loading.catch(function(){ loading = null; });
+        if (!loaded[name]){
+            loaded[name] = new Promise(function(resolve, reject){
+                var s = document.createElement("script");
+                s.src = load.url(name);
+                s.onload = resolve;
+                s.onerror = function(){ reject(new Error("Could not load " + name)); };
+                document.head.appendChild(s);
+            });
+            loaded[name].catch(function(){ delete loaded[name]; });
         }
-        return loading;
+        return loaded[name];
+    }
+    var load = function(names){
+        return names.reduce(function(p, name){ return p.then(function(){ return one(name); }); }, Promise.resolve());
     };
+    load.url = function(name){ return base + name + query; };
+    return load;
 })();
+
+// The Thermal Inspector's (2D map), and the 3D one's after them (it uses their helpers)
+var NAMES = ["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "inspector.js"];
+var NAMES_3D = ["mesh_index.js", "model3d.js", "pointcloud3d.js", "frames3d.js", "inspector3d.js"];
+window.DjiThermalMapScripts = function(){ return window.DjiThermalScripts(NAMES); };
 
 // The Thermal Inspector on WebODM's 2D map (inspector.js, with frames.js's source frames window), with WebODM's Leaflet:
 // its button shows when the map has a thermal orthophoto or the project has workset mosaics
@@ -44,6 +51,53 @@ PluginsAPI.Map.willAddControls(["leaflet", "dji-thermal/inspector.css", "dji-the
     }, function(e){
         if (window.console) window.console.warn("DJI Thermal: the Thermal Inspector is not available: " + e.message);
     });
+});
+
+// The 3D Thermal Inspector on WebODM's 3D page (inspector3d.js; the model as temperatures: model3d.js): the model
+// coloured from its temperatures as soon as it's shown, and the panel's button, once the server says the page's
+// model holds them. WebODM's trigger takes the first answer only (ApiFactory.js; another plugin's button answers at
+// once): the button is given at once, with no dependencies to wait for, and shows itself when it can; its
+// stylesheets are added here. The 2D Inspector's scripts come first: the 3D one uses their helpers.
+window.DjiThermal3DScripts = function(){
+    ["inspector.css", "frames.css", "inspector3d.css"].forEach(function(name){
+        var href = window.DjiThermalScripts.url(name);
+        if (document.querySelector('link[href="' + href + '"]')) return;
+        var link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = href;
+        document.head.appendChild(link);
+    });
+    return window.DjiThermalMapScripts().then(function(){ return window.DjiThermalScripts(NAMES_3D); });
+};
+PluginsAPI.ModelView.addActionButton(function(args){
+    function Button(props){
+        React.Component.call(this, props);
+        this.state = {inspector: null};
+    }
+    Button.prototype = Object.create(React.Component.prototype);
+    Button.prototype.constructor = Button;
+    Button.prototype.componentDidMount = function(){
+        var self = this;
+        window.DjiThermal3DScripts().then(function(){
+            return window.ThermalInspector3D.create(args.viewer);
+        }).then(function(inspector){
+            if (inspector && !self.unmounted) self.setState({inspector: inspector});
+        }, function(e){
+            if (window.console) window.console.warn("DJI Thermal: the 3D Thermal Inspector is not available: " + e.message);
+        });
+    };
+    Button.prototype.componentWillUnmount = function(){
+        this.unmounted = true;
+        if (this.state.inspector) this.state.inspector.detach();
+    };
+    Button.prototype.render = function(){
+        var inspector = this.state.inspector;
+        if (!inspector || !inspector.toggle) return null;
+        return React.createElement("button", {type: "button", className: "btn btn-sm btn-secondary dt-inspector3d-button",
+            title: "Thermal Inspector", onClick: function(){ inspector.toggle(); }},
+            React.createElement("i", {className: "fa fa-thermometer-half"}));
+    };
+    return React.createElement(Button);
 });
 
 // A component of the plugin's built bundles (public/build), loaded once it is shown. A task panel's button can't wait

@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 
 from app.plugins import Menu, MountPoint, PluginBase, logger, signals
 
-from . import analyzer_api, converter, datasets, frames_api, inspector_api
+from . import analyzer_api, converter, datasets, frames_api, inspector_api, model3d_api
 from .analyzer_pages import dataset_page, datasets_page, frame_page, version, viewer_page
 from .api import Describe, TaskConvert, TaskDataset, TaskWorkset, TaskWorksetStart
 from .page import sdk_page
@@ -80,6 +80,12 @@ class Plugin(PluginBase):
             MountPoint(TASK + '/inspector/palette$', inspector_api.InspectorPalette.as_view()),
             MountPoint(TASK + '/inspector/measurements$', inspector_api.InspectorMeasurements.as_view()),
             MountPoint(TASK + r'/inspector/measurements/(?P<mid>[0-9a-f]{12})$', inspector_api.InspectorMeasurement.as_view()),
+            # The 3D Thermal Inspector (model3d_api.py)
+            MountPoint(TASK + '/inspector/model$', model3d_api.Model3D.as_view()),
+            MountPoint(TASK + r'/inspector/model/(?P<index>\d+)/values$', model3d_api.Model3DValues.as_view()),
+            MountPoint(TASK + '/inspector/model/saved$', model3d_api.Model3DSaved.as_view()),
+            MountPoint(TASK + '/inspector/model/frames$', model3d_api.Model3DFrames.as_view()),
+            MountPoint(TASK + r'/inspector/model/frames/(?P<index>\d+)/values$', model3d_api.Model3DFrameValues.as_view()),
             MountPoint(r'projects/(?P<project_pk>\d+)/inspector/mosaics$', inspector_api.InspectorMosaics.as_view()),
             MountPoint(r'projects/(?P<project_pk>\d+)/inspector/palette$', inspector_api.InspectorProjectPalette.as_view()),
             MountPoint(r'projects/(?P<project_pk>\d+)/tasks/(?P<pk>[^/.]+)/convert$', TaskConvert.as_view()),

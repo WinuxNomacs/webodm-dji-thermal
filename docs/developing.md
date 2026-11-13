@@ -33,6 +33,7 @@ Everything the plugin ships is in `dji-thermal/` (the plugin's id, and the relea
 | `conversion_tasks.py` | A WebODM task made from a workset's temperature TIFFs. |
 | `inspector.py`, `inspector_api.py` | The Thermal Inspector's reads of a task's thermal orthophoto (a point, a region, a line, tiles), and the workset mosaics it can lay on the map. |
 | `measurements.py` | Saved measurements (pins, regions, lines), kept with the task or the workset. |
+| `model3d.py`, `model3d_api.py`, `frames3d.py` | The 3D Thermal Inspector's reads of a task's textured model: which temperature TIFF is each of the GLB's materials, their values, the task's saved pins in the model's coordinates, and the photos that saw a point of it (see [The 3D view](#the-3d-view)). |
 | `correction.py` | The approximate correction for another emissivity and reflected temperature. |
 | `sdk.py`, `page.py` | DJI's own Thermal SDK, uploaded on the DJI Thermal page under Administration (`templates/sdk.html`). |
 | `shapes.py` | Shapes, with WebODM's own GDAL (OGR). Never Django's GEOS or a compiled package of the plugin's. |
@@ -70,9 +71,38 @@ Keep the work in plain functions that take data and return HTML strings or value
 | `split.js`, `split.css` | A divider on a Leaflet map showing layers on one side of it, upright or across (the overlays' Swipe in the Inspector). Shared: it needs only Leaflet and knows nothing of this plugin, so another WebODM plugin can take both files as they are; its API is in its header (`create(L, map, opts)`, `add(layer, side)`, `turn()`, `on("change")`, the exported `clip`). TweakUI copies both files as they are: a change here is copied there. A plugin using it tells WebODM's split event (`sideBySideChanged(layer, true)` then `false`) each time its divider starts, and ends its own when it hears another's, so the dividers take turns. |
 | `scale.js`, `recolour.js`, `frames.js` | Shared by the mosaic viewer and the Inspector: colour scales, the range's D-pad and the Image controls, tiles coloured in the browser (each value tile fetched once for the layers drawn from it), and the window of the frames that saw a point. |
 | `picture_viewer.js` | The full-page picture viewer. |
+| `mesh_index.js`, `model3d.js`, `pointcloud3d.js`, `pointcloud3d_worker.js`, `frames3d.js`, `inspector3d.js` | The 3D Thermal Inspector on WebODM's 3D page (see [The 3D view](#the-3d-view)). |
 | `thermal/` | DJI Thermal Task's panel and the project page's workset progress: JSX and ES modules, built by WebODM's webpack into `public/build/` (untracked). |
 
-The pages' HTML is in `templates/`, and their styles in `analyzer.css`, `frames.css` and `inspector.css`.
+The pages' HTML is in `templates/`, and their styles in `analyzer.css`, `frames.css`, `inspector.css` and
+`inspector3d.css`.
+
+### The 3D view
+
+WebODM's 3D page (`ModelView.jsx`: Potree and three.js) shows a task's textured model or its point cloud, one at a
+time. For a thermal task, ODM textured the model from the temperature TIFFs, and its GLB holds them as grey: the
+temperatures themselves are in the float textures beside the OBJ (`odm_texturing/`).
+
+| File | What it does |
+| --- | --- |
+| `model3d.py` | Which texture is each of the GLB's materials (the OBJ's first `usemtl` order, checked against the GLB's image sizes), their values (ODM's 0.0 fill between patches is no data), the model's range (cached in `thermal/model3d.json` by the textures' version), and the saved 2D pins in the model's coordinates. |
+| `frames3d.py` | The photos that saw a point: ODM's refined cameras (`odm_report/shots.geojson`, `cameras.json`), a point projected into each photo as OpenSfM does (`project`: the `brown` and `perspective` lenses), each photo's temperature at its pixel, ranked by the angle from the surface's normal; and, for a task made from a workset, each photo's frame in the dataset. |
+| `model3d_api.py` | `inspector/model`, `.../model/<index>/values` (the 2D map's value tiles, one per material), `.../model/saved`, `.../model/frames` and `.../model/frames/<index>/values`. |
+| `main.js` | `PluginsAPI.ModelView.addActionButton`: loads `NAMES` and `NAMES_3D` (`DjiThermal3DScripts`) and the stylesheets (`inspector.css`, `frames.css`, `inspector3d.css`), then `ThermalInspector3D.create(viewer)`; the thermometer button once it resolves. The hook answers at once, with no dependencies: WebODM keeps only the first plugin's answer. |
+| `inspector3d.js` | The panel, the tools (`TOOLS`, `TOOL_ORDER`), the measurements (in `localStorage`) and their markers (DOM elements and SVG lines, placed over the view each frame). It reuses `inspector.js`'s exported helpers for the colour scale, Image, Manual Corrections, the isotherm and the legend. |
+| `model3d.js` | The model as a **source**: fetches each material's values, finds WebODM's model in the scene (`findModel`, `matchMaterials`) and gives it a canvas texture in the palette; reads a hit's temperature (`reading`). On the point cloud view, it loads its own copy of WebODM's smallest GLB, for its shapes only (`meshes()`). |
+| `mesh_index.js` | A bounding-volume tree over the model's triangles (`build`): `raycast` (where the pointer meets the model) and `closest` (the nearest surface to a point). Runs in a page or a worker. |
+| `pointcloud3d.js`, `pointcloud3d_worker.js` | The point cloud as a source: each node Potree loads goes to the worker, which finds every point's nearest model surface within `LIMIT` (25 cm) and answers its material and texture coordinates; the points are then coloured from the model's values, and restyled without asking again. A node's points are placed as Potree places them (`nodeMatrix`: the cloud's matrix times the node's own), never with three.js's `updateMatrixWorld`, which would add its parents' positions again. |
+| `frames3d.js` | The photos that saw a spot, beside the panel (the 2D source frames window's markup and `frames.css`): leaves out those the model hides the spot from (`hidden`: a ray from just off the surface to the camera, with `MeshIndex.raycast`), shows each in the palette from its values with a crosshair, and what all of them read there (`spread`). Its camera is marked in the view by `inspector3d.js`. |
+
+How a hover becomes a temperature: `inspector3d.spotAt` casts a ray from the pointer with `MeshIndex.raycast` (on the
+point cloud: the point Potree picks, then `MeshIndex.closest`), which gives the hit's material and texture
+coordinates (`uv`); the model source reads the texel there from that material's values (`valueAt`). Every colour and
+every temperature comes from those values, never from the GLB's grey.
+
+A **source** answers `ready`, `loaded()`, `shown()`, `restyle(style)`, `reading(hit)` and `detach()` (listed in
+`model3d.js`'s header). `inspector3d.js` restyles every source in `sources` when the palette, range, Image or isotherm
+changes, and reads the one shown.
 
 ### How a request flows
 
@@ -141,7 +171,7 @@ What you need: Docker, Node (for Jest and ESLint) and [uv](https://docs.astral.s
   ```bash
   docker exec -w /webodm dt-webapp python manage.py test --noinput coreplugins.dji-thermal.tests.test_converter \
     coreplugins.dji-thermal.tests.test_api coreplugins.dji-thermal.tests.test_sdk coreplugins.dji-thermal.tests.test_analyzer \
-    coreplugins.dji-thermal.tests.test_inspector coreplugins.dji-thermal.tests.test_frames coreplugins.dji-thermal.tests.test_portable
+    coreplugins.dji-thermal.tests.test_inspector coreplugins.dji-thermal.tests.test_frames coreplugins.dji-thermal.tests.test_model3d coreplugins.dji-thermal.tests.test_portable
   ```
 
   Run it in `dt3-webapp` too before you propose a change, since the plugin supports both versions. Never run two
@@ -245,6 +275,33 @@ A kind of layer laid on the map (Mosaic Overlays, Ortho Overlays) is an `overlay
 `{kind, title, open, items, controls}`, its tickboxes `data-act="<kind>-on"` in rows marked `data-<kind>`; the button
 (`overlays-toggle`) opens `state.overlaysOpen[kind]`.
 6. Test the HTML function and the behaviour in `inspector.test.js`.
+
+### A tool in the 3D Thermal Inspector
+
+The 3D panel's tools (Hover, ΔT, Pin) are the `TOOLS` table in `inspector3d.js`.
+
+1. Add an entry to `TOOLS`: its `icon`, `name`, `title` (the button's tooltip), `hint` (shown while it's chosen) and
+   `click(inspector, spot)`, called when the model is clicked with it. `spot` is `{point, reading}`: the point in the
+   scene's coordinates and its reading (`{valid, temperature, reason}`, °C).
+2. Put its name in `TOOL_ORDER`, where its button goes.
+3. What it does goes in the `api` object `create` builds (beside `addPin` and `deltaSpot`). Keep what it makes in
+   `state.measurements` with a `kind` of its own, so it's kept in `localStorage`, listed (`measurementsHtml`), drawn
+   (`drawMarkers`) and exported (`measurementsCsv`): teach each of these the new kind.
+4. A new reason for no temperature goes in `REASONS`.
+5. Tests in `inspector3d.test.js` (its fake viewer clicks the model), and update `docs/quickstart-3d.md`.
+
+### A source of temperatures in 3D
+
+Something else on the 3D page to colour and read (splats, another task's model) is a new source.
+
+1. A script in `public/`, in the pattern above, whose `source(viewer, ..., deps)` answers what `model3d.js`'s header
+   lists. `restyle(style)` takes `recolour.js`'s style: `Recolour.tonedPalette` turns it into colours, and
+   `style.isothermPaint` is painted over them. `detach()` puts the original look back.
+2. Add the script to `NAMES_3D` in `main.js`, before `inspector3d.js` (`pages.test.js` checks the order).
+3. In `inspector3d.js`'s `create`, make it, add it to `sources`, and teach `spotAt` to read it when it's shown.
+   Heavy work (a lookup per point) goes in a worker, as `pointcloud3d_worker.js` does, loaded by its URL
+   (`scriptUrl`), with every call the worker makes given in its message.
+4. Tests in `public/__tests__/`, with a fake viewer as `pointcloud3d.test.js` has.
 
 ### An API route
 

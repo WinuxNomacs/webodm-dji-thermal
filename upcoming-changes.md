@@ -3,6 +3,19 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **R27. The distance setting: how it's applied, and whether it changes temperatures** (the user, 2026-11-13, in
+  `new.md`: "Plan for after this feature work to discuss a possible bug raised by a user regarding how the distance
+  setting is applied and if it effects temperature?"). To discuss now that the 3D work is kept. What's known now: the
+  conversion passes `distance` with the other measurement values to DJI's SDK through dji-thermal-cli (`converter.py`
+  `PARAM_FIELDS`; `frames.py` also takes `lrf`/`embedded`), where it sets the atmosphere's effect; the Inspector's
+  Manual Corrections take the atmosphere's transmission as 1 (`correction.py`), so distance plays no part there. To
+  find out: the user's report itself, then measure what a change of distance does to a frame's temperatures.
+- **R29. The 2D map's source frames placed with ODM's cameras** (the user, 2026-11-13: "a worthwhile followup",
+  after R27). On a WebODM orthophoto, the frames window places the point with the workset's camera models (the frames'
+  GPS and gimbal, "the point can be a little off"); ODM's refined cameras (`shots.geojson`, `cameras.json`) put it on
+  the right pixel (measured for R28: best at no offset). Builds on R28's `frames3d.py` (`shots`, `project`). Open: the point's height on a 2D map (the DSM,
+  or the orthophoto's ground), photos the terrain hides, and whether tasks not made from a workset get the window too
+  (their own photos, as in 3D).
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
@@ -14,6 +27,14 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **Thermal 3D (R25, R26, R28)** — 2026-11-13, built on one branch, `thermal-3d`, kept by the user ("merge the 3d
+  branch") and merged whole: the model in the palette on WebODM's 3D page (the reported bug), the 3D Thermal
+  Inspector (Hover, ΔT, Pin, Measurements, palette, scale, Image, isotherm, legend, Manual Corrections, saved 2D pins),
+  the point cloud coloured from the model's nearest surface within 25 cm, and the photos that saw a spot. Code:
+  `model3d.py`, `model3d_api.py`, `frames3d.py`, `public/mesh_index.js`, `model3d.js`, `pointcloud3d.js`,
+  `pointcloud3d_worker.js`, `frames3d.js`, `inspector3d.js`, `inspector3d.css`; tests `tests/test_model3d.py` and
+  `public/__tests__/*3d*.test.js`, `mesh_index.test.js`. Validated end to end in the browser against the textures and
+  the 2D Inspector. Details: "Done: Thermal 3D".
 - **Release 1.3.0** — 2026-11-12, `release/1.3.0` (the user: "cut the release and create the PR for webodm
   maintainers to pull in the updated addin"): everything since 1.2.0 (R10 to R24: Pointer Info and Temperature On
   Pointer, the ΔT tool, Banded in place of Equalized, Mosaic and Ortho Overlays as dropdowns, the overlays' own
@@ -2257,6 +2278,215 @@
   `Registered [coreplugins.dji-thermal.plugin]`. `ignored/WebODM` is at `v3.3.2`, `ignored/WebODM-Docs` and
   `ignored/WebODM-Plugins` on their upstream `main`. Ruff passes; Jest and ESLint have nothing to check until
   `dji-thermal/public/` exists.
+
+## Done: Thermal 3D
+
+**The request** (reported to the user, 2026-11-13): "They created a thermal task and changed the thermal palette but
+the 3d model still appears in the original thermal palette while the 2d ortho takes the palette chosen at task
+creation." The user: "Expectation is that the thermal palette applies to the converted source photos for the 3d
+model as well", then "if it can be done safely and accurately using the temperature textures then let's do it and
+do it right. 3D will need its own Thermal Inspector with palette picker. Point cloud should be colored too if it can
+be done safely and accurately. Clicking the model should show a temperature and work very similar to how the Thermal
+Inspector works for 2D where the features make sense in 3D. Obviously no ortho or mosaic overlays in 3D".
+
+**Why it happens** (checked 2026-11-13, NodeODX 4.0.0 image, the dev task HomerunObliqueII): a Thermal Task's images
+are one-band temperature TIFFs (°C); the palette (`thermal/task.json`) is only how the browser colours the
+orthophoto's values (`recolour.js`). ODX textures the 3D model from the same TIFFs: its textures
+(`assets/odm_texturing/odm_textured_model_geo_material*_map_Kd.tif`, deflate, float32) hold temperatures, and its
+GLB (what WebODM's 3D page loads) has them stretched over their whole range (-49.5 to 69.2 °C there) to grey JPEGs
+(`modules/gltf.py` `convert_materials_to_jpeg`). The point cloud's colours are grey too, each photo stretched over
+its own range (`modules/multispectral.py` `to_8bit`): against the orthophoto they follow temperature only roughly
+(correlation 0.94, median 1.5 °C off, 90th percentile 5 °C), so they can't be read back as temperatures. Converting
+the photos in the palette instead would leave the orthophoto without temperatures.
+
+**What's there to build on** (checked): WebODM 3.3.2's and 4.0.0's 3D pages are the same (`ModelView.jsx`): Potree
+with its three.js r124, the textured model loaded from `textured_model.glb` (the OBJ when there is none), the point
+cloud and the model shown one at a time; `PluginsAPI.ModelView.addActionButton` hands a plugin the viewer
+(`window.viewer` is it too). The GLB's materials are the TIFFs in order (`.mtl` order), at the same sizes (4096 and
+256 px there; 20 materials, 946k triangles, its centre in `CESIUM_RTC`). rasterio reads the TIFFs on Docker 3.3.2,
+4.0.0 and native Windows. No LAZ reader is in WebODM's Python (nor native Windows), so the point cloud's points are
+read in the browser, from what Potree has already decoded.
+
+**Decided** (the user, 2026-11-13):
+- The model and point cloud are coloured from the temperatures (the textures), not from the grey.
+- A 3D Thermal Inspector on WebODM's 3D page, with the 2D one's features that make sense there: Pointer Info and
+  Temperature On Pointer, Pin, ΔT (its distance in 3D), Measurements (Hide/Show, CSV, Remove all; kept in the browser),
+  Palette, the colour scale, Image, the legend, the isotherm, Manual Corrections. No overlays.
+- **No regions or lines in 3D**: they stay a 2D map feature.
+- **Saved measurements**: the task's saved 2D pins are shown on the model, read only, where they fall on its surface;
+  3D pins and ΔTs are kept in the browser, as 2D's unsaved ones are. No saving from 3D.
+- **Source frames** on a click in 3D: a later phase.
+- The point cloud is coloured only if it is accurate: a point takes the temperature of the model's surface nearest to
+  it; points with no surface near enough are drawn grey and read "no temperature". If R26's first step shows that
+  isn't accurate, it stops there and the user decides.
+
+**Design** (Claude's, to check while building):
+- **Server** (`inspector_api.py`, `inspector.py`): `TASK/inspector/model` answers whether the task's 3D model holds
+  temperatures (a GLB and one float32 single-band TIFF per GLB material, with the task's orthophoto thermal), each
+  material's size, the textures' coldest, hottest and 2nd to 98th percentile temperatures (Auto), and what the task
+  was measured with (as the orthophoto's, for Manual Corrections). `TASK/inspector/model/<n>/values` answers one
+  material's temperatures as the map's value tiles are encoded (`colouring`'s 16-bit PNG, `X-Values-Offset`,
+  `X-Values-Step`), cached by the browser while the file is unchanged (ETag from its size and time). For those who
+  can view the project, and on public tasks as the 2D values are.
+- **Browser** (`inspector3d.js`, plain ES5 like `inspector.js`; added by `main.js` through
+  `PluginsAPI.ModelView.addActionButton`, its button only when the model holds temperatures): when the model is
+  loaded, each material's map is replaced by a canvas texture coloured from its values by `recolour.js`, in the
+  user's palette (as the map: the Analyzer's preference, else the task's) and over Auto's range, whether the panel is
+  open or not; the colour scale, Image, the isotherm and a correction colour it again. The legend sits over the 3D
+  view.
+- **Reading a temperature**: a ray from the pointer to the model (a bounding-volume tree over its triangles, built in
+  the plugin's own code, `mesh_index.js`, so hovering a million triangles stays fast), the hit's texture coordinates,
+  the texel's value; on the point cloud, the picked point's temperature (R26).
+- **Shared with the 2D Inspector**: the panel's markup, styles and colour code where they fit (`scale.js`,
+  `recolour.js`, `inspector.css`); the palette (the user's preference) and the task's isotherm (the same browser key);
+  the range and Image are per visit, as in 2D.
+- **R26, the point cloud**: as Potree loads each node, its points take the temperature of the nearest model surface
+  within a limit (from the mesh index; in a Web Worker if needed to keep the page responsive), coloured as the model
+  is. First step, before anything is built on it: measure on HomerunObliqueII how far points lie from the surface
+  and how their temperatures compare with the textures' and the orthophoto's, and how long a node takes; then
+  set the limit, or stop.
+
+**One branch, kept or cut whole** (the user, 2026-11-13): "do all of this work in a single feature branch that I can
+decide to keep or cut as it pans out for temperature work in 3D. Once I decide to keep or cut it, we can move back to
+the smaller branch approach. This is a very impactful feature so if it doesn't workout I want to be able to cut
+cleanly. Ensure you design it with developer accessibility and extensibility in mind too". So:
+- R25 and R26 are built on `thermal-3d` only, a commit per tested step, and **nothing of it is merged into `main`**
+  until the user says keep (then one merge) or cut (the branch is deleted; `main` never knew it).
+- Fixes needed on `main` meanwhile go on their own small branches from `main`; `thermal-3d` takes `main` in by a
+  merge (never a rebase), so its commits stay as they were tested.
+- **Its own files**, so a cut takes nothing else with it and a reader finds 3D in one place: `model3d.py` (the
+  model's textures: found, checked, read), `model3d_api.py` (its views), `public/inspector3d.js` (the panel and
+  tools), `public/model3d.js` (the model's materials coloured), `public/mesh_index.js` (the bounding-volume tree),
+  `public/pointcloud3d.js` (R26), `public/inspector3d.css`, and their tests (`tests/test_model3d.py`,
+  `public/__tests__/*3d*.test.js`, `mesh_index.test.js`).
+- **Shared code touched only where it must be**, each place listed here as it's made: `plugin.py` (the API's mount
+  points), `main.js` (one `PluginsAPI.ModelView` hook loading the 3D scripts), and any helper of `inspector.js`,
+  `scale.js` or `recolour.js` the 3D panel needs, exported as it is rather than copied.
+- **Extensible by design**: the 3D Inspector reads temperatures from *sources* (the model; R26's point cloud; later
+  splats or source frames), each answering the same few questions (is it shown, what's the temperature at this hit,
+  colour yourself with these settings), and its *tools* (Pointer, Pin, ΔT) are entries of one table, as `regions.js`'s
+  are, so a tool or a source is added in one place. The server's answers go through `model3d.py`'s functions, one per
+  question, which the views only wrap.
+- **For developers**: `docs/developing.md` gets a "3D" part (the modules' map, how a hit becomes a temperature, and
+  recipes: adding a tool, adding a source), written with the code, not after.
+
+Touch points in shared code (kept current while building):
+- `plugin.py`: imports `model3d_api`, mounts `TASK/inspector/model`, `TASK/inspector/model/<n>/values`,
+  `TASK/inspector/model/saved`, `TASK/inspector/model/frames` and `TASK/inspector/model/frames/<n>/values`.
+- `CLAUDE.md`, the `test` skill, `docs/developing.md`: `test_model3d` in the Django test command.
+- `main.js`: the script loader made one for any page (`DjiThermalScripts(names)`, `NAMES` and `NAMES_3D`; the 2D
+  `DjiThermalMapScripts` as it was) and the `PluginsAPI.ModelView.addActionButton` hook (answered at once, without
+  dependencies: WebODM's trigger drops a later answer, so it adds its stylesheets itself: `inspector.css`,
+  `frames.css` (R28's window), `inspector3d.css`; `NAMES_3D` lists `mesh_index.js`, `model3d.js`, `pointcloud3d.js`,
+  `frames3d.js`, `inspector3d.js`; the worker loads itself); `main.test.js` mocks `ModelView`, `pages.test.js`
+  checks the 3D list's order.
+- `eslint.config.mjs`: `Int32Array`, `Uint32Array` and `Int16Array` among the ES5 files' globals.
+- `inspector.js`: exports four helpers it had (`isothermHtml`, `validCorrection`, `ISOTHERM_COLORS`, `REASONS`) for the
+  3D panel; nothing in it changed.
+- Docs: `README.md` ("The Thermal Inspector" › "In 3D", the intro and "What you can do"), `docs/index.md`,
+  `docs/api.md` (the three routes), `docs/developing.md` (the map's rows, "The 3D view", the recipes "A tool in the 3D
+  Thermal Inspector" and "A source of temperatures in 3D"); the docs' own `docs/quickstart-3d.md` and its two
+  screenshots are the branch's.
+- `dev/screenshots.js`: the `inspector-3d`, `inspector-3d-cloud` and `inspector-3d-frames` shots (`open3d`, `viewAt`), WebGL in software
+  (SwiftShader) for every shot, and HEAD requests let through (Potree checks the point cloud with one); the `docs`
+  skill says so, and that the 3D shots leave `thermal/model3d.json` cached.
+
+**Source frames in 3D (R28)** (the user, 2026-11-13: "Let's get source frames in 3D going"; asked which
+frames: "show the individual photo responsible for the pixel on the model or the list of source frames that witnessed
+the pixel by rank"; then chose "Identify + ranked").
+
+Checked (HomerunObliqueII): each task has ODM's refined cameras (`assets/odm_report/shots.geojson`: each photo's
+centre in the task's projection and its rotation, OpenSfM's axis-angle, world to camera; `assets/cameras.json`: the
+lens, `brown`) and its own temperature TIFFs (the task's folder). Projected with them, the model's points land on the
+right pixel: the photo closest to straight down reads a median 0.44 °C from the model, and offsetting the pixel by one
+either way only agrees worse (best at 0, 0). ODM doesn't keep which photo textured each face (texrecon runs with
+`--no_intermediate_results`; `odm_report/camera_mappings.npz` is only the undistortion maps), and its global seam
+leveling shifts each patch's values a little, so the model's value and its photo's differ slightly.
+
+Design:
+- **Which photo coloured a spot, inferred**: texrecon gives each connected patch of faces one photo, laid out as one
+  chart of the texture atlas. The chart of the clicked texel is matched against each photo that saw it (many of its
+  faces projected with ODM's cameras, the photo's values against the texture's); the photo that matches is the one,
+  with how sure the match is (the margin over the next). Worked out on the server once per task and cached.
+- **The window** (as 2D's, beside the panel): first the photo that coloured the spot, with a crosshair on the point,
+  its value and the model's; then the others that saw it, ranked by how squarely they faced the surface (the angle
+  between the view and the surface's normal), those the model hides from them left out (a ray from the point to the
+  camera through the mesh index); "Open this frame" (the Analyzer's frame page) when the task came from a workset.
+  On every thermal task with a 3D model; from the point cloud through each point's nearest surface. Drawn in the
+  palette and range, with Manual Corrections, as the model.
+- **First step, before anything is built on it**: measure on HomerunObliqueII how clearly the chart matching picks
+  one photo (the margin), and check it against texrecon's own choice where that can be had; stop and ask if it isn't
+  reliable.
+
+**R28's first step, measured** (2026-11-13, HomerunObliqueII, offline in WebODM's container): the OBJ's 946k faces
+fall into 10,664 charts (97 % of the faces in the 2,403 of 20 faces or more). Each chart's face centres projected into
+all 151 photos with ODM's cameras, the photos' values against the texture's:
+- No photo reproduces its chart: the best one differs by a median 0.38 °C (mean |diff|), and with its own offset taken
+  away still varies by 0.44 °C (std, photos sampled bilinearly); the next best, by 0.52 °C.
+- The best is at least twice as good as the next on 4.6 % of the faces, three times on 3.2 %.
+So which photo textured a spot can't be told from what ODM keeps: the photos of a surface agree with each other about as
+well as with the texture, which seam leveling has shifted and smoothed. Stopped there for the user's decision. Knowing
+it for certain needs ODM to keep texrecon's labeling (it runs with `--no_intermediate_results`): a change to ODM, not
+something the plugin can do.
+
+**Decided** (the user, 2026-11-13): "Ranked + each reading": every photo that saw the spot, those the model hides it
+from left out, ranked by how squarely each faced the surface, with each photo's own temperature there, the model's,
+and the spread across the photos; no photo singled out.
+
+**Built** (2026-11-13, on `thermal-3d`):
+- Server: `frames3d.py` (ODM's cameras read once per version of `shots.geojson`/`cameras.json`; `project` as OpenSfM,
+  `brown` and `perspective` lenses; a photo that isn't a one-band float TIFF left out, one whose file is gone listed as
+  not available; `workset_frames` maps the task's photos to the workset's frames), `model3d_api.py`
+  (`Model3DFrames`, `Model3DFrameValues`), `plugin.py` (the two routes). Tests in `tests/test_model3d.py`
+  (`TestFrames3D`: a nadir and a level camera made in the test, a brown lens against a hand computation, refusals,
+  public tasks).
+- Browser: `public/frames3d.js` (the window, `hidden` by a ray from 5 cm off the surface to the camera, `spread`),
+  wired in `inspector3d.js` (Hover's and Pin's clicks, a pin's name, a saved pin's; the camera of the photo shown marked
+  with a line to the spot; a cloud point more than 25 cm from the model says its photos can't be told), styles in
+  `inspector3d.css` (beside the panel; above it on a phone). Tests: `frames3d.test.js`, two in `inspector3d.test.js`.
+- Measured live on HomerunObliqueII (289 spots from above): a median 25 photos per spot; on roofs and ground the first
+  photo a median 11° from square on; the model within the photos' range at 266 of 283 spots; the median of the photos
+  0.47 °C from the model (p90 1.5). Desktop and phone checked; no console errors but the dev livereload.
+
+
+**R26's first step, measured** (2026-11-13, HomerunObliqueII, offline in NodeODX's image and in the browser):
+- The point cloud's points lie on the model: median 2 mm from its surface, 98.5 % within 5 cm, 99.1 % within 10 cm,
+  99.5 % within 25 cm (115k points sampled; every nearest spot holds a temperature). So a point takes its surface's
+  temperature as accurately as the model has it. The limit: **25 cm**; beyond it a point keeps ODX's grey and reads "no
+  temperature" (0.5 % here).
+- The model's textures against the orthophoto, where the surface faces up (72k points): median +0.31 °C, |median| 0.47 °C,
+  |p90| 1.6 °C, |p95| 2.3 °C. ODX textures the model and the orthophoto in separate runs, each patch from the photo it
+  picks, so the two can read a spot from different photos; neither is the truer. The docs say so.
+- In the browser, the 2 million points of the opening view (48 nodes): 16.8 s with one 25 cm search, 7.5 s with a 3 cm
+  search first (most points are within millimetres) and 25 cm for the rest. So the lookups run in a Web Worker, node by
+  node as Potree loads them, the page free meanwhile; restyling the points looked up is then a lookup of their texels.
+- WebODM doesn't load the textured model while the point cloud is shown: the plugin loads the GLB itself (WebODM's
+  GLTFLoader and DRACOLoader are on the page) for the index, its textures dropped.
+
+**Validated end to end in the browser** (2026-11-13, HomerunObliqueII, 2000 random orthophoto pixels, each read by the
+3D Inspector's own code on the 3D page and by the 2D Inspector's `point` request):
+- The 3D reading against the texture TIFF at the hit's texture coordinates (the value PNGs, decoding, texel lookup,
+  rows as stored): within 0.001 °C at all 1949 hits (rows flipped would differ by a median 6 °C). The 2D reading against
+  the orthophoto TIFF's pixel: identical.
+- 3D against 2D at the same spot: up-facing surfaces median 0.33 °C (p90 1.3, p95 1.6); all surfaces 0.40 (p90 1.5);
+  walls and slopes 0.50 (p90 2.1). Moving the map by up to a metre either way never agrees better than not moving it
+  (best at 0, 0 on a 2 cm grid): the model and orthophoto are registered.
+- **Found and fixed**: the point cloud's nodes were placed with three.js's `updateMatrixWorld`, which adds each parent
+  node's position again (Potree places a node with the cloud's matrix times its own: `nodeMatrix`), so every node but
+  the root was looked up hundreds of kilometres away (2.5 % of points coloured) and, its matrix overwritten, drawn out
+  of sight (the cloud looked coarse). After: 99.0 % of 12.6k points within 25 cm (median 3 mm), the worker's lookups
+  identical to the main thread's, Hover reading picked points; the docs' point cloud screenshot retaken.
+
+**Steps**, each on this branch (`thermal-3d`), with its tests:
+1. The server's model answers (Django tests on a small GLB and TIFFs made in the test; refusals: no GLB, RGB
+   textures, a material count that doesn't match).
+2. The model coloured in the palette on the 3D page (Jest: material swap, recolour on palette/range change).
+3. The 3D Inspector panel: Pointer Info, Temperature On Pointer, Pin, ΔT, Measurements, CSV, scale, Image, legend,
+   isotherm, Manual Corrections, saved 2D pins (Jest: mesh index hits and texel lookup, the panel's behaviours).
+4. R26: the measurement step above, then the point cloud coloured and read.
+5. Docs: README ("The Thermal Inspector" gets a 3D part), a quickstart for 3D with screenshots (the model only: no
+   coordinates, Potree's location readouts hidden), `developing.md`; live checks on 4.0.0 at 1280 and 390 px, the
+   tests on 3.3.2 before the merge.
 
 ## Done: Thermal Analyzer, part 2
 

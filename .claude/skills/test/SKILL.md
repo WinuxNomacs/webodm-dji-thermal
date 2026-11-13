@@ -11,7 +11,7 @@ the 3.3.2 one too (`DT_WEBODM=3.3.2 dev/webodm.sh up`, containers `dt3-*`):
 1. **Ruff** (Python 3.9 syntax, the oldest WebODM's, and lint): `.venv/bin/ruff check .`
 2. **ESLint** (`dji-thermal/public`: `main.js` and the Analyzer's pages in ES5, `thermal/` in JSX): `npm run lint -- dji-thermal`
 3. **Jest**: `npm test` (add a path or `-t "<name>"` to run fewer).
-4. **Django**: `docker exec -w /webodm dt-webapp python manage.py test --noinput coreplugins.dji-thermal.tests.test_converter coreplugins.dji-thermal.tests.test_api coreplugins.dji-thermal.tests.test_sdk coreplugins.dji-thermal.tests.test_analyzer coreplugins.dji-thermal.tests.test_inspector coreplugins.dji-thermal.tests.test_frames coreplugins.dji-thermal.tests.test_portable`.
+4. **Django**: `docker exec -w /webodm dt-webapp python manage.py test --noinput coreplugins.dji-thermal.tests.test_converter coreplugins.dji-thermal.tests.test_api coreplugins.dji-thermal.tests.test_sdk coreplugins.dji-thermal.tests.test_analyzer coreplugins.dji-thermal.tests.test_inspector coreplugins.dji-thermal.tests.test_frames coreplugins.dji-thermal.tests.test_model3d coreplugins.dji-thermal.tests.test_portable`.
    The tests that need real R-JPEGs or DJI's SDK read `DT_SAMPLES_DIR`, `DT_FLIGHT_DIR` and `DT_SDK_ZIP` set in `.env` (see the
    README), mounted by `dev/webodm.sh up`; they are skipped, naming the variable, when those are not set. Check
    before a merge (on a machine with the images) that the run's summary has only `skipped=1`: the Windows-only

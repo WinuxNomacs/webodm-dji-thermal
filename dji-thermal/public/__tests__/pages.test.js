@@ -34,4 +34,11 @@ describe('the scripts each page loads', () => {
         expect(names[names.length - 1]).toBe('inspector.js');
         expect(missing(names)).toEqual([]);
     });
+
+    test("WebODM's 3D pages load the 3D Thermal Inspector's scripts after the 2D one's, in an order that has what each needs", () => {
+        const names = JSON.parse(/var NAMES = (\[[^\]]*\])/.exec(source('main.js'))[1]);
+        const names3d = JSON.parse(/var NAMES_3D = (\[[^\]]*\])/.exec(source('main.js'))[1]);
+        expect(names3d[names3d.length - 1]).toBe('inspector3d.js');
+        expect(missing(names.concat(names3d))).toEqual([]);
+    });
 });

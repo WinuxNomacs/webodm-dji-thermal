@@ -2724,7 +2724,9 @@
                rawIsotherm: rawIsotherm, keptRange: keptRange, correctionHtml: correctionHtml, forgetCorrections: forgetCorrections,
                savedHtml: savedHtml, savedCsv: savedCsv, savedGeoJson: savedGeoJson, formHtml: formHtml, measurementsHtml: measurementsHtml,
                mosaicsHtml: mosaicsHtml, orthosHtml: orthosHtml, orthosOf: orthosOf, orthoUrl: orthoUrl, shownAt: shownAt, shownClip: shownClip, clipOf: clipOf, acrossLayers: acrossLayers, toCelsius: toCelsius, movable: movable, adjustOf: adjustOf, autoRange: autoRange,
-               scaleHtml: scaleHtml, imageHtml: imageHtml, create: create};
+               scaleHtml: scaleHtml, imageHtml: imageHtml, create: create,
+               // for the 3D Thermal Inspector (inspector3d.js)
+               isothermHtml: isothermHtml, validCorrection: validCorrection, ISOTHERM_COLORS: ISOTHERM_COLORS, REASONS: REASONS};
     root.ThermalInspector = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

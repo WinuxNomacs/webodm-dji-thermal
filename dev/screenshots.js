@@ -8,7 +8,8 @@
 // Set in the environment or in .env (untracked):
 //   DT_DOCS_USER, DT_DOCS_PASSWORD   a login on the dev WebODM
 //   DT_DOCS_DATASET                  a Thermal Analyzer dataset, analyzed, with a workset that has mosaics
-//   DT_DOCS_MAP                      the map page of a task with a thermal orthophoto (/map/project/<id>/task/<id>/)
+//   DT_DOCS_MAP                      the map page of a task with a thermal orthophoto (/map/project/<id>/task/<id>/); its
+//                                    3D page (/3d/...) for the 3D Thermal Inspector's shots, its model made from the TIFFs
 //   DT_FLIGHT_DIR                    a flight's photos (as for the tests), a few given to the Thermal Task panel
 //   DT_DOCS_URL                      the dev WebODM, by default http://localhost:8002
 "use strict";
@@ -327,6 +328,52 @@ const SHOTS = {
         await p.waitForTimeout(4000);
         return p;
     },
+    "inspector-3d": async (p, env) => {
+        // The 3D Thermal Inspector on the textured model: a pin, a ΔT and the temperature under the pointer. Only the 3D
+        // view is shot: the page's heading names the task
+        await open3d(p, env, "mesh");
+        await p.click(".dt-inspector3d-button");
+        await p.waitForTimeout(4000);       // the model indexed
+        const at = await viewAt(p);
+        await p.click('.dt-inspector3d-panel [data-mode="pin"]');
+        await p.mouse.click(...at(0.36, 0.5));
+        await p.click('.dt-inspector3d-panel [data-mode="delta"]');
+        await p.mouse.click(...at(0.3, 0.56));
+        await p.mouse.click(...at(0.42, 0.45));
+        await p.waitForSelector(".dt-inspector-delta-figures", {timeout: 30000});
+        await p.click('.dt-inspector3d-panel [data-mode="hover"]');
+        await p.mouse.move(...at(0.4, 0.6));
+        await p.mouse.move(...at(0.4, 0.61));
+        await p.waitForTimeout(1500);
+        return p.locator("#potree_render_area");
+    },
+    "inspector-3d-cloud": async (p, env) => {
+        // The point cloud in the palette: each point its nearest model surface's temperature
+        await open3d(p, env, "cloud");
+        await p.waitForFunction(() => {
+            const pc = window.viewer.scene.pointclouds[0], nodes = (pc && pc.visibleNodes) || [];
+            return nodes.length && nodes.every((n) => n.geometryNode && n.geometryNode.geometry.__dtCloud && n.geometryNode.geometry.__dtCloud.found);
+        }, null, {timeout: 120000});
+        await p.click(".dt-inspector3d-button");
+        const at = await viewAt(p);
+        await p.mouse.move(...at(0.42, 0.58));
+        await p.mouse.move(...at(0.42, 0.59));
+        await p.waitForTimeout(1500);
+        return p.locator("#potree_render_area");
+    },
+    "inspector-3d-frames": async (p, env) => {
+        // A click in Hover on the model's roof: the photos that saw that spot, the first beside the panel
+        await open3d(p, env, "mesh");
+        await p.click(".dt-inspector3d-button");
+        await p.waitForTimeout(4000);       // the model indexed
+        const at = await viewAt(p);
+        await p.mouse.move(...at(0.47, 0.6));
+        const drawn = p.waitForResponse((r) => /\/inspector\/model\/frames\/\d+\/values/.test(r.url()), {timeout: 60000});
+        await p.mouse.click(...at(0.47, 0.6));
+        await drawn;
+        await p.waitForTimeout(1500);
+        return p.locator("#potree_render_area");
+    },
     "inspector-saved": async (p, env) => {
         // A region on the map's thermal orthophoto measured with the correction on, and its Save form filled in (not
         // sent: the script stays read only)
@@ -426,6 +473,24 @@ async function openFrame(p, env) {
     await p.waitForTimeout(2000);
 }
 
+// The 3D page of DT_DOCS_MAP's task, showing the model or the point cloud, once the plugin has coloured its model
+async function open3d(p, env, what) {
+    await p.setViewportSize({width: 1600, height: 900});     // the 3D view beside WebODM's sidebar, wide enough for the panel
+    await p.goto(env.url + need(env, "DT_DOCS_MAP").replace(/^\/map\//, "/3d/") + "?t=" + what);
+    await p.waitForSelector(".dt-inspector3d-button", {timeout: 120000});
+    await p.waitForResponse((r) => /\/inspector\/model\/0\/values/.test(r.url()), {timeout: 120000}).catch(() => {});
+    await p.waitForTimeout(4000);
+}
+
+// Where shares of the 3D view are on the page: at(fx, fy) as [x, y]
+async function viewAt(p) {
+    const box = await p.evaluate(() => {
+        const r = window.viewer.renderer.domElement.getBoundingClientRect();
+        return {x: r.left, y: r.top, width: r.width, height: r.height};
+    });
+    return (fx, fy) => [box.x + box.width * fx, box.y + box.height * fy];
+}
+
 async function hoverMap(p) {
     const box = await p.locator("#ta-viewer-map").boundingBox();
     await p.mouse.move(box.x + box.width * 0.45, box.y + box.height * 0.5);
@@ -473,13 +538,14 @@ async function shoot(p, target, file) {
     if (unknown.length) throw new Error("No such shot: " + unknown.join(", ") + ". The shots: " + Object.keys(SHOTS).join(", "));
     fs.mkdirSync(OUT, {recursive: true});
 
-    const browser = await chromium.launch({headless: true});
+    // WebGL drawn in software (the 3D page's Potree), as on a machine without a GPU
+    const browser = await chromium.launch({headless: true, args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]});
     const context = await browser.newContext({viewport: SIZE});     // a fresh profile, gone when it closes
     const p = await context.newPage();
     const blocked = [], errors = [];
     await p.route("**/*", (route) => {
         const req = route.request(), url = req.url();
-        const allowed = url.startsWith(origin) && (req.method() === "GET" || POSTS.some((re) => re.test(url.split("?")[0])));
+        const allowed = url.startsWith(origin) && (req.method() === "GET" || req.method() === "HEAD" || POSTS.some((re) => re.test(url.split("?")[0])));
         if (allowed) return route.continue();
         if (url.startsWith(origin)) blocked.push(req.method() + " " + url);
         return route.abort();
