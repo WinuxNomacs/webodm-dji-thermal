@@ -8,6 +8,7 @@
   Thermal 3D" below.
 - **R26. The point cloud in the thermal palette**, each point's temperature taken from the model's surface; after
   R25, which it builds on. Details: "Up next: Thermal 3D".
+  Both on one branch, `thermal-3d`, not merged until the user decides to keep or cut it (the user, 2026-11-13).
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
@@ -2331,6 +2332,32 @@ read in the browser, from what Potree has already decoded.
   is. First step, before anything is built on it: measure on HomerunObliqueII how far points lie from the surface
   and how their temperatures compare with the textures' and the orthophoto's, and how long a node takes; then
   set the limit, or stop.
+
+**One branch, kept or cut whole** (the user, 2026-11-13): "do all of this work in a single feature branch that I can
+decide to keep or cut as it pans out for temperature work in 3D. Once I decide to keep or cut it, we can move back to
+the smaller branch approach. This is a very impactful feature so if it doesn't workout I want to be able to cut
+cleanly. Ensure you design it with developer accessibility and extensibility in mind too". So:
+- R25 and R26 are built on `thermal-3d` only, a commit per tested step, and **nothing of it is merged into `main`**
+  until the user says keep (then one merge) or cut (the branch is deleted; `main` never knew it).
+- Fixes needed on `main` meanwhile go on their own small branches from `main`; `thermal-3d` takes `main` in by a
+  merge (never a rebase), so its commits stay as they were tested.
+- **Its own files**, so a cut takes nothing else with it and a reader finds 3D in one place: `model3d.py` (the
+  model's textures: found, checked, read), `model3d_api.py` (its views), `public/inspector3d.js` (the panel and
+  tools), `public/model3d.js` (the model's materials coloured), `public/mesh_index.js` (the bounding-volume tree),
+  `public/pointcloud3d.js` (R26), `public/inspector3d.css`, and their tests (`tests/test_model3d.py`,
+  `public/__tests__/*3d*.test.js`, `mesh_index.test.js`).
+- **Shared code touched only where it must be**, each place listed here as it's made: `plugin.py` (the API's mount
+  points), `main.js` (one `PluginsAPI.ModelView` hook loading the 3D scripts), and any helper of `inspector.js`,
+  `scale.js` or `recolour.js` the 3D panel needs, exported as it is rather than copied.
+- **Extensible by design**: the 3D Inspector reads temperatures from *sources* (the model; R26's point cloud; later
+  splats or source frames), each answering the same few questions (is it shown, what's the temperature at this hit,
+  colour yourself with these settings), and its *tools* (Pointer, Pin, ΔT) are entries of one table, as `regions.js`'s
+  are, so a tool or a source is added in one place. The server's answers go through `model3d.py`'s functions, one per
+  question, which the views only wrap.
+- **For developers**: `docs/developing.md` gets a "3D" part (the modules' map, how a hit becomes a temperature, and
+  recipes: adding a tool, adding a source), written with the code, not after.
+
+Touch points in shared code (kept current while building): none yet.
 
 **Steps**, each on this branch (`thermal-3d`), with its tests:
 1. The server's model answers (Django tests on a small GLB and TIFFs made in the test; refusals: no GLB, RGB
