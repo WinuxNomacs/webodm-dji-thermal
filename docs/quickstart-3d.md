@@ -75,6 +75,28 @@ on the model, dashed in green, with their values as saved, under **Saved measure
 save, rename and delete them on the map. A pin that falls off the model is listed as "not on the model". Regions,
 lines and saved ΔTs aren't shown in 3D.
 
+## 6. The photos that saw a spot
+
+A click in **Hover** on the model or the point cloud opens the task's photos that saw that spot, beside the panel.
+Dropping a pin, or clicking a pin's name under **Measurements**, opens them too.
+
+![The photos that saw a spot of the roof: the first, most squarely facing it, beside the panel](images/inspector-3d-frames.png)
+
+- Each photo is placed with the cameras ODM refined while it built the model, so the circle is on the pixel that saw
+  the spot, on walls as on roofs.
+- Photos that had the spot in view but the building hides it from are left out, and the window says how many. The
+  rest come in order, the one facing the surface most squarely first, with how far from square on it was and how far
+  away. The arrows step through them, and the view marks where each was taken from.
+- Each photo is drawn in your palette and range, as the model is. Under it: **This photo**, its temperature at the
+  spot; **The model**, the model's; and what all the photos read there, lowest to highest with the median. A spot
+  where they agree closely is one to trust; a wide spread (an edge, a reflection) says to look again.
+- ODM doesn't keep which photo it coloured the model from, and it smooths the joins between the photos' patches, so
+  the model's temperature is close to the photos' but rarely exactly one of them. No photo is singled out.
+- When the task was made from a workset, **Open this frame** opens the frame on its own page in the Analyzer, to
+  measure it in its pixels or with other values.
+- On the point cloud, a point more than 25 cm from the model's surface has no photos: the model is what tells which
+  photos saw a spot.
+
 ## How close the model is to the map
 
 The model's textures and the orthophoto are made from the same TIFFs, but ODM blends the photos separately for each,
@@ -82,5 +104,4 @@ so the same spot can read slightly differently in 2D and in 3D. On a measured fl
 from the orthophoto by about 0.5 °C (the median), and by more than 1.6 °C in one place in ten. For a temperature to
 report, prefer the 2D map. Use the model for walls and the sides of things, which the orthophoto doesn't show.
 
-What isn't in 3D: regions and lines, the overlays (mosaics and other tasks' orthophotos), and the frames that saw a
-point.
+What isn't in 3D: regions and lines, and the overlays (mosaics and other tasks' orthophotos).

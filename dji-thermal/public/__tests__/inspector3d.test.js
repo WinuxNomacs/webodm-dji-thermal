@@ -67,6 +67,7 @@ async function page(opts = {}) {
         if (url.endsWith("/display")) return json(DISPLAY);
         if (url.indexOf("/inspector/palette?name=") !== -1) return json({color_map: COLORS});
         if (url.endsWith("/inspector/model/saved")) return json({pins: opts.saved || []});
+        if (url.indexOf("/inspector/model/frames?") !== -1) return json(opts.frames || {frames: [], workset: null});
         return json({}, false);
     });
     const storage = opts.storage || memoryStorage(), downloads = [];
@@ -152,6 +153,42 @@ describe("reading the model", () => {
         p.click(130, 100);                                      // (30, 0): 30 °C
         expect(p.panel().querySelector(".dt-inspector-readout").textContent).toBe("30.00 °C");
         expect(p.inspector.state.measurements).toHaveLength(0);
+    });
+
+    test("a click in Hover opens the photos that saw the spot beside the panel, its camera marked; closing the panel closes them", async () => {
+        const photo = {index: 0, file: "P1.tiff", x: 19.5, y: 14.5, width: 40, height: 30, camera: [30, 0, 50], view_angle: 3, distance: 50,
+                       temperature: 31, available: true, frame: null};
+        const p = await page({frames: {frames: [photo], workset: null}});
+        p.inspector.toggle();
+        await flush();
+        p.run();
+        await flush();
+        p.click(130, 100);                                      // (30, 0): 30 °C
+        await flush();
+        const asked = p.fetchFn.mock.calls.map((c) => c[0]).filter((u) => u.indexOf("/inspector/model/frames?") !== -1);
+        expect(asked).toHaveLength(1);
+        expect(asked[0]).toMatch(new RegExp("/projects/1/tasks/" + TASK.id + "/inspector/model/frames\\?x=30(\\.0+\\d*)?&y=0&z=0$"));
+        const box = p.area.querySelector(".dt-inspector3d-frames");
+        expect(box.hidden).toBe(false);
+        expect(box.textContent).toContain("Photo 1 of 1 that saw this spot");
+        expect(box.textContent).toContain("This photo31.00 °C");
+        expect(box.textContent).toContain("The model30.00 °C");
+        expect(p.area.querySelector(".dt-inspector3d-marker.dt-camera")).not.toBeNull();
+        p.inspector.toggle();
+        expect(box.hidden).toBe(true);
+        expect(p.area.querySelector(".dt-inspector3d-marker.dt-camera")).toBeNull();
+    });
+
+    test("a click in Hover on a point of the cloud far from the model says its photos can't be told", async () => {
+        const p = await page({shown: false});
+        p.inspector.toggle();
+        await flush();
+        p.run();
+        await flush();
+        p.click(150, 10);                                       // y = 90: no model surface within 25 cm
+        await flush();
+        expect(p.fetchFn.mock.calls.some((c) => c[0].indexOf("/inspector/model/frames?") !== -1)).toBe(false);
+        expect(p.area.querySelector(".dt-inspector3d-frames").textContent).toContain("more than 25 cm from the model's surface");
     });
 
     test("with the point cloud shown, reads the picked point on the model's nearest surface, and says when it has none", async () => {

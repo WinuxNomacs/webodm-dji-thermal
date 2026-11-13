@@ -4,7 +4,8 @@
 // user's palette from them, as the 2D map colours the orthophoto (recolour.js); the panel's *tools* (TOOLS: Hover, ΔT,
 // Pin) read the one shown where the pointer is (a ray cast at the model with mesh_index.js, or the point Potree picks). The panel is the 2D Inspector's where that makes sense in 3D (inspector.js's exported helpers draw
 // its colour scale, Image section, Manual Corrections and isotherm): no regions, lines or overlays. Pins and ΔTs are
-// kept in the browser for the task; the task's saved 2D pins are shown on the model, read only.
+// kept in the browser for the task; the task's saved 2D pins are shown on the model, read only. A click in Hover (or a
+// pin dropped, or a pin's name clicked) opens the photos that saw that spot beside the panel (frames3d.js).
 // main.js adds it through PluginsAPI.ModelView.addActionButton, which hands it WebODM's Potree viewer; the task is the
 // page's (its data-modelview element's data-task).
 (function (root) {
@@ -21,18 +22,19 @@
     var Model3D = root.ThermalModel3D || (typeof require !== "undefined" ? require("./model3d.js") : null);
     var MeshIndex = root.ThermalMeshIndex || (typeof require !== "undefined" ? require("./mesh_index.js") : null);
     var PointCloud3D = root.ThermalPointCloud3D || (typeof require !== "undefined" ? require("./pointcloud3d.js") : null);
+    var Frames3D = root.ThermalFrames3D || (typeof require !== "undefined" ? require("./frames3d.js") : null);
 
     // The tools, in the panel's order: each its button (icon, name, what it does) and the hint shown while it's chosen;
     // click(inspector, spot) when the model is clicked with it (spot: {point, reading}). A tool is added here.
     var TOOLS = {
-        hover: {icon: "fa fa-mouse-pointer", name: "Hover", title: "Hover: read the temperature under the pointer (or where tapped)", hint: "",
-                click: function (inspector, spot) { inspector.showReading(spot); }},
+        hover: {icon: "fa fa-mouse-pointer", name: "Hover", title: "Hover: read the temperature under the pointer (or where tapped); click: the photos that saw it", hint: "",
+                click: function (inspector, spot) { inspector.showReading(spot); inspector.showFrames(spot); }},
         delta: {icon: Regions.TOOLS.delta.icon, name: "ΔT", label: true, title: "ΔT: click two spots, the second's temperature less the first's",
                 hint: "Click the first spot on the model, then the second: ΔT is the second's temperature less the first's. Esc cancels.",
                 click: function (inspector, spot) { inspector.deltaSpot(spot); }},
         pin: {icon: Regions.TOOLS.pin.icon, name: "Pin", title: "Pin: click the model to keep a point and its temperature",
               hint: "Click the model to pin a point and its temperature.",
-              click: function (inspector, spot) { inspector.addPin(spot); }}
+              click: function (inspector, spot) { inspector.addPin(spot); inspector.showFrames(spot); }}
     };
     var TOOL_ORDER = ["hover", "delta", "pin"];
 
@@ -40,6 +42,8 @@
     var REASONS = {outside: "Not on the model", nodata: "No temperature here", loading: "Loading the model's temperatures…",
                    building: "Preparing the model…", far: "No temperature: no model surface within 25 cm of this point",
                    unplaced: "Not on the model"};
+    // A point of the cloud far from the model: which photos saw it can't be told (the model is what says which hid it)
+    var FAR_FRAMES = "This point is more than 25 cm from the model's surface, so which photos saw it can't be told.";
 
     function escapeHtml(t) {
         return String(t === null || t === undefined ? "" : t).replace(/[&<>"']/g, function (c) {
@@ -291,10 +295,10 @@
                      pointerTemperature: true, legendVisible: true, correction: {on: false}, correctionNotice: "", baseline: null,
                      isotherm: Inspector.loadIsotherm(storage, ikey), isothermNotice: "", rangeError: "",
                      measurements: loadMeasurements(storage, key), measurementsVisible: true, shown: null,
-                     saved: [], savedVisible: true};
+                     saved: [], savedVisible: true, camera: null};
         var look = {colors: null, range: null, adjust: Scale.defaultAdjust()};
         var description = null, index = null, building = null, savedRaw = [];
-        var area, panel, legend, cursor, markers, svg, panelMove, hoverTimer = null, detached = false;
+        var area, panel, legend, cursor, markers, svg, panelMove, frames, framesMove, hoverTimer = null, detached = false;
         var press = null;
 
         function readJson(r) { return r.json().then(function (data) { return {ok: r.ok, data: data}; }); }
@@ -331,6 +335,7 @@
         function restyle() {
             var style = styleOf(look, Scale.stepsOf(bandsOf(), look.range), isothermPaint(state.isotherm, fix()));
             if (style) sources.forEach(function (s) { s.restyle(style); });
+            if (frames) frames.restyle();
             renderLegend();
         }
         function setLook(range, adjust) {
@@ -411,7 +416,14 @@
             raycaster.setFromCamera(ndc, viewer.scene.getActiveCamera());
             var hit = MeshIndex.raycast(index, raycaster.ray.origin, raycaster.ray.direction, function (m) { return m.visible !== false; });
             if (!hit) return {point: null, reading: {valid: false, reason: "outside"}};
-            return {point: hit.point, reading: model.reading(hit)};
+            return {point: hit.point, reading: model.reading(hit), hit: hit};
+        }
+
+        // The surface's normal at a spot: its hit's triangle, or the model's surface nearest to the point (a point of the
+        // cloud, a pin), or null
+        function normalAt(spot) {
+            if (!index || !spot || !spot.point) return null;
+            return Frames3D.surfaceNormal(index, spot.hit || MeshIndex.closest(index, spot.point, PointCloud3D.LIMIT));
         }
 
         function onPointerMove(e) {
@@ -475,6 +487,14 @@
             showReading: function (spot) {
                 state.readout = spot.reading;
                 renderReadout();
+            },
+            // The photos that saw a spot of the model, beside the panel; none off the model. A point of the cloud is read
+            // at the model's surface nearest to it (where its temperature comes from: it may lie a little inside)
+            showFrames: function (spot) {
+                if (!frames || !spot || !spot.point) return;
+                if (spot.reading && spot.reading.reason === "far") return frames.note(FAR_FRAMES);
+                var at = spot.hit && spot.hit.point ? spot.hit.point : spot.point;
+                frames.show(at, normalAt(spot), spot.reading && spot.reading.valid ? spot.reading.temperature : null);
             },
             addPin: function (spot) {
                 var r = spot.reading;
@@ -559,6 +579,10 @@
             }
             if (state.pending) html += marker("dt-spot", "…");
             if (state.savedVisible) state.saved.forEach(function (s) { if (s.point) html += marker("dt-saved", s.name); });
+            if (state.camera) {
+                html += marker("dt-camera", "Photo", "Where the photo shown was taken from");
+                lines += '<line class="dt-inspector3d-line dt-inspector3d-camera-line"></line>';
+            }
             markers.innerHTML = html;
             svg.innerHTML = lines;
             placeMarkers();
@@ -573,7 +597,12 @@
             }
             if (state.pending) out.push(state.pending.point);
             if (state.savedVisible) state.saved.forEach(function (s) { if (s.point) out.push(s.point); });
+            if (state.camera) out.push(cameraPoint());
             return out;
+        }
+        function cameraPoint() {
+            var c = state.camera.camera;
+            return {x: c[0], y: c[1], z: c[2]};
         }
         function placeMarkers() {
             if (!markers) return;
@@ -583,17 +612,20 @@
                 els[i].style.display = s ? "" : "none";
                 if (s) els[i].style.transform = "translate(" + Math.round(s.x) + "px, " + Math.round(s.y) + "px)";
             }
-            if (!state.measurementsVisible) return;
-            state.measurements.forEach(function (m) {
-                if (m.kind === "pin") return;
-                var a = screenOf(m.first.point), b = screenOf(m.second.point), line = lines[li++];
+            function join(line, a, b) {
                 if (!line) return;
                 line.setAttribute("visibility", a && b ? "visible" : "hidden");
                 if (a && b) {
                     line.setAttribute("x1", a.x); line.setAttribute("y1", a.y);
                     line.setAttribute("x2", b.x); line.setAttribute("y2", b.y);
                 }
-            });
+            }
+            if (state.measurementsVisible) {
+                state.measurements.forEach(function (m) {
+                    if (m.kind !== "pin") join(lines[li++], screenOf(m.first.point), screenOf(m.second.point));
+                });
+            }
+            if (state.camera) join(lines[li++], screenOf(state.camera.point), screenOf(cameraPoint()));
         }
         function everyFrame() {
             if (detached) return;
@@ -653,6 +685,7 @@
             setMode("hover");
             if (cursor) cursor.style.display = "none";
             if (panelMove) panelMove.reset();
+            if (frames) frames.close();
             render();
         }
 
@@ -745,6 +778,7 @@
             var range = Inspector.keptRange(look.range, before, fix());
             if (range) look.range = range;
             restyle();
+            if (frames) frames.refresh();
             drawMarkers();
             render();
         }
@@ -774,12 +808,18 @@
                     return render();
                 }
                 state.shown = m.id;
-                if (what === "goto") lookAt(m.kind === "pin" ? m.point : m.second.point);
+                if (what === "goto") {
+                    lookAt(m.kind === "pin" ? m.point : m.second.point);
+                    if (m.kind === "pin") api.showFrames({point: m.point, reading: {valid: typeof m.temperature === "number", temperature: m.temperature}});
+                }
                 return render();
             }
             var srow = e.target.closest("[data-saved]");
             var s = srow && state.saved.filter(function (x) { return String(x.id) === srow.getAttribute("data-saved"); })[0];
-            if (s && what === "goto-saved") lookAt(s.point);
+            if (s && what === "goto-saved") {
+                lookAt(s.point);
+                api.showFrames({point: s.point, reading: model.reading(MeshIndex.closest(index, s.point, PointCloud3D.LIMIT) || {})});
+            }
         }
         function onPanelInput(e) {
             var what = e.target.getAttribute("data-act") || "";
@@ -811,7 +851,7 @@
             if (/^image-(brightness|contrast|gamma|sharpen)$/.test(what)) { slide(e.target); render(); }
         }
 
-        function onUnits() { drawMarkers(); renderLegend(); render(); }
+        function onUnits() { drawMarkers(); renderLegend(); render(); if (frames) frames.refresh(); }
 
         // The panel, legend, pointer label and markers, over the 3D view
         function mount() {
@@ -820,7 +860,8 @@
             overlay.className = "dt-inspector3d";
             overlay.innerHTML = '<svg class="dt-inspector3d-lines"></svg><div class="dt-inspector3d-markers"></div>' +
                 '<div class="dt-inspector-cursor" style="display: none"></div><div class="dt-legend dt-inspector3d-legend" hidden></div>' +
-                '<div class="dt-inspector-panel dt-inspector3d-panel" hidden></div>';
+                '<div class="dt-inspector-panel dt-inspector3d-panel" hidden></div>' +
+                '<div class="dt-inspector-frames dt-inspector3d-frames" hidden></div>';
             area.appendChild(overlay);
             svg = overlay.querySelector(".dt-inspector3d-lines");
             markers = overlay.querySelector(".dt-inspector3d-markers");
@@ -830,9 +871,21 @@
             panel.addEventListener("click", onPanelClick);
             panel.addEventListener("change", onPanelChange);
             panel.addEventListener("input", onPanelInput);
+            frames = Frames3D.create(overlay.querySelector(".dt-inspector3d-frames"), {
+                fetchFn: fetchFn, task: task, raycast: MeshIndex.raycast, index: function () { return index; },
+                style: function () { return styleOf(look, Scale.stepsOf(bandsOf(), look.range), isothermPaint(state.isotherm, fix())); },
+                corrected: function (c) { return Inspector.corrected(c, fix()); },
+                format: function (c) { return Inspector.formatTemp(c, Inspector.userUnit()); },
+                changed: function (shown) {
+                    state.camera = shown;
+                    if (!shown && framesMove) framesMove.reset();
+                    drawMarkers();
+                }
+            });
             if (Inspector.movable) {
                 panelMove = Inspector.movable(panel, area, function (t) { return !!t.closest(".dt-inspector-head") && !t.closest(FIELDS); }, null, doc);
                 Inspector.movable(legend, area, function () { return true; }, null, doc);
+                framesMove = Inspector.movable(frames.element, area, function (t) { return !!t.closest(".ta-pip-head") && !t.closest(FIELDS); }, null, doc);
             }
             var canvas = viewer.renderer.domElement;
             canvas.addEventListener("pointermove", onPointerMove);

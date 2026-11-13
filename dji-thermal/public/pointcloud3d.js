@@ -134,7 +134,7 @@
                 nodes.forEach(paint);
             },
             // The temperature where the pointer is ({x, y} in the view's pixels): the point Potree picks there, read on
-            // the model's nearest surface; {point, reading}
+            // the model's nearest surface; {point, reading, hit (that surface's, or null)}
             spotAt: function (mouse, camera) {
                 var pc = cloud();
                 if (!index || !pc || !Potree || !Potree.Utils) return {point: null, reading: {valid: false, reason: "building"}};
@@ -142,7 +142,7 @@
                 if (!picked || !picked.location) return {point: null, reading: {valid: false, reason: "outside"}};
                 var p = {x: picked.location.x, y: picked.location.y, z: picked.location.z};
                 var hit = MeshIndex.closest(index, p, LIMIT);
-                return {point: p, reading: hit ? model.reading(hit) : {valid: false, reason: "far"}};
+                return {point: p, reading: hit ? model.reading(hit) : {valid: false, reason: "far"}, hit: hit};
             },
             reading: function (hit) { return model.reading(hit); },
             detach: function () {

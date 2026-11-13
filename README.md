@@ -17,7 +17,8 @@ Process DJI radiometric thermal photos (R-JPEG) in WebODM and get temperature ma
   emissivity and reflected temperature, isotherms, the map's palette, colour range and image adjustments (as the
   mosaic viewer's), and its legend. It also lays the Analyzer's workset mosaics and the project's other orthophotos on
   the map, to compare them with the task's own layers, and shows the frames that saw a point clicked. On the task's
-  3D view, it colours the textured model and the point cloud in the palette from their temperatures and reads them.
+  3D view, it colours the textured model and the point cloud in the palette from their temperatures, reads them and
+  shows the photos that saw a spot.
 
 Temperatures are computed with [dji-thermal-cli](https://pypi.org/project/dji-thermal-cli/), a pure-Python
 implementation of DJI's Thermal SDK: no native library and no outside service. An administrator can have DJI's own
@@ -42,7 +43,8 @@ SDK compute them instead (see [DJI's own Thermal SDK](#djis-own-thermal-sdk)).
   statistics, histogram, surroundings and ΔT, the ΔT between two spots, isotherms, measurements saved for the project, and a correction for
   another emissivity: [Measuring on the map](docs/quickstart-inspector.md).
 - **Measure on the 3D model.** The textured model and the point cloud in your palette, from the temperatures the
-  model's textures hold, with the temperature under the pointer, pins and ΔTs on them: [Measuring on the 3D model](docs/quickstart-3d.md).
+  model's textures hold, with the temperature under the pointer, pins and ΔTs on them, and the photos that saw a
+  spot, walls included: [Measuring on the 3D model](docs/quickstart-3d.md).
 - **Trace a temperature back to its photos.** The frames that saw a point on the map, each one measured in its own
   pixels or measured again with other values: [The frames that saw a point](docs/quickstart-inspector.md#6-the-frames-that-saw-a-point)
   and [One frame at a time](docs/quickstart-worksets.md#one-frame-at-a-time).
@@ -524,8 +526,15 @@ Thermal Inspector, with the 2D Inspector's tools that make sense on a model:
   It's coloured in your browser, in a background thread, as Potree loads its parts.
 - **Saved measurements**: the pins saved on the task's 2D map, shown on the model with their values as saved, read
   only.
+- **The photos that saw a spot**: a click in Hover (or a pin dropped, or a pin's name clicked) opens the task's
+  photos that saw that spot beside the panel, placed with the cameras ODM refined, so the spot is on the right pixel,
+  walls included. Photos the model hides the spot from are left out; the rest come most squarely facing the surface
+  first, one at a time in your palette with a crosshair on the spot, with that photo's temperature there, the model's,
+  and what all the photos read there. Its camera is marked in the view, and **Open this frame** opens the frame's page
+  in the Analyzer when the task came from a workset. ODM doesn't keep which photo it coloured the model from, so none
+  is singled out.
 
-Not in 3D: regions and lines, the overlays and the source frames. ODM blends the photos separately for the model's
+Not in 3D: regions and lines, and the overlays. ODM blends the photos separately for the model's
 textures and for the orthophoto, so a spot can read about 0.5 °C differently in 3D (the median on a measured flight).
 For a temperature to report, prefer the 2D map. See [Measuring on the 3D model](docs/quickstart-3d.md).
 

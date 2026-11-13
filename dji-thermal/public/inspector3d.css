@@ -23,6 +23,13 @@
 .dt-inspector3d-marker.dt-spot:not(.dt-spot-end) span { display: none; }
 .dt-inspector3d-marker.dt-saved::before { background: #2e7d32; border-style: dashed; }
 .dt-inspector3d-line { stroke: #fff; stroke-width: 2px; stroke-dasharray: 5 3; filter: drop-shadow(0 0 1px #000); }
+.dt-inspector3d-marker.dt-camera::before { background: #1e88e5; border-radius: 2px; }
+.dt-inspector3d-line.dt-inspector3d-camera-line { stroke: #90caf9; }
+/* The photos that saw a spot (frames3d.js; the 2D source frames window's styles, frames.css): beside the panel */
+.dt-inspector3d .dt-inspector3d-frames { right: 316px; top: 52px; max-height: calc(100% - 120px); max-width: calc(100% - 340px); }
+.dt-inspector3d-frames canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; }
+.dt-inspector3d-frames .dt-frames3d-figures { margin: 4px 0; }
+.dt-inspector3d-frames .dt-frames3d-figures td { padding: 1px 4px; }
 /* While Pin or ΔT is chosen: a crosshair over the view */
 canvas.dt-inspector3d-picking { cursor: crosshair; }
 /* A phone: the panel over the lower part of the view, the model above it (its top, with the reading, stays in view as
@@ -30,4 +37,5 @@ canvas.dt-inspector3d-picking { cursor: crosshair; }
 @media (max-width: 480px) {
     .dt-inspector3d .dt-inspector3d-panel { left: 8px; right: 8px; width: auto; top: auto; bottom: 52px; max-height: 48%; }
     .dt-inspector3d .dt-inspector3d-legend { bottom: auto; top: 52px; }
+    .dt-inspector3d .dt-inspector3d-frames { left: 8px; right: 8px; width: auto; max-width: none; top: 52px; max-height: calc(52% - 112px); }
 }

@@ -9,8 +9,9 @@
 - **R26. The point cloud in the thermal palette**, each point's temperature taken from the model's surface; after
   R25, which it builds on. Details: "Up next: Thermal 3D".
   Both on one branch, `thermal-3d`, not merged until the user decides to keep or cut it (the user, 2026-11-13).
-- **R28. Source frames in 3D**: a click on the 3D model or point cloud shows the photo that coloured that spot, then
-  the others that saw it, ranked. On `thermal-3d` with R25/R26. Details: "Up next: Source frames in 3D".
+- **R28. Source frames in 3D**: a click on the 3D model or point cloud shows the photos that saw that spot, ranked,
+  each with its own temperature there. Built on `thermal-3d` with R25/R26 (2026-11-13). Details: "Up next: Source
+  frames in 3D".
 - **R27. The distance setting: how it's applied, and whether it changes temperatures** (the user, 2026-11-13, in
   `new.md`: "Plan for after this feature work to discuss a possible bug raised by a user regarding how the distance
   setting is applied and if it effects temperature?"). To discuss once R25/R26 are kept or cut. What's known now: the
@@ -2365,14 +2366,15 @@ cleanly. Ensure you design it with developer accessibility and extensibility in 
   recipes: adding a tool, adding a source), written with the code, not after.
 
 Touch points in shared code (kept current while building):
-- `plugin.py`: imports `model3d_api`, mounts `TASK/inspector/model`, `TASK/inspector/model/<n>/values` and
-  `TASK/inspector/model/saved`.
+- `plugin.py`: imports `model3d_api`, mounts `TASK/inspector/model`, `TASK/inspector/model/<n>/values`,
+  `TASK/inspector/model/saved`, `TASK/inspector/model/frames` and `TASK/inspector/model/frames/<n>/values`.
 - `CLAUDE.md`, the `test` skill, `docs/developing.md`: `test_model3d` in the Django test command.
 - `main.js`: the script loader made one for any page (`DjiThermalScripts(names)`, `NAMES` and `NAMES_3D`; the 2D
   `DjiThermalMapScripts` as it was) and the `PluginsAPI.ModelView.addActionButton` hook (answered at once, without
-  dependencies: WebODM's trigger drops a later answer, so it adds its stylesheets itself; `NAMES_3D` lists
-  `mesh_index.js`, `model3d.js`, `pointcloud3d.js`, `inspector3d.js`; the worker loads itself); `main.test.js` mocks
-  `ModelView`, `pages.test.js` checks the 3D list's order.
+  dependencies: WebODM's trigger drops a later answer, so it adds its stylesheets itself: `inspector.css`,
+  `frames.css` (R28's window), `inspector3d.css`; `NAMES_3D` lists `mesh_index.js`, `model3d.js`, `pointcloud3d.js`,
+  `frames3d.js`, `inspector3d.js`; the worker loads itself); `main.test.js` mocks `ModelView`, `pages.test.js`
+  checks the 3D list's order.
 - `eslint.config.mjs`: `Int32Array`, `Uint32Array` and `Int16Array` among the ES5 files' globals.
 - `inspector.js`: exports four helpers it had (`isothermHtml`, `validCorrection`, `ISOTHERM_COLORS`, `REASONS`) for the
   3D panel; nothing in it changed.
@@ -2380,7 +2382,7 @@ Touch points in shared code (kept current while building):
   `docs/api.md` (the three routes), `docs/developing.md` (the map's rows, "The 3D view", the recipes "A tool in the 3D
   Thermal Inspector" and "A source of temperatures in 3D"); the docs' own `docs/quickstart-3d.md` and its two
   screenshots are the branch's.
-- `dev/screenshots.js`: the `inspector-3d` and `inspector-3d-cloud` shots (`open3d`, `viewAt`), WebGL in software
+- `dev/screenshots.js`: the `inspector-3d`, `inspector-3d-cloud` and `inspector-3d-frames` shots (`open3d`, `viewAt`), WebGL in software
   (SwiftShader) for every shot, and HEAD requests let through (Potree checks the point cloud with one); the `docs`
   skill says so, and that the 3D shots leave `thermal/model3d.json` cached.
 
@@ -2418,9 +2420,28 @@ all 151 photos with ODM's cameras, the photos' values against the texture's:
   away still varies by 0.44 °C (std, photos sampled bilinearly); the next best, by 0.52 °C.
 - The best is at least twice as good as the next on 4.6 % of the faces, three times on 3.2 %.
 So which photo textured a spot can't be told from what ODM keeps: the photos of a surface agree with each other about as
-well as with the texture, which seam leveling has shifted and smoothed. **Stopped here for the user's decision.** Knowing
+well as with the texture, which seam leveling has shifted and smoothed. Stopped there for the user's decision. Knowing
 it for certain needs ODM to keep texrecon's labeling (it runs with `--no_intermediate_results`): a change to ODM, not
 something the plugin can do.
+
+**Decided** (the user, 2026-11-13): "Ranked + each reading": every photo that saw the spot, those the model hides it
+from left out, ranked by how squarely each faced the surface, with each photo's own temperature there, the model's,
+and the spread across the photos; no photo singled out.
+
+**Built** (2026-11-13, on `thermal-3d`):
+- Server: `frames3d.py` (ODM's cameras read once per version of `shots.geojson`/`cameras.json`; `project` as OpenSfM,
+  `brown` and `perspective` lenses; a photo that isn't a one-band float TIFF left out, one whose file is gone listed as
+  not available; `workset_frames` maps the task's photos to the workset's frames), `model3d_api.py`
+  (`Model3DFrames`, `Model3DFrameValues`), `plugin.py` (the two routes). Tests in `tests/test_model3d.py`
+  (`TestFrames3D`: a nadir and a level camera made in the test, a brown lens against a hand computation, refusals,
+  public tasks).
+- Browser: `public/frames3d.js` (the window, `hidden` by a ray from 5 cm off the surface to the camera, `spread`),
+  wired in `inspector3d.js` (Hover's and Pin's clicks, a pin's name, a saved pin's; the camera of the photo shown marked
+  with a line to the spot; a cloud point more than 25 cm from the model says its photos can't be told), styles in
+  `inspector3d.css` (beside the panel; above it on a phone). Tests: `frames3d.test.js`, two in `inspector3d.test.js`.
+- Measured live on HomerunObliqueII (289 spots from above): a median 25 photos per spot; on roofs and ground the first
+  photo a median 11° from square on; the model within the photos' range at 266 of 283 spots; the median of the photos
+  0.47 °C from the model (p90 1.5). Desktop and phone checked; no console errors but the dev livereload.
 
 
 **R26's first step, measured** (2026-11-13, HomerunObliqueII, offline in NodeODX's image and in the browser):

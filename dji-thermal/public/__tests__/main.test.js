@@ -181,7 +181,7 @@ test("the 3D Thermal Inspector is added to the 3D page, after the 2D one's scrip
     const inspector = {toggle: jest.fn(), detach: jest.fn()};
     window.ThermalInspector3D = {create: jest.fn(() => Promise.resolve(inspector))};
     button.componentDidMount();
-    const names = ["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "inspector.js", "mesh_index.js", "model3d.js", "pointcloud3d.js", "inspector3d.js"];
+    const names = ["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "inspector.js", "mesh_index.js", "model3d.js", "pointcloud3d.js", "frames3d.js", "inspector3d.js"];
     for (let i = 0; i < names.length; i++) {
         await new Promise(r => setTimeout(r, 0));
         const scripts = document.head.querySelectorAll("script");
@@ -192,7 +192,7 @@ test("the 3D Thermal Inspector is added to the 3D page, after the 2D one's scrip
     await new Promise(r => setTimeout(r, 0));
     expect(window.ThermalInspector3D.create).toHaveBeenCalledWith("viewer");
     expect(Array.from(document.head.querySelectorAll("link")).map(l => l.getAttribute("href")))
-        .toEqual(["/plugins/dji-thermal/inspector.css", "/plugins/dji-thermal/inspector3d.css"]);
+        .toEqual(["/plugins/dji-thermal/inspector.css", "/plugins/dji-thermal/frames.css", "/plugins/dji-thermal/inspector3d.css"]);
     const shown = button.render();
     expect(shown.props.title).toBe("Thermal Inspector");
     shown.props.onClick();

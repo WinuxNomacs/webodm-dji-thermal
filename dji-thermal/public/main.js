@@ -40,7 +40,7 @@ window.DjiThermalScripts = (function(){
 
 // The Thermal Inspector's (2D map), and the 3D one's after them (it uses their helpers)
 var NAMES = ["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "inspector.js"];
-var NAMES_3D = ["mesh_index.js", "model3d.js", "pointcloud3d.js", "inspector3d.js"];
+var NAMES_3D = ["mesh_index.js", "model3d.js", "pointcloud3d.js", "frames3d.js", "inspector3d.js"];
 window.DjiThermalMapScripts = function(){ return window.DjiThermalScripts(NAMES); };
 
 // The Thermal Inspector on WebODM's 2D map (inspector.js, with frames.js's source frames window), with WebODM's Leaflet:
@@ -59,7 +59,7 @@ PluginsAPI.Map.willAddControls(["leaflet", "dji-thermal/inspector.css", "dji-the
 // once): the button is given at once, with no dependencies to wait for, and shows itself when it can; its
 // stylesheets are added here. The 2D Inspector's scripts come first: the 3D one uses their helpers.
 window.DjiThermal3DScripts = function(){
-    ["inspector.css", "inspector3d.css"].forEach(function(name){
+    ["inspector.css", "frames.css", "inspector3d.css"].forEach(function(name){
         var href = window.DjiThermalScripts.url(name);
         if (document.querySelector('link[href="' + href + '"]')) return;
         var link = document.createElement("link");

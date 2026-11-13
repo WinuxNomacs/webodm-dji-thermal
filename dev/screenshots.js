@@ -361,6 +361,19 @@ const SHOTS = {
         await p.waitForTimeout(1500);
         return p.locator("#potree_render_area");
     },
+    "inspector-3d-frames": async (p, env) => {
+        // A click in Hover on the model's roof: the photos that saw that spot, the first beside the panel
+        await open3d(p, env, "mesh");
+        await p.click(".dt-inspector3d-button");
+        await p.waitForTimeout(4000);       // the model indexed
+        const at = await viewAt(p);
+        await p.mouse.move(...at(0.47, 0.6));
+        const drawn = p.waitForResponse((r) => /\/inspector\/model\/frames\/\d+\/values/.test(r.url()), {timeout: 60000});
+        await p.mouse.click(...at(0.47, 0.6));
+        await drawn;
+        await p.waitForTimeout(1500);
+        return p.locator("#potree_render_area");
+    },
     "inspector-saved": async (p, env) => {
         // A region on the map's thermal orthophoto measured with the correction on, and its Save form filled in (not
         // sent: the script stays read only)
