@@ -2364,7 +2364,7 @@ Touch points in shared code (kept current while building):
   `DjiThermalMapScripts` as it was) and the `PluginsAPI.ModelView.addActionButton` hook (answered at once, without
   dependencies: WebODM's trigger drops a later answer, so it adds its stylesheets itself); `main.test.js` mocks
   `ModelView`, `pages.test.js` checks the 3D list's order.
-- `eslint.config.mjs`: `Int32Array` among the ES5 files' globals.
+- `eslint.config.mjs`: `Int32Array` and `Uint32Array` among the ES5 files' globals.
 
 **Steps**, each on this branch (`thermal-3d`), with its tests:
 1. The server's model answers (Django tests on a small GLB and TIFFs made in the test; refusals: no GLB, RGB

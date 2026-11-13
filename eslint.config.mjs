@@ -14,7 +14,7 @@ export default [
             // ES5 syntax, but the ES2015 Promise and typed arrays the browsers have; module and require are the UMD
             // wrapper's
             globals: {...globals.browser, Promise: "readonly", DataView: "readonly", Uint8Array: "readonly", Float32Array: "readonly",
-                      Float64Array: "readonly", Int32Array: "readonly", module: "readonly", require: "readonly", PluginsAPI: "readonly",
+                      Float64Array: "readonly", Int32Array: "readonly", Uint32Array: "readonly", module: "readonly", require: "readonly", PluginsAPI: "readonly",
                       React: "readonly"},
         },
         // ES5 has no catch without a binding, so one left unused is no mistake
