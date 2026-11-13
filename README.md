@@ -230,8 +230,9 @@ The sections, in the order of the work:
   flight's medians) and **Harmonize** (also each frame's drift against its overlapping neighbours removed).
 - **Outputs**: temperature TIFFs in °C, °F or K, pseudo-colour PNGs, gray16, raw counts, DJI R-JPEGs and the others
   dji-thermal-cli writes, their compression, and whether to build the mosaics.
-- **Measurement**: each parameter, with the flight's recorded median beside it (left empty, each image keeps its
-  own), in your unit, and the unit of the files (the mosaics' and the frame page's downloads'; each frame's TIFFs are
+- **Measurement**: each parameter, with the flight's recorded median and the range its cameras accept beside it
+  (left empty, each image keeps its own; a value outside the range, which the SDK would refuse for every frame, is
+  refused before the workset starts), in your unit, and the unit of the files (the mosaics' and the frame page's downloads'; each frame's TIFFs are
   in the units ticked in Outputs).
 - **Colours**, shown once a colour or 16-bit grey output is ticked: the palette and colour range of the pictures.
 - **Adjustments**: gimbal overrides, temperatures above or below a threshold replaced, the location stripped.

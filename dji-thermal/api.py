@@ -233,6 +233,7 @@ class TaskWorkset(APIView):
         if sent.get('max_pitch') not in (None, ''):
             raw['max_pitch'] = sent['max_pitch']
         settings, errors = conversions.parse_settings(raw)
+        errors = errors or conversions.range_errors(settings, conversions.camera_ranges(task))
         if errors:
             raise exceptions.ValidationError(detail=errors)
         conversion_tasks.set_task_palette(task, settings.get('palette'))

@@ -671,6 +671,26 @@ class TestConversions(AnalyzerTestCase):
         self.assertIn("emissivity", res.data)
         self.assertEqual(conversions.ids(task), [])
 
+    @skip_without("DJI_THERMAL_FLIGHT_DIR")
+    def test_a_value_the_frames_cameras_refuse_starts_no_workset_and_the_dataset_says_their_ranges(self):
+        task = self.create()
+        with contextlib.ExitStack() as stack:
+            self.upload(task, [stack.enter_context(open(f, "rb")) for f in flight_frames(2)])
+        self.assertEqual(conversions.camera_ranges(task), {})       # before the analysis: nothing to check against
+        self.client.post("{}/{}/analyze".format(API, task.id))
+        ranges = self.client.get("{}/{}".format(API, task.id)).data["ranges"]
+        self.assertEqual(ranges["distance"], [1.0, 300.0])           # the M4T's
+        self.assertEqual(ranges["ambient_temp"], [-40.0, 80.0])
+        res = self.convert(task, {"distance": 500})
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        said = res.data["distance"]
+        self.assertEqual(str(said[0] if isinstance(said, list) else said), "Outside what the photos' cameras accept: 1 to 300 m")
+        self.assertEqual(conversions.ids(task), [])
+        # A temperature, in the settings' unit: 90 °C is 194 °F, above the M4T's 80 °C
+        errors = conversions.range_errors({"unit": "F", "ambient_temp": 194.0, "distance": 300.0}, ranges)
+        self.assertEqual(errors, {"ambient_temp": "Outside what the photos' cameras accept: -40 to 176 °F"})
+        self.assertEqual(conversions.range_errors({"unit": "C", "distance": "lrf", "humidity": None}, ranges), {})
+
     def test_a_conversion_of_no_thermal_image_fails_with_each_images_reason(self):
         task = self.create()
         self.upload(task, [jpeg("DJI_0001_V.JPG")])

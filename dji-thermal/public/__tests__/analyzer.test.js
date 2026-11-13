@@ -1530,6 +1530,26 @@ describe("a dataset's conversions", () => {
         expect(conversions.formProblem(Object.assign({}, read, {range_max: null}))).toMatch(/colour range/);
     });
 
+    it("shows the range the frames' cameras accept beside each value, and refuses one outside it before asking the server", () => {
+        const ranges = {distance: [1, 300], humidity: [1, 100], emissivity: [0.1, 1], reflected_temp: [-40, 100], ambient_temp: [-40, 80]};
+        document.body.innerHTML = '<div id="f">' + conversions.formHtml(DEFAULTS, PREFERENCES, {}, ranges) + "</div>";
+        const text = document.getElementById("f").textContent;
+        expect(text).toContain("range 1 to 300 m");
+        expect(text).toContain("range -40 to 80 °C");
+        expect(text).toContain("range 0.1 to 1");
+        window.localStorage.setItem("unit_system", "imperial");
+        expect(conversions.rangeText("ambient_temp", ranges)).toBe("-40 to 176 °F");
+        window.localStorage.clear();
+        const s = Object.assign({}, DEFAULTS, {unit: "C"});
+        expect(conversions.rangeProblem(Object.assign({}, s, {distance: 300}), ranges)).toBe(null);
+        expect(conversions.rangeProblem(Object.assign({}, s, {distance: 500}), ranges))
+            .toBe("Distance to the target is outside what the photos' cameras accept: 1 to 300 m.");
+        // Temperatures in the settings' unit: 194 °F is 90 °C
+        expect(conversions.rangeProblem(Object.assign({}, s, {unit: "F", ambient_temp: 194}), ranges)).toMatch(/^Ambient temperature is outside/);
+        expect(conversions.rangeProblem(Object.assign({}, s, {distance: 500}), {})).toBe(null);
+        expect(conversions.rangeProblem(Object.assign({}, s, {distance: 500}), undefined)).toBe(null);
+    });
+
     it("reads Harmonize as Normalize too, and a workset saved before Harmonize existed as harmonized when it normalized", () => {
         document.body.innerHTML = '<div id="f">' + conversions.formHtml(Object.assign({}, DEFAULTS, {harmonize: true}), PREFERENCES, {}) + "</div>";
         expect(conversions.readForm(document.getElementById("f"))).toMatchObject({normalize: true, harmonize: true});

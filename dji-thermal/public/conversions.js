@@ -64,9 +64,40 @@
         return blank(v) ? "Not recorded" : "Recorded: " + core.formatNumber(v, digits === undefined ? 1 : digits, unit || "");
     }
 
+    // The settings the photos' cameras give a range for (the server's conversions.RANGED), and their names
+    var RANGED = [["distance", "Distance to the target"]].concat(MEASUREMENTS.map(function (m) { return [m.key, m.label]; }));
+    // A setting's range as the frames' cameras accept it (ranges: the dataset's, temperatures in °C), in unit (a
+    // temperature's; the user's when not given): "1 to 300 m", "-40 to 100 °C"; "" without one
+    function rangeText(key, ranges, unit) {
+        var r = (ranges || {})[key];
+        if (!r) return "";
+        var m = MEASUREMENTS.filter(function (x) { return x.key === key; })[0] || {};
+        if (m.temperature) {
+            var to = unit || core.userUnit();
+            return num(core.convertTemp(r[0], "C", to), 1) + " to " + num(core.convertTemp(r[1], "C", to), 1) + " " + core.unitSymbol(to);
+        }
+        return num(r[0], 2) + " to " + num(r[1], 2) + (key === "distance" ? " m" : m.unit ? " " + m.unit : "");
+    }
+
+    // The first measurement value (settings as read, in their unit) outside what the frames' cameras accept, in words:
+    // dji-thermal-cli would refuse every frame of those cameras; null when all are in range or there are no ranges
+    function rangeProblem(s, ranges) {
+        for (var i = 0; i < RANGED.length; i++) {
+            var key = RANGED[i][0], r = (ranges || {})[key], v = s[key];
+            if (!r || typeof v !== "number") continue;
+            var m = MEASUREMENTS.filter(function (x) { return x.key === key; })[0] || {};
+            var c = m.temperature ? core.convertTemp(v, s.unit || "C", "C") : v;
+            if (c < r[0] - 1e-6 || c > r[1] + 1e-6) {
+                return RANGED[i][1] + " is outside what the photos' cameras accept: " + rangeText(key, ranges) + ".";
+            }
+        }
+        return null;
+    }
+
     // The settings form, its temperatures in the user's unit. meta: {products, palettes}; rec: recorded(analysis), in °C
-    function formHtml(s, meta, rec) {
+    function formHtml(s, meta, rec, ranges) {
         rec = rec || {};
+        var withRange = function (text, key) { var r = rangeText(key, ranges); return r ? text + "; range " + r : text; };
         var unit = core.unitOf(s.unit || core.userUnit()), u = core.unitSymbol(core.userUnit());
         var shown = settingsIn(s, unit, core.userUnit());
         TEMPERATURES.forEach(function (k) { if (typeof shown[k] === "number") shown[k] = Math.round(shown[k] * 100) / 100; });
@@ -93,13 +124,13 @@
                 var sel = fixed ? m[0] === "fixed" : m[0] === s.distance;
                 return '<option value="' + m[0] + '"' + (sel ? " selected" : "") + ">" + esc(m[1]) + "</option>";
             }).join("") + "</select>" + numberInput("distance", fixed ? s.distance : "", ' step="0.1" min="0.1" placeholder="m"' + (fixed ? "" : " hidden")) +
-            "</div>", esc(distanceHelp));
+            "</div>", esc(withRange(distanceHelp, "distance")));
         var measurement = MEASUREMENTS.map(function (m) {
                 var hint = m.temperature ? core.convertTemp(rec[m.hint], "C") : rec[m.hint];
                 var label = m.label + (m.temperature ? " (" + u + ")" : m.unit ? " (" + m.unit + ")" : "");
                 var placeholder = blank(hint) ? "As recorded" : "As recorded (" + core.formatNumber(hint, m.digits === undefined ? 1 : m.digits) + ")";
                 return field(label, numberInput(m.key, s[m.key], ' step="' + (m.step || "any") + '" placeholder="' + esc(placeholder) + '"'),
-                    esc(recordedText(hint, m.digits, m.temperature ? " " + u : m.unit ? " " + m.unit : "")));
+                    esc(withRange(recordedText(hint, m.digits, m.temperature ? " " + u : m.unit ? " " + m.unit : ""), m.key)));
             }).join("") + distance +
             field("Unit of the files", '<select class="form-control input-sm" name="unit">' + ["C", "F", "K"].map(function (k) {
                 return '<option value="' + k + '"' + (k === unit ? " selected" : "") + ">" + UNIT_LABELS[k] + "</option>";
@@ -903,7 +934,7 @@
         function renderForm() {
             var form = root$("ta-convert-form");
             var sections = built ? [].map.call(form.querySelectorAll("details.ta-section"), function (d) { return d.open; }) : null;
-            form.innerHTML = formHtml(settings, meta, recorded(dataset && dataset.analysis));
+            form.innerHTML = formHtml(settings, meta, recorded(dataset && dataset.analysis), dataset && dataset.ranges);
             drawnWith = dataset && dataset.analyzed_at;
             if (sections) [].forEach.call(form.querySelectorAll("details.ta-section"), function (d, i) { d.open = sections[i]; });
             var from = root$("ta-convert-from");
@@ -1406,7 +1437,8 @@
 
         root$("ta-convert-start").addEventListener("click", function () {
             var s = readForm(root$("ta-convert-form"));
-            if (formProblem(s)) return message(esc(formProblem(s)), "text-danger");
+            var problem = formProblem(s) || rangeProblem(s, dataset && dataset.ranges);
+            if (problem) return message(esc(problem), "text-danger");
             var btn = root$("ta-convert-start");
             btn.disabled = true;
             send(base.replace(/\/$/, ""), "POST", {name: root$("ta-convert-name").value.trim(), settings: s})
@@ -1625,7 +1657,7 @@
         return {update: update, usePlan: usePlan, useSettings: useSettings};
     }
 
-    var api = {recorded: recorded, settingsIn: settingsIn, formHtml: formHtml, readForm: readForm, formProblem: formProblem, planSettings: planSettings, statusLabel: statusLabel,
+    var api = {recorded: recorded, settingsIn: settingsIn, formHtml: formHtml, readForm: readForm, formProblem: formProblem, rangeProblem: rangeProblem, rangeText: rangeText, planSettings: planSettings, statusLabel: statusLabel,
                differences: differences, chipsHtml: chipsHtml, markForm: markForm, resetSetting: resetSetting,
                mosaicHtml: mosaicHtml, mapUrl: mapUrl, actionsHtml: actionsHtml, listHtml: listHtml, mosaicsHtml: mosaicsHtml, mosaicDetailHtml: mosaicDetailHtml, parentHtml: parentHtml, taskStatusLabel: taskStatusLabel, tasksHtml: tasksHtml,
                taskHtml: taskHtml, readTaskForm: readTaskForm, optionsFormHtml: optionsFormHtml, readOptions: readOptions, skipReasons: skipReasons, resultRows: resultRows, resultsHtml: resultsHtml,
