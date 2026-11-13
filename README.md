@@ -110,8 +110,11 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
    - **Distance to the target**: by default each photo's laser rangefinder distance where it has a valid one
      (each photo of the M4T flight checked has one; DJI's sample images have none), else the distance the camera
      recorded (usually 5 m, whatever the flight height). Or the recorded distance, or one distance for all photos.
-     With the rangefinder's distance, the temperatures differ slightly from DJI's own apps, which use the recorded
-     one.
+     The distance sets how much DJI's SDK corrects for the air, from the ambient temperature and humidity. The
+     camera's recorded ambient temperature is its own estimate, not the air's. Over tens of metres, a wrong ambient
+     temperature moves every temperature by several degrees. So with a real distance, type the air temperature and
+     humidity measured at the flight; without them, choose the recorded distance, as DJI's own apps use
+     ([Measurement settings](docs/measurement.md#distance-ambient-temperature-and-humidity-together)).
 4. **Palette**, under Measurement (the Workset Creation Settings' order: Frames, Measurement, Colours): the DJI
    palette the task's thermal map (and the Thermal Inspector) opens in, starting on the one the photos were shot in,
    unless you've chosen a palette in the Analyzer's preferences; the task's images hold temperatures, so the map can

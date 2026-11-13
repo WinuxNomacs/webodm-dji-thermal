@@ -3,13 +3,6 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R27. The distance setting: how it's applied, and whether it changes temperatures** (the user, 2026-11-13, in
-  `new.md`: "Plan for after this feature work to discuss a possible bug raised by a user regarding how the distance
-  setting is applied and if it effects temperature?"). To discuss now that the 3D work is kept. What's known now: the
-  conversion passes `distance` with the other measurement values to DJI's SDK through dji-thermal-cli (`converter.py`
-  `PARAM_FIELDS`; `frames.py` also takes `lrf`/`embedded`), where it sets the atmosphere's effect; the Inspector's
-  Manual Corrections take the atmosphere's transmission as 1 (`correction.py`), so distance plays no part there. To
-  find out: the user's report itself, then measure what a change of distance does to a frame's temperatures.
 - **R29. The 2D map's source frames placed with ODM's cameras** (the user, 2026-11-13: "a worthwhile followup",
   after R27). On a WebODM orthophoto, the frames window places the point with the workset's camera models (the frames'
   GPS and gimbal, "the point can be a little off"); ODM's refined cameras (`shots.geojson`, `cameras.json`) put it on
@@ -27,6 +20,18 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R27. The distance setting** — 2026-11-13, `r27-distance-docs`: not a bug; the docs now explain it. A user
+  reported that with the recorded 5 m their temperatures matched a weather station, while with the rangefinder's
+  distance or 20, 100 or 200 m they all read much lower. Measured on an M4T frame: the plugin (dji-thermal-cli 1.12.0)
+  and the library (1.13.1) give the same numbers, so the distance reaches DJI's SDK as set. It's DJI's air correction:
+  mean 22.8 °C at 5 m, 21.8 at the rangefinder's 21 m, 18.8 at 100 m, 17.8 at 200 m. Its size depends mostly on the
+  ambient temperature: at 100 m, 20 °C instead of the recorded 27.6 turns a −4.0 °C mean shift into +4.6; the
+  humidity moves it under 0.3 °C. The recorded ambient isn't the air's: the same as the reflected temperature in every
+  photo, drifting 26.6 to 27.8 °C in 1/16 °C steps, beside 5 m and 50 %. UAV4GEO's 1 to 25 m is an older SDK's (and
+  the H20T's) limit; the M4T accepts 1 to 300 m. The user chose "Reply and document it" (not a warning in the form
+  nor a new default). The fix: `docs/measurement.md` ("Distance, ambient temperature and humidity together", and
+  the ambient section no longer says the effect is small at drone distances), the README's distance bullet, and
+  `docs/quickstart-inspector.md`'s correction note. Docs only, no code.
 - **Thermal 3D (R25, R26, R28)** — 2026-11-13, built on one branch, `thermal-3d`, kept by the user ("merge the 3d
   branch") and merged whole: the model in the palette on WebODM's 3D page (the reported bug), the 3D Thermal
   Inspector (Hover, ΔT, Pin, Measurements, palette, scale, Image, isotherm, legend, Manual Corrections, saved 2D pins),
