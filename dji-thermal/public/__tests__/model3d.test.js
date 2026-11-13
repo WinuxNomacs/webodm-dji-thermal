@@ -26,7 +26,7 @@ function model(sizes, names, flipY) {
 }
 
 function fakeCanvas() {
-    const ctx = {createImageData: (w, h) => ({data: new Uint8ClampedArray(w * h * 4)}), putImageData: jest.fn()};
+    const ctx = {createImageData: (w, h) => ({data: new Uint8ClampedArray(w * h * 4)}), putImageData: jest.fn(), drawImage: jest.fn()};
     return {getContext: () => ctx, ctx};
 }
 
@@ -53,6 +53,16 @@ describe("matching the model's materials to the server's", () => {
         const cloud = Object.assign(model([[4, 2], [2, 2]]), {isPoints: true}), m = model([[4, 2], [2, 2]]);
         expect(Model3D.findModel({children: [cloud, m]}, DESCRIPTION).object).toBe(m);
         expect(Model3D.findModel({children: [cloud]}, DESCRIPTION)).toBeNull();
+    });
+});
+
+describe("a phone's GLB", () => {
+    test("may have its textures reduced by a power of two both ways, and is still the model's", () => {
+        expect(Model3D.sameTexture([4096, 4096], 4096, 4096)).toBe(true);
+        expect(Model3D.sameTexture([1024, 1024], 4096, 4096)).toBe(true);
+        expect(Model3D.sameTexture([1024, 2048], 4096, 4096)).toBe(false);
+        expect(Model3D.sameTexture([1365, 1365], 4096, 4096)).toBe(false);
+        expect(Model3D.matchMaterials(model([[2, 1], [1, 1]]), DESCRIPTION)).not.toBeNull();
     });
 });
 
@@ -158,6 +168,31 @@ describe("the model as a source", () => {
         expect(source.reading(hit(m.meshes[1], 0.75, 0.75))).toEqual({valid: true, temperature: 23, reason: null});
         expect(source.reading(hit(m.meshes[0], 0.6, 0.1))).toEqual({valid: false, temperature: null, reason: "nodata"});
         expect(source.reading(hit({material: {}}, 0.5, 0.5)).reason).toBe("outside");
+    });
+
+    test("fetches the values before WebODM shows the model (the point cloud reads them), and colours a reduced texture at its size", async () => {
+        const source = make();
+        await source.ready;
+        await flush();
+        expect(Recolour.fetchValues).toHaveBeenCalledTimes(2);
+        expect(source.valueAt(1, {x: 0.75, y: 0.75})).toBe(23);
+        source.restyle({colors: GREYS, range: [10, 23], shares: null, steps: null, sharpen: 0, isotherm: null});
+        const m = model([[2, 1], [1, 1]]);       // a phone's: each texture half the size
+        scene.children.push(m);
+        tick();
+        const small = canvases.filter((c) => c.ctx.drawImage && c.ctx.drawImage.mock.calls.length);
+        expect(small).toHaveLength(2);
+        expect(small[0].ctx.drawImage.mock.calls[0].slice(1)).toEqual([0, 0, 2, 1]);
+        expect(m.meshes[0].material.map.image).toBe(small[0]);
+    });
+
+    test("reads a hit on the plugin's own copy of the model by its material's index", async () => {
+        const source = make();
+        await source.ready;
+        await flush();
+        const copy = {object: {material: {__dtMaterial: 1}}, uv: {x: 0.25, y: 0.25}};
+        expect(source.reading(copy)).toEqual({valid: true, temperature: 20, reason: null});
+        expect(source.reading({object: {material: {}}, uv: {x: 0, y: 0}}).reason).toBe("outside");
     });
 
     test("puts the model's own look back when detached", async () => {

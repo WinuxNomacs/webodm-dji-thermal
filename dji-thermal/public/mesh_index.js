@@ -238,4 +238,4 @@
     var api = {build: build, raycast: raycast, closest: closest, triangles: triangles, LEAF: LEAF};
     root.ThermalMeshIndex = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
-})(typeof window !== "undefined" ? window : {});
+})(typeof window !== "undefined" ? window : typeof self !== "undefined" ? self : {});       // a page, or a worker (pointcloud3d_worker.js)

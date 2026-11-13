@@ -2363,9 +2363,10 @@ Touch points in shared code (kept current while building):
 - `CLAUDE.md`, the `test` skill, `docs/developing.md`: `test_model3d` in the Django test command.
 - `main.js`: the script loader made one for any page (`DjiThermalScripts(names)`, `NAMES` and `NAMES_3D`; the 2D
   `DjiThermalMapScripts` as it was) and the `PluginsAPI.ModelView.addActionButton` hook (answered at once, without
-  dependencies: WebODM's trigger drops a later answer, so it adds its stylesheets itself); `main.test.js` mocks
+  dependencies: WebODM's trigger drops a later answer, so it adds its stylesheets itself; `NAMES_3D` lists
+  `mesh_index.js`, `model3d.js`, `pointcloud3d.js`, `inspector3d.js`; the worker loads itself); `main.test.js` mocks
   `ModelView`, `pages.test.js` checks the 3D list's order.
-- `eslint.config.mjs`: `Int32Array` and `Uint32Array` among the ES5 files' globals.
+- `eslint.config.mjs`: `Int32Array`, `Uint32Array` and `Int16Array` among the ES5 files' globals.
 - `inspector.js`: exports four helpers it had (`isothermHtml`, `validCorrection`, `ISOTHERM_COLORS`, `REASONS`) for the
   3D panel; nothing in it changed.
 

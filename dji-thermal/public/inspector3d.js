@@ -1,8 +1,8 @@
 // The 3D Thermal Inspector, on WebODM's 3D page of a task whose model holds temperatures (a DJI Thermal Task's, or a
-// workset's). The model (model3d.js) and, later, the point cloud are *sources* of temperatures (see model3d.js for
-// what a source answers), each coloured in the user's palette from them, as the 2D map colours the orthophoto
-// (recolour.js); the panel's *tools* (TOOLS: Hover, ΔT, Pin) read them where the pointer is (a ray cast with
-// mesh_index.js). The panel is the 2D Inspector's where that makes sense in 3D (inspector.js's exported helpers draw
+// workset's). The model (model3d.js) and the point cloud (pointcloud3d.js: each point the temperature of the model's
+// nearest surface) are *sources* of temperatures (see model3d.js for what a source answers), each coloured in the
+// user's palette from them, as the 2D map colours the orthophoto (recolour.js); the panel's *tools* (TOOLS: Hover, ΔT,
+// Pin) read the one shown where the pointer is (a ray cast at the model with mesh_index.js, or the point Potree picks). The panel is the 2D Inspector's where that makes sense in 3D (inspector.js's exported helpers draw
 // its colour scale, Image section, Manual Corrections and isotherm): no regions, lines or overlays. Pins and ΔTs are
 // kept in the browser for the task; the task's saved 2D pins are shown on the model, read only.
 // main.js adds it through PluginsAPI.ModelView.addActionButton, which hands it WebODM's Potree viewer; the task is the
@@ -20,6 +20,7 @@
     var Inspector = root.ThermalInspector || (typeof require !== "undefined" ? require("./inspector.js") : null);
     var Model3D = root.ThermalModel3D || (typeof require !== "undefined" ? require("./model3d.js") : null);
     var MeshIndex = root.ThermalMeshIndex || (typeof require !== "undefined" ? require("./mesh_index.js") : null);
+    var PointCloud3D = root.ThermalPointCloud3D || (typeof require !== "undefined" ? require("./pointcloud3d.js") : null);
 
     // The tools, in the panel's order: each its button (icon, name, what it does) and the hint shown while it's chosen;
     // click(inspector, spot) when the model is clicked with it (spot: {point, reading}). A tool is added here.
@@ -37,7 +38,7 @@
 
     // What a reading that has no temperature says
     var REASONS = {outside: "Not on the model", nodata: "No temperature here", loading: "Loading the model's temperatures…",
-                   building: "Preparing the model…", cloud: "Switch to Textured Model to read temperatures",
+                   building: "Preparing the model…", far: "No temperature: no model surface within 25 cm of this point",
                    unplaced: "Not on the model"};
 
     function escapeHtml(t) {
@@ -267,8 +268,9 @@
     }
 
     // The 3D Inspector on a viewer. deps (for tests): {fetchFn, document, storage, THREE, path, setInterval,
-    // clearInterval, setTimeout, requestAnimationFrame, save (the palette preference), download}. A Promise of the
-    // inspector, or null when the page's model doesn't hold temperatures
+    // clearInterval, setTimeout, requestAnimationFrame, save (the palette preference), download, Worker, Potree,
+    // scriptUrl (a plugin script's URL: main.js's)}. A Promise of the inspector, or null when the page's model doesn't
+    // hold temperatures
     function create(viewer, deps) {
         deps = deps || {};
         var doc = deps.document || root.document, fetchFn = deps.fetchFn || root.fetch.bind(root);
@@ -280,7 +282,10 @@
         var publicPage = /^\/public\//.test((deps.path !== undefined ? deps.path : root.location && root.location.pathname) || "");
         var model = Model3D.source(viewer, {fetchFn: fetchFn, THREE: THREE, document: doc, task: task,
                                             setInterval: deps.setInterval, clearInterval: deps.clearInterval});
-        var sources = [model];
+        var scriptUrl = deps.scriptUrl || (root.DjiThermalScripts && root.DjiThermalScripts.url) || function (name) { return "/plugins/dji-thermal/" + name; };
+        var cloud = PointCloud3D.source(viewer, model, {Worker: deps.Worker, Potree: deps.Potree, script: scriptUrl("pointcloud3d_worker.js"),
+                                                        indexScript: scriptUrl("mesh_index.js")});
+        var sources = [model, cloud];
         var key = MEASUREMENTS_PREFIX + task.id, ikey = Inspector.isothermKey([task.id]);
         var state = {open: false, mode: "hover", readout: null, notice: "", pending: null, display: null, palette: "",
                      pointerTemperature: true, legendVisible: true, correction: {on: false}, correctionNotice: "", baseline: null,
@@ -365,33 +370,42 @@
 
         // -- reading the model --------------------------------------------------------------------------------------
 
-        // The model's meshes indexed once it's loaded (a second or two for a million triangles): a Promise of the index
+        // The model's meshes indexed (WebODM's model, or the plugin's own copy while the point cloud is shown: a second
+        // or two for a million triangles), then the point cloud's points looked up on it: a Promise of the index, or
+        // of null when the model can't be had
         function indexed() {
-            if (index) return Promise.resolve(index);
-            if (!model.loaded()) return Promise.resolve(null);
             if (!building) {
-                building = new Promise(function (resolve) {
-                    // After the panel says so: the build holds the page
-                    later(function () {
-                        var meshes = [];
-                        model.objects().forEach(function (o) { o.traverse(function (m) { if (m.isMesh) meshes.push(m); }); });
-                        index = MeshIndex.build(meshes);
-                        resolve(index);
-                    }, 30);
+                building = model.meshes().then(function (meshes) {
+                    if (!meshes.length || detached) return null;
+                    return new Promise(function (resolve) {
+                        // After the panel says so: the build holds the page
+                        later(function () {
+                            index = MeshIndex.build(meshes);
+                            resolve(index);
+                        }, 30);
+                    });
                 });
-                building.then(placeSaved);
+                building.then(function (built) {
+                    if (!built) return;
+                    cloud.start(built);
+                    placeSaved();
+                    if (state.open) render();
+                });
             }
             return building;
         }
 
         // What's under the pointer (clientX, clientY): {point, reading}; the reading says why there's no temperature
         function spotAt(x, y) {
-            if (!model.loaded() || !model.shown()) return {point: null, reading: {valid: false, reason: model.loaded() ? "cloud" : "loading"}};
             if (!index) {
-                indexed().then(function () { if (state.open) render(); });
+                indexed();
                 return {point: null, reading: {valid: false, reason: "building"}};
             }
             var canvas = viewer.renderer.domElement, rect = canvas.getBoundingClientRect();
+            if (!model.shown()) {
+                if (!cloud.shown()) return {point: null, reading: {valid: false, reason: "outside"}};
+                return cloud.spotAt(new THREE.Vector2(x - rect.left, y - rect.top), viewer.scene.getActiveCamera());
+            }
             var ndc = new THREE.Vector2((x - rect.left) / rect.width * 2 - 1, -(y - rect.top) / rect.height * 2 + 1);
             var raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(ndc, viewer.scene.getActiveCamera());
@@ -583,6 +597,7 @@
         }
         function everyFrame() {
             if (detached) return;
+            cloud.tick();
             if (markers && markers.children.length) placeMarkers();
             if (legend) legend.hidden = !legendShown();
             frame(everyFrame);
@@ -590,7 +605,7 @@
 
         // -- the legend ------------------------------------------------------------------------------------------------
 
-        function legendShown() { return !!(state.legendVisible && look.colors && look.range && model.shown()); }
+        function legendShown() { return !!(state.legendVisible && look.colors && look.range && (model.shown() || cloud.loaded())); }
         function renderLegend() {
             if (!legend) return;
             var unit = Inspector.userUnit(), s = scaleState();
@@ -629,8 +644,7 @@
 
         function open() {
             state.open = true;
-            if (!model.loaded()) state.notice = REASONS.cloud;
-            indexed().then(function () { if (state.open) { state.notice = ""; render(); } });
+            indexed();
             render();
         }
         function close() {
@@ -841,8 +855,9 @@
             fetchFn(API + "projects/" + task.project + "/tasks/" + task.id + "/inspector/model/saved", {credentials: "same-origin"})
                 .then(readJson).then(function (r) {
                     savedRaw = r.ok ? r.data.pins || [] : [];
-                    if (savedRaw.length) indexed().then(placeSaved);
+                    placeSaved();
                 }, function () {});
+            indexed();          // the point cloud coloured as soon as it can be
             drawMarkers();
             return loadDisplay().then(function (d) {
                 state.display = d;

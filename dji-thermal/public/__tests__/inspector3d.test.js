@@ -46,12 +46,18 @@ async function page(opts = {}) {
     area.getBoundingClientRect = () => ({left: 0, top: 0, width: 200, height: 200});
     Object.defineProperty(area, "clientWidth", {value: 200});
     Object.defineProperty(area, "clientHeight", {value: 200});
-    const viewer = {renderArea: area, renderer: {domElement: canvas}, scene: {getActiveCamera: () => ({}), view: {lookAt: jest.fn()}}};
+    // The point cloud, shown when the model isn't
+    const pointcloud = {visible: opts.shown === false, visibleNodes: []};
+    const viewer = {renderArea: area, renderer: {domElement: canvas}, scene: {getActiveCamera: () => ({}), view: {lookAt: jest.fn()}, pointclouds: [pointcloud]}};
     const source = {ready: Promise.resolve(opts.description || DESCRIPTION), loaded: () => true, shown: jest.fn(() => opts.shown !== false),
-                    objects: () => [{traverse: (fn) => fn({isMesh: true})}], restyle: jest.fn(), detach: jest.fn(),
+                    meshes: () => Promise.resolve([{isMesh: true}]), values: () => Promise.resolve(), materialIndexOf: () => 0,
+                    restyle: jest.fn(), detach: jest.fn(),
                     reading: (hit) => (hit.point.x >= 0 ? {valid: true, temperature: hit.point.x, reason: null} : {valid: false, temperature: null, reason: "nodata"})};
     jest.spyOn(Model3D, "source").mockReturnValue(source);
-    const index = {tris: {origin: [0, 0, 0]}, bounds: Float32Array.of(-1e3, -1e3, 0, 1e3, 1e3, 30)};
+    const index = {tris: {origin: [0, 0, 0], list: []}, bounds: Float32Array.of(-1e3, -1e3, 0, 1e3, 1e3, 30)};
+    // The model's nearest surface to a point picked on the point cloud: right under it, within 25 cm where y < 80
+    jest.spyOn(MeshIndex, "closest").mockImplementation((idx, p) => (p.y < 80 ? {point: {x: p.x, y: p.y, z: 0}} : null));
+    // Potree picks the cloud's point under the pointer: at the pointer's place in the view, as the model's rays
     jest.spyOn(MeshIndex, "build").mockReturnValue(index);
     // The model is the plane z = 0 where x and y are within 90; a saved pin far away isn't on it
     jest.spyOn(MeshIndex, "raycast").mockImplementation((idx, o) => (Math.abs(o.x) <= 90 && Math.abs(o.y) <= 90 ? {point: {x: o.x, y: o.y, z: 0}} : null));
@@ -64,8 +70,15 @@ async function page(opts = {}) {
         return json({}, false);
     });
     const storage = opts.storage || memoryStorage(), downloads = [];
+    const Potree = {Utils: {getMousePointCloudIntersection: (mouse) => {
+        const x = (mouse.x / 200 * 2 - 1) * 100, y = (1 - mouse.y / 200 * 2) * 100;
+        return Math.abs(x) <= 90 && Math.abs(y) <= 90 ? {location: {x, y, z: 0.1}} : null;
+    }}};
+    const workers = [];
+    function Worker(url) { this.url = url; this.posted = []; this.postMessage = (m) => this.posted.push(m); this.terminate = jest.fn(); workers.push(this); }
     const inspector = await Inspector3D.create(viewer, {
-        fetchFn, storage, THREE, path: opts.path || "/3d/project/1/task/x/", save: saved,
+        fetchFn, storage, THREE, Potree, Worker, scriptUrl: (name) => "/plugins/dji-thermal/" + name,
+        path: opts.path || "/3d/project/1/task/x/", save: saved,
         setTimeout: (fn) => { timers.push(fn); return timers.length; }, requestAnimationFrame: () => 0,
         download: (name, text) => downloads.push({name, text})
     });
@@ -79,7 +92,7 @@ async function page(opts = {}) {
         if (el.type === "checkbox") el.checked = value; else el.value = value;
         el.dispatchEvent(new Event("change", {bubbles: true}));
     };
-    return {inspector, viewer, area, source, fetchFn, storage, saved, downloads, run, panel, pointer, click, act, change};
+    return {inspector, viewer, area, source, fetchFn, storage, saved, downloads, run, panel, pointer, click, act, change, workers};
 }
 
 beforeEach(() => { window.localStorage.setItem("unit_system", "metric"); });
@@ -116,7 +129,9 @@ describe("reading the model", () => {
     test("hovering says the temperature under the pointer in the panel and beside it", async () => {
         const p = await page();
         p.inspector.toggle();
+        await flush();
         p.run();
+        await flush();
         p.pointer("pointermove", 150, 50);         // ndc (0.5, 0.5): the point (50, 50) on the model, 50 °C
         p.run();
         expect(p.panel().querySelector(".dt-inspector-readout").textContent).toBe("50.00 °C");
@@ -131,19 +146,39 @@ describe("reading the model", () => {
     test("a tap (or a click) in Hover reads where it is, as a phone has no hover", async () => {
         const p = await page();
         p.inspector.toggle();
+        await flush();
         p.run();
+        await flush();
         p.click(130, 100);                                      // (30, 0): 30 °C
         expect(p.panel().querySelector(".dt-inspector-readout").textContent).toBe("30.00 °C");
         expect(p.inspector.state.measurements).toHaveLength(0);
     });
 
-    test("with the point cloud shown, says to switch to the textured model", async () => {
+    test("with the point cloud shown, reads the picked point on the model's nearest surface, and says when it has none", async () => {
         const p = await page({shown: false});
         p.inspector.toggle();
+        await flush();
         p.run();
-        p.pointer("pointermove", 150, 50);
+        await flush();
+        await flush();
+        p.pointer("pointermove", 150, 50);         // the cloud's point (50, 50): the model under it, 50 °C
         p.run();
-        expect(p.panel().querySelector(".dt-inspector-readout").textContent).toBe(Inspector3D.REASONS.cloud);
+        expect(p.panel().querySelector(".dt-inspector-readout").textContent).toBe("50.00 °C");
+        p.pointer("pointermove", 150, 5);          // (50, 95): beyond the model's reach
+        p.run();
+        expect(p.panel().querySelector(".dt-inspector-readout").textContent).toBe("Not on the model");
+        p.pointer("pointermove", 110, 15);         // (10, 85): a point with no surface within 25 cm
+        p.run();
+        expect(p.panel().querySelector(".dt-inspector-readout").textContent).toBe(Inspector3D.REASONS.far);
+    });
+
+    test("starts the point cloud's lookups in a worker once the model is indexed, with the index and the scripts", async () => {
+        const p = await page();
+        p.run();
+        await flush();
+        expect(p.workers).toHaveLength(1);
+        expect(p.workers[0].url).toBe("/plugins/dji-thermal/pointcloud3d_worker.js");
+        expect(p.workers[0].posted[0]).toEqual(expect.objectContaining({type: "index", script: "/plugins/dji-thermal/mesh_index.js"}));
     });
 });
 
@@ -151,7 +186,9 @@ describe("pins and ΔTs", () => {
     test("Pin keeps a clicked point and its temperature, numbered, in the browser for the task", async () => {
         const p = await page();
         p.inspector.toggle();
+        await flush();
         p.run();
+        await flush();
         p.inspector.setMode("pin");
         p.click(150, 50);
         p.click(120, 80);
@@ -167,7 +204,9 @@ describe("pins and ΔTs", () => {
     test("a drag of the view isn't a click", async () => {
         const p = await page();
         p.inspector.toggle();
+        await flush();
         p.run();
+        await flush();
         p.inspector.setMode("pin");
         p.pointer("pointerdown", 150, 50);
         p.pointer("pointerup", 170, 50);
@@ -177,7 +216,9 @@ describe("pins and ΔTs", () => {
     test("ΔT is the second spot's temperature less the first's, with their distance in 3D; Esc cancels the first", async () => {
         const p = await page();
         p.inspector.toggle();
+        await flush();
         p.run();
+        await flush();
         p.inspector.setMode("delta");
         p.click(150, 50);                                       // (50, 50): 50 °C
         document.dispatchEvent(Object.assign(new Event("keydown"), {key: "Escape"}));
@@ -194,7 +235,9 @@ describe("pins and ΔTs", () => {
     test("Manual Corrections change the temperatures shown, and the scale keeps the temperatures it shows", async () => {
         const p = await page();
         p.inspector.toggle();
+        await flush();
         p.run();
+        await flush();
         p.inspector.setMode("pin");
         p.click(130, 100);                                      // (30, 0): 30 °C measured with 0.95 and 20 °C
         p.change("correction-on", true);
@@ -210,7 +253,9 @@ describe("pins and ΔTs", () => {
     test("the CSV has each one's place in the model's coordinates and the task's projection", async () => {
         const p = await page();
         p.inspector.toggle();
+        await flush();
         p.run();
+        await flush();
         p.inspector.setMode("pin");
         p.click(150, 50);
         p.act("csv-measurements").click();
@@ -224,7 +269,9 @@ describe("the isotherm", () => {
     test("is painted over the model, and kept with the 2D map's of the same task", async () => {
         const p = await page();
         p.inspector.toggle();
+        await flush();
         p.run();
+        await flush();
         p.change("isotherm-mode", "above");
         const iso = p.inspector.state.isotherm;
         expect(iso.mode).toBe("above");
@@ -238,7 +285,9 @@ describe("the saved 2D pins", () => {
         const p = await page({saved: [{id: "a1", name: "Vent", x: 20, y: 30, values: {temperature: 21.5}},
                                       {id: "b2", name: "Far", x: 500, y: 500, values: {temperature: 9}}]});
         p.inspector.toggle();
+        await flush();
         p.run();
+        await flush();
         await flush();
         expect(p.inspector.state.saved.map((s) => s.point)).toEqual([{x: 20, y: 30, z: 0}, null]);
         expect(MeshIndex.raycast).toHaveBeenCalledWith(expect.anything(), {x: 20, y: 30, z: 40}, {x: 0, y: 0, z: -1});
