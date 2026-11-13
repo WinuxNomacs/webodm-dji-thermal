@@ -213,7 +213,7 @@ emissivity from 0.1 to 1 and any reflected temperature from −100 to 1000 °C. 
   correction. **Auto** stretches the scale over the corrected layer again, which looks much like it did before: a
   correction moves every temperature the same way, so a fixed scale is what shows the difference.
 
-The correction is approximate: a broadband model, with the air's transmission taken as 1, as at drone distances.
+The correction is approximate: a broadband model that leaves out the air between the camera and the surface.
 It's for comparing surfaces, not for calibrated values; for exact values, make a workset with the measurement
 settings you want. A layer that doesn't record how it was measured (an orthophoto that wasn't made from the plugin's
 TIFFs) isn't corrected, and the panel says so. Each visit starts with the box unticked. Untick it to go back: the

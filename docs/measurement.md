@@ -31,9 +31,13 @@ than the air on a clear day. With a high emissivity it changes little.
 
 ## Ambient temperature and relative humidity
 
-The air between the camera and the surface absorbs some radiation. The air temperature and humidity, with the
-distance, tell how much. The effect is small at drone distances. The H20T and the XT S don't use the ambient
-temperature, and the form says so.
+The air between the camera and the surface absorbs some of the surface's radiation and adds its own. DJI's SDK
+corrects for it from the air temperature, the humidity and the distance (below). The H20T and the XT S don't use the
+ambient temperature, and the form says so.
+
+**What the camera records isn't the air's temperature.** On the M4T flight checked, every photo records 5 m,
+50 % humidity, and the same value for the ambient and the reflected temperature. That value drifts during the
+flight (here 26.6 to 27.8 °C) in steps of 1/16 °C. It's the camera's own estimate, not a weather reading.
 
 ## Distance to the target
 
@@ -46,8 +50,39 @@ How far the surface is from the camera, for the same air correction. Three choic
   apps use it, so choose this to match their temperatures exactly.
 - **Set for all photos**: one distance you type.
 
-With the rangefinder's distance, temperatures differ slightly from DJI's apps, but they're nearer the truth when
-the camera recorded 5 m and the drone flew at 20 m.
+## Distance, ambient temperature and humidity together
+
+The correction grows with the distance. Over a few metres it's small, whatever the air temperature. Over tens of
+metres it depends mostly on the ambient temperature:
+
+- If the ambient temperature is warmer than the real air, the SDK removes too much of the air's heat, and
+  everything reads too cold. Surfaces cooler than the air drop the most.
+- If it's cooler than the real air, everything reads too warm.
+
+Measured on one frame of the M4T flight, with the recorded ambient temperature (27.6 °C):
+
+| Distance | Mean | Coolest pixel |
+|---|---|---|
+| 5 m (as recorded) | 22.8 °C | 13.2 °C |
+| 21 m (the rangefinder's) | 21.8 °C | 10.0 °C |
+| 100 m | 18.8 °C | −3.5 °C |
+| 200 m | 17.8 °C | −3.5 °C |
+
+At 100 m, an ambient temperature of 20 °C instead of 27.6 °C turns that frame's mean shift from −4.0 °C into
++4.6 °C. The humidity matters far less: 20 % or 80 % moves the mean by under 0.3 °C.
+
+So:
+
+- **To correct for the air**, use the rangefinder's distance (or your flight height), and type the ambient
+  temperature and humidity measured at the time of the flight, from a weather station or a thermometer at the site.
+- **Without a measured air temperature**, choose **As recorded**. The short 5 m path keeps the correction small, and
+  the temperatures match DJI's apps.
+
+To see what a value changes before converting a whole flight, use the frame page's **Measure again** (below).
+
+This is DJI's own correction, the one its apps and other tools built on DJI's SDK use. Older versions of the SDK, and
+some cameras (the H20T), accept distances only from 1 to 25 m. With the SDK the plugin uses, the M4T accepts 1 to
+300 m, and each field shows its camera's range.
 
 ## Temperature unit
 
