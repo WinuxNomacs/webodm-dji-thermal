@@ -141,7 +141,7 @@ What you need: Docker, Node (for Jest and ESLint) and [uv](https://docs.astral.s
   ```bash
   docker exec -w /webodm dt-webapp python manage.py test --noinput coreplugins.dji-thermal.tests.test_converter \
     coreplugins.dji-thermal.tests.test_api coreplugins.dji-thermal.tests.test_sdk coreplugins.dji-thermal.tests.test_analyzer \
-    coreplugins.dji-thermal.tests.test_inspector coreplugins.dji-thermal.tests.test_frames coreplugins.dji-thermal.tests.test_portable
+    coreplugins.dji-thermal.tests.test_inspector coreplugins.dji-thermal.tests.test_frames coreplugins.dji-thermal.tests.test_model3d coreplugins.dji-thermal.tests.test_portable
   ```
 
   Run it in `dt3-webapp` too before you propose a change, since the plugin supports both versions. Never run two

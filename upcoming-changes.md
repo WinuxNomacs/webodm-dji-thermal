@@ -2357,7 +2357,9 @@ cleanly. Ensure you design it with developer accessibility and extensibility in 
 - **For developers**: `docs/developing.md` gets a "3D" part (the modules' map, how a hit becomes a temperature, and
   recipes: adding a tool, adding a source), written with the code, not after.
 
-Touch points in shared code (kept current while building): none yet.
+Touch points in shared code (kept current while building):
+- `plugin.py`: imports `model3d_api`, mounts `TASK/inspector/model` and `TASK/inspector/model/<n>/values`.
+- `CLAUDE.md`, the `test` skill, `docs/developing.md`: `test_model3d` in the Django test command.
 
 **Steps**, each on this branch (`thermal-3d`), with its tests:
 1. The server's model answers (Django tests on a small GLB and TIFFs made in the test; refusals: no GLB, RGB
