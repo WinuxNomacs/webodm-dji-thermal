@@ -199,3 +199,135 @@ class TestModel3D(BootTestCase):
         self.task.save()
         self.assertEqual(anonymous.get(self.url(self.task)).status_code, status.HTTP_200_OK)
         self.assertEqual(anonymous.get(self.url(self.task, "/0/values")).status_code, status.HTTP_200_OK)
+
+
+frames3d = importlib.import_module("coreplugins.dji-thermal.frames3d")
+NADIR = [np.pi, 0.0, 0.0]       # world to camera looking straight down: x east, y south (rows down), z down
+CAMERA = 'v2 test 40 30 brown 1.0'
+LENS = {'projection_type': 'brown', 'width': 40, 'height': 30, 'focal_x': 1.0, 'focal_y': 1.0, 'c_x': 0.0, 'c_y': 0.0,
+        'k1': 0.0, 'k2': 0.0, 'k3': 0.0, 'p1': 0.0, 'p2': 0.0}
+
+
+def photo(col, row):
+    """A photo's °C: 20 plus the column and a hundredth of the row"""
+    return 20.0 + col + 0.01 * row
+
+
+class TestFrames3D(TestModel3D):
+    """The photos that saw a point of the model (frames3d.py), placed with ODX's cameras (shots.geojson, cameras.json)"""
+
+    def setUp(self):
+        super().setUp()
+        # Straight down 50 m over (400001, 4659999, 0); 30 m east of it, turned to look west at the point (a wall facing
+        # east); one whose photo isn't of temperatures; one whose photo is gone
+        self.shots = [('a_nadir.tiff', [400001.0, 4659999.0, 50.0], NADIR, 'float'),
+                      ('b_east.tiff', [400031.0, 4659999.0, 0.0], self.looking_west(), 'float'),
+                      ('c_rgb.tiff', [400001.0, 4659999.0, 40.0], NADIR, 'rgb'),
+                      ('d_gone.tiff', [400001.0, 4659999.0, 60.0], NADIR, None)]
+        self.write_cameras(self.task, self.shots)
+
+    @staticmethod
+    def looking_west():
+        """World to camera looking west, level (camera x north, y down, z west: rows [0, 1, 0], [0, 0, -1], [-1, 0, 0]),
+        as a rotation vector: 120° about (1, 1, -1)"""
+        return [float(v) * 2 * np.pi / 3 / np.sqrt(3) for v in (1, 1, -1)]
+
+    def write_cameras(self, task, shots):
+        features = []
+        for name, centre, rotation, kind in shots:
+            features.append({'type': 'Feature', 'geometry': {'type': 'Point', 'coordinates': [0, 0, 0]},
+                             'properties': {'filename': name, 'camera': CAMERA, 'translation': centre, 'rotation': rotation}})
+            if kind:
+                rows, cols = np.mgrid[0:30, 0:40]
+                write_texture(task.task_path(name), photo(cols, rows), *((3, 'uint8') if kind == 'rgb' else ()))
+        os.makedirs(task.assets_path('odm_report'), exist_ok=True)
+        with open(task.assets_path('odm_report', 'shots.geojson'), 'w') as f:
+            json.dump({'type': 'FeatureCollection', 'features': features}, f)
+        with open(task.assets_path('cameras.json'), 'w') as f:
+            json.dump({CAMERA.removeprefix('v2 '): LENS}, f)
+
+    def frames(self, x, y, z, normal=None, task=None):
+        query = "?x={}&y={}&z={}".format(x, y, z) + ("&nx={}&ny={}&nz={}".format(*normal) if normal else "")
+        return self.client.get(self.url(task or self.task, "/frames" + query))
+
+    def test_a_point_below_a_camera_is_at_its_photos_centre_with_the_photos_temperature_there(self):
+        found = self.frames(400001.0, 4659999.0, 0.0).data
+        nadir = next(f for f in found['frames'] if f['file'] == 'a_nadir.tiff')
+        self.assertAlmostEqual(nadir['x'], 19.5, places=6)          # (40 - 1) / 2: pixel centres at whole numbers
+        self.assertAlmostEqual(nadir['y'], 14.5, places=6)
+        self.assertAlmostEqual(nadir['view_angle'], 0.0, places=6)
+        self.assertAlmostEqual(nadir['distance'], 50.0, places=6)
+        self.assertEqual(nadir['camera'], [400001.0, 4659999.0, 50.0])
+        self.assertAlmostEqual(nadir['temperature'], photo(20, 15), places=4)     # its nearest pixel, floor(x + 0.5)
+        self.assertIsNone(found['workset'])
+        self.assertIsNone(nadir['frame'])
+
+    def test_a_point_east_of_the_camera_is_right_of_centre_and_south_below_it(self):
+        nadir = next(f for f in self.frames(400006.0, 4659998.0, 0.0).data['frames'] if f['file'] == 'a_nadir.tiff')
+        # 5 m east and 1 m south at 50 m: 0.1 and 0.02 of the focal length, times the photo's larger side (40)
+        self.assertAlmostEqual(nadir['x'], 19.5 + 4.0, places=6)
+        self.assertAlmostEqual(nadir['y'], 14.5 + 0.8, places=6)
+        self.assertAlmostEqual(nadir['temperature'], photo(24, 15), places=4)
+
+    def test_the_camera_facing_the_surface_comes_first(self):
+        # From straight down, the nadir photo first; on a wall facing east, the photo looking west at it
+        down = [f['file'] for f in self.frames(400001.0, 4659999.0, 0.0).data['frames']]
+        self.assertEqual(down[0], 'a_nadir.tiff')
+        wall = self.frames(400001.0, 4659999.0, 0.0, normal=(1, 0, 0)).data['frames']
+        self.assertEqual(wall[0]['file'], 'b_east.tiff')
+        self.assertAlmostEqual(wall[0]['view_angle'], 0.0, places=5)
+        self.assertAlmostEqual(wall[0]['x'], 19.5, places=5)
+        self.assertAlmostEqual(wall[0]['y'], 14.5, places=5)
+        self.assertAlmostEqual(next(f for f in wall if f['file'] == 'a_nadir.tiff')['view_angle'], 90.0, places=5)
+
+    def test_leaves_out_photos_that_did_not_see_the_point_or_are_not_of_temperatures_and_says_which_are_gone(self):
+        files = {f['file']: f for f in self.frames(400001.0, 4659999.0, 0.0).data['frames']}
+        self.assertNotIn('c_rgb.tiff', files)
+        self.assertFalse(files['d_gone.tiff']['available'])
+        self.assertIsNone(files['d_gone.tiff']['temperature'])
+        # 26 m west of the nadir camera's point is outside its photo (column -1.3: its nearest pixel is past the first;
+        # at 25 m, column -0.5, the first), and in front of the east one; 9 m east of the point is behind the east one
+        self.assertEqual([f['file'] for f in self.frames(399975.0, 4659999.0, 0.0).data['frames']
+                          if f['file'] in ('a_nadir.tiff', 'b_east.tiff')], ['b_east.tiff'])
+        self.assertEqual([f['file'] for f in self.frames(400040.0, 4659999.0, 0.0).data['frames'] if f['file'] == 'b_east.tiff'], [])
+
+    def test_projects_through_a_brown_lens_as_opensfm_does(self):
+        lens = dict(LENS, k1=0.1, k2=0.01, k3=0.001, p1=0.002, p2=0.003, c_x=0.01, c_y=-0.02)
+        shot = {'centre': [0.0, 0.0, 10.0], 'rotation': frames3d.rotation_matrix(NADIR), 'camera': lens}
+        x, y = 3.0 / 10, 2.0 / 10                    # 3 m east, 2 m south (the camera's y is south), 10 m below
+        r2 = x * x + y * y
+        radial = 1 + 0.1 * r2 + 0.01 * r2 ** 2 + 0.001 * r2 ** 3
+        xd = x * radial + 2 * 0.002 * x * y + 0.003 * (r2 + 2 * x * x)
+        yd = y * radial + 0.002 * (r2 + 2 * y * y) + 2 * 0.003 * x * y
+        u, v = frames3d.project(shot, [3.0, -2.0, 0.0])
+        self.assertAlmostEqual(u, (xd + 0.01) * 40 + 19.5, places=9)
+        self.assertAlmostEqual(v, (yd - 0.02) * 40 + 14.5, places=9)
+        self.assertIsNone(frames3d.project(shot, [0.0, 0.0, 20.0]))      # above the camera looking down: behind it
+
+    def test_serves_a_photos_temperatures_as_a_value_tile_the_browser_decodes_to_the_photo(self):
+        index = next(f for f in self.frames(400001.0, 4659999.0, 0.0).data['frames'] if f['file'] == 'a_nadir.tiff')['index']
+        response = self.client.get(self.url(self.task, "/frames/{}/values".format(index)))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        rows, cols = np.mgrid[0:30, 0:40]
+        self.assertLess(np.nanmax(abs(decoded(response) - photo(cols, rows))), 0.001)
+        again = self.client.get(self.url(self.task, "/frames/{}/values".format(index)), HTTP_IF_NONE_MATCH=response['ETag'])
+        self.assertEqual(again.status_code, status.HTTP_304_NOT_MODIFIED)
+        gone = next(f for f in self.frames(400001.0, 4659999.0, 0.0).data['frames'] if f['file'] == 'd_gone.tiff')['index']
+        self.assertEqual(self.client.get(self.url(self.task, "/frames/{}/values".format(gone))).status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(self.client.get(self.url(self.task, "/frames/99/values")).status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_needs_a_point_and_odms_cameras(self):
+        self.assertEqual(self.client.get(self.url(self.task, "/frames?x=1&y=2")).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.get(self.url(self.task, "/frames?x=1&y=2&z=nan")).status_code, status.HTTP_400_BAD_REQUEST)
+        os.remove(self.task.assets_path('odm_report', 'shots.geojson'))
+        self.assertEqual(self.frames(400001.0, 4659999.0, 0.0).status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_only_those_who_can_view_the_task_see_its_photos_or_anyone_when_it_is_public(self):
+        anonymous = APIClient()
+        self.assertEqual(anonymous.get(self.url(self.task, "/frames?x=400001&y=4659999&z=0")).status_code, status.HTTP_404_NOT_FOUND)
+        self.task.public = True
+        self.task.save()
+        found = anonymous.get(self.url(self.task, "/frames?x=400001&y=4659999&z=0"))
+        self.assertEqual(found.status_code, status.HTTP_200_OK)
+        self.assertIsNone(found.data['workset'])
+        self.assertEqual(anonymous.get(self.url(self.task, "/frames/0/values")).status_code, status.HTTP_200_OK)

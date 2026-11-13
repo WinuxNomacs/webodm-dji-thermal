@@ -84,6 +84,8 @@ class Plugin(PluginBase):
             MountPoint(TASK + '/inspector/model$', model3d_api.Model3D.as_view()),
             MountPoint(TASK + r'/inspector/model/(?P<index>\d+)/values$', model3d_api.Model3DValues.as_view()),
             MountPoint(TASK + '/inspector/model/saved$', model3d_api.Model3DSaved.as_view()),
+            MountPoint(TASK + '/inspector/model/frames$', model3d_api.Model3DFrames.as_view()),
+            MountPoint(TASK + r'/inspector/model/frames/(?P<index>\d+)/values$', model3d_api.Model3DFrameValues.as_view()),
             MountPoint(r'projects/(?P<project_pk>\d+)/inspector/mosaics$', inspector_api.InspectorMosaics.as_view()),
             MountPoint(r'projects/(?P<project_pk>\d+)/inspector/palette$', inspector_api.InspectorProjectPalette.as_view()),
             MountPoint(r'projects/(?P<project_pk>\d+)/tasks/(?P<pk>[^/.]+)/convert$', TaskConvert.as_view()),
