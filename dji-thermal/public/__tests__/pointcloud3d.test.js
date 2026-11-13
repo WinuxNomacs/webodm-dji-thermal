@@ -59,13 +59,32 @@ describe("colouring the points", () => {
     });
 });
 
+describe("where a node's points are", () => {
+    test("the point cloud's matrix times the node's own, as Potree places it, not the node's parents' added again", () => {
+        // A child node at (410977, 4661801, 221) in the cloud's coordinates, under a parent at (410961, 4661801, 205):
+        // three.js's chain of parents would put it at their sum, hundreds of kilometres away
+        const at = (x, y, z) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
+        const pointcloud = {matrixWorld: {elements: at(0, 0, 0)}};
+        const sceneNode = {matrix: {elements: at(410977, 4661801, 221)}, updateMatrix: jest.fn(),
+                           matrixWorld: {elements: at(821938, 9323602, 426)}};
+        const m = PointCloud3D.nodeMatrix(pointcloud, sceneNode);
+        expect(m.slice(12, 15)).toEqual([410977, 4661801, 221]);
+        expect(sceneNode.updateMatrix).toHaveBeenCalled();
+        expect(sceneNode.matrixWorld.elements.slice(12, 15)).toEqual([821938, 9323602, 426]);     // Potree's own, untouched
+        // The cloud moved and turned a quarter about z: the node's corner goes with it
+        pointcloud.matrixWorld.elements = [0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 5, 6, 7, 1];
+        sceneNode.matrix.elements = at(1, 2, 3);
+        expect(PointCloud3D.nodeMatrix(pointcloud, sceneNode).slice(12, 15)).toEqual([5 - 2, 6 + 1, 7 + 3]);
+    });
+});
+
 describe("the point cloud as a source", () => {
     function setup() {
         const m = model();
         const rgba = Uint8Array.from([50, 50, 50, 255, 60, 60, 60, 255]);
         const geometry = {attributes: {position: {array: Float32Array.of(2, 3, 0, 2, 3, 5)}, rgba: {array: rgba, needsUpdate: false}}};
-        const node = {geometryNode: {geometry}, sceneNode: {matrixWorld: {elements: IDENTITY}, updateMatrixWorld: jest.fn()}};
-        const pointcloud = {visible: true, visibleNodes: [node]};
+        const node = {geometryNode: {geometry}, sceneNode: {matrix: {elements: IDENTITY}, updateMatrix: jest.fn()}};
+        const pointcloud = {visible: true, visibleNodes: [node], matrixWorld: {elements: IDENTITY}};
         const viewer = {scene: {pointclouds: [pointcloud]}};
         const fake = {ready: Promise.resolve({}), values: () => Promise.resolve(), materialIndexOf: (hit) => hit.object.material.__dtMaterial,
                       valueAt: (i, uv) => 10 + uv.x * 20, reading: (hit) => ({valid: true, temperature: 10 + hit.uv.x * 20})};

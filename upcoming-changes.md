@@ -2391,6 +2391,20 @@ Touch points in shared code (kept current while building):
 - WebODM doesn't load the textured model while the point cloud is shown: the plugin loads the GLB itself (WebODM's
   GLTFLoader and DRACOLoader are on the page) for the index, its textures dropped.
 
+**Validated end to end in the browser** (2026-11-13, HomerunObliqueII, 2000 random orthophoto pixels, each read by the
+3D Inspector's own code on the 3D page and by the 2D Inspector's `point` request):
+- The 3D reading against the texture TIFF at the hit's texture coordinates (the value PNGs, decoding, texel lookup,
+  rows as stored): within 0.001 °C at all 1949 hits (rows flipped would differ by a median 6 °C). The 2D reading against
+  the orthophoto TIFF's pixel: identical.
+- 3D against 2D at the same spot: up-facing surfaces median 0.33 °C (p90 1.3, p95 1.6); all surfaces 0.40 (p90 1.5);
+  walls and slopes 0.50 (p90 2.1). Moving the map by up to a metre either way never agrees better than not moving it
+  (best at 0, 0 on a 2 cm grid): the model and orthophoto are registered.
+- **Found and fixed**: the point cloud's nodes were placed with three.js's `updateMatrixWorld`, which adds each parent
+  node's position again (Potree places a node with the cloud's matrix times its own: `nodeMatrix`), so every node but
+  the root was looked up hundreds of kilometres away (2.5 % of points coloured) and, its matrix overwritten, drawn out
+  of sight (the cloud looked coarse). After: 99.0 % of 12.6k points within 25 cm (median 3 mm), the worker's lookups
+  identical to the main thread's, Hover reading picked points; the docs' point cloud screenshot retaken.
+
 **Steps**, each on this branch (`thermal-3d`), with its tests:
 1. The server's model answers (Django tests on a small GLB and TIFFs made in the test; refusals: no GLB, RGB
    textures, a material count that doesn't match).

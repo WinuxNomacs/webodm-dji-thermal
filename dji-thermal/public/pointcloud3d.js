@@ -13,6 +13,21 @@
 
     function clip01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
 
+    // Where a node's points are in the world (its positions are from its box's corner), as Potree places it: the
+    // point cloud's matrix times the node's own, not three.js's chain of parents (Potree adds each node to its parent's,
+    // but gives it a position in the cloud's coordinates; three.js's updateMatrixWorld would add the parents' again,
+    // and leave Potree's own picking reading the wrong place). Column-major, 16 numbers
+    function nodeMatrix(pointcloud, sceneNode) {
+        sceneNode.updateMatrix();
+        var a = pointcloud.matrixWorld.elements, b = sceneNode.matrix.elements, out = new Array(16);
+        for (var c = 0; c < 4; c++) {
+            for (var r = 0; r < 4; r++) {
+                out[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+            }
+        }
+        return out;
+    }
+
     // What the worker needs of the index, copied: its arrays, and each mesh's texture coordinates and material
     // (materialIndexOf: model3d's)
     function indexMessage(index, script, materialIndexOf) {
@@ -85,9 +100,8 @@
                 g.__dtCloud = state;
                 pending[id] = state;
                 nodes.push(state);
-                node.sceneNode.updateMatrixWorld(true);
                 worker.postMessage({type: "node", id: id, positions: Float32Array.from(g.attributes.position.array),
-                                    matrix: Array.prototype.slice.call(node.sceneNode.matrixWorld.elements)});
+                                    matrix: nodeMatrix(pc, node.sceneNode)});
             });
         }
 
@@ -144,7 +158,7 @@
         };
     }
 
-    var api = {source: source, colourPoints: colourPoints, indexMessage: indexMessage, LIMIT: LIMIT};
+    var api = {source: source, colourPoints: colourPoints, indexMessage: indexMessage, nodeMatrix: nodeMatrix, LIMIT: LIMIT};
     root.ThermalPointCloud3D = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});
