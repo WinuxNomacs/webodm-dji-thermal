@@ -1,0 +1,3 @@
+/* The 3D Thermal Inspector (inspector3d.js) on WebODM's 3D page; its panel shares the 2D Inspector's styles
+   (inspector.css) */
+.dt-inspector3d-button { min-width: 30px; }

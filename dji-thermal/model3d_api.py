@@ -6,7 +6,7 @@ from django.http import HttpResponseNotModified
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 
-from . import correction, inspector_api, model3d
+from . import conversion_tasks, correction, inspector_api, model3d
 
 
 class Model3DView(inspector_api.InspectorView):
@@ -21,11 +21,12 @@ class Model3DView(inspector_api.InspectorView):
 
 class Model3D(Model3DView):
     def get(self, request, pk=None, project_pk=None):
-        """The model's description (model3d.describe) and what the task was measured with, for Manual Corrections:
-        {..., baseline: {emissivity, reflected} or null}"""
+        """The model's description (model3d.describe), what the task was measured with, for Manual Corrections, and
+        its palette (chosen in DJI Thermal Task, or ''): {..., baseline: {emissivity, reflected} or null, palette}"""
         task, found = self.described(request, pk)
         base = correction.task_baseline(task)
-        return Response(dict(found, baseline={'emissivity': base[0], 'reflected': base[1]} if base else None))
+        return Response(dict(found, baseline={'emissivity': base[0], 'reflected': base[1]} if base else None,
+                             palette=conversion_tasks.task_palette(task)))
 
 
 class Model3DValues(Model3DView):

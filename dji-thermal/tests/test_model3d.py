@@ -167,6 +167,12 @@ class TestModel3D(BootTestCase):
         self.task.save()
         self.assertIn("no textured 3D model", str(self.client.get(self.url(self.task)).data))
 
+    def test_says_the_palette_chosen_for_the_task(self):
+        self.assertEqual(self.client.get(self.url(self.task)).data['palette'], '')
+        conversion_tasks = importlib.import_module("coreplugins.dji-thermal.conversion_tasks")
+        conversion_tasks.set_task_palette(self.task, 'ironred')
+        self.assertEqual(self.client.get(self.url(self.task)).data['palette'], 'ironred')
+
     def test_says_what_the_task_was_measured_with_for_manual_corrections(self):
         self.assertIsNone(self.client.get(self.url(self.task)).data['baseline'])
         with open(os.path.join(self.task.task_path(), 'a_temp_c.tiff'), 'wb') as f:

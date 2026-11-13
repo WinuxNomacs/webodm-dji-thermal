@@ -2360,6 +2360,11 @@ cleanly. Ensure you design it with developer accessibility and extensibility in 
 Touch points in shared code (kept current while building):
 - `plugin.py`: imports `model3d_api`, mounts `TASK/inspector/model` and `TASK/inspector/model/<n>/values`.
 - `CLAUDE.md`, the `test` skill, `docs/developing.md`: `test_model3d` in the Django test command.
+- `main.js`: the script loader made one for any page (`DjiThermalScripts(names)`, `NAMES` and `NAMES_3D`; the 2D
+  `DjiThermalMapScripts` as it was) and the `PluginsAPI.ModelView.addActionButton` hook (answered at once, without
+  dependencies: WebODM's trigger drops a later answer, so it adds its stylesheets itself); `main.test.js` mocks
+  `ModelView`, `pages.test.js` checks the 3D list's order.
+- `eslint.config.mjs`: `Int32Array` among the ES5 files' globals.
 
 **Steps**, each on this branch (`thermal-3d`), with its tests:
 1. The server's model answers (Django tests on a small GLB and TIFFs made in the test; refusals: no GLB, RGB

@@ -11,7 +11,7 @@ function sideMenu(staff){
 
 function loadMain(){
     global.PluginsAPI = {Dashboard: {addNewTaskButton: jest.fn(), addTaskActionButton: jest.fn()},
-                         Map: {willAddControls: jest.fn()}};
+                         Map: {willAddControls: jest.fn()}, ModelView: {addActionButton: jest.fn()}};
     global.React = {createElement: (type, props, ...children) => ({type, props, children}), Component: function(props){ this.props = props; }};
     jest.isolateModules(() => require("../main.js"));
 }
@@ -165,4 +165,39 @@ test("the Thermal Inspector is added to every map, with WebODM's Leaflet, its sc
     expect(document.head.querySelectorAll("script").length).toBe(6);
     expect(window.ThermalInspector.create).toHaveBeenCalledTimes(2);
     delete window.ThermalInspector;
+});
+
+test("the 3D Thermal Inspector is added to the 3D page, after the 2D one's scripts, its button shown once the model holds temperatures", async () => {
+    sideMenu(false);
+    document.head.innerHTML = "";
+    loadMain();
+    // Answered at once (no dependencies): WebODM takes the first answer only
+    const add = global.PluginsAPI.ModelView.addActionButton.mock.calls[0][0];
+    expect(typeof add).toBe("function");
+    const element = add({viewer: "viewer"});
+    const button = new element.type({});
+    button.setState = function (s) { Object.assign(this.state, s); };
+    expect(button.render()).toBeNull();
+    const inspector = {toggle: jest.fn(), detach: jest.fn()};
+    window.ThermalInspector3D = {create: jest.fn(() => Promise.resolve(inspector))};
+    button.componentDidMount();
+    const names = ["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "inspector.js", "model3d.js", "inspector3d.js"];
+    for (let i = 0; i < names.length; i++) {
+        await new Promise(r => setTimeout(r, 0));
+        const scripts = document.head.querySelectorAll("script");
+        expect(scripts[i].getAttribute("src")).toBe("/plugins/dji-thermal/" + names[i]);
+        scripts[i].onload();
+    }
+    await new Promise(r => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
+    expect(window.ThermalInspector3D.create).toHaveBeenCalledWith("viewer");
+    expect(Array.from(document.head.querySelectorAll("link")).map(l => l.getAttribute("href")))
+        .toEqual(["/plugins/dji-thermal/inspector.css", "/plugins/dji-thermal/inspector3d.css"]);
+    const shown = button.render();
+    expect(shown.props.title).toBe("Thermal Inspector");
+    shown.props.onClick();
+    expect(inspector.toggle).toHaveBeenCalled();
+    button.componentWillUnmount();
+    expect(inspector.detach).toHaveBeenCalled();
+    delete window.ThermalInspector3D;
 });
