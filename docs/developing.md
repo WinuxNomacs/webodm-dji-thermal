@@ -77,7 +77,9 @@ Keep the work in plain functions that take data and return HTML strings or value
 | `thermal/` | DJI Thermal Task's panel and the project page's workset progress: JSX and ES modules, built by WebODM's webpack into `public/build/` (untracked). |
 
 The pages' HTML is in `templates/`, and their styles in `analyzer.css`, `frames.css`, `inspector.css` and
-`inspector3d.css`.
+`inspector3d.css`. On WebODM's map and 3D pages `main.js` adds the stylesheets itself (`DjiThermalScripts.styles`), at the
+scripts' version: a stylesheet named as a dependency of a `PluginsAPI` hook is fetched with no version, and a browser
+keeps the old one after an update.
 
 ### The 3D view
 
