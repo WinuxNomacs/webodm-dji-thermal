@@ -3,7 +3,18 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R43. ODM's global seam levelling off for thermal tasks?** (`r43-seam-levelling`) — 2026-11-14. From a review of
+- **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
+  release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
+  macOS"); Apple Silicon was checked without a Mac.
+
+**Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
+  the earlier "Folder conversion" item (below).
+
+**Done**
+- **R43. ODM's global seam levelling off for thermal tasks** (`r43-seam-levelling`) — 2026-11-14. From a review of
   two Mavic 3M multispectral tools (mavic3m-pansharpening, dedal-calibration: reflectance, nothing for thermal
   images): dedal-calibration processes its calibrated images with `texturing-skip-global-seam-leveling` so the mosaic
   keeps the images' values, which neither the plugin's plan nor dji-thermal-cli's `check --webodm` sets. Decided (the
@@ -31,17 +42,16 @@
     measured, which stretch the orthophoto's range and statistics. This is likely what the 1.0.0 live check's
     orthophoto of -601 to 603 °C was (closed then as not reproduced). One flight; nothing was created in WebODM
     (the node's own task, removed).
-- **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
-  release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
-  macOS"); Apple Silicon was checked without a Mac.
-
-**Later**
-- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
-  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
-
-**Done**
+  - **Decided** (the user, 2026-11-14): add it, in dji-thermal-cli's `check --webodm` plan. **Built:** dji-thermal-cli
+    1.14.0 (the plan's `recommended` gains `texturing-skip-global-seam-leveling`; released and on PyPI 2026-11-14,
+    pushed and tagged by Claude on the user's word), pinned here (from 1.12.0: 1.13.0 and 1.13.1 come with it, the
+    suites pass on both WebODM versions). In the plugin: DJI Thermal Task's panel starts WebODM's options with it
+    (`thermal/plan.js` `PANEL_OPTIONS`; `sameOptions` takes true and "true" alike), the panel's note names it
+    (`ThermalTaskPanel.jsx`), the Analyzer's plan shows it under "Texturing" (`analyzer_core.js` `WEBODM_SECTIONS`).
+    Tests: `__tests__/plan.test.js`; the CLI's `tests/test_webodm.py`. Docs: README, `quickstart-thermal-task.md`
+    (its panel screenshot retaken), `quickstart-analyzer.md`. Checked live, read only, at 1280 and 390 px: the
+    panel's Review lists both options. A dataset analyzed before keeps its stored plan until **Analyze again**; so
+    the plan tab's and Create task's screenshots (the docs dataset's stored analysis) are as they were.
 - **R42. "(Default)" at the top of the Palette list** (`r42-default-palette`) — 2026-11-14. The user: "can we add
   (Default) to the top of the list of thermal palettes that allows the user to switch the view to that of the
   source/raw image?" Decided (the user, 2026-11-14): **where**: the Thermal Inspector's Palette menu on the map page
