@@ -123,6 +123,8 @@
     }
 
     var WORDS = {surface: "The model", hides: "the model"};
+    // How many photos' temperatures the window keeps (each about 1.3 MB), the ones shown longest ago dropped first
+    var KEPT = 24;
 
     // The window on box (an element over the 3D view, or WebODM's map). deps: {fetchFn, task, raycast
     // (MeshIndex.raycast), index() (the mesh index, or null; not given: the server leaves the hidden photos out),
@@ -132,7 +134,7 @@
     // valuesUrl(index), words (windowHtml's)}
     function create(box, deps) {
         var fetchFn = deps.fetchFn || root.fetch.bind(root), doc = box.ownerDocument;
-        var pick = null, seq = 0, tiles = {};
+        var pick = null, seq = 0, tiles = {}, order = [];
         var framesAt = deps.framesUrl || function (point, normal) { return framesUrl(deps.task, point, normal); };
         var valuesOf = deps.valuesUrl || function (index) { return valuesUrl(deps.task, index); };
 
@@ -141,12 +143,15 @@
             if (!canvas || !f) return;
             var style = deps.style(), url = valuesOf(f.index), tile = tiles[url];
             if (!style) return;
+            order = order.filter(function (u) { return u !== url; }).concat(url);
+            while (order.length > KEPT) delete tiles[order.shift()];
             if (!tile) {
                 tiles[url] = "loading";
                 Recolour.fetchValues(url, fetchFn).then(function (t) {
+                    if (tiles[url] !== "loading") return;       // dropped meanwhile
                     tiles[url] = t || "none";
                     draw();
-                }, function () { tiles[url] = "none"; });
+                }, function () { if (tiles[url] === "loading") delete tiles[url]; });     // asked for again when shown again
                 return;
             }
             if (typeof tile === "string") return;
@@ -233,7 +238,7 @@
     }
 
     var api = {create: create, framesUrl: framesUrl, valuesUrl: valuesUrl, framePage: framePage, surfaceNormal: surfaceNormal,
-               hidden: hidden, inView: inView, spread: spread, windowHtml: windowHtml, OFF_SURFACE: OFF_SURFACE};
+               hidden: hidden, inView: inView, spread: spread, windowHtml: windowHtml, OFF_SURFACE: OFF_SURFACE, KEPT: KEPT};
     root.ThermalFrames3D = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

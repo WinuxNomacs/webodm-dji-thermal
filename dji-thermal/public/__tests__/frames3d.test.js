@@ -150,6 +150,22 @@ describe("the window's behaviour", () => {
         expect(urls).toContain("/map/frames/1/values");
     });
 
+    test("asks again for a photo's temperatures that failed to load, when it's shown again", async () => {
+        document.body.innerHTML = '<div id="box" hidden></div>';
+        const box = document.getElementById("box"), asked = [];
+        const fetchFn = jest.fn((url) => {
+            if (url.includes("/values")) { asked.push(url); return Promise.reject(new Error("offline")); }
+            return Promise.resolve({ok: true, json: () => Promise.resolve({frames: [frame("a", [-10, 0, 30], 20), frame("bb", [0, 5, 40], 21)], workset: null})});
+        });
+        const frames = Frames3D.create(box, {fetchFn, task: {id: "t1", project: 3}, style: () => ({palette: []}), corrected: (c) => c, format: (c) => String(c)});
+        await frames.show({x: 0, y: 0, z: 0}, null, null);
+        await new Promise(r => setTimeout(r, 0));
+        box.querySelector('[data-pip="next"]').click();
+        await new Promise(r => setTimeout(r, 0));
+        box.querySelector('[data-pip="prev"]').click();
+        expect(asked.map(u => u.replace(/.*frames\//, ""))).toEqual(["1/values", "2/values", "1/values"]);
+    });
+
     test("says why when the server has no photos to give", async () => {
         document.body.innerHTML = '<div id="box"></div>';
         const box = document.getElementById("box");

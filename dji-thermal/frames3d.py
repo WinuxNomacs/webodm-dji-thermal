@@ -216,8 +216,13 @@ def frames_at(task, point, normal=None):
 
 def on_map(task):
     """Whether the photos that saw a point of the task's map can be told (frames_on_map): it has the cameras ODX
-    refined and a surface model"""
-    return all(os.path.isfile(asset(task, a)) for a in (SHOTS_ASSET, CAMERAS_ASSET, DSM_ASSET))
+    refined, a surface model, and its photos still (WebODM's Compact removes them: nothing to show then)"""
+    if not all(os.path.isfile(asset(task, a)) for a in (SHOTS_ASSET, CAMERAS_ASSET, DSM_ASSET)):
+        return False
+    try:
+        return any(photo_path(task, s['file']) for s in shots(task))
+    except NoCameras:
+        return False
 
 
 def sight_blocked(heights, origin, inverse, point, camera):
