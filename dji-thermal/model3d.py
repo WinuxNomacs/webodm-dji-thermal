@@ -15,6 +15,7 @@ than coloured wrongly.
 The space between a texture's patches is exactly 0.0 (mvs-texturing's fill), which no measured temperature is in
 practice (a texel's value went through seam levelling): it holds no temperature (EMPTY).
 """
+import contextlib
 import hashlib
 import json
 import os
@@ -28,6 +29,7 @@ EMPTY = 0.0                     # a texture's fill between patches, no temperatu
 PERCENTILES = (2, 98)           # Auto's range, as the 2D colour scale's
 STATS_SAMPLES = 4_000_000       # texels the range is computed from, at most (evenly spread over the textures)
 CACHE_FILE = 'model3d.json'     # in the task's thermal/ folder: the model's description, by its version
+VALUES_DIR = 'model3d'          # beside it: each material's value tile, by the model's version (material_values)
 # The description's layout: a change to it (or to how it's computed) is a new version of every model's
 VERSION = 1
 
@@ -226,10 +228,56 @@ def material_values(task, index):
     :raises NotThermalModel: as textures; IndexError: no such material"""
     from . import colouring
 
-    materials = describe(task)['materials']      # the order, kept: not the OBJ read again for each material
+    found = describe(task)
+    materials = found['materials']      # the order, kept: not the OBJ read again for each material
     if not 0 <= index < len(materials):
         raise IndexError(index)
-    return colouring.value_png(read_texture(texture_path(task, materials[index]['name'])))
+    kept = _kept_values(task, found['version'], index)
+    if kept is not None:
+        return kept
+    out = colouring.value_png(read_texture(texture_path(task, materials[index]['name'])))
+    _keep_values(task, found['version'], index, out)
+    return out
+
+
+def _values_files(task, version, index):
+    base = datasets.data_path(task, VALUES_DIR, '{}-{}'.format(version, index))
+    return base + '.png', base + '.json'
+
+
+def _kept_values(task, version, index):
+    """A material's value tile as kept for this version of the model, or None"""
+    png, meta = _values_files(task, version, index)
+    kept = datasets.read_json(meta, None)
+    if not isinstance(kept, dict):
+        return None
+    try:
+        with open(png, 'rb') as f:
+            return f.read(), float(kept['offset']), float(kept['step'])
+    except (OSError, KeyError, TypeError, ValueError):
+        return None
+
+
+def _keep_values(task, version, index, tile):
+    """Keeps a material's value tile (reading and encoding a large texture takes seconds), and removes those of the
+    model's other versions; a tile that can't be kept is only computed again next time"""
+    data, offset, step = tile
+    png, meta = _values_files(task, version, index)
+    folder = os.path.dirname(png)
+
+    def write(part):
+        with open(part, 'wb') as f:
+            f.write(data)
+    try:
+        os.makedirs(folder, exist_ok=True)
+        for name in os.listdir(folder):
+            if not name.startswith(version + '-'):
+                with contextlib.suppress(OSError):
+                    os.remove(os.path.join(folder, name))
+        datasets.write_file(png, write)
+        datasets.write_json(meta, {'offset': offset, 'step': step})     # last: the PNG is complete once it's there
+    except OSError:
+        pass
 
 
 def texture_path(task, name):

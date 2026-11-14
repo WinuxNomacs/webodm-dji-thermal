@@ -85,7 +85,7 @@ temperatures themselves are in the float textures beside the OBJ (`odm_texturing
 
 | File | What it does |
 | --- | --- |
-| `model3d.py` | Which texture is each of the GLB's materials (the OBJ's first `usemtl` order, checked against the GLB's image sizes), their values (ODM's 0.0 fill between patches is no data), the model's range (cached in `thermal/model3d.json` by the textures' version), and the saved 2D pins in the model's coordinates. |
+| `model3d.py` | Which texture is each of the GLB's materials (the OBJ's first `usemtl` order, checked against the GLB's image sizes), their values (ODM's 0.0 fill between patches is no data; each material's PNG kept in `thermal/model3d/` by the textures' version), the model's range (cached in `thermal/model3d.json` by the textures' version), and the saved 2D pins in the model's coordinates. |
 | `frames3d.py` | The photos that saw a point: ODM's refined cameras (`odm_report/shots.geojson`, `cameras.json`), a point projected into each photo as OpenSfM does (`project`: the `brown` and `perspective` lenses), each photo's temperature at its pixel, ranked by the angle from the surface's normal; and, for a task made from a workset, each photo's frame in the dataset. |
 | `model3d_api.py` | `inspector/model`, `.../model/<index>/values` (the 2D map's value tiles, one per material), `.../model/saved`, `.../model/frames` and `.../model/frames/<index>/values`. |
 | `main.js` | `PluginsAPI.ModelView.addActionButton`: loads `NAMES` and `NAMES_3D` (`DjiThermal3DScripts`) and the stylesheets (`inspector.css`, `frames.css`, `inspector3d.css`), then `ThermalInspector3D.create(viewer)`; the thermometer button once it resolves. The hook answers at once, with no dependencies: WebODM keeps only the first plugin's answer. |

@@ -88,6 +88,32 @@ describe("the space around a texture's patches", () => {
         expect(px(2)).toEqual([200, 100, 50, 255]);
         expect(px(3)).toEqual(Model3D.EMPTY_RGB.concat(255));
     });
+
+    test("plans the same fill as looking at every empty texel in each pass, a nearest patch texel in the neighbours' order", () => {
+        const NEIGHBOURS = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+        function everyTexel(values, w, h, reach) {
+            const from = Array.from(values, (v, i) => (v === v ? i : -1)), targets = [], sources = [];
+            for (let pass = 0; pass < reach; pass++) {
+                const found = [];
+                for (let at = 0; at < w * h; at++) {
+                    if (from[at] !== -1) continue;
+                    const x = at % w, y = (at - x) / w;
+                    const d = NEIGHBOURS.find(([dx, dy]) => x + dx >= 0 && x + dx < w && y + dy >= 0 && y + dy < h && from[(y + dy) * w + x + dx] !== -1);
+                    if (d) found.push([at, from[(y + d[1]) * w + x + d[0]]]);
+                }
+                found.forEach(([at, src]) => { from[at] = src; targets.push(at); sources.push(src); });
+            }
+            return {targets, sources};
+        }
+        let seed = 7;
+        const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+        for (const [w, h, empty, reach] of [[31, 17, 0.6, 2], [40, 40, 0.9, 3], [9, 4, 0.3, 1], [6, 6, 1, 2]]) {
+            const values = Float32Array.from({length: w * h}, () => (random() < empty ? NaN : 20));
+            const plan = Model3D.fillPlan(values, w, h, reach), expected = everyTexel(values, w, h, reach);
+            expect(Array.from(plan.targets)).toEqual(expected.targets);
+            expect(Array.from(plan.sources)).toEqual(expected.sources);
+        }
+    });
 });
 
 describe("the model as a source", () => {

@@ -16,7 +16,7 @@
 (function (root) {
     var API = "/api/plugins/dji-thermal/";
     var WATCH_MS = 400;             // how often the scene is looked at until WebODM has added the model
-    var FETCHES = 3;                // material values fetched at once
+    var FETCHES = 6;                // material values fetched at once (a browser asks a server 6 at a time)
     var DILATE = 2;                 // texels a material's colours reach into the empty space around its patches
     var EMPTY_RGB = [128, 128, 128];    // where a texture holds no temperature, beyond that
     var DRACO_PATH = "/static/app/js/vendor/draco/";      // WebODM's own (ModelView.jsx)
@@ -82,30 +82,49 @@
     // are doesn't change with the style): each within `reach` texels of a patch from a nearest one of it, as
     // {targets, sources} (texel indices), so a patch sampled at its edge blends with its own colours, not black
     function fillPlan(values, w, h, reach) {
-        var from = new Int32Array(w * h), targets = [], sources = [];
-        for (var i = 0; i < w * h; i++) from[i] = values[i] === values[i] ? i : -1;
-        for (var pass = 0; pass < reach; pass++) {
-            var found = [];
-            for (var y = 0; y < h; y++) {
-                for (var x = 0; x < w; x++) {
-                    var at = y * w + x;
-                    if (from[at] !== -1) continue;
-                    for (var d = 0, src = -1; d < 8 && src === -1; d++) {
-                        var xx = x + NEIGHBOURS[d][0], yy = y + NEIGHBOURS[d][1];
-                        if (xx >= 0 && xx < w && yy >= 0 && yy < h && from[yy * w + xx] !== -1) src = from[yy * w + xx];
-                    }
-                    if (src !== -1) found.push(at, src);
+        var n = w * h, from = new Int32Array(n), empty = 0;
+        for (var i = 0; i < n; i++) {
+            from[i] = values[i] === values[i] ? i : -1;
+            if (from[i] === -1) empty++;
+        }
+        // The texels a pass looks at, in order: at first every empty one, then the empty neighbours of those just
+        // filled (no other can have gained a neighbour with a colour)
+        var look = new Int32Array(empty), count = 0;
+        for (var j = 0; j < n; j++) if (from[j] === -1) look[count++] = j;
+        var targets = new Int32Array(empty), sources = new Int32Array(empty), done = 0;
+        var seen = reach > 1 ? new Uint8Array(n) : null;
+        for (var pass = 0; pass < reach && count; pass++) {
+            var start = done;
+            for (var k = 0; k < count; k++) {
+                var at = look[k], x = at % w, y = (at - x) / w, src = -1;
+                for (var d = 0; d < 8 && src === -1; d++) {
+                    var xx = x + NEIGHBOURS[d][0], yy = y + NEIGHBOURS[d][1];
+                    if (xx >= 0 && xx < w && yy >= 0 && yy < h && from[yy * w + xx] !== -1) src = from[yy * w + xx];
+                }
+                if (src !== -1) {
+                    targets[done] = at;
+                    sources[done++] = src;
                 }
             }
-            if (!found.length) break;
+            if (done === start) break;
             // Set after the pass, so a texel filled now is a source only for the next
-            for (var k = 0; k < found.length; k += 2) {
-                from[found[k]] = found[k + 1];
-                targets.push(found[k]);
-                sources.push(found[k + 1]);
+            for (var f = start; f < done; f++) from[targets[f]] = sources[f];
+            if (pass + 1 >= reach) break;
+            count = 0;
+            for (var g = start; g < done; g++) {
+                var t = targets[g], tx = t % w, ty = (t - tx) / w;
+                for (var e = 0; e < 8; e++) {
+                    var nx = tx + NEIGHBOURS[e][0], ny = ty + NEIGHBOURS[e][1], q = ny * w + nx;
+                    if (nx >= 0 && nx < w && ny >= 0 && ny < h && from[q] === -1 && !seen[q]) {
+                        seen[q] = 1;
+                        look[count++] = q;
+                    }
+                }
             }
+            look.subarray(0, count).sort();
+            for (var c = 0; c < count; c++) seen[look[c]] = 0;
         }
-        return {targets: Int32Array.from(targets), sources: Int32Array.from(sources)};
+        return {targets: targets.slice(0, done), sources: sources.slice(0, done)};
     }
     var NEIGHBOURS = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
 

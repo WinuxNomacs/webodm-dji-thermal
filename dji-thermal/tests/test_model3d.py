@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import struct
+from unittest import mock
 
 import numpy as np
 import rasterio
@@ -138,6 +139,24 @@ class TestModel3D(BootTestCase):
         again = self.client.get(self.url(self.task, "/0/values"), HTTP_IF_NONE_MATCH=etag)
         self.assertEqual(again.status_code, status.HTTP_304_NOT_MODIFIED)
         self.assertNotEqual(self.client.get(self.url(self.task, "/1/values"))['ETag'], etag)
+
+    def test_a_materials_temperatures_are_read_once_and_kept_until_the_task_is_processed_again(self):
+        first = self.client.get(self.url(self.task, "/1/values"))
+        folder = os.path.join(self.task.task_path('thermal'), model3d.VALUES_DIR)
+        version = model3d.describe(self.task)['version']
+        self.assertEqual(sorted(os.listdir(folder)), [version + '-1.json', version + '-1.png'])
+        with mock.patch.object(model3d, 'read_texture', side_effect=AssertionError("read again")):
+            again = self.client.get(self.url(self.task, "/1/values"))
+        self.assertEqual((again.content, again['X-Values-Offset'], again['X-Values-Step']),
+                         (first.content, first['X-Values-Offset'], first['X-Values-Step']))
+        # Processed again: its textures read again, and the old version's kept tiles removed
+        texture = os.path.join(os.path.dirname(self.task.get_asset_download_path('textured_model.glb')),
+                               'odm_textured_model_geo_material0000_map_Kd.tif')
+        colder = texels('material0000', 8, 5)
+        colder[colder != model3d.EMPTY] -= 30
+        write_texture(texture, colder)
+        self.assertLess(np.nanmin(decoded(self.client.get(self.url(self.task, "/1/values")))), -10)
+        self.assertTrue(all(not name.startswith(version) for name in os.listdir(folder)))
 
     def test_a_material_the_model_does_not_have_is_not_found(self):
         self.assertEqual(self.client.get(self.url(self.task, "/2/values")).status_code, status.HTTP_404_NOT_FOUND)
