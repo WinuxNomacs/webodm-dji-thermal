@@ -114,9 +114,9 @@
             '<table class="table table-condensed dt-frames3d-figures"><tbody>' + rows.map(function (r) {
                 return "<tr><td>" + escapeHtml(r[0]) + '</td><td class="text-right">' + escapeHtml(r[1]) + "</td></tr>";
             }).join("") + "</tbody></table>" +
-            '<span class="ta-message">Seen ' + escapeHtml(angle) + ", " + Number(f.distance).toFixed(1) + " m away." +
+            '<div class="ta-message">Seen ' + escapeHtml(angle) + ", " + Number(f.distance).toFixed(1) + " m away." +
             (s && s.count > 1 ? " The " + s.count + " photos read " + escapeHtml(format(s.low)) + " to " + escapeHtml(format(s.high)) +
-                " here (median " + escapeHtml(format(s.median)) + ")." : "") + "</span>" + hiddenNote +
+                " here (median " + escapeHtml(format(s.median)) + ")." : "") + "</div>" + hiddenNote +
             (page ? '<a href="' + escapeHtml(page) + '" target="_blank" rel="noopener" data-pip="open" ' +
                 'title="The frame on its own page in the Analyzer: measure it, or measure it again with other parameters">' +
                 '<i class="fa fa-external-link-alt"></i> Open this frame</a>' : "") + "</div>";

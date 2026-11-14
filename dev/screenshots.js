@@ -401,16 +401,18 @@ const SHOTS = {
         return p;
     },
     "inspector-frames": async (p, env) => {
-        // The frames that saw a point clicked on the map's thermal orthophoto (its task processed from a workset)
+        // The task's photos that saw a point clicked on the map's thermal orthophoto (ODM's cameras and surface model)
         await p.setViewportSize({width: SIZE.width, height: 1100});    // room for the window, down to Open this frame
         await p.goto(env.url + need(env, "DT_DOCS_MAP"));
         await p.waitForSelector(".dt-inspector-button", {timeout: 30000});
         await p.waitForTimeout(3000);
         await p.click(".dt-inspector-button");
         const map = await p.locator(".leaflet-container").first().boundingBox();
-        await p.mouse.click(map.x + map.width * 0.4, map.y + map.height * 0.55);
-        await p.waitForSelector(".dt-inspector-frames:not([hidden]) img", {timeout: 30000})
-            .catch(() => { throw new Error("no source frames: is DT_DOCS_MAP's task processed from a workset with mosaics?"); });
+        await p.mouse.click(map.x + map.width * 0.25, map.y + map.height * 0.45);   // left of the window: its marks show
+        const drawn = p.waitForResponse((r) => /\/inspector\/frames\/\d+\/values/.test(r.url()), {timeout: 60000});
+        await p.waitForSelector(".dt-inspector-frames:not([hidden]) canvas", {timeout: 30000})
+            .catch(() => { throw new Error("no photos window: has DT_DOCS_MAP's task ODM's cameras and a surface model?"); });
+        await drawn;
         await p.waitForTimeout(2000);
         return p;
     },
