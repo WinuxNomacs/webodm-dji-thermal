@@ -39,11 +39,12 @@ window.DjiThermalScripts = (function(){
 })();
 
 // The Thermal Inspector's (2D map), and the 3D one's after them (it uses their helpers)
-var NAMES = ["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "inspector.js"];
-var NAMES_3D = ["mesh_index.js", "model3d.js", "pointcloud3d.js", "frames3d.js", "inspector3d.js"];
+var NAMES = ["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "frames3d.js", "inspector.js"];
+var NAMES_3D = ["mesh_index.js", "model3d.js", "pointcloud3d.js", "inspector3d.js"];
 window.DjiThermalMapScripts = function(){ return window.DjiThermalScripts(NAMES); };
 
-// The Thermal Inspector on WebODM's 2D map (inspector.js, with frames.js's source frames window), with WebODM's Leaflet:
+// The Thermal Inspector on WebODM's 2D map (inspector.js, with frames.js's source frames window and frames3d.js's
+// photos that saw a point), with WebODM's Leaflet:
 // its button shows when the map has a thermal orthophoto or the project has workset mosaics
 PluginsAPI.Map.willAddControls(["leaflet", "dji-thermal/inspector.css", "dji-thermal/split.css", "dji-thermal/frames.css"], function(args, L){
     window.DjiThermalMapScripts().then(function(){

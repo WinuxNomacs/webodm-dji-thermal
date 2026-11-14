@@ -9,7 +9,9 @@
 // control): a thermal layer like the orthophotos, read through the Analyzer's API. main.js adds it through
 // PluginsAPI.Map.willAddControls, with WebODM's own Leaflet, to every map; its button shows only where the map has
 // temperatures: a thermal orthophoto, or a workset mosaic laid on it (the Analyzer's "Open on WebODM's map"). A click shows the frames that saw a point (frames.js, the Analyzer's source
-// frames window) beside the panel, on a mosaic and on an orthophoto processed from a workset's TIFFs. Pins, regions
+// frames window) beside the panel, on a mosaic; on a thermal orthophoto, the task's own photos that saw it, placed with
+// the cameras ODM refined (frames3d.js, the 3D page's window), or, for a task without them or a surface model, the
+// frames of the workset whose TIFFs it was processed from. Pins, regions
 // and lines can be saved, named, with what they measured, for everyone who can view the project (kept with the task or
 // the workset: measurements.py); and the temperatures corrected for another emissivity and reflected temperature
 // (correction.py's model, from what each layer was measured with): a correction changed keeps each layer's colour scale
@@ -39,6 +41,7 @@
     });
     var Scale = root.ThermalScale || (typeof require !== "undefined" ? require("./scale.js") : null);
     var Frames = root.ThermalFrames || (typeof require !== "undefined" ? require("./frames.js") : null);
+    var Frames3D = root.ThermalFrames3D || (typeof require !== "undefined" ? require("./frames3d.js") : null);
     var movable = Frames.movable;
     var Recolour = root.ThermalRecolour || (typeof require !== "undefined" ? require("./recolour.js") : null);
     var META = root.Symbol ? root.Symbol["for"]("meta") : "meta";      // where WebODM's map keeps a layer's metadata
@@ -267,12 +270,14 @@
         return mosaicBase(info) + "/mosaics/" + info.tab + "/values/" + coords.z + "/" + coords.x + "/" + coords.y + ".png?v=" + encodeURIComponent(info.built_at);
     }
 
-    // Where a thermal layer's source frames come from: a mosaic's own; for a WebODM orthophoto, the workset (of
-    // mosaics, the Inspector's list) whose TIFFs its task processed, drawn as its as-converted mosaic in the layer's
-    // palette, range and adjustments ({base, tab, query, orthophoto}); null for an orthophoto from elsewhere
-    function framesSource(t, mosaics, palette, display) {
+    // Where a thermal layer's source frames come from: a mosaic's own; for a WebODM orthophoto, its task's own photos
+    // when they can be placed (photos: the task has ODM's cameras and a surface model; {photos: true}), else the
+    // workset (of mosaics, the Inspector's list) whose TIFFs its task processed, drawn as its as-converted mosaic in
+    // the layer's palette, range and adjustments ({base, tab, query, orthophoto}); null for an orthophoto with neither
+    function framesSource(t, mosaics, palette, display, photos) {
         if (!t) return null;
         if (t.mosaic) return {base: mosaicBase(t.mosaic), tab: t.mosaic.tab, query: mosaicQuery(t.mosaic), orthophoto: false};
+        if (photos) return {photos: true};
         var m = (mosaics || []).filter(function (x) { return (x.tasks || []).indexOf(t.task) !== -1; })[0];
         if (!m) return null;
         var info = laidMosaic(t.project, m, "as_converted", palette || paletteOf(t.layer._url), display);
@@ -1148,6 +1153,7 @@
                      split: {vertical: true, at: 0.5}};
         var project = projectOf(args.tiles, deps.path !== undefined ? deps.path : root.location && root.location.pathname);
         var search = deps.search !== undefined ? deps.search : root.location && root.location.search;
+        var photos = null, photosAt = null;     // the photos window of an orthophoto (frames3d.js), and the point it shows
         var container, panel, frameBox, panelMove, legendMove, frameMove, framesMoved = false, cursor, pinLayer, regionLayer, savedLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
         var profileMarker = null, profileAt = null;     // the point of the profile hovered, on the map
         var pickSeq = 0;                    // the frames asked for last
@@ -1158,7 +1164,7 @@
         function render() {
             if (!state.open) { panel.hidden = true; return; }
             panel.hidden = false;
-            state.frames = thermalLayers(map).some(function (t) { return !!framesSource(t, state.mosaics); });
+            state.frames = thermalLayers(map).some(function (t) { return !!framesSource(t, state.mosaics, null, null, hasPhotos(t)); });
             state.onMap = sourcesOnMap();
             state.pinTemp = pinTemp;
             state.savable = {};
@@ -1202,11 +1208,11 @@
             thermalLayers(map, true).forEach(function (t) {
                 var src = layerSource(t);
                 if (state.sources[src.key]) return;
-                state.sources[src.key] = assign(src, {loading: true, measurements: [], can_change: false, baseline: null, palette: ""});
+                state.sources[src.key] = assign(src, {loading: true, measurements: [], can_change: false, baseline: null, palette: "", photos: false});
                 fetchFn(src.url, {credentials: "same-origin"}).then(readJson).then(function (r) {
                     if (r.ok) {
                         assign(src, {measurements: r.data.measurements || [], can_change: !!r.data.can_change, baseline: r.data.baseline || null,
-                                     palette: r.data.palette || ""});
+                                     palette: r.data.palette || "", photos: !!r.data.photos});
                     }
                 }, function () {}).then(function () {
                     src.loading = false;
@@ -2000,8 +2006,10 @@
         // The frames that saw a point of a thermal layer, beside the panel; keep: the frame to show again if it saw the
         // point too. False (nothing shown) for a layer without source frames.
         function showFrames(t, latlng, keep) {
-            var src = framesSource(t, state.mosaics, state.palette, state.display);
+            var src = framesSource(t, state.mosaics, state.palette, state.display, hasPhotos(t));
             if (!src) return false;
+            if (src.photos) return showPhotos(t, latlng);
+            if (photosAt) photos.close();
             var n = ++pickSeq;
             fetchFn(Frames.framesUrl(src.base, src.tab, latlng), {credentials: "same-origin"}).then(readJson).then(function (r) {
                 if (n !== pickSeq || !state.open) return;
@@ -2013,6 +2021,48 @@
                 drawPick();
             }, function () {});
             return true;
+        }
+
+        // -- an orthophoto's photos window (frames3d.js): the task's own photos, placed with ODM's cameras ------------
+
+        // Whether an orthophoto's task has the photos that saw a point of it (its source's answer, once loaded)
+        function hasPhotos(t) {
+            var s = t && !t.mosaic && state.sources[layerSource(t).key];
+            return !!(s && s.photos);
+        }
+        function photosUrl(t, rest) { return API + "projects/" + t.project + "/tasks/" + t.task + "/inspector/frames" + rest; }
+
+        // An orthophoto's photos drawn as it is: its palette, range and Image settings, the isotherm painted over
+        function photoStyle(t) {
+            var style = drawStyle(t.layer), iso = style && isothermStyle(rawIsotherm(state.isotherm, fixFor(t)));
+            return style && assign({}, style, {seams: false, isothermPaint: iso ? {rgb: iso.paint, limits: iso.isotherm} : null});
+        }
+
+        function showPhotos(t, latlng) {
+            pickSeq++;              // a mosaic's frames window gives way
+            state.pick = null;
+            photosAt = {t: t, latlng: latlng};
+            photos.show({t: t, lng: latlng.lng, lat: latlng.lat}, null);
+            return true;
+        }
+
+        // The photo shown changed (or the window closed): the point marked on the map, and where the photo shown was
+        // taken from, with a line to the point
+        function onPhotoShown(shown, open) {
+            pickLayer.clearLayers();
+            if (!open || !photosAt) {
+                photosAt = null;
+                if (!state.pick) { framesMoved = false; frameMove.reset(); }
+                return;
+            }
+            if (framesMoved) frameMove.keep();
+            else placeFrames(panelMove.offset());
+            var at = shown && shown.frame && shown.frame.lonlat;
+            if (at) {
+                L.polyline([photosAt.latlng, [at[1], at[0]]], {color: "#fff", weight: 2, dashArray: "6 4", interactive: false}).addTo(pickLayer);
+                L.circleMarker([at[1], at[0]], {radius: 5, color: "#000", weight: 1, fillColor: "#1e88e5", fillOpacity: 1, interactive: false}).addTo(pickLayer);
+            }
+            L.circleMarker(photosAt.latlng, {radius: 6, color: "#000", weight: 1, fillColor: "#fff", fillOpacity: 1, interactive: false}).addTo(pickLayer);
         }
 
         function frameImageUrl(pick) {
@@ -2039,6 +2089,7 @@
         // The frame shown drawn again as its layer is (palette, range)
         function restylePick() {
             if (sliding) return;
+            if (photosAt) photos.refresh();
             var img = state.pick && frameBox.querySelector("img");
             var url = img && frameImageUrl(state.pick);
             if (url && img.getAttribute("src") !== url) img.setAttribute("src", url);
@@ -2055,6 +2106,7 @@
         }
 
         function closeFrames() {
+            if (photosAt) photos.close();
             pickSeq++;
             state.pick = null;
             if (!frameBox) return;
@@ -2145,7 +2197,7 @@
 
         function onLayerRemove(e) {
             if (!thermalLayer(e.layer)) return;
-            if (state.pick && state.pick.t.layer === e.layer) closeFrames();
+            if ((state.pick && state.pick.t.layer === e.layer) || (photosAt && photosAt.t.layer === e.layer)) closeFrames();
             drawIsotherms();
             renderLegend();
             drawSaved();
@@ -2550,6 +2602,16 @@
                 frameBox = L.DomUtil.create("div", "dt-inspector-frames", container);
                 frameBox.hidden = true;
                 frameBox.addEventListener("click", onFramesClick);
+                photos = Frames3D.create(frameBox, {
+                    fetchFn: fetchFn,
+                    framesUrl: function (p) { return photosUrl(p.t, "?lon=" + p.lng + "&lat=" + p.lat); },
+                    valuesUrl: function (index) { return photosAt ? photosUrl(photosAt.t, "/" + index + "/values") : ""; },
+                    words: {surface: "The orthophoto", hides: "the surface"},
+                    style: function () { return photosAt ? photoStyle(photosAt.t) : null; },
+                    corrected: function (c) { return corrected(c, photosAt ? fixFor(photosAt.t) : null); },
+                    format: function (c) { return formatTemp(c, userUnit()); },
+                    changed: onPhotoShown
+                });
                 // A frame that cannot be drawn says so in its place
                 frameBox.addEventListener("error", function (e) {
                     if (e.target.tagName === "IMG") e.target.parentNode.outerHTML = '<div class="text-danger">Could not draw this frame.</div>';

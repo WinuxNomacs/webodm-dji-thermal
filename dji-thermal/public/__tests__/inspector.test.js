@@ -1840,6 +1840,48 @@ describe("the Thermal Inspector's workset mosaics", () => {
         map.remove();
     });
 
+    it("shows the task's own photos that saw a point of an orthophoto when ODM's cameras can place them, the photo shown marked on the map", async () => {
+        const map = leafletMap(THERMAL_TASK);
+        const tiles = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}];
+        const TASK = "/api/plugins/dji-thermal/projects/2/tasks/abc-1/inspector/";
+        const photo = (index, file, lonlat, temperature) => ({index, file, x: 19.5, y: 14.5, width: 40, height: 30, camera: [0, 0, 30], lonlat,
+                                                              view_angle: 3, distance: 30, temperature, available: true, frame: null});
+        const photos = jest.fn(() => jsonResponse({frames: [photo(4, "P4.tiff", [0.5002, 0.5001], 29), photo(7, "P7.tiff", [0.4998, 0.5], 31)],
+                                                   workset: null, hidden: 1, orthophoto: 30}));
+        // The task came from a workset too: its photos win over the workset's frames
+        const made = [Object.assign({}, MOSAICS[0], {tasks: ["abc-1"]})];
+        const {ins, fetchFn} = begin(map, tiles, {[LIST]: {mosaics: made}, ["GET " + TASK + "frames"]: photos,
+            ["GET " + TASK + "measurements"]: {measurements: [], can_change: false, baseline: null, palette: "", photos: true},
+            ["GET " + TASK + "frames/4/values"]: () => Promise.resolve({status: 404, ok: false}),
+            ["GET " + TASK + "frames/7/values"]: () => Promise.resolve({status: 404, ok: false}),
+            [POINT]: {valid: true, temperature: 30}});
+        await ins.mosaicsReady;
+        await flush(); await flush();
+        ins.open();
+        expect(ins.click({latlng: L.latLng(0.5, 0.5)})).toBe(true);
+        await flush(); await flush();
+        expect(photos.mock.calls[0][0]).toBe(TASK + "frames?lon=0.5&lat=0.5");
+        expect(fetchFn.mock.calls.some(c => c[0].includes("/mosaics/as_converted/frames"))).toBe(false);
+        const box = frameBox(map);
+        expect(box.hidden).toBe(false);
+        expect(box.textContent).toContain("Photo 1 of 2 that saw this spot");
+        expect(box.textContent).toContain("P4.tiff");
+        expect(box.textContent).toContain("The orthophoto30.00 °C");
+        expect(box.textContent).toContain("1 more photo had it in view, but the surface hides it from that one.");
+        expect(box.textContent).not.toContain("not ODM's cameras");
+        // The point, the photo's camera and the line between them
+        const marks = () => Object.values(map._layers).filter(l => l.options && l.options.interactive === false);
+        const line = () => marks().find(l => l instanceof L.Polyline && !(l instanceof L.Polygon));
+        expect(line().getLatLngs().map(p => [p.lat, p.lng])).toEqual([[0.5, 0.5], [0.5001, 0.5002]]);
+        pip(map, "next");
+        expect(box.textContent).toContain("P7.tiff");
+        expect(line().getLatLngs()[1].lng).toBe(0.4998);
+        pip(map, "close");
+        expect(box.hidden).toBe(true);
+        expect(line()).toBeUndefined();
+        map.remove();
+    });
+
     it("leaves a click on an orthophoto from elsewhere to WebODM", async () => {
         const map = leafletMap(THERMAL_TASK);
         const tiles = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}];

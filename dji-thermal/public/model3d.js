@@ -129,18 +129,8 @@
     var NEIGHBOURS = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
 
     // An isotherm painted over the colours, as the 2D map lays one over the orthophoto: the texels whose temperatures
-    // are within limits ([low, high], °C as the texture's, either null: open) in rgb
-    function paintIsotherm(values, rgba, isotherm) {
-        var lo = isotherm.limits[0], hi = isotherm.limits[1], rgb = isotherm.rgb;
-        for (var i = 0; i < values.length; i++) {
-            var v = values[i];
-            if (v !== v || (lo !== null && v < lo) || (hi !== null && v > hi)) continue;
-            rgba[i * 4] = rgb[0];
-            rgba[i * 4 + 1] = rgb[1];
-            rgba[i * 4 + 2] = rgb[2];
-        }
-        return rgba;
-    }
+    // are within limits ([low, high], °C as the texture's, either null: open) in rgb (recolour.js)
+    var paintIsotherm = Recolour.paintIsotherm;
 
     // The texels without a temperature coloured as planned (fillPlan), and in EMPTY_RGB beyond
     function fill(rgba, plan) {
