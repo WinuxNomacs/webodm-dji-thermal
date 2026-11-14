@@ -6,9 +6,23 @@
 - **R29. The 2D map's source frames placed with ODM's cameras** (the user, 2026-11-13: "a worthwhile followup",
   after R27). On a WebODM orthophoto, the frames window places the point with the workset's camera models (the frames'
   GPS and gimbal, "the point can be a little off"); ODM's refined cameras (`shots.geojson`, `cameras.json`) put it on
-  the right pixel (measured for R28: best at no offset). Builds on R28's `frames3d.py` (`shots`, `project`). Open: the point's height on a 2D map (the DSM,
-  or the orthophoto's ground), photos the terrain hides, and whether tasks not made from a workset get the window too
-  (their own photos, as in 3D).
+  the right pixel (measured for R28: best at no offset). Builds on R28's `frames3d.py` (`shots`, `project`).
+  Checked: the dev tasks all have `assets/odm_dem/dsm.tif` (5 cm, the cameras' coordinates; `dsm: true` is WebODM's
+  default and the plugin's plan's, but nothing forces it).
+  **Decided** (the user, 2026-11-13, on WebODM's map page, the Thermal Inspector's source frames window):
+  - A thermal orthophoto gets **the 3D page's window** ("Photos that saw this spot"): the task's own photos on the
+    exact pixel, each photo's temperature there, the orthophoto's, the spread, ranked from straight down, "Open this
+    frame" when the task came from a workset. Workset mosaics laid on the map keep their own window.
+  - The point's height is the **DSM**'s. **No DSM: today's window** (a workset's task keeps the GPS-and-gimbal
+    placement and its note; another task has none).
+  - **Photos the terrain hides are left out, with the note**, as in 3D, by each photo's line of sight over the DSM
+    (on the server), its tolerance settled by measuring against the model's ray test.
+  - **Every thermal task** with ODM's cameras, a DSM and its temperature photos gets the window, not only a
+    workset's (so a workset whose mosaics were never built gets it too).
+  - Chosen while planning (not asked): the photo shown is marked on the map by its camera and a line to the point,
+    as in 3D, in place of today's footprint outline.
+  First step: measure on HomerunObliqueII that the DSM's heights put the point on the right pixel, and the DSM's
+  line-of-sight test against the model's; stop and ask if it doesn't hold.
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
