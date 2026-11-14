@@ -159,19 +159,35 @@ has no thermal orthophoto but another in the project does, the Inspector's butto
 
 ## 6. The frames that saw a point
 
-On a workset mosaic, or on the orthophoto of a task processed from a workset whose mosaics are built, a click in
-**Hover** opens the frames that saw that point, beside the panel. Dropping a pin, or clicking a pin's name in the
-panel, opens them too.
+On a thermal orthophoto or a workset mosaic, a click in **Hover** opens the photos that saw that point, beside the
+panel. Dropping a pin, or clicking a pin's name in the panel, opens them too.
 
-![The frames that saw a point clicked on a thermal orthophoto processed from a workset](images/inspector-frames.png)
+![The photos that saw a point clicked on a thermal orthophoto](images/inspector-frames.png)
 
-- The frame is drawn in the layer's palette and range, with a circle on the point; its outline is dashed on the map.
-- The arrows step through every frame that saw the point. On a mosaic, the frame its pixel came from is first. On an
-  orthophoto, ODM blended the frames, so they start with the one that saw the point closest to straight down.
-- On an orthophoto the frames are placed with the workset's camera models, from their GPS and gimbal, not the cameras
-  ODM refined: the point can be a little off.
-- **Open this frame** opens the frame on its own page in the Analyzer, in a new tab, to measure it in its pixels or
-  measure it again with other values: see [One frame at a time](quickstart-worksets.md#one-frame-at-a-time).
+On a thermal orthophoto, they are the task's own photos, placed with the cameras ODM refined when it processed the
+task, at the height of the task's surface model, so the circle is on the very pixel:
+
+- The photo is drawn in the orthophoto's palette, range and Image settings, with a circle on the point. On the map,
+  the point is marked, with a dashed line to where the photo shown was taken from.
+- Below it: **This photo**'s temperature at the point, **The orthophoto**'s (ODM blended it from several photos),
+  how far from straight down and from how far the photo saw the point, and what all the photos read there (lowest,
+  highest and median). Manual Corrections apply to them all.
+- The arrows step through every photo that saw the point, starting with the one closest to straight down.
+- Photos that had the point in view but from which the surface hides it (behind a roof's edge, a wall, a tree) are
+  left out, and the window says how many.
+- **Open this frame**, when the task was processed from a workset's TIFFs, opens the frame on its own page in the
+  Analyzer, in a new tab, to measure it in its pixels or measure it again with other values: see
+  [One frame at a time](quickstart-worksets.md#one-frame-at-a-time).
+
+A task processed without a surface model (ODM's `dsm` option off) or without ODM's cameras can't place its photos so:
+if it was processed from a workset whose mosaics are built, the window shows the workset's frames instead, placed
+from their GPS and gimbal (the point can be a little off, and the window says so); otherwise the click is WebODM's.
+
+On a workset mosaic, the window is the mosaic viewer's: the workset's frames drawn in the mosaic's palette and range,
+the frame the mosaic's pixel came from first, each one's outline dashed on the map, and **Open this frame**.
+
+On both:
+
 - Drag it by its heading to move it on its own: it stays where you drop it, even as the panel moves, until it's
   closed. Opened again, it's beside the panel.
 - The cross closes the window; closing the Inspector closes it too.

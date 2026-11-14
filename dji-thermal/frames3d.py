@@ -7,6 +7,12 @@ assets/cameras.json: each lens). A point of the model (x, y, z) projected with t
 each photo, and the task's own photos (its one-band temperature TIFFs) read the temperature there. Measured on a flight,
 the projected pixel is the right one: offsetting it by a pixel either way only agrees worse with the model.
 
+On WebODM's map (the 2D Thermal Inspector) a point of the orthophoto is placed the same way, at the height the task's
+surface model (assets/odm_dem/dsm.tif, in the cameras' coordinates) has there, and a photo is left out when the surface
+comes between the point and its camera (frames_on_map). Measured on a flight: the photo closest to straight down reads
+a median 0.13 °C from the orthophoto, a pixel either way agreeing worse; the photos the surface hides read a median
+4.9 °C from it, the others 0.6 °C.
+
 Which photo ODX textured a spot from isn't kept (its texturing runs without intermediate results) and can't be told
 from the textures (seam levelling shifts them, and the photos of a surface agree with each other about as well), so
 every photo that saw the point is answered, with its own temperature there; the browser leaves out those the model
@@ -19,12 +25,23 @@ import os
 
 SHOTS_ASSET = ('odm_report', 'shots.geojson')
 CAMERAS_ASSET = ('cameras.json',)
+DSM_ASSET = ('odm_dem', 'dsm.tif')
 # OpenSfM's projections the plugin follows: the lenses ODX gives DJI's thermal cameras ('brown') and the simplest
 PROJECTIONS = ('brown', 'perspective')
+# A photo's line of sight over the DSM: the surface hides the point when it stands more than SIGHT_CLEARANCE (m) above
+# the line, from SIGHT_START (m, along the ground) off the point, read two samples a cell; only the DSM within
+# SIGHT_REACH cells of the point is read (beyond it a line of sight is far above the surface)
+SIGHT_CLEARANCE = 0.10
+SIGHT_START = 0.10
+SIGHT_REACH = 1024
 
 
 class NoCameras(Exception):
     """The task has no cameras ODX refined, or none the plugin can project with; the message says why"""
+
+
+class NoHeight(Exception):
+    """The task's surface model has no height at the point"""
 
 
 def asset(task, parts):
@@ -195,6 +212,84 @@ def frames_at(task, point, normal=None):
                     'distance': math.sqrt(sum((c[k] - point[k]) ** 2 for k in range(3))),
                     'temperature': temperature, 'available': path is not None})
     return sorted(out, key=lambda f: (round(f['view_angle'], 6), f['distance']))
+
+
+def on_map(task):
+    """Whether the photos that saw a point of the task's map can be told (frames_on_map): it has the cameras ODX
+    refined and a surface model"""
+    return all(os.path.isfile(asset(task, a)) for a in (SHOTS_ASSET, CAMERAS_ASSET, DSM_ASSET))
+
+
+def sight_blocked(heights, origin, inverse, point, camera):
+    """
+    Whether the surface comes between a point on it and a camera (both [x, y, z]). heights: a window of the DSM (NaN
+    where it has none), origin: the window's first (column, row), inverse: the DSM's transform from coordinates to
+    columns and rows
+    """
+    import numpy as np
+    (pc, pr), (cc, cr) = inverse * (point[0], point[1]), inverse * (camera[0], camera[1])
+    cells, along = math.hypot(cc - pc, cr - pr), math.hypot(camera[0] - point[0], camera[1] - point[1])
+    if cells < 1 or along <= SIGHT_START:
+        return False                # straight above: nothing between
+    reach = min(1.0, SIGHT_REACH * 1.5 / cells)      # the part of the line over the window
+    n = int(cells * reach * 2) + 1
+    t = np.arange(1, n + 1) / n * reach
+    t = t[t * along >= SIGHT_START]
+    cols = np.floor(pc + t * (cc - pc)).astype(np.int64) - origin[0]
+    rows = np.floor(pr + t * (cr - pr)).astype(np.int64) - origin[1]
+    inside = (rows >= 0) & (rows < heights.shape[0]) & (cols >= 0) & (cols < heights.shape[1])
+    if not inside.any():
+        return False
+    line = point[2] + t[inside] * (camera[2] - point[2])
+    with np.errstate(invalid='ignore'):     # NaN: no surface there
+        return bool(np.any(heights[rows[inside], cols[inside]] - line > SIGHT_CLEARANCE))
+
+
+def frames_on_map(task, lon, lat):
+    """
+    The photos that saw a point of the task's map (lon, lat), at the height its surface model has there: {point ([x, y,
+    z], the cameras' coordinates), frames (frames_at's, from straight down, each with lonlat: where its photo was taken
+    from, [lon, lat]), hidden (how many more had the point in view, the surface between them and it)}
+    :raises NoCameras: as shots, or the task has no surface model; NoHeight: it has no height there
+    """
+    import numpy as np
+    import rasterio
+    from rasterio.errors import RasterioError
+    from rasterio.warp import transform
+    from rasterio.windows import Window
+
+    path = asset(task, DSM_ASSET)
+    try:
+        with rasterio.open(path) as src:
+            xs, ys = transform('EPSG:4326', src.crs, [lon], [lat])
+            inverse, crs = ~src.transform, src.crs
+            col, row = (math.floor(v) for v in inverse * (xs[0], ys[0]))
+            if not (0 <= row < src.height and 0 <= col < src.width):
+                raise NoHeight()
+            origin = max(0, col - SIGHT_REACH), max(0, row - SIGHT_REACH)
+            window = Window(origin[0], origin[1], min(src.width, col + SIGHT_REACH + 1) - origin[0],
+                            min(src.height, row + SIGHT_REACH + 1) - origin[1])
+            heights = src.read(1, window=window).astype(np.float32)
+            if src.nodata is not None:
+                heights[heights == src.nodata] = np.nan
+    except (OSError, RasterioError) as e:
+        raise NoCameras("This task has no surface model (DSM) to place the point with") from e
+    heights[~np.isfinite(heights)] = np.nan
+    z = float(heights[row - origin[1], col - origin[0]])
+    if not math.isfinite(z):
+        raise NoHeight()
+    point = [xs[0], ys[0], z]
+    seen, hidden = [], 0
+    for f in frames_at(task, point):
+        if sight_blocked(heights, origin, inverse, point, f['camera']):
+            hidden += 1
+        else:
+            seen.append(f)
+    if seen:
+        lons, lats = transform(crs, 'EPSG:4326', [f['camera'][0] for f in seen], [f['camera'][1] for f in seen])
+        for f, a, b in zip(seen, lons, lats):
+            f['lonlat'] = [a, b]
+    return {'point': point, 'frames': seen, 'hidden': hidden}
 
 
 def frame_values(task, index):

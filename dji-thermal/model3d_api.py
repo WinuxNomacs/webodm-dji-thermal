@@ -93,27 +93,12 @@ class Model3DFrames(Model3DView):
             frames = frames3d.frames_at(task, point, normal)
         except frames3d.NoCameras as e:
             raise NotFound({'error': str(e)}) from None
-        source = frames3d.workset_frames(task, request.user) if request.user.is_authenticated else None
-        for f in frames:
-            f['frame'] = source['frames'].get(f['file']) if source else None
-        return Response({'frames': frames, 'workset': {'dataset': source['dataset'], 'workset': source['workset']} if source else None})
+        return Response(inspector_api.photo_frames(task, request.user, frames))
 
 
 class Model3DFrameValues(Model3DView):
     def get(self, request, pk=None, project_pk=None, index=""):
-        """One photo's temperatures (°C) as a value tile for the browser to colour (inspector_api.values_response, no
-        margin); its ETag from the photo's file and the cameras"""
+        """One photo's temperatures (°C) as a value tile for the browser to colour
+        (inspector_api.photo_values_response)"""
         task, _found = self.described(request, pk)
-        version = [inspector_api.VALUES_VERSION, frames3d.version(task, int(index)), int(index)]
-        etag = '"{}"'.format(hashlib.sha1(repr(version).encode()).hexdigest()[:20])
-        if etag in [t.strip() for t in request.META.get('HTTP_IF_NONE_MATCH', '').split(',')]:
-            response = HttpResponseNotModified()
-        else:
-            try:
-                data, offset, step = frames3d.frame_values(task, int(index))
-            except (LookupError, frames3d.NoCameras) as e:
-                raise NotFound({'error': str(e)}) from None
-            response = inspector_api.values_response((data, offset, step, 1.0), 'private, no-cache', margin=0)
-        response['ETag'] = etag
-        response['Cache-Control'] = 'private, no-cache'
-        return response
+        return inspector_api.photo_values_response(request, task, int(index))

@@ -8,3 +8,8 @@
 .ta-pip-mark { position: absolute; width: 17px; height: 17px; margin: -8px 0 0 -8px; pointer-events: none;
     border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #000; }
 .ta-pip-foot { margin-top: 4px; overflow-wrap: anywhere; }
+/* The photos that saw a spot (frames3d.js), on the 3D page and WebODM's map: each photo drawn in the browser, its
+   reading and the surface's in a small table */
+.ta-pip-image canvas.dt-frames3d-canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; }
+.ta-pip-foot .dt-frames3d-figures { margin: 4px 0; }
+.ta-pip-foot .dt-frames3d-figures td { padding: 1px 4px; }

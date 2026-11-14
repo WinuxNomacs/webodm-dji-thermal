@@ -119,13 +119,35 @@ describe("the window's behaviour", () => {
         expect(s.box.textContent).toContain("21.0 °C");                // a's 20, corrected
         expect(s.box.textContent).toContain("The model20.0 °C");       // 19, corrected
         expect(s.box.textContent).toContain("1 more photo had it in view");
-        expect(s.changed).toHaveBeenLastCalledWith({camera: [-10, 0, 30], point: {x: 0, y: 0, z: 0}});
+        expect(s.changed).toHaveBeenLastCalledWith(expect.objectContaining({camera: [-10, 0, 30], point: {x: 0, y: 0, z: 0}}), true);
+        expect(s.changed.mock.calls[s.changed.mock.calls.length - 1][0].frame.file).toBe("a");
         s.box.querySelector('[data-pip="next"]').click();
         expect(s.box.textContent).toContain("Photo 2 of 2");
-        expect(s.changed).toHaveBeenLastCalledWith({camera: [0, 5, 40], point: {x: 0, y: 0, z: 0}});
+        expect(s.changed).toHaveBeenLastCalledWith(expect.objectContaining({camera: [0, 5, 40], point: {x: 0, y: 0, z: 0}}), true);
         s.box.querySelector('[data-pip="close"]').click();
         expect(s.box.hidden).toBe(true);
-        expect(s.changed).toHaveBeenLastCalledWith(null);
+        expect(s.changed).toHaveBeenLastCalledWith(null, false);
+    });
+
+    test("shows a point of the map from the caller's own URLs, in its words, with the photos the server left out and the orthophoto's temperature", async () => {
+        document.body.innerHTML = '<div id="box" hidden></div>';
+        const box = document.getElementById("box"), urls = [];
+        const fetchFn = jest.fn((url) => {
+            urls.push(url);
+            if (url.includes("/values")) return Promise.resolve({status: 200, ok: true, arrayBuffer: () => Promise.reject(new Error("no"))});
+            return Promise.resolve({ok: true, json: () => Promise.resolve({frames: [frame("a", [-10, 0, 30], 20), frame("b", [20, 0, 2], 21)],
+                                                                          workset: null, hidden: 2, orthophoto: 18})});
+        });
+        const frames = Frames3D.create(box, {fetchFn, framesUrl: (p) => "/map/frames?lon=" + p.lng + "&lat=" + p.lat, valuesUrl: (i) => "/map/frames/" + i + "/values",
+                                             words: {surface: "The orthophoto", hides: "the surface"}, style: () => ({palette: []}),
+                                             corrected: (c) => c + 1, format: (c) => c.toFixed(1) + " °C"});
+        await frames.show({lng: 1.5, lat: 2.5}, null);
+        expect(urls[0]).toBe("/map/frames?lon=1.5&lat=2.5");
+        // No mesh to hide a photo in the browser: both shown, the server's two counted
+        expect(box.textContent).toContain("Photo 1 of 2 that saw this spot");
+        expect(box.textContent).toContain("The orthophoto19.0 °C");
+        expect(box.textContent).toContain("2 more photos had it in view, but the surface hides it from them.");
+        expect(urls).toContain("/map/frames/1/values");
     });
 
     test("says why when the server has no photos to give", async () => {

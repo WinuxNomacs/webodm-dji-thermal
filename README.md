@@ -501,13 +501,17 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   and a horizontal divider alike); a ΔT across the divider compares the two layers.
   A map without temperatures shows the
   Inspector's button when the project has another task's thermal orthophoto to lay.
-- **Source frames**: a click in Hover (or a pin dropped, or a pin's name clicked in the panel) on a workset mosaic, or
-  on the orthophoto of a task processed from a workset whose mosaics are built, opens the window of the frames that
-  saw that point beside the panel, as in the mosaic viewer: one at a time with a crosshair on the point, its outline
-  on the map, drawn in the layer's palette and range. On a mosaic, its own frame comes first; on an orthophoto, the
-  one that saw the point closest to straight down, placed with the workset's camera models (from the frames' GPS and
-  gimbal, not ODM's refined cameras, so the point can be a little off), and **Open this frame**: the frame page, in a
-  new tab. Elsewhere a click in Hover is still WebODM's (its popup).
+- **Source frames**: a click in Hover (or a pin dropped, or a pin's name clicked in the panel) on a thermal
+  orthophoto or a workset mosaic opens the window of the photos that saw that point beside the panel, one at a time
+  with a crosshair on the point. On a thermal orthophoto they are the task's own photos, placed with the cameras ODM
+  refined at the height of the task's surface model (so on the very pixel), as on the 3D view: each drawn in the
+  orthophoto's palette and range, with its temperature there, the orthophoto's and what all the photos read, from the
+  one closest to straight down; those the surface hides the point from are left out and counted; the photo shown is
+  marked on the map by where it was taken from, with a line to the point; **Open this frame** (the frame page, in a
+  new tab) when the task came from a workset. A task without a surface model (`dsm` off) or ODM's cameras shows
+  instead, when it was processed from a workset whose mosaics are built, the workset's frames placed from their GPS
+  and gimbal (the point can be a little off). On a mosaic, the window is the mosaic viewer's, the mosaic's own frame
+  first, its outline on the map. Elsewhere a click in Hover is still WebODM's (its popup).
 
 Temperatures are read from the orthophoto or mosaic on the server (the plugin's own API, for those who can view the
 task or project) and shown in your temperature unit (the °C / °F menu at the top of the page), the same setting as

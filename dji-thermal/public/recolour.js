@@ -194,6 +194,20 @@
         return out;
     }
 
+    // An isotherm painted over colours already drawn (a 3D model's textures, a photo): the values within isotherm's
+    // limits ([low, high], as the values', either null: open) in its rgb, the rest left as they are
+    function paintIsotherm(values, rgba, isotherm) {
+        var lo = isotherm.limits[0], hi = isotherm.limits[1], rgb = isotherm.rgb;
+        for (var i = 0; i < values.length; i++) {
+            var v = values[i];
+            if (v !== v || (lo !== null && v < lo) || (hi !== null && v > hi)) continue;
+            rgba[i * 4] = rgb[0];
+            rgba[i * 4 + 1] = rgb[1];
+            rgba[i * 4 + 2] = rgb[2];
+        }
+        return rgba;
+    }
+
     // The values of an isotherm as the server takes it ("above,T", "below,T", "between,A,B") drawn in the palette, as
     // colour takes them ([low, high]), or null for none
     function isothermRange(value) {
@@ -301,7 +315,7 @@
 
     var api = {decode: decode, fetchValues: fetchValues, curveShares: curveShares, banded: banded,
                drawnShares: drawnShares, tonedPalette: tonedPalette, colour: colour, isothermRange: isothermRange,
-               drawFromValues: drawFromValues, CURVE_SAMPLES: CURVE_SAMPLES};
+               drawFromValues: drawFromValues, paintIsotherm: paintIsotherm, CURVE_SAMPLES: CURVE_SAMPLES};
     root.ThermalRecolour = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});
