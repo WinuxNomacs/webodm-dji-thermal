@@ -7,47 +7,41 @@
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
 
-**Then** (proposed from R32's review, 2026-11-13). Decided (the user, 2026-11-14, "continue"): R33: an unreadable
-surface model is said in words in the window, no fallback; R35: left as it is (the Inspector open means the click is
-its own), nothing to build; R37: under 768 px the frames window takes the page's width over the map; R38: every
-screenshot in °C.
-- **R33. A photo that can't be shown says so.** Map page and 3D page › Thermal Inspector › the "Photos that saw this
-  spot" window. Today a photo whose temperatures can't be loaded (its file gone, the server refusing) is a black
-  picture with no words, and a photo that isn't on the server can rank first. The answer already says `available`
-  per photo. Proposed: such a photo shows "This photo isn't on the server any more" in place of the picture, and the
-  photos that can be shown come first. Also: `frames3d.frames_on_map` doesn't catch a surface model without a
-  projection (rasterio's `CRSError`), a server error where the others answer in words; and `on_map` says yes on files
-  alone, so a task whose DSM can't be read shows an error in the window rather than falling back to a workset's
-  window. Open: whether an unreadable DSM should fall back (the flag then costs opening the DSM once per task).
-- **R34. A click before the map's layers have answered.** Map page › Thermal Inspector › Hover or Pin. Whether a
-  layer has the photos window comes with its `measurements` answer; a click before it arrives opens a workset's
-  older window, or WebODM's own popup. Proposed: the click waits for the layer's answer (it is asked for when the
-  Inspector opens). Small; no decision needed but the go-ahead.
-- **R35. WebODM's own popup with the Inspector open.** Map page › Thermal Inspector open in Hover. Since R29
-  (decision 4, "every thermal task") a click on any thermal orthophoto with photos opens the photos window, so
-  WebODM's popup for that layer (its own readings, the orthophoto's downloads) is reached only by closing the
-  Inspector. Open: leave it (the Inspector open means its click), or a way through (a modifier key, or a link in the
-  window).
-- **R36. Pointer Info follows a correction at once.** Map page and 3D page › Thermal Inspector › Pointer Info. After
-  Emissivity, Reflected or Manual Corrections change, the reading stays at its last value until the pointer moves
-  (older than R29). Proposed: recompute it for the last hovered point. Small.
-- **R37. The frames window on a narrow page.** Map page › Thermal Inspector › frames window, either kind (photos or
-  a workset's frames). Its width is the page's less 380 px, so under about 700 px wide it is a sliver (10 px at
-  390). The user's rule is "nothing breaks or overflows under 768px", no phone layouts. Open: under 768 px, the
-  window below the panel at full width, or over the map at full width with the panel closed behind it.
-- **R38. The docs' screenshots in one unit.** `docs/images`: shots retaken since the dev account's unit became °F
-  (`inspector-frames.png`, `inspector-3d-frames.png`) show °F, the others °C. Proposed: `dev/screenshots.js` sets
-  the unit itself (in its own browser, nothing saved on the server), and the °F shots are retaken. Open: °C or °F.
-- **R39. The server's cache of photos.** `frames3d._photo` keeps 48 photos' temperatures; a point seen by more
-  (dense flights) reads some again on every click. Measure first on a dense flight; raise the number or cache by
-  size only if it shows.
-
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
 - **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
   the earlier "Folder conversion" item (below).
 
+- **R33 to R39. What R32's review proposed** — 2026-11-14 (the user: "continue", then the four decisions below).
+  - **R33. A photo that can't be shown says so** (`r33-photo-messages`). Map page and 3D page › Thermal Inspector ›
+    "Photos that saw this spot". Decided: a surface model that can't be read is said in words in the window, no
+    fallback. In place of the picture: "This photo isn't on the server any more" (the server said so, and it isn't
+    asked for; or it answered 404 for its temperatures) or "This photo couldn't be loaded" (asked again when shown
+    again), without the crosshair; the photos whose file is gone come last (`frames3d.frames_at`); a DSM without a
+    projection (rasterio's `CRSError`) answers "This task's surface model (DSM) can't be read..." (404) as one that
+    can't be opened. Code: `frames3d.py`, `public/frames3d.js`, `public/frames.css`; tests: `tests/test_model3d.py`,
+    `__tests__/frames3d.test.js`; docs: troubleshooting, the Inspector's quickstart, the API.
+  - **R34. A click before the map's layers have answered** (`r34-inspector-fixes`). A click on an orthophoto whose
+    task hasn't yet said whether it has its photos waits for that answer (`showFrames`, the source's `ready`), in
+    place of a workset's older window or WebODM's popup; a later click replaces one still waiting. The cost: such a
+    click on a task that turns out to have no frames window is not WebODM's either. `__tests__/inspector.test.js`.
+  - **R35. WebODM's own popup with the Inspector open.** Decided: left as it is (the Inspector open means the click
+    is its own; closing it gives WebODM's popup back). Nothing built.
+  - **R36. Pointer Info follows a correction at once** (`r34-inspector-fixes`). Map page: the reading under the
+    pointer is kept as read (`hovered`) and corrected again by `correctionChanged` (`readHovered`), the text beside
+    the pointer too. The 3D page already did (it corrects when it draws). `__tests__/inspector.test.js`.
+  - **R37. The frames window on a narrow page** (`r34-inspector-fixes`). Decided: full width over the map. On a map
+    under 768 px wide (`NARROW`) `placeFrames` gives the window (photos or a workset's frames) the map's width from
+    its top, and `inspector.css` raises it over the panel and the map's other controls (`:has`); it is still dragged
+    by its heading and closed as before. Checked live at 390 px (344 px wide, no page overflow, Close reachable) and
+    at 1280 px (beside the panel as before).
+  - **R38. The docs' screenshots in one unit** (`r38-docs-celsius`). Decided: °C. `dev/screenshots.js` changes the
+    `unit` answer on its way to the page (nothing saved), and `inspector-frames.png` and `inspector-3d-frames.png`
+    were retaken in °C.
+  - **R39. The server's cache of photos.** Measured on HomerunObliqueII (151 photos; 30 to 61 in view of a point of
+    the map): a point's photos read from the files in 0.07 to 0.14 s, from the cache in 0.01 s; with more than 48 in
+    view a repeated click costs about 0.1 s more. Not worth a change: `frames3d._photo` stays at 48.
 - **R32. Review of R29's code** — 2026-11-13, `r29-review-fixes` (the user: "review the code for bugs and possible
   ui breaking points ... fix any obvious bugs along the way but plan any more involved bugs to be discussed for a
   phased approach later"). Read: `frames3d.py`, the two routes, `frames3d.js`, the map Inspector's wiring, and the
@@ -58,7 +52,7 @@ screenshot in °C.
   photo on the server; `tests/test_model3d.py`); the window kept every photo's values (about 1.3 MB each) for as long
   as the page (the last 24 now, `frames3d.js` `KEPT`); a values request that failed left the photo blank for good
   (asked again when shown again; `__tests__/frames3d.test.js`); on the 3D page Potree's stylesheet made the panel's
-  and the window's links pale lilac on white (`inspector3d.css`). Planned, not built: R33 to R39 above.
+  and the window's links pale lilac on white (`inspector3d.css`). What it proposed: R33 to R39.
 **Done**
 - **R29. The 2D map's photos placed with ODM's cameras** — 2026-11-13, `r29-2d-frames-cameras` (the user: "a
   worthwhile followup", after R27). On WebODM's map page, a click in Hover or Pin on a thermal orthophoto (or a pin's
