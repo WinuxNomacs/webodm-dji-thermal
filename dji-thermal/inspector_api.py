@@ -1,6 +1,7 @@
 """The Thermal Inspector's API: a task's thermal orthophoto read at a point and over a region, drawn in a palette with
-the mosaics' adjustments and as isotherms (see inspector.py), a palette's colours for its legend, and the workset mosaics of a project it can
-lay on the map (their regions and isotherms: analyzer_api, with region_request and isotherm_request)"""
+the mosaics' adjustments and as isotherms (see inspector.py), a palette's colours for its legend, the photos that saw a
+point of it (frames3d.py), and the workset mosaics of a project it can lay on the map (their regions and isotherms:
+analyzer_api, with region_request and isotherm_request)"""
 import hashlib
 import math
 import os
@@ -13,7 +14,8 @@ from rest_framework.response import Response
 from app.api.tasks import TaskNestedView
 from app.models import Project
 
-from . import colouring, conversion_tasks, conversions, converter, correction, datasets, inspector, measurements, mosaics
+from . import colouring, conversion_tasks, conversions, converter, correction, datasets, frames3d, inspector
+from . import measurements, mosaics
 from . import webodm_versions
 
 # The mosaics' tabs laid on the map: those of temperatures (View angle stays in the Analyzer's viewer)
@@ -31,17 +33,77 @@ class InspectorView(TaskNestedView):
         return task
 
 
+def lonlat(request):
+    """A request's ?lon=&lat=
+    :raises ValidationError: missing, or not a place"""
+    try:
+        lon, lat = float(request.query_params.get('lon')), float(request.query_params.get('lat'))
+    except (TypeError, ValueError):
+        raise ValidationError({'error': "lon and lat are required"}) from None
+    if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+        raise ValidationError({'error': "Coordinates out of range"})
+    return lon, lat
+
+
 class InspectorPoint(InspectorView):
     def get(self, request, pk=None, project_pk=None):
         """The temperature (°C) at ?lon=&lat="""
         task = self.thermal_task(request, pk)
+        return Response(inspector.point(task, *lonlat(request)))
+
+
+def photo_frames(task, user, frames):
+    """The photos that saw a point (frames3d.frames_at's), as the frames windows take them: {frames (each with its
+    frame: its path in the dataset, or null), workset ({dataset, workset} when the task was processed from a workset's
+    TIFFs the user can view, for the Analyzer's frame page, else null)}"""
+    source = frames3d.workset_frames(task, user) if user.is_authenticated else None
+    for f in frames:
+        f['frame'] = source['frames'].get(f['file']) if source else None
+    return {'frames': frames, 'workset': {'dataset': source['dataset'], 'workset': source['workset']} if source else None}
+
+
+def photo_values_response(request, task, index):
+    """One of the task's photos' temperatures (°C) as a value tile for the browser to colour (values_response, no
+    margin); its ETag from the photo's file and the cameras"""
+    version = [VALUES_VERSION, frames3d.version(task, index), index]
+    etag = '"{}"'.format(hashlib.sha1(repr(version).encode()).hexdigest()[:20])
+    if etag in [t.strip() for t in request.META.get('HTTP_IF_NONE_MATCH', '').split(',')]:
+        response = HttpResponseNotModified()
+    else:
         try:
-            lon, lat = float(request.query_params.get('lon')), float(request.query_params.get('lat'))
-        except (TypeError, ValueError):
-            raise ValidationError({'error': "lon and lat are required"}) from None
-        if not (-180 <= lon <= 180 and -90 <= lat <= 90):
-            raise ValidationError({'error': "Coordinates out of range"})
-        return Response(inspector.point(task, lon, lat))
+            data, offset, step = frames3d.frame_values(task, index)
+        except (LookupError, frames3d.NoCameras) as e:
+            raise NotFound({'error': str(e)}) from None
+        response = values_response((data, offset, step, 1.0), 'private, no-cache', margin=0)
+    response['ETag'] = etag
+    response['Cache-Control'] = 'private, no-cache'
+    return response
+
+
+class InspectorFrames(InspectorView):
+    def get(self, request, pk=None, project_pk=None):
+        """
+        The photos that saw the point ?lon=&lat= of the task's orthophoto, placed with the cameras ODM refined at the
+        surface model's height there, from the one closest to straight down (frames3d.frames_on_map): {frames, workset
+        (photo_frames), hidden (how many more the surface hides it from), orthophoto (its temperature there, °C, or
+        null)}; no frames where the surface model has no height
+        """
+        task = self.thermal_task(request, pk)
+        lon, lat = lonlat(request)
+        try:
+            found = frames3d.frames_on_map(task, lon, lat)
+        except frames3d.NoHeight:
+            found = {'frames': [], 'hidden': 0}
+        except frames3d.NoCameras as e:
+            raise NotFound({'error': str(e)}) from None
+        return Response(dict(photo_frames(task, request.user, found['frames']), hidden=found['hidden'],
+                             orthophoto=inspector.point(task, lon, lat)['temperature']))
+
+
+class InspectorFrameValues(InspectorView):
+    def get(self, request, pk=None, project_pk=None, index=""):
+        """One of the task's photos' temperatures, for the frames window to colour (photo_values_response)"""
+        return photo_values_response(request, self.thermal_task(request, pk), int(index))
 
 
 def tile_params(request):
@@ -386,12 +448,14 @@ class InspectorProjectPalette(InspectorProjectView):
 
 # -- saved measurements (measurements.py) ---------------------------------------------------------------------------
 
-def saved_list(path, baseline, can_change, palette=''):
+def saved_list(path, baseline, can_change, palette='', photos=False):
     """The measurements saved at path, with what the layer was measured with (for the correction), whether the
-    user may save, rename and delete them, and the palette the layer opens in ('' for none of its own)"""
+    user may save, rename and delete them, the palette the layer opens in ('' for none of its own), and whether the
+    photos that saw a point of it can be told (an orthophoto's, with ODM's cameras: InspectorFrames)"""
     base = baseline()
     return Response({'measurements': measurements.listed(path), 'can_change': can_change,
-                     'baseline': {'emissivity': base[0], 'reflected': base[1]} if base else None, 'palette': palette})
+                     'baseline': {'emissivity': base[0], 'reflected': base[1]} if base else None, 'palette': palette,
+                     'photos': photos})
 
 
 def saved_record(data, point, region, baseline):
@@ -489,7 +553,8 @@ class InspectorMeasurements(InspectorMeasurementsView):
         """The measurements saved on the task's thermal orthophoto (saved_list)"""
         task = self.thermal_task(request, pk)
         return saved_list(measurements.task_path(task), lambda: correction.task_baseline(task),
-                          request.user.has_perm('change_project', task.project), conversion_tasks.task_palette(task))
+                          request.user.has_perm('change_project', task.project), conversion_tasks.task_palette(task),
+                          frames3d.on_map(task))
 
     def post(self, request, pk=None, project_pk=None):
         """A pin, region, line or ΔT measured and saved (saved_record)"""

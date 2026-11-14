@@ -78,6 +78,8 @@ class Plugin(PluginBase):
             MountPoint(TASK + r'/inspector/values/(?P<z>\d+)/(?P<x>\d+)/(?P<y>\d+)$', inspector_api.InspectorValues.as_view()),
             MountPoint(TASK + '/inspector/curve$', inspector_api.InspectorCurve.as_view()),
             MountPoint(TASK + '/inspector/palette$', inspector_api.InspectorPalette.as_view()),
+            MountPoint(TASK + '/inspector/frames$', inspector_api.InspectorFrames.as_view()),
+            MountPoint(TASK + r'/inspector/frames/(?P<index>\d+)/values$', inspector_api.InspectorFrameValues.as_view()),
             MountPoint(TASK + '/inspector/measurements$', inspector_api.InspectorMeasurements.as_view()),
             MountPoint(TASK + r'/inspector/measurements/(?P<mid>[0-9a-f]{12})$', inspector_api.InspectorMeasurement.as_view()),
             # The 3D Thermal Inspector (model3d_api.py)

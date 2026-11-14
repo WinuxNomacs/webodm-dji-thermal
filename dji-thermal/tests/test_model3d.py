@@ -350,3 +350,83 @@ class TestFrames3D(TestModel3D):
         self.assertEqual(found.status_code, status.HTTP_200_OK)
         self.assertIsNone(found.data['workset'])
         self.assertEqual(anonymous.get(self.url(self.task, "/frames/0/values")).status_code, status.HTTP_200_OK)
+
+    # On WebODM's map (the 2D Inspector): a point of the orthophoto, at the surface model's height there
+
+    def write_dsm(self, heights, task=None):
+        """The task's surface model, 0.5 m cells from (399990, 4660010): heights(x, y) of each cell's centre, NaN none"""
+        path = (task or self.task).assets_path('odm_dem', 'dsm.tif')
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        rows, cols = np.mgrid[0:40, 0:120]
+        values = np.asarray(heights(399990.25 + 0.5 * cols, 4660009.75 - 0.5 * rows) + 0.0 * cols, dtype=np.float32)
+        values[~np.isfinite(values)] = -9999.0
+        with rasterio.open(path, 'w', driver='GTiff', width=120, height=40, count=1, dtype='float32', crs='EPSG:32616',
+                           nodata=-9999.0, transform=from_origin(399990.0, 4660010.0, 0.5, 0.5)) as dst:
+            dst.write(values, 1)
+
+    def map_url(self, what, task=None):
+        task = task or self.task
+        return "/api/plugins/dji-thermal/projects/{}/tasks/{}/inspector/{}".format(task.project.id, task.id, what)
+
+    def on_map(self, x, y, client=None):
+        from rasterio.warp import transform
+        lon, lat = transform('EPSG:32616', 'EPSG:4326', [x], [y])
+        return (client or self.client).get(self.map_url("frames?lon={!r}&lat={!r}".format(lon[0], lat[0]))), lon[0], lat[0]
+
+    def test_a_point_of_the_map_is_placed_at_the_surface_models_height_and_read_in_each_photo_and_the_orthophoto(self):
+        self.write_dsm(lambda x, y: 10.0)
+        response, lon, lat = self.on_map(400001.1, 4659998.9)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        found = response.data
+        nadir = next(f for f in found['frames'] if f['file'] == 'a_nadir.tiff')
+        self.assertAlmostEqual(nadir['distance'], 40.0, places=2)            # 50 m up, over a surface at 10 m
+        self.assertAlmostEqual(nadir['x'], 19.5 + 0.1, places=3)             # 0.1 m east at 40 m, times 40
+        self.assertAlmostEqual(nadir['y'], 14.5 + 0.1, places=3)
+        self.assertAlmostEqual(nadir['temperature'], photo(20, 15), places=4)
+        self.assertAlmostEqual(nadir['lonlat'][0], lon, delta=1e-5)          # taken from 10 cm away
+        self.assertAlmostEqual(nadir['lonlat'][1], lat, delta=1e-5)
+        self.assertAlmostEqual(found['orthophoto'], 20.0, places=4)
+        self.assertIsNone(found['workset'])
+        self.assertIsNone(nadir['frame'])
+
+    def test_leaves_out_the_photos_the_surface_hides_a_point_of_the_map_from_and_counts_them(self):
+        # A wall 5 m high, 9 to 10 m east of the point, between it and the level camera 30 m east
+        self.write_dsm(lambda x, y: np.where((x > 400010.0) & (x < 400011.0), 5.0, 0.0))
+        found = self.on_map(400001.0, 4659999.0)[0].data
+        self.assertEqual([f['file'] for f in found['frames']], ['a_nadir.tiff', 'd_gone.tiff'])
+        self.assertEqual(found['hidden'], 1)
+        beyond = self.on_map(400020.0, 4659999.0)[0].data       # east of the wall: the level camera sees it
+        self.assertIn('b_east.tiff', [f['file'] for f in beyond['frames']])
+        self.assertIn('a_nadir.tiff', [f['file'] for f in beyond['frames']])     # over the wall
+        self.assertEqual(beyond['hidden'], 0)
+        self.assertIsNone(beyond['orthophoto'])                  # past the orthophoto's edge
+
+    def test_a_task_says_whether_the_photos_that_saw_a_point_of_its_map_can_be_told(self):
+        self.assertFalse(self.client.get(self.map_url("measurements")).data['photos'])       # no surface model
+        self.assertEqual(self.on_map(400001.0, 4659999.0)[0].status_code, status.HTTP_404_NOT_FOUND)
+        self.write_dsm(lambda x, y: np.where(x < 400000.5, np.nan, 0.0))
+        self.assertTrue(self.client.get(self.map_url("measurements")).data['photos'])
+        none = self.on_map(400000.2, 4659999.0)[0]               # the surface model has no height there
+        self.assertEqual(none.status_code, status.HTTP_200_OK)
+        self.assertEqual((none.data['frames'], none.data['hidden']), ([], 0))
+        self.assertEqual(self.on_map(399000.0, 4659999.0)[0].data['frames'], [])      # outside it
+        self.assertEqual(self.client.get(self.map_url("frames?lon=200&lat=0")).status_code, status.HTTP_400_BAD_REQUEST)
+        os.remove(self.task.assets_path('cameras.json'))
+        self.assertFalse(self.client.get(self.map_url("measurements")).data['photos'])
+
+    def test_a_maps_photos_are_served_without_a_thermal_model_to_those_who_can_view_the_task(self):
+        self.write_dsm(lambda x, y: 0.0)
+        os.remove(os.path.join(os.path.dirname(self.task.get_asset_download_path('textured_model.glb')), 'odm_textured_model_geo.glb'))
+        self.assertEqual(self.frames(400001.0, 4659999.0, 0.0).status_code, status.HTTP_404_NOT_FOUND)       # the 3D page's
+        index = self.on_map(400001.0, 4659999.0)[0].data['frames'][0]['index']
+        response = self.client.get(self.map_url("frames/{}/values".format(index)))
+        rows, cols = np.mgrid[0:30, 0:40]
+        self.assertLess(np.nanmax(abs(decoded(response) - photo(cols, rows))), 0.001)
+        again = self.client.get(self.map_url("frames/{}/values".format(index)), HTTP_IF_NONE_MATCH=response['ETag'])
+        self.assertEqual(again.status_code, status.HTTP_304_NOT_MODIFIED)
+        anonymous = APIClient()
+        self.assertEqual(self.on_map(400001.0, 4659999.0, anonymous)[0].status_code, status.HTTP_404_NOT_FOUND)
+        self.task.public = True
+        self.task.save()
+        self.assertEqual(self.on_map(400001.0, 4659999.0, anonymous)[0].status_code, status.HTTP_200_OK)
+        self.assertEqual(anonymous.get(self.map_url("frames/{}/values".format(index))).status_code, status.HTTP_200_OK)
