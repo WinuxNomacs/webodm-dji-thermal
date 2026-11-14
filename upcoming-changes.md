@@ -14,6 +14,14 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R41. The map page's stylesheets at the scripts' version** (`r41-map-styles-versioned`) — 2026-11-14. The user:
+  "Preview frame viewer is supposed to open full page size over the current view until they click close or press
+  escape". The preview is laid over the whole window by `frames.css`; on WebODM's map page the stylesheets were
+  dependencies of `PluginsAPI.Map.willAddControls`, fetched with no version, so a browser kept the old `frames.css`
+  beside the new scripts (Claude's reading of the report: not seen in the user's browser; a fresh browser showed it
+  over the whole window before and after). Now `main.js` adds them itself (`DjiThermalScripts.styles`, as the 3D page
+  did) at the scripts' version. Tests: `__tests__/main.test.js`. Checked live on the map and 3D pages at 1280 and
+  390 px: the stylesheets are asked for with `?v=`, the preview covers the window.
 - **R40. Preview frame** (`r40-preview-frame`) — 2026-11-14. The user: "Next to "Open Frame", add a "Preview frame"
   option that opens the full size source frame in a in-page image viewer where the user can
   next/previous/exit/zoom/pan the image. This allows the user to examine the full source image without leaving the

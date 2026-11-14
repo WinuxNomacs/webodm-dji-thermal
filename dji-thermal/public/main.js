@@ -35,6 +35,19 @@ window.DjiThermalScripts = (function(){
         return names.reduce(function(p, name){ return p.then(function(){ return one(name); }); }, Promise.resolve());
     };
     load.url = function(name){ return base + name + query; };
+    // The plugin's stylesheets, at the same version, each added once. Not left to WebODM's loader (a dependency
+    // named "dji-thermal/x.css"): it asks for them with no version, so a browser kept the old one after an update,
+    // beside the new scripts
+    load.styles = function(names){
+        names.forEach(function(name){
+            var href = load.url(name);
+            if (document.querySelector('link[href="' + href + '"]')) return;
+            var link = document.createElement("link");
+            link.rel = "stylesheet";
+            link.href = href;
+            document.head.appendChild(link);
+        });
+    };
     return load;
 })();
 
@@ -46,7 +59,8 @@ window.DjiThermalMapScripts = function(){ return window.DjiThermalScripts(NAMES)
 // The Thermal Inspector on WebODM's 2D map (inspector.js, with frames.js's source frames window and frames3d.js's
 // photos that saw a point), with WebODM's Leaflet:
 // its button shows when the map has a thermal orthophoto or the project has workset mosaics
-PluginsAPI.Map.willAddControls(["leaflet", "dji-thermal/inspector.css", "dji-thermal/split.css", "dji-thermal/frames.css"], function(args, L){
+PluginsAPI.Map.willAddControls(["leaflet"], function(args, L){
+    window.DjiThermalScripts.styles(["inspector.css", "split.css", "frames.css"]);
     window.DjiThermalMapScripts().then(function(){
         if (window.ThermalInspector) window.ThermalInspector.create(args, L);
     }, function(e){
@@ -60,14 +74,7 @@ PluginsAPI.Map.willAddControls(["leaflet", "dji-thermal/inspector.css", "dji-the
 // once): the button is given at once, with no dependencies to wait for, and shows itself when it can; its
 // stylesheets are added here. The 2D Inspector's scripts come first: the 3D one uses their helpers.
 window.DjiThermal3DScripts = function(){
-    ["inspector.css", "frames.css", "inspector3d.css"].forEach(function(name){
-        var href = window.DjiThermalScripts.url(name);
-        if (document.querySelector('link[href="' + href + '"]')) return;
-        var link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = href;
-        document.head.appendChild(link);
-    });
+    window.DjiThermalScripts.styles(["inspector.css", "frames.css", "inspector3d.css"]);
     return window.DjiThermalMapScripts().then(function(){ return window.DjiThermalScripts(NAMES_3D); });
 };
 PluginsAPI.ModelView.addActionButton(function(args){

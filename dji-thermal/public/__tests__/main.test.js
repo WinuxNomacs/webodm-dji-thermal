@@ -144,9 +144,12 @@ test("the Thermal Inspector is added to every map, with WebODM's Leaflet, its sc
     document.head.innerHTML = "";
     loadMain();
     const [deps, add] = global.PluginsAPI.Map.willAddControls.mock.calls[0];
-    expect(deps).toEqual(["leaflet", "dji-thermal/inspector.css", "dji-thermal/split.css", "dji-thermal/frames.css"]);
+    // The stylesheets aren't left to WebODM's loader, which asks for them with no version
+    expect(deps).toEqual(["leaflet"]);
     window.ThermalInspector = {create: jest.fn()};
     add({tiles: []}, "L");
+    const sheets = () => Array.from(document.head.querySelectorAll("link")).map(l => l.rel + " " + l.getAttribute("href"));
+    expect(sheets()).toEqual(["inspector.css", "split.css", "frames.css"].map(n => "stylesheet /plugins/dji-thermal/" + n));
     await new Promise(r => setTimeout(r, 0));
     // Each script added once the one before it ran
     const loaded = [];
@@ -163,6 +166,7 @@ test("the Thermal Inspector is added to every map, with WebODM's Leaflet, its sc
     add({tiles: []}, "L");
     await new Promise(r => setTimeout(r, 0));
     expect(document.head.querySelectorAll("script").length).toBe(8);
+    expect(sheets().length).toBe(3);
     expect(window.ThermalInspector.create).toHaveBeenCalledTimes(2);
     delete window.ThermalInspector;
 });
@@ -200,4 +204,22 @@ test("the 3D Thermal Inspector is added to the 3D page, after the 2D one's scrip
     button.componentWillUnmount();
     expect(inspector.detach).toHaveBeenCalled();
     delete window.ThermalInspector3D;
+});
+
+test("the map's scripts and stylesheets carry main.js's version, so a browser fetches them again after an update", async () => {
+    sideMenu(false);
+    document.head.innerHTML = "";
+    const script = document.createElement("script");
+    Object.defineProperty(document, "currentScript", {configurable: true, get: () => script});
+    script.src = "/plugins/dji-thermal/main.js?v=abc123";
+    try {
+        loadMain();
+    } finally {
+        delete document.currentScript;
+    }
+    global.PluginsAPI.Map.willAddControls.mock.calls[0][1]({tiles: []}, "L");
+    expect(Array.from(document.head.querySelectorAll("link")).map(l => l.getAttribute("href")))
+        .toEqual(["inspector.css", "split.css", "frames.css"].map(n => "http://localhost/plugins/dji-thermal/" + n + "?v=abc123"));
+    await new Promise(r => setTimeout(r, 0));
+    expect(document.head.querySelector("script").getAttribute("src")).toBe("http://localhost/plugins/dji-thermal/scale.js?v=abc123");
 });
