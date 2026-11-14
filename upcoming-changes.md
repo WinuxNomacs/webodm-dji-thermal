@@ -20,6 +20,17 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R31. The 3D model's palette loads faster** — 2026-11-13, `r31-3d-speed` (the user: "it currently takes multiple
+  seconds to load", then "let's go with 1-3"). On the HomerunObliqueII model (20 materials, one 4096×4096), all
+  materials' values took ~6.9 s on every visit: each request read the texture TIFF and encoded its PNG again (2.3 s
+  for the large one). Now: `model3d.material_values` keeps each material's PNG and its offset and step in the task's
+  `thermal/model3d/` (`<textures' version>-<index>`), read back until the task is processed again (older versions'
+  files removed); the browser fetches 6 materials at once (`FETCHES`, was 3); and `fillPlan` (the gaps between
+  patches) looks only at the texels next to those just filled, in typed arrays, with the same plan as before. All
+  20 then load in ~1.9 s; the large material's colouring in the browser (~1.5 to 2 s) is unchanged. Dropped: a
+  faster PNG compression (level 1: 0.75 s instead of 2.3 s, 12.3 MB instead of 9.2 MB), worth it only on the
+  first visit once the values are kept. Tests: Django `test_a_materials_temperatures_are_read_once_and_kept_...`,
+  Jest "plans the same fill as looking at every empty texel in each pass...". No user-visible change but speed.
 - **R30. Out-of-range values refused before a workset starts** — 2026-11-13, `r30-workset-ranges` (the user: "Yes",
   asked after R27 found the gap). A distance (or emissivity, humidity, reflected or ambient temperature) outside what
   a camera accepts, typed in the Workset Creation Settings, was taken (the server only checked 0.1 to 1000 m), then

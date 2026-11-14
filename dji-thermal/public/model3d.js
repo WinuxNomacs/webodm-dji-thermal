@@ -16,7 +16,7 @@
 (function (root) {
     var API = "/api/plugins/dji-thermal/";
     var WATCH_MS = 400;             // how often the scene is looked at until WebODM has added the model
-    var FETCHES = 3;                // material values fetched at once
+    var FETCHES = 6;                // material values fetched at once (a browser asks a server 6 at a time)
     var DILATE = 2;                 // texels a material's colours reach into the empty space around its patches
     var EMPTY_RGB = [128, 128, 128];    // where a texture holds no temperature, beyond that
     var DRACO_PATH = "/static/app/js/vendor/draco/";      // WebODM's own (ModelView.jsx)
