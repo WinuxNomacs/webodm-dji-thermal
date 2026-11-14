@@ -14,6 +14,44 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R43. ODM's global seam levelling off for thermal tasks** (`r43-seam-levelling`) — 2026-11-14. From a review of
+  two Mavic 3M multispectral tools (mavic3m-pansharpening, dedal-calibration: reflectance, nothing for thermal
+  images): dedal-calibration processes its calibrated images with `texturing-skip-global-seam-leveling` so the mosaic
+  keeps the images' values, which neither the plugin's plan nor dji-thermal-cli's `check --webodm` sets. Decided (the
+  user, 2026-11-14): measure it first, on one flight processed both ways, each orthophoto against the photos' own
+  temperatures (as the Thermal Inspector's photos window places them); the rest of that review is dropped (a
+  per-run verdict, fixed factory lens parameters: the thermal photos carry no `DewarpData`; a reference target).
+  The option is added to the plan only if the measurement shows it helps.
+  - **Measured** (2026-11-14): the 151 harmonized frames of the test flight on the dev node (ODX 3.8.5, the plan's
+    options), processed once as today, then its texturing run again (`rerun-from mvs_texturing`) with the option:
+    one reconstruction, the same cameras, the same orthophoto grid (1.6 cm/px). 16,017 random orthophoto pixels
+    against the photo closest to straight down that the surface doesn't hide (`frames3d`'s placing):
+
+    | | levelled (today) | not levelled |
+    |---|---|---|
+    | median / 90th / 95th percentile of the difference | 0.150 / 0.65 / 1.11 °C | 0.153 / 0.68 / 1.10 °C |
+    | neighbouring pixels' step, 99th percentile | 2.08 °C | 2.07 °C |
+    | orthophoto's range (the photos: -45.4 to 65.0 °C) | **-389.9** to 58.1 °C | -44.2 to 58.1 °C |
+    | orthophoto pixels outside the photos' range | 28, in 3 patches | 0 |
+    | texels of the 3D model's textures outside it | 240 | 62 |
+
+    The two orthophotos differ by a median 0.04 °C, over 0.5 °C on 4.3 % of the pixels (whole patches shifted by a
+    few tenths), over 1 °C on 1.2 %. The texturing run a third time, levelled again, gave -391.2 °C again (20
+    pixels): the impossible values come from the levelling, not from one run. So: no closer to the photos on
+    average and no more visible seams either way; the levelling's cost is a few pixels far outside any temperature
+    measured, which stretch the orthophoto's range and statistics. This is likely what the 1.0.0 live check's
+    orthophoto of -601 to 603 °C was (closed then as not reproduced). One flight; nothing was created in WebODM
+    (the node's own task, removed).
+  - **Decided** (the user, 2026-11-14): add it, in dji-thermal-cli's `check --webodm` plan. **Built:** dji-thermal-cli
+    1.14.0 (the plan's `recommended` gains `texturing-skip-global-seam-leveling`; released and on PyPI 2026-11-14,
+    pushed and tagged by Claude on the user's word), pinned here (from 1.12.0: 1.13.0 and 1.13.1 come with it, the
+    suites pass on both WebODM versions). In the plugin: DJI Thermal Task's panel starts WebODM's options with it
+    (`thermal/plan.js` `PANEL_OPTIONS`; `sameOptions` takes true and "true" alike), the panel's note names it
+    (`ThermalTaskPanel.jsx`), the Analyzer's plan shows it under "Texturing" (`analyzer_core.js` `WEBODM_SECTIONS`).
+    Tests: `__tests__/plan.test.js`; the CLI's `tests/test_webodm.py`. Docs: README, `quickstart-thermal-task.md`
+    (its panel screenshot retaken), `quickstart-analyzer.md`. Checked live, read only, at 1280 and 390 px: the
+    panel's Review lists both options. A dataset analyzed before keeps its stored plan until **Analyze again**; so
+    the plan tab's and Create task's screenshots (the docs dataset's stored analysis) are as they were.
 - **R42. "(Default)" at the top of the Palette list** (`r42-default-palette`) — 2026-11-14. The user: "can we add
   (Default) to the top of the list of thermal palettes that allows the user to switch the view to that of the
   source/raw image?" Decided (the user, 2026-11-14): **where**: the Thermal Inspector's Palette menu on the map page

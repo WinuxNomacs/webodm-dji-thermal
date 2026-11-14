@@ -15,10 +15,14 @@ describe("what DJI Thermal Task's panel takes from the WebODM plan", () => {
     });
 
     test("options are the same whatever their order, and differ by any value", () => {
-        expect(sameOptions([{name: "radiometric-calibration", value: "none"}], PANEL_OPTIONS)).toBe(true);
+        const seams = "texturing-skip-global-seam-leveling";
+        expect(sameOptions([{name: seams, value: true}, {name: "radiometric-calibration", value: "none"}], PANEL_OPTIONS)).toBe(true);
+        expect(sameOptions([{name: seams, value: "true"}, {name: "radiometric-calibration", value: "none"}], PANEL_OPTIONS)).toBe(true);
+        expect(sameOptions([{name: seams, value: false}, {name: "radiometric-calibration", value: "none"}], PANEL_OPTIONS)).toBe(false);
+        expect(sameOptions([{name: "radiometric-calibration", value: "none"}], PANEL_OPTIONS)).toBe(false);
         expect(sameOptions([{name: "dsm", value: true}, {name: "radiometric-calibration", value: "none"}],
                            [{name: "radiometric-calibration", value: "none"}, {name: "dsm", value: true}])).toBe(true);
-        expect(sameOptions([{name: "radiometric-calibration", value: "camera"}], PANEL_OPTIONS)).toBe(false);
+        expect(sameOptions([{name: seams, value: true}, {name: "radiometric-calibration", value: "camera"}], PANEL_OPTIONS)).toBe(false);
         expect(sameOptions([], PANEL_OPTIONS)).toBe(false);
     });
 });

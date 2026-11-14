@@ -334,8 +334,8 @@ export default class ThermalTaskPanel extends React.Component {
                 <p>{text} <span className="text-muted">{_("To check the flight first or compare settings, use the")}{" "}
                     <a href="/plugins/dji-thermal/">{_("DJI Thermal Analyzer")}</a>.</span></p>
                 <p className="help-block">{this.state.frames.normalize ?
-                    _("WebODM's options below start as the plan's (radiometric-calibration none). Left so, the task also gets the plan's orthophoto resolution and GPS accuracy, from the photos' analysis, before it starts.") :
-                    _("WebODM's options below start as the plan's (radiometric-calibration none). Normalized or harmonized, the task also gets its orthophoto resolution and GPS accuracy, from the photos' analysis.")}</p>
+                    _("WebODM's options below start as the plan's (radiometric-calibration none, no global seam leveling). Left so, the task also gets the plan's orthophoto resolution and GPS accuracy, from the photos' analysis, before it starts.") :
+                    _("WebODM's options below start as the plan's (radiometric-calibration none, no global seam leveling). Normalized or harmonized, the task also gets its orthophoto resolution and GPS accuracy, from the photos' analysis.")}</p>
             </React.Fragment>
         );
     }
