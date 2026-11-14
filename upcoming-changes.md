@@ -3,26 +3,6 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R29. The 2D map's source frames placed with ODM's cameras** (the user, 2026-11-13: "a worthwhile followup",
-  after R27). On a WebODM orthophoto, the frames window places the point with the workset's camera models (the frames'
-  GPS and gimbal, "the point can be a little off"); ODM's refined cameras (`shots.geojson`, `cameras.json`) put it on
-  the right pixel (measured for R28: best at no offset). Builds on R28's `frames3d.py` (`shots`, `project`).
-  Checked: the dev tasks all have `assets/odm_dem/dsm.tif` (5 cm, the cameras' coordinates; `dsm: true` is WebODM's
-  default and the plugin's plan's, but nothing forces it).
-  **Decided** (the user, 2026-11-13, on WebODM's map page, the Thermal Inspector's source frames window):
-  - A thermal orthophoto gets **the 3D page's window** ("Photos that saw this spot"): the task's own photos on the
-    exact pixel, each photo's temperature there, the orthophoto's, the spread, ranked from straight down, "Open this
-    frame" when the task came from a workset. Workset mosaics laid on the map keep their own window.
-  - The point's height is the **DSM**'s. **No DSM: today's window** (a workset's task keeps the GPS-and-gimbal
-    placement and its note; another task has none).
-  - **Photos the terrain hides are left out, with the note**, as in 3D, by each photo's line of sight over the DSM
-    (on the server), its tolerance settled by measuring against the model's ray test.
-  - **Every thermal task** with ODM's cameras, a DSM and its temperature photos gets the window, not only a
-    workset's (so a workset whose mosaics were never built gets it too).
-  - Chosen while planning (not asked): the photo shown is marked on the map by its camera and a line to the point,
-    as in 3D, in place of today's footprint outline.
-  First step: measure on HomerunObliqueII that the DSM's heights put the point on the right pixel, and the DSM's
-  line-of-sight test against the model's; stop and ask if it doesn't hold.
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
@@ -34,6 +14,44 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R29. The 2D map's photos placed with ODM's cameras** — 2026-11-13, `r29-2d-frames-cameras` (the user: "a
+  worthwhile followup", after R27). On WebODM's map page, a click in Hover or Pin on a thermal orthophoto (or a pin's
+  name) now opens the 3D page's window, "Photos that saw this spot", in the Thermal Inspector's frames window: the
+  task's own photos placed with ODM's refined cameras at the surface model's height, each drawn as the orthophoto is
+  with its temperature there, the orthophoto's, the spread, from the one closest to straight down; those the surface
+  hides are left out and counted; the photo shown is marked on the map by its camera and a dashed line to the point;
+  "Open this frame" when the task came from a workset.
+  **Decided** (the user, 2026-11-13): the 3D page's window for a thermal orthophoto, workset mosaics laid on the map
+  keeping their own; the height from the DSM, and without one today's window (a workset's task keeps the
+  GPS-and-gimbal placement and its note, another task has none); hidden photos left out with the note, by a line of
+  sight over the DSM on the server; every thermal task with ODM's cameras, a DSM and its temperature photos, not
+  only a workset's. Chosen while planning (not asked): the camera and line on the map in place of the footprint.
+  **Measured first** (HomerunObliqueII, 151 photos, DSM 5 cm in the cameras' coordinates, covering the orthophoto
+  but ~0.03 % of its edge cells):
+  - Placement (3000 spots, the height from the DSM): a median of 27 photos see a spot; the most nadir photo against
+    the orthophoto: median −0.01 °C, |difference| median 0.13 °C, p90 0.55, p95 0.94; best at no offset (0.132
+    against 0.18 to 0.19 one pixel away). The median of all the photos is 0.55 °C from the orthophoto.
+  - Hiding (136 spots, 4027 sight lines, against R28's ray through the model): the model hides 4.6 %; the DSM test
+    agrees with it on 95 to 96 % at every tolerance tried; the DSM is 0.048 m from the model's height (median, p90
+    1.17 m: eaves and trees).
+  - Which test tells the orthophoto better (406 spots, 12,546 lines, |photo − orthophoto|): kept by both 0.61 °C
+    (median); the DSM test (clear by 0.10 m, from 0.10 m off the point) drops 5.2 %: kept 0.62 (p90 2.15), dropped
+    4.04; the model's: kept 0.62, dropped 2.17; dropped by the DSM alone 3.73, by the model alone 1.19. So the DSM
+    test, on the orthophoto's own surface, is the better one here: `SIGHT_CLEARANCE` and `SIGHT_START` 0.10 m.
+  **Code**: `frames3d.py` (`on_map`, `frames_on_map`, `sight_blocked`, `NoHeight`: a window of the DSM around the
+  point and the cameras, 0.05 to 1 s on the dev tasks); `inspector_api.py` (`InspectorFrames`,
+  `InspectorFrameValues`: `TASK/inspector/frames?lon=&lat=` and `/frames/<n>/values`, sharing `photo_frames` and
+  `photo_values_response` with `model3d_api.py`; `measurements` answers `photos`, so a click knows at once whose it
+  is); `frames3d.js` (`create` takes `framesUrl`, `valuesUrl`, `words`; the server's `hidden` and `orthophoto`);
+  `inspector.js` (`framesSource`'s `photos`, `hasPhotos`, `showPhotos`, `photoStyle`, `onPhotoShown`);
+  `recolour.js` takes `paintIsotherm` from `model3d.js`; `frames3d.js` loads with the 2D scripts (`main.js`
+  `NAMES`, `frame.html`); the window's styles in `frames.css`. **Tests**: Django `test_model3d.TestFrames3D` (a
+  DSM made in the test: the height, a wall hiding a camera, the `photos` flag, who may ask); Jest
+  `frames3d.test.js` ("shows a point of the map from the caller's own URLs..."), `inspector.test.js` ("shows the
+  task's own photos that saw a point of an orthophoto..."), `main.test.js`, `pages.test.js`. Docs: README,
+  `quickstart-inspector.md` section 6 and `inspector-frames.png`, `api.md`, `developing.md`. Live on 4.0.0 at 1280
+  px: 33 to 67 photos a point, the palette restyles without fetching again, Pin opens it, a workset mosaic keeps
+  its own window. Not changed: under 400 px wide the frames window (either kind) has no room beside the panel.
 - **R31. The 3D model's palette loads faster** — 2026-11-13, `r31-3d-speed` (the user: "it currently takes multiple
   seconds to load", then "let's go with 1-3"). On the HomerunObliqueII model (20 materials, one 4096×4096), all
   materials' values took ~6.9 s on every visit: each request read the texture TIFF and encoded its PNG again (2.3 s

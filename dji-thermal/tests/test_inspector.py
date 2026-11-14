@@ -279,7 +279,7 @@ class TestInspector(BootTestCase):
 
     def test_measurements_are_saved_with_the_task_measured_here_renamed_and_deleted(self):
         url = self.url(self.task, "measurements")
-        self.assertEqual(self.client.get(url).data, {'measurements': [], 'can_change': True, 'baseline': None, 'palette': ''})
+        self.assertEqual(self.client.get(url).data, {'measurements': [], 'can_change': True, 'baseline': None, 'palette': '', 'photos': False})
         conversion_tasks.set_task_palette(self.task, 'ironred')
         self.assertEqual(self.client.get(url).data['palette'], 'ironred')
         pin = {'name': "Vent", 'comment': "Warm air", 'shape': 'pin',
