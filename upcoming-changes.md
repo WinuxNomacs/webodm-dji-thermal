@@ -7,7 +7,10 @@
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
 
-**Then** (proposed from R32's review, 2026-11-13; none built, each to be decided with the user first)
+**Then** (proposed from R32's review, 2026-11-13). Decided (the user, 2026-11-14, "continue"): R33: an unreadable
+surface model is said in words in the window, no fallback; R35: left as it is (the Inspector open means the click is
+its own), nothing to build; R37: under 768 px the frames window takes the page's width over the map; R38: every
+screenshot in °C.
 - **R33. A photo that can't be shown says so.** Map page and 3D page › Thermal Inspector › the "Photos that saw this
   spot" window. Today a photo whose temperatures can't be loaded (its file gone, the server refusing) is a black
   picture with no words, and a photo that isn't on the server can rank first. The answer already says `available`

@@ -310,6 +310,13 @@ class TestFrames3D(TestModel3D):
                           if f['file'] in ('a_nadir.tiff', 'b_east.tiff')], ['b_east.tiff'])
         self.assertEqual([f['file'] for f in self.frames(400040.0, 4659999.0, 0.0).data['frames'] if f['file'] == 'b_east.tiff'], [])
 
+    def test_a_photo_that_is_gone_comes_after_those_on_the_server_however_squarely_it_saw_the_point(self):
+        # Gone, and nearer than the nadir photo that is there
+        self.write_cameras(self.task, self.shots + [('0_gone_near.tiff', [400001.0, 4659999.0, 30.0], NADIR, None)])
+        files = [f['file'] for f in self.frames(400001.0, 4659999.0, 0.0).data['frames']]
+        self.assertEqual(files[0], 'a_nadir.tiff')
+        self.assertEqual(files[-2:], ['0_gone_near.tiff', 'd_gone.tiff'])
+
     def test_projects_through_a_brown_lens_as_opensfm_does(self):
         lens = dict(LENS, k1=0.1, k2=0.01, k3=0.001, p1=0.002, p2=0.003, c_x=0.01, c_y=-0.02)
         shot = {'centre': [0.0, 0.0, 10.0], 'rotation': frames3d.rotation_matrix(NADIR), 'camera': lens}
@@ -400,6 +407,15 @@ class TestFrames3D(TestModel3D):
         self.assertIn('a_nadir.tiff', [f['file'] for f in beyond['frames']])     # over the wall
         self.assertEqual(beyond['hidden'], 0)
         self.assertIsNone(beyond['orthophoto'])                  # past the orthophoto's edge
+
+    def test_a_surface_model_without_a_projection_is_said_in_words(self):
+        path = self.task.assets_path('odm_dem', 'dsm.tif')
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with rasterio.open(path, 'w', driver='GTiff', width=4, height=4, count=1, dtype='float32') as dst:
+            dst.write(np.zeros((4, 4), dtype=np.float32), 1)
+        response = self.on_map(400001.0, 4659999.0)[0]
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn("surface model (DSM) can't be read", response.data['error'])
 
     def test_a_task_says_whether_the_photos_that_saw_a_point_of_its_map_can_be_told(self):
         self.assertFalse(self.client.get(self.map_url("measurements")).data['photos'])       # no surface model

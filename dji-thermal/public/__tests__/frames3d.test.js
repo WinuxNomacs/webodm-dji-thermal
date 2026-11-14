@@ -166,6 +166,35 @@ describe("the window's behaviour", () => {
         expect(asked.map(u => u.replace(/.*frames\//, ""))).toEqual(["1/values", "2/values", "1/values"]);
     });
 
+    test("says so in place of a photo that is gone, without asking for it, or that the server can't give, or that failed to load", async () => {
+        document.body.innerHTML = '<div id="box" hidden></div>';
+        const box = document.getElementById("box"), asked = [];
+        const fetchFn = jest.fn((url) => {
+            if (url.includes("/values")) {
+                asked.push(url.replace(/.*frames\//, ""));
+                return url.includes("/2/") ? Promise.resolve({status: 404, ok: false}) : Promise.reject(new Error("offline"));
+            }
+            return Promise.resolve({ok: true, json: () => Promise.resolve({frames: [frame("a", [-10, 0, 30], null, {available: false}),
+                frame("bb", [0, 5, 40], 21), frame("ccc", [0, 5, 45], 22)], workset: null})});
+        });
+        const frames = Frames3D.create(box, {fetchFn, task: {id: "t1", project: 3}, style: () => ({palette: []}), corrected: (c) => c, format: (c) => String(c)});
+        const settled = () => new Promise(r => setTimeout(r, 0));
+        await frames.show({x: 0, y: 0, z: 0}, null, null);
+        await settled();
+        expect(box.querySelector(".dt-frames3d-missing").textContent).toBe("This photo isn't on the server any more.");
+        expect(box.querySelector(".ta-pip-mark")).toBeNull();
+        expect(asked).toEqual([]);
+        box.querySelector('[data-pip="next"]').click();
+        expect(box.querySelector(".dt-frames3d-missing")).toBeNull();
+        await settled();
+        expect(box.querySelector(".dt-frames3d-missing").textContent).toBe("This photo isn't on the server any more.");
+        expect(box.querySelector(".ta-pip-mark")).toBeNull();
+        box.querySelector('[data-pip="next"]').click();
+        await settled();
+        expect(box.querySelector(".dt-frames3d-missing").textContent).toBe("This photo couldn't be loaded.");
+        expect(asked).toEqual(["2/values", "3/values"]);
+    });
+
     test("says why when the server has no photos to give", async () => {
         document.body.innerHTML = '<div id="box"></div>';
         const box = document.getElementById("box");

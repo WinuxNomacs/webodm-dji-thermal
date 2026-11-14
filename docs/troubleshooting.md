@@ -150,6 +150,16 @@ Likewise, the task's orthophoto isn't a temperature map.
 The point or region has no temperature to read there: the task's crop leaves it out, it's beyond the
 orthophoto, or the orthophoto has no data there.
 
+**"This photo isn't on the server any more"**, **"This photo couldn't be loaded"** (Photos that saw this spot)
+
+The photo's file was removed from the task after it was processed (the photos that are still there are shown
+first); or the request for it failed: step to another photo and back to ask for it again. A task whose photos were
+all removed (WebODM's Compact) has no photos window.
+
+**"This task's surface model (DSM) can't be read, so the point can't be placed in its photos"**
+
+The task's `odm_dem/dsm.tif` is damaged or has no projection. Processing the task again makes it anew.
+
 ## DJI's own Thermal SDK
 
 **"dji-thermal-cli cannot be loaded (…): DJI thermal images cannot be converted"**, on the DJI Thermal page
