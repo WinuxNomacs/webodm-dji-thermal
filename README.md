@@ -304,8 +304,9 @@ over WebODM's base layers:
 - a click on the map keeps those values at that point, marked, until **Follow the cursor** (or Esc), and opens a
   window over the map with the **frames that saw that point** (the mosaic's own first, the
   others in turn with the arrows), each drawn in the tab's palette and range (on View angle, the angle each of its
-  pixels saw the ground at), with a crosshair on the point and its outline on the map, and **Open this frame** (the
-  frame page, below, in a new tab); dragged by its heading, it stays where it's dropped until closed; mosaics built before version 1.5.0 of dji-thermal-cli are built again to show them;
+  pixels saw the ground at), with a crosshair on the point and its outline on the map, **Open this frame** (the
+  frame page, below, in a new tab) and **Preview frame** (the whole frame at its full size over the page: zoomed,
+  dragged, stepped to the others, closed with Esc); dragged by its heading, it stays where it's dropped until closed; mosaics built before version 1.5.0 of dji-thermal-cli are built again to show them;
 - what dji-thermal-cli reports (seams, misalignment, frame offsets, heights) and the mosaic files to download (also
   in the workset's zip);
 - **Open on WebODM's map** (also in the workset's menu): WebODM's map of the project with this mosaic laid on it by
@@ -508,7 +509,8 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   orthophoto's palette and range, with its temperature there, the orthophoto's and what all the photos read, from the
   one closest to straight down; those the surface hides the point from are left out and counted; the photo shown is
   marked on the map by where it was taken from, with a line to the point; **Open this frame** (the frame page, in a
-  new tab) when the task came from a workset. A task without a surface model (`dsm` off) or ODM's cameras shows
+  new tab) when the task came from a workset, and **Preview frame** (the whole photo at its full size over the page,
+  zoomed and dragged, with the temperature under the pointer, stepping through the photos without leaving the map). A task without a surface model (`dsm` off) or ODM's cameras shows
   instead, when it was processed from a workset whose mosaics are built, the workset's frames placed from their GPS
   and gimbal (the point can be a little off). On a mosaic, the window is the mosaic viewer's, the mosaic's own frame
   first, its outline on the map. Elsewhere a click in Hover is still WebODM's (its popup).
@@ -539,7 +541,8 @@ Thermal Inspector, with the 2D Inspector's tools that make sense on a model:
   walls included. Photos the model hides the spot from are left out; the rest come most squarely facing the surface
   first, one at a time in your palette with a crosshair on the spot, with that photo's temperature there, the model's,
   and what all the photos read there. Its camera is marked in the view, and **Open this frame** opens the frame's page
-  in the Analyzer when the task came from a workset. ODM doesn't keep which photo it coloured the model from, so none
+  in the Analyzer when the task came from a workset; **Preview frame** shows the whole photo at its full size over
+  the page, zoomed and dragged, with the temperature under the pointer. ODM doesn't keep which photo it coloured the model from, so none
   is singled out.
 
 Not in 3D: regions and lines, and the overlays. ODM blends the photos separately for the model's

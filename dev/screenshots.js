@@ -416,6 +416,20 @@ const SHOTS = {
         await p.waitForTimeout(2000);
         return p;
     },
+    "inspector-preview": async (p, env) => {
+        // "Preview frame" in that window: the photo over the page, zoomed in a step, the pointer on it for its temperature
+        await SHOTS["inspector-frames"](p, env);
+        await p.setViewportSize(SIZE);
+        await p.click('.dt-inspector-frames [data-pip="preview"]');
+        await p.waitForSelector(".dt-preview-note[hidden]", {state: "attached", timeout: 30000});
+        const stage = await p.locator(".dt-preview-stage").boundingBox();
+        await p.mouse.move(stage.x + stage.width * 0.45, stage.y + stage.height * 0.5);
+        await p.mouse.wheel(0, -100);
+        await p.mouse.wheel(0, -100);
+        await p.mouse.move(stage.x + stage.width * 0.25, stage.y + stage.height * 0.62);     // on the roof, off the circle
+        await p.waitForTimeout(800);
+        return p;
+    },
     "inspector-mosaics": async (p, env) => {
         // WebODM's map of the dataset's project, its first workset's mosaic laid by the link, swiped against the
         // project's own layers

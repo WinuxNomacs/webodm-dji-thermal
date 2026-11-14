@@ -94,6 +94,11 @@ Dropping a pin, or clicking a pin's name under **Measurements**, opens them too.
   the model's temperature is close to the photos' but rarely exactly one of them. No photo is singled out.
 - When the task was made from a workset, **Open this frame** opens the frame on its own page in the Analyzer, to
   measure it in its pixels or with other values.
+- **Preview frame** shows the whole photo at its full size over the page, without leaving the 3D view:
+  zoom with the wheel, a pinch, the buttons or `+` and `-` (`0` or a double click fits it again), drag it, step to the
+  others with the arrows or ← and →, and close it with Esc or the ×. The spot keeps its circle, and
+  the temperature under the pointer is shown beside it. The view's own keys and wheel are the preview's while it is
+  open.
 - On the point cloud, a point more than 25 cm from the model's surface has no photos: the model is what tells which
   photos saw a spot.
 

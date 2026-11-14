@@ -131,6 +131,11 @@ closed, it goes back to its corner:
 
 ![The frames that saw a point](images/mosaic-frames.png)
 
+**Preview frame**, under the frame, shows it at its full size over the page, without leaving the mosaic: zoom with
+the wheel, a pinch, the buttons or `+` and `-` (`0` or a double click fits it again), drag it, step to the other
+frames with the arrows or ← and →, and close it with Esc or the ×. The point keeps its circle, and the window follows
+the frame shown.
+
 ### One frame at a time
 
 **Open this frame**, under the frame in that window, opens it on the frame page in a new tab (a thermal frame's
