@@ -277,8 +277,9 @@ describe("the Thermal Inspector", () => {
         expect(inspector.paletteOf(layer._url)).toBe("inferno");
         ins.open();
         const select = panel().querySelector('[data-act="palette"]');
-        expect([].map.call(select.options, o => o.value)).toEqual(["ironred", "inferno", "magma", "jet"]);
-        expect([].map.call(select.options, o => o.textContent)).toEqual(["DJI ironred", "inferno", "magma", "jet"]);
+        expect([].map.call(select.options, o => o.value)).toEqual(["", "ironred", "inferno", "magma", "jet"]);
+        expect([].map.call(select.options, o => o.textContent)).toEqual(["(Default)", "DJI ironred", "inferno", "magma", "jet"]);
+        expect(select.value).toBe("inferno");
         select.value = "jet";
         select.dispatchEvent(new Event("change", {bubbles: true}));
         expect(inspector.paletteOf(layer._url)).toBe("jet");
@@ -295,6 +296,46 @@ describe("the Thermal Inspector", () => {
         const later = tileLayer(TILES.replace("abc-1", "abc-3"), THERMAL_TASK);
         map.add(later);
         expect(inspector.paletteOf(later._url)).toBe("inferno");
+    });
+
+    it("(Default), first in the list, shows the orthophoto as WebODM draws it, on this page only, and the look comes back with a palette", async () => {
+        const layer = tileLayer(TILES, THERMAL_TASK);
+        const map = fakeMap([layer]);
+        const {ins, saved, panel} = start(map, {"GET /api/plugins/dji-thermal/display": Object.assign({}, DISPLAY, {palette: "ironred"})});
+        await ins.ready;
+        ins.open();
+        const select = () => panel().querySelector('[data-act="palette"]');
+        const choose = (value) => { select().value = value; select().dispatchEvent(new Event("change", {bubbles: true})); };
+        // The Inspector's own range, over DJI's ironred (the plugin's tiles)
+        const field = (act) => panel().querySelector('[data-act="' + act + '"]');
+        field("range-min").value = "15";
+        field("range-max").value = "35";
+        field("range-max").dispatchEvent(new Event("change", {bubbles: true}));
+        const mine = layer._url;
+        expect(mine).toContain("palette=ironred");
+        expect(mine).toContain("rescale=15,35");
+        choose("");
+        // WebODM's own tiles, in the colour map and over the range its layer panel holds
+        expect(layer._url).toMatch(/^\/api\/projects\/2\/tasks\/abc-1\/orthophoto\/tiles\//);
+        expect(inspector.paletteOf(layer._url)).toBe("magma");
+        expect(layer._url).toContain("rescale=10,40");
+        expect(select().value).toBe("");
+        expect(panel().textContent).toContain("Orthophotos as WebODM draws them; the photos as the camera saved them.");
+        expect(saved).toEqual([]);
+        // A range set in WebODM's panel keeps it
+        panelSets(layer, "magma", "12,30");
+        expect(inspector.paletteOf(layer._url)).toBe("magma");
+        expect(select().value).toBe("");
+        // A palette chosen again: drawn in it; the look it had is back only when (Default)'s wasn't changed meanwhile
+        choose("ironred");
+        expect(inspector.paletteOf(layer._url)).toBe("ironred");
+        expect(layer._url).toContain("rescale=12,30");
+        expect(saved).toEqual(["ironred"]);
+        choose("");
+        choose("ironred");
+        expect(layer._url).toContain("palette=ironred");
+        expect(layer._url).toContain("rescale=12,30");
+        expect(panel().textContent).not.toContain("as WebODM draws them");
     });
 
     it("draws the layer in one of DJI's palettes with the plugin's tiles, through WebODM's range changes", async () => {

@@ -430,7 +430,8 @@ class DatasetThumbnail(DatasetView):
         thermal frame's temperatures in one of DJI's palettes (?palette=, the user's preferred), cached in the dataset;
         with ?size=large, at the file's own size (up to LARGE_SIZE), for the detail pane, with ?size=list, up to
         LIST_SIZE, for the frame page's list; with ?workset=, also a frame
-        that workset converted (a dataset never analyzed has its frames' thumbnails in the workset's Files)"""
+        that workset converted (a dataset never analyzed has its frames' thumbnails in the workset's Files); with
+        ?own=1, always its embedded picture, as the camera saved it (the Thermal Inspector's "(Default)")"""
         from PIL import Image
         task = get_dataset(request, pk)
         rel = request.query_params.get('file') or ""
@@ -440,9 +441,10 @@ class DatasetThumbnail(DatasetView):
         if rel not in kinds and any(f.get('ok') and f.get('path') == rel for f in converted):
             kinds[rel] = 'thermal'
         path = dataset_file(task, rel, kinds)
-        palette = request.query_params.get('palette') or ""
+        own = request.query_params.get('own') == '1'
+        palette = "" if own else request.query_params.get('palette') or ""
         size = SIZES.get(request.query_params.get('size'), THUMBNAIL_SIZE)
-        if size == LARGE_SIZE and palette not in conversions.palettes():
+        if size == LARGE_SIZE and not own and palette not in conversions.palettes():
             # The detail pane draws a frame in the palette it was shot in when the user's isn't one of DJI's
             palette = next((r.get('palette') for r in datasets.analysis(task).get('files') or [] if r.get('path') == rel), "") or ""
         if kinds[rel] == 'thermal' and palette in conversions.palettes():
@@ -456,7 +458,7 @@ class DatasetThumbnail(DatasetView):
                 im.draft('RGB', size)
                 im = im.convert('RGB')
                 im.thumbnail(size)
-                im.save(out, 'JPEG', quality=75)
+                im.save(out, 'JPEG', quality=90 if own else 75)
         except FileNotFoundError:
             raise NotFound({'error': "The file is not on the server any more"}) from None
         except (OSError, ValueError):

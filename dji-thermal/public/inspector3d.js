@@ -240,6 +240,9 @@
     function panelHtml(state, s, temp) {
         var unit = Inspector.userUnit(), options = Inspector.paletteOptions(state.display);
         if (state.palette && !options.some(function (o) { return o[0] === state.palette; })) options = options.concat([[state.palette, state.palette]]);
+        // "(Default)": the model as WebODM draws it, the photos as the camera saved them
+        var current = state.plain ? Inspector.PLAIN : state.palette;
+        if (options.length) options = [[Inspector.PLAIN, "(Default)"]].concat(options);
         var tool = TOOLS[state.mode];
         return '<div class="dt-inspector-top"><div class="dt-inspector-head"><strong><i class="fa fa-thermometer-half"></i> Thermal Inspector</strong>' +
             '<a href="javascript:void(0)" class="dt-inspector-close" data-act="close" title="Close"><i class="fa fa-times"></i></a></div>' +
@@ -257,8 +260,10 @@
             '<div class="dt-inspector-readout">' + readoutHtml(state.readout, unit, temp) + "</div>" +
             (options.length ? '<label class="dt-inspector-label">Palette <select class="form-control input-sm" data-act="palette">' +
                 options.map(function (o) {
-                    return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === state.palette ? " selected" : "") + ">" + escapeHtml(o[1]) + "</option>";
-                }).join("") + "</select></label>" : "") + Inspector.scaleHtml(s, state, unit).replace(">This layer: ", ">This model: ") + "</div>" +
+                    return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === current ? " selected" : "") + ">" + escapeHtml(o[1]) + "</option>";
+                }).join("") + "</select></label>" : "") +
+            (state.plain ? '<div class="text-muted dt-inspector-hint">The model as WebODM draws it; the photos as the camera saved them.</div>' : "") +
+            Inspector.scaleHtml(s, state, unit).replace(">This layer: ", ">This model: ") + "</div>" +
             Inspector.correctionHtml(state.correction, unit, [{name: "This model", baseline: state.baseline}], state.correctionNotice,
                                      state.baseline) +
             Inspector.imageHtml(s) +
@@ -291,7 +296,7 @@
                                                         indexScript: scriptUrl("mesh_index.js")});
         var sources = [model, cloud];
         var key = MEASUREMENTS_PREFIX + task.id, ikey = Inspector.isothermKey([task.id]);
-        var state = {open: false, mode: "hover", readout: null, notice: "", pending: null, display: null, palette: "",
+        var state = {open: false, mode: "hover", readout: null, notice: "", pending: null, display: null, palette: "", plain: false,
                      pointerTemperature: true, legendVisible: true, correction: {on: false}, correctionNotice: "", baseline: null,
                      isotherm: Inspector.loadIsotherm(storage, ikey), isothermNotice: "", rangeError: "",
                      measurements: loadMeasurements(storage, key), measurementsVisible: true, shown: null,
@@ -356,7 +361,19 @@
                 render();
             });
         }
+        // "(Default)" chosen, or left for a palette: this page only, never saved
+        function setPlain(on) {
+            if (state.plain === on) return;
+            state.plain = on;
+            sources.forEach(function (s) { s.plain(on); });
+            if (frames) frames.refresh();
+            renderLegend();
+            render();
+        }
         function choosePalette(name) {
+            if (name === Inspector.PLAIN) return setPlain(true);
+            state.palette = name;               // the menu shows it at once, the model once its colours have come
+            setPlain(false);
             usePalette(name);
             if (publicPage) return;
             (deps.save || function (body) {
@@ -637,7 +654,7 @@
 
         // -- the legend ------------------------------------------------------------------------------------------------
 
-        function legendShown() { return !!(state.legendVisible && look.colors && look.range && (model.shown() || cloud.loaded())); }
+        function legendShown() { return !!(state.legendVisible && !state.plain && look.colors && look.range && (model.shown() || cloud.loaded())); }
         function renderLegend() {
             if (!legend) return;
             var unit = Inspector.userUnit(), s = scaleState();
@@ -876,6 +893,7 @@
                 style: function () { return styleOf(look, Scale.stepsOf(bandsOf(), look.range), isothermPaint(state.isotherm, fix())); },
                 corrected: function (c) { return Inspector.corrected(c, fix()); },
                 format: function (c) { return Inspector.formatTemp(c, Inspector.userUnit()); },
+                own: function () { return state.plain; },
                 changed: function (shown) {
                     state.camera = shown;
                     if (!shown && framesMove) framesMove.reset();

@@ -127,4 +127,19 @@ describe("the point cloud as a source", () => {
         expect(Array.from(s.rgba)).toEqual([50, 50, 50, 255, 60, 60, 60, 255]);
         expect(w.terminate).toHaveBeenCalled();
     });
+
+    test("shows ODX's own colours while plain, and the temperatures' again after", async () => {
+        const s = setup();
+        s.cloud.start(s.m.index);
+        s.cloud.tick();
+        s.cloud.restyle({colors: GREYS.map(() => 0xff0000ff), range: [10, 30], shares: null, steps: null});
+        const w = s.workers[0];
+        w.onmessage({data: {type: "node", id: w.posted[1].id, material: Int16Array.of(0, 0), uv: Float32Array.of(0.5, 0, 0.5, 0)}});
+        const coloured = Array.from(s.rgba);
+        s.cloud.plain(true);
+        expect(Array.from(s.rgba)).toEqual([50, 50, 50, 255, 60, 60, 60, 255]);
+        s.cloud.plain(false);
+        expect(Array.from(s.rgba)).toEqual(coloured);
+        expect(w.terminate).not.toHaveBeenCalled();
+    });
 });

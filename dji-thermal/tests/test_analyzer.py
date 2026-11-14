@@ -423,6 +423,14 @@ class TestAnalysis(AnalyzerTestCase):
         with Image.open(io.BytesIO(large.content)) as im:
             self.assertEqual(im.size, (row["width"], row["height"]))
         self.assertEqual(large.content, own.content)
+        # The Thermal Inspector's "(Default)": the frame's embedded picture as the camera saved it, whatever the palette
+        saved = self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": row["path"], "palette": "rainbow1", "size": "large", "own": "1"})
+        self.assertEqual(saved["Content-Type"], "image/jpeg")
+        with Image.open(io.BytesIO(saved.content)) as im:
+            self.assertEqual(im.size, (row["width"], row["height"]))
+        self.assertNotEqual(saved.content, large.content)
+        self.assertEqual(saved.content, self.client.get("{}/{}/thumbnail".format(API, task.id),
+                                                        {"file": row["path"], "size": "large", "own": "1"}).content)
         self.assertEqual(self.client.get("{}/{}/thumbnail".format(API, task.id), {"file": "../x.jpg"}).status_code,
                          status.HTTP_404_NOT_FOUND)
         # A thumbnail that can't be kept (asked for twice at once, the disk full) is still sent, nothing left behind

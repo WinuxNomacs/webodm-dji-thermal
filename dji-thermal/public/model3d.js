@@ -9,6 +9,7 @@
 //                cloud, one at a time)
 //   restyle(s)   colour it again with a recolour.js style ({colors, range, shares, steps, ...}, °C), with an isotherm
 //                painted over it (isothermPaint: {rgb, limits: [low, high], °C, either null}) or not
+//   plain(on)    as WebODM draws it while on (the Palette list's "(Default)"), coloured again when off
 //   reading(hit) the temperature at a hit of it: {valid, temperature (°C), reason}
 //   detach()     its original look back, its listeners off
 // The model also gives the meshes the 3D Inspector's index is built from (meshes()), and the temperature at texture
@@ -175,7 +176,7 @@
         var fetchFn = deps.fetchFn || root.fetch.bind(root), task = deps.task;
         var every = deps.setInterval || root.setInterval.bind(root), stop = deps.clearInterval || root.clearInterval.bind(root);
         var model = null, own = null, entries = [], style = null, timer = null, detached = false, description = null;
-        var valuesLoaded = null;
+        var valuesLoaded = null, plain = false;
 
         function readJson(r) { return r.json().then(function (data) { return {ok: r.ok, status: r.status, data: data}; }); }
 
@@ -218,7 +219,7 @@
         // A material of WebODM's model coloured with the style, its texture made the first time (at the size WebODM's
         // GLB has it: a phone's may be reduced)
         function paint(e) {
-            if (!style || !e.tile || !e.material) return;
+            if (plain || !style || !e.tile || !e.material) return;
             var w = e.tile.width, h = e.tile.height;
             if (!e.canvas) {
                 e.canvas = doc.createElement("canvas");
@@ -323,6 +324,22 @@
             restyle: function (s) {
                 style = s;
                 entries.forEach(paint);
+            },
+            // The model as WebODM draws it (its own textures back) while on, the Inspector's "(Default)"; coloured again
+            // with the style when off
+            plain: function (on) {
+                plain = !!on;
+                entries.forEach(function (e) {
+                    if (!e.material) return;
+                    if (!plain) {
+                        if (e.texture) e.material.map = e.texture;
+                        return paint(e);
+                    }
+                    if (!e.texture) return;
+                    e.material.map = e.original;
+                    if (e.original) e.original.needsUpdate = true;     // its GPU copy was dropped: uploaded again
+                    e.material.needsUpdate = true;
+                });
             },
             // The temperature (°C) of a material at texture coordinates, NaN where it holds none, undefined until its
             // values have come

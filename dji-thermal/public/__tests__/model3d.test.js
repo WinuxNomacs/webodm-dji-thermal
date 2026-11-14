@@ -236,6 +236,28 @@ describe("the model as a source", () => {
         expect(m.meshes.map((x) => x.material.map)).toEqual(originals);
         expect(swapped.dispose).toHaveBeenCalled();
     });
+
+    test("shows the model as WebODM draws it while plain, and coloured again after, in the style set meanwhile", async () => {
+        const source = make();
+        await source.ready;
+        source.restyle({colors: GREYS, range: [10, 23], shares: null, steps: null, sharpen: 0, isotherm: null});
+        const m = model([[4, 2], [2, 2]]);
+        const originals = m.meshes.map((x) => x.material.map);
+        scene.children.push(m);
+        tick();
+        await flush();
+        await flush();
+        const coloured = m.meshes.map((x) => x.material.map);
+        expect(coloured[0]).not.toBe(originals[0]);
+        source.plain(true);
+        expect(m.meshes.map((x) => x.material.map)).toEqual(originals);
+        // A palette or range changed meanwhile doesn't colour it
+        source.restyle({colors: GREYS, range: [0, 50], shares: null, steps: null, sharpen: 0, isotherm: null});
+        expect(m.meshes.map((x) => x.material.map)).toEqual(originals);
+        source.plain(false);
+        expect(m.meshes.map((x) => x.material.map)).toEqual(coloured);
+        expect(coloured[0].dispose).not.toHaveBeenCalled();
+    });
 });
 
 describe("the 3D Inspector's palette", () => {

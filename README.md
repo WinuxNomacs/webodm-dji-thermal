@@ -453,6 +453,15 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   Analyzer's preference, saved when you choose one here or in WebODM's own layer panel, and the one the map opens
   in. WebODM's layer panel lists only its own colour maps; one it has that the Analyzer doesn't is drawn but not
   saved.
+- **(Default)**, first in the Palette list (and in the 3D Inspector's): the view without the plugin's colours, on
+  this page only (it is never saved as your palette). Each orthophoto is drawn as WebODM draws it (the colour map
+  and range of WebODM's layer panel, no Image adjustments), the 3D model with its own textures and the point cloud in
+  its own colours, and the photos that saw a spot show as the camera saved them (the picture in the frames window and
+  in Preview frame, where the temperature under the pointer is still read). A photo's own picture comes from the
+  task's workset; for a task not made from one you can view, the photo stays drawn from its temperatures and the
+  window says so. A workset mosaic laid on the map keeps its palette (only the plugin draws it), and its frames show
+  as the camera saved them. Choosing a palette again brings the colours back, with the range and Image settings you
+  had.
 - **Colour scale**: under Palette, the topmost thermal layer's palette over its range, the range in your unit (typed,
   narrowed or widened by a tenth with **◀** and **▶** between its fields, raised or lowered by a tenth of its width with **▲** and **▼**
   but never past the layer's hottest or coldest temperature, or **Auto** between them: its 2nd to 98th percentile) and the layer's own coldest and hottest temperatures. It is the range

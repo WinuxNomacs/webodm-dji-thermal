@@ -22,6 +22,9 @@ It's used:
   its colour scale or in WebODM's layer panel (the same range). Its Image section, as the mosaic viewer's, changes
   how the colours are shared out over that range.
 
+The Thermal Inspector's Palette list starts with **(Default)**: the map or 3D view as WebODM draws it, and the photos
+that saw a spot as the camera saved them. It applies to the page you're on and is never saved as your palette.
+
 WebODM's own layer panel lists only WebODM's colour maps. Choosing one there also sets your palette; a colour map
 WebODM has that the plugin's list doesn't is drawn but not saved.
 
