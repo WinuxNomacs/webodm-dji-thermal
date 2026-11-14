@@ -1,7 +1,7 @@
 // The docs' screenshots (docs/images/*.png), taken in a headless browser from the dev WebODM (dev/webodm.sh up) on
 // your own data: `node dev/screenshots.js [name ...]` at the repo root, every shot when no name is given. Read only:
 // the browser sends no request that changes anything (only the login and two that compute without saving), and none
-// beyond WebODM, so the maps have no base layer to show where a flight was. Nothing on a page that gives a location
+// beyond WebODM, so the maps have no base layer to show where a flight was. Temperatures are in °C in every shot. Nothing on a page that gives a location
 // is shot: the detail pane's latitude and longitude are hidden first (and the camera's serial number), and a shot
 // whose page shows a number that looks like a coordinate is refused. Look at each one before committing it.
 //
@@ -551,6 +551,11 @@ async function shoot(p, target, file) {
         if (allowed) return route.continue();
         if (url.startsWith(origin)) blocked.push(req.method() + " " + url);
         return route.abort();
+    });
+    // Every shot in °C, whatever the account's own unit: its answer changed on the way to the page, nothing saved
+    await p.route("**/api/plugins/dji-thermal/unit", async (route) => {
+        const response = await route.fetch();
+        await route.fulfill({response, json: Object.assign(await response.json(), {unit: "C"})});
     });
     p.on("pageerror", (e) => errors.push(e.message));
 
