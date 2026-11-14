@@ -63,9 +63,27 @@
             '<div class="ta-pip-foot">' + escapeHtml(f.file) + '<br><span class="ta-message">' +
             (f.source ? "The mosaic's pixel here comes from this frame; " : "") + "seen " + escapeHtml(angle) + " from straight down" +
             (pick.orthophoto ? ". Placed from the frames' GPS and gimbal, not ODM's cameras: the point may be a little off." : "") +
-            "</span>" + (base ? '<br><a href="' + escapeHtml(framePageUrl(base, f.file, pick.orthophoto ? "" : "mosaic")) + '" target="_blank" rel="noopener" data-pip="open" ' +
+            '</span><div class="ta-pip-links">' + (base ? '<a href="' + escapeHtml(framePageUrl(base, f.file, pick.orthophoto ? "" : "mosaic")) + '" target="_blank" rel="noopener" data-pip="open" ' +
                 'title="The frame on its own page: measure it, or measure it again with other parameters"><i class="fa fa-external-link-alt"></i> Open this frame</a>' : "") +
-            "</div>";
+            '<a href="#" role="button" data-pip="preview" title="The whole frame at its full size, over the page: zoom it, drag it, step to the others">' +
+                '<i class="fa fa-search-plus"></i> Preview frame</a>' + "</div></div>";
+    }
+
+    // The window's "Preview frame": its frames over the whole page (preview.js), each from urlOf(frame) (the picture the
+    // window shows), the point marked; shown(i): the frame shown changed, for the window to follow. Null without frames
+    function preview(doc, pick, urlOf, shown) {
+        var Preview = root.ThermalPreview || (typeof require !== "undefined" ? require("./preview.js") : null);
+        var frames = pick && pick.frames || [], n = frames.length;
+        if (!Preview || !n) return null;
+        return Preview.open(doc, {
+            count: n, at: pick.at,
+            title: function (i) { return "Frame " + (i + 1) + " of " + n + " that saw this point: " + frames[i].file; },
+            item: function (i) {
+                var f = frames[i];
+                return {name: f.file, width: f.width, height: f.height, mark: {x: f.x, y: f.y}, url: urlOf(f)};
+            },
+            shown: shown
+        });
     }
 
     // A box (the Inspector's panel and legend, a frames window) dragged over the map: moved by an offset (a CSS
@@ -122,7 +140,7 @@
     }
     var movedOnTop = 1000;      // Leaflet's corners are at 1000: the box grabbed last goes over them
 
-    var api = {movable: movable, framesUrl: framesUrl, frameUrl: frameUrl, framePageUrl: framePageUrl, orthophotoFrames: orthophotoFrames, pipHtml: pipHtml};
+    var api = {movable: movable, framesUrl: framesUrl, frameUrl: frameUrl, framePageUrl: framePageUrl, orthophotoFrames: orthophotoFrames, pipHtml: pipHtml, preview: preview};
     root.ThermalFrames = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

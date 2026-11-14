@@ -2152,9 +2152,16 @@
         }
 
         function onFramesClick(e) {
-            var b = e.target.closest("button[data-pip]");
-            if (!b || b.disabled || !state.pick) return;
+            var b = e.target.closest("[data-pip]"), pick = state.pick;
+            if (!b || b.disabled || !pick) return;
             var action = b.getAttribute("data-pip");
+            if (action === "open") return;
+            if (action === "preview") {
+                e.preventDefault();
+                var src = framesSource(thermalLayer(pick.t.layer), state.mosaics, state.palette, state.display);
+                return src && Frames.preview(doc, pick, function (f) { return Frames.frameUrl(src.base, src.tab, f.index, src.query); },
+                                             function (i) { if (state.pick === pick) { pick.at = i; drawPick(); } });
+            }
             if (action === "close") return closeFrames();
             state.pick.at = Math.max(0, Math.min(state.pick.frames.length - 1, state.pick.at + (action === "next" ? 1 : -1)));
             drawPick();

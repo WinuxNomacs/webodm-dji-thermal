@@ -39,7 +39,7 @@ window.DjiThermalScripts = (function(){
 })();
 
 // The Thermal Inspector's (2D map), and the 3D one's after them (it uses their helpers)
-var NAMES = ["scale.js", "recolour.js", "regions.js", "split.js", "frames.js", "frames3d.js", "inspector.js"];
+var NAMES = ["scale.js", "recolour.js", "regions.js", "split.js", "preview.js", "frames.js", "frames3d.js", "inspector.js"];
 var NAMES_3D = ["mesh_index.js", "model3d.js", "pointcloud3d.js", "inspector3d.js"];
 window.DjiThermalMapScripts = function(){ return window.DjiThermalScripts(NAMES); };
 

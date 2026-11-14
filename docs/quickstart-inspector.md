@@ -182,13 +182,22 @@ task, at the height of the task's surface model, so the circle is on the very pi
 - **Open this frame**, when the task was processed from a workset's TIFFs, opens the frame on its own page in the
   Analyzer, in a new tab, to measure it in its pixels or measure it again with other values: see
   [One frame at a time](quickstart-worksets.md#one-frame-at-a-time).
+- **Preview frame** shows the whole photo at its full size over the page, without leaving the map:
+  zoom with the wheel, a pinch, the buttons or `+` and `-` (`0` or a double click fits it again), drag it, step to the
+  others with the arrows or ← and →, and close it with Esc or the ×. The point keeps its circle, the
+  temperature under the pointer is shown beside it (with Manual Corrections, in your unit), and the window follows
+  the photo shown:
+
+![A photo previewed over the map, the point circled](images/inspector-preview.png)
 
 A task processed without a surface model (ODM's `dsm` option off) or without ODM's cameras can't place its photos so:
 if it was processed from a workset whose mosaics are built, the window shows the workset's frames instead, placed
 from their GPS and gimbal (the point can be a little off, and the window says so); otherwise the click is WebODM's.
 
 On a workset mosaic, the window is the mosaic viewer's: the workset's frames drawn in the mosaic's palette and range,
-the frame the mosaic's pixel came from first, each one's outline dashed on the map, and **Open this frame**.
+the frame the mosaic's pixel came from first, each one's outline dashed on the map, **Open this frame** and
+**Preview frame** (the frame's picture as the window draws it, over the page: without the temperature under the
+pointer, which the frame page has).
 
 On both:
 

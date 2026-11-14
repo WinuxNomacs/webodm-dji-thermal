@@ -692,9 +692,15 @@
         if (doc.defaultView) doc.defaultView.addEventListener("resize", function () { pipMove.keep(); });
 
         $("ta-viewer-pip").addEventListener("click", function (e) {
-            var b = e.target.closest ? e.target.closest("button[data-pip]") : null;
+            var b = e.target.closest ? e.target.closest("[data-pip]") : null;
             if (!b || b.disabled) return;
             var action = b.getAttribute("data-pip");
+            if (action === "open") return;
+            if (action === "preview") {
+                e.preventDefault();
+                return Frames.preview(doc, pick, function (f) { return frameUrl(base, tab, f.index, style(), v.built_at, v.unit); },
+                                      function (i) { pick.at = i; showPick(); });
+            }
             if (action === "close") return closePick();
             pick.at = Math.max(0, Math.min(pick.frames.length - 1, pick.at + (action === "next" ? 1 : -1)));
             showPick();

@@ -14,6 +14,28 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R40. Preview frame** (`r40-preview-frame`) — 2026-11-14. The user: "Next to "Open Frame", add a "Preview frame"
+  option that opens the full size source frame in a in-page image viewer where the user can
+  next/previous/exit/zoom/pan the image. This allows the user to examine the full source image without leaving the
+  task if they wish." Decided (the user, 2026-11-14): **both windows** (map page and 3D page › Thermal Inspector ›
+  "Photos that saw this spot", for every task with photos and not only a workset's; and "Frame n of N that saw this
+  point", on the mosaic viewer page and for a workset mosaic laid on the map page), and **the temperature under the
+  pointer where it's free** (the photos window, whose photos the browser draws from their values: with Manual
+  Corrections, in the user's unit; a workset's frames are the server's pictures: picture only).
+  - Built: beside "Open this frame", "Preview frame" opens the frame shown over the whole page: fitted, zoomed by
+    the wheel (about the pointer), a pinch, the bar's buttons, `+`/`-`, a double click (`0` fits), dragged, stepped
+    with the bar's arrows or ←/→ through the frames that saw the spot, closed with Esc or the ×; the spot keeps its
+    circle; the frames window under it follows the frame shown. While open the keys, wheel and drags are its own (the
+    map and the 3D view don't move: checked on the 3D page's camera). A photo whose file is gone has no link, and
+    stepped to says so as the window does. The window and its preview share one request for a photo's values.
+  - Code: `public/preview.js` (`ThermalPreview`, knows nothing of temperatures), `public/frames3d.js` (`preview`,
+    `valuesFor`, `ask`), `public/frames.js` (`preview`, the link in `pipHtml`), `public/viewer.js`,
+    `public/inspector.js` (`onFramesClick`), `public/main.js` (`NAMES`), `templates/viewer.html`,
+    `templates/frame.html`, `public/frames.css`. Tests: `__tests__/preview.test.js`, `__tests__/main.test.js`.
+    Docs: README, the Inspector's, 3D and worksets quickstarts, `developing.md`, `images/inspector-preview.png`
+    (`dev/screenshots.js` `inspector-preview`), the frames windows' shots retaken.
+  - Checked live on :8002, read only, at 1280 and 390 px: the map page's photos window, a workset mosaic's window
+    there, the mosaic viewer page, the 3D page; no console errors.
 - **R33 to R39. What R32's review proposed** — 2026-11-14 (the user: "continue", then the four decisions below).
   - **R33. A photo that can't be shown says so** (`r33-photo-messages`). Map page and 3D page › Thermal Inspector ›
     "Photos that saw this spot". Decided: a surface model that can't be read is said in words in the window, no
