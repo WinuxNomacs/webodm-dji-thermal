@@ -13,6 +13,7 @@
 - **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
   the earlier "Folder conversion" item (below).
 
+**Done**
 - **R33 to R39. What R32's review proposed** — 2026-11-14 (the user: "continue", then the four decisions below).
   - **R33. A photo that can't be shown says so** (`r33-photo-messages`). Map page and 3D page › Thermal Inspector ›
     "Photos that saw this spot". Decided: a surface model that can't be read is said in words in the window, no
@@ -53,7 +54,6 @@
   as the page (the last 24 now, `frames3d.js` `KEPT`); a values request that failed left the photo blank for good
   (asked again when shown again; `__tests__/frames3d.test.js`); on the 3D page Potree's stylesheet made the panel's
   and the window's links pale lilac on white (`inspector3d.css`). What it proposed: R33 to R39.
-**Done**
 - **R29. The 2D map's photos placed with ODM's cameras** — 2026-11-13, `r29-2d-frames-cameras` (the user: "a
   worthwhile followup", after R27). On WebODM's map page, a click in Hover or Pin on a thermal orthophoto (or a pin's
   name) now opens the 3D page's window, "Photos that saw this spot", in the Thermal Inspector's frames window: the
