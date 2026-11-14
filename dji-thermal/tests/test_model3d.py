@@ -414,6 +414,14 @@ class TestFrames3D(TestModel3D):
         os.remove(self.task.assets_path('cameras.json'))
         self.assertFalse(self.client.get(self.map_url("measurements")).data['photos'])
 
+    def test_a_task_whose_photos_were_removed_has_no_photos_window_on_its_map(self):
+        self.write_dsm(lambda x, y: 0.0)
+        self.assertTrue(self.client.get(self.map_url("measurements")).data['photos'])
+        for name in os.listdir(self.task.task_path()):       # as WebODM's Compact leaves it
+            if name.endswith('.tiff'):
+                os.remove(self.task.task_path(name))
+        self.assertFalse(self.client.get(self.map_url("measurements")).data['photos'])
+
     def test_a_maps_photos_are_served_without_a_thermal_model_to_those_who_can_view_the_task(self):
         self.write_dsm(lambda x, y: 0.0)
         os.remove(os.path.join(os.path.dirname(self.task.get_asset_download_path('textured_model.glb')), 'odm_textured_model_geo.glb'))
