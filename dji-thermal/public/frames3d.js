@@ -15,6 +15,7 @@
     var OFF_SURFACE = 0.05;             // metres: a ray to a camera starts this far off the surface, so it doesn't meet it
     var Recolour = root.ThermalRecolour || (typeof require !== "undefined" ? require("./recolour.js") : null);
     var Frames = root.ThermalFrames || (typeof require !== "undefined" ? require("./frames.js") : null);
+    var Preview = root.ThermalPreview || (typeof require !== "undefined" ? require("./preview.js") : null);
 
     function escapeHtml(t) {
         return String(t === null || t === undefined ? "" : t).replace(/[&<>"']/g, function (c) {
@@ -118,9 +119,12 @@
             '<div class="ta-message">Seen ' + escapeHtml(angle) + ", " + Number(f.distance).toFixed(1) + " m away." +
             (s && s.count > 1 ? " The " + s.count + " photos read " + escapeHtml(format(s.low)) + " to " + escapeHtml(format(s.high)) +
                 " here (median " + escapeHtml(format(s.median)) + ")." : "") + "</div>" + hiddenNote +
+            '<div class="ta-pip-links">' +
             (page ? '<a href="' + escapeHtml(page) + '" target="_blank" rel="noopener" data-pip="open" ' +
                 'title="The frame on its own page in the Analyzer: measure it, or measure it again with other parameters">' +
-                '<i class="fa fa-external-link-alt"></i> Open this frame</a>' : "") + "</div>";
+                '<i class="fa fa-external-link-alt"></i> Open this frame</a>' : "") +
+            (f.available === false ? "" : '<a href="#" role="button" data-pip="preview" title="The whole frame at its full size, over the page: zoom it, drag it, step to the others">' +
+                '<i class="fa fa-search-plus"></i> Preview frame</a>') + "</div></div>";
     }
 
     var WORDS = {surface: "The model", hides: "the model"};
@@ -138,22 +142,54 @@
     // valuesUrl(index), words (windowHtml's)}
     function create(box, deps) {
         var fetchFn = deps.fetchFn || root.fetch.bind(root), doc = box.ownerDocument;
-        var pick = null, seq = 0, tiles = {}, order = [];
+        var pick = null, seq = 0, tiles = {}, order = [], asking = {};
         var framesAt = deps.framesUrl || function (point, normal) { return framesUrl(deps.task, point, normal); };
         var valuesOf = deps.valuesUrl || function (index) { return valuesUrl(deps.task, index); };
 
+        // A photo's values kept as the one used last, the ones used longest ago dropped past KEPT
+        function kept(url) {
+            order = order.filter(function (u) { return u !== url; }).concat(url);
+            while (order.length > KEPT) delete tiles[order.shift()];
+        }
+        // One request for a photo's values at a time, shared by the window and its preview
+        function ask(url) {
+            if (!asking[url]) {
+                var done = function () { delete asking[url]; };
+                asking[url] = Recolour.fetchValues(url, fetchFn);
+                asking[url].then(done, done);
+            }
+            return asking[url];
+        }
+        // A photo's values (a promise of them, or of null when the server has none), from those kept when they are
+        function valuesFor(f) {
+            var url = valuesOf(f.index), tile = tiles[url];
+            kept(url);
+            if (tile === "none") return Promise.resolve(null);
+            if (tile && typeof tile !== "string") return Promise.resolve(tile);
+            return ask(url).then(function (t) {
+                if (order.indexOf(url) >= 0) tiles[url] = t || "none";
+                return t;
+            });
+        }
+        function paint(canvas, tile, style) {
+            canvas.width = tile.width;
+            canvas.height = tile.height;
+            var ctx = canvas.getContext("2d"), image = ctx.createImageData(tile.width, tile.height);
+            Recolour.colour(tile, style, image.data);
+            if (style.isothermPaint) Recolour.paintIsotherm(tile.values, image.data, style.isothermPaint);
+            ctx.putImageData(image, 0, 0);
+        }
         function draw() {
             var canvas = box.querySelector(".dt-frames3d-canvas"), f = pick && pick.frames && pick.frames[pick.at];
             if (!canvas || !f || f.available === false) return;
             var style = deps.style(), url = valuesOf(f.index), tile = tiles[url];
             if (!style) return;
-            order = order.filter(function (u) { return u !== url; }).concat(url);
-            while (order.length > KEPT) delete tiles[order.shift()];
+            kept(url);
             if (!tile) {
                 tiles[url] = "loading";
-                Recolour.fetchValues(url, fetchFn).then(function (t) {
-                    if (tiles[url] !== "loading") return;       // dropped meanwhile
-                    tiles[url] = t || "none";
+                ask(url).then(function (t) {
+                    if (!tiles[url]) return;                    // dropped meanwhile
+                    if (tiles[url] === "loading") tiles[url] = t || "none";     // or kept already, by the preview
                     draw();
                 }, function () {
                     if (tiles[url] !== "loading") return;
@@ -165,12 +201,43 @@
             }
             if (tile === "none") return missing(GONE);
             if (typeof tile === "string") return;
-            canvas.width = tile.width;
-            canvas.height = tile.height;
-            var ctx = canvas.getContext("2d"), image = ctx.createImageData(tile.width, tile.height);
-            Recolour.colour(tile, style, image.data);
-            if (style.isothermPaint) Recolour.paintIsotherm(tile.values, image.data, style.isothermPaint);
-            ctx.putImageData(image, 0, 0);
+            paint(canvas, tile, style);
+        }
+        // The frames window's "Preview frame": the photos over the whole page (preview.js), each drawn as the window
+        // draws it, the temperature under the pointer as the window's figures are; the window follows the photo shown
+        function preview() {
+            if (!Preview || !pick || !pick.frames.length) return null;
+            var frames = pick.frames, n = frames.length;
+            return Preview.open(doc, {
+                count: n, at: pick.at,
+                title: function (i) { return "Photo " + (i + 1) + " of " + n + " that saw this spot: " + frames[i].file; },
+                item: function (i) {
+                    var f = frames[i], tile = null;
+                    return {
+                        name: f.file, width: f.width, height: f.height, mark: {x: f.x, y: f.y},
+                        paint: function (canvas) {
+                            var style = deps.style();
+                            if (f.available === false || !style) return Promise.resolve(f.available === false ? GONE : FAILED);
+                            return valuesFor(f).then(function (t) {
+                                if (!t) return GONE;
+                                tile = t;
+                                paint(canvas, t, style);
+                                return true;
+                            }, function () { return FAILED; });
+                        },
+                        read: function (col, row) {
+                            var v = tile && col < tile.width && row < tile.height ? tile.values[row * tile.width + col] : NaN;
+                            return isFinite(v) ? deps.format(deps.corrected(v)) : "";
+                        }
+                    };
+                },
+                shown: function (i) {
+                    if (!pick || pick.frames !== frames) return;
+                    pick.at = i;
+                    render();
+                    shownChanged();
+                }
+            });
         }
         // The words in place of the shown photo's picture, its mark gone with it
         function missing(text) {
@@ -196,6 +263,7 @@
         box.addEventListener("click", function (e) {
             var b = e.target.closest("[data-pip]"), action = b && b.getAttribute("data-pip");
             if (!action || action === "open" || !pick) return;
+            if (action === "preview") { e.preventDefault(); return preview(); }
             if (action === "close") return api.close();
             pick.at = Math.max(0, Math.min(pick.frames.length - 1, pick.at + (action === "next" ? 1 : -1)));
             render();
@@ -244,6 +312,7 @@
             // Drawn again: the palette, range, isotherm or a correction changed (restyle), or the unit (refresh)
             restyle: draw,
             refresh: render,
+            preview: preview,
             close: function () {
                 seq++;
                 pick = null;

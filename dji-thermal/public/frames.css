@@ -8,6 +8,24 @@
 .ta-pip-mark { position: absolute; width: 17px; height: 17px; margin: -8px 0 0 -8px; pointer-events: none;
     border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #000; }
 .ta-pip-foot { margin-top: 4px; overflow-wrap: anywhere; }
+.ta-pip-links { display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.ta-pip-links a { cursor: pointer; }
+/* A frame's preview (preview.js): over the whole page, the frame at its own pixels moved and scaled by a transform */
+.dt-preview { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 100000; display: flex; flex-direction: column;
+    background: rgba(0, 0, 0, 0.92); color: #eee; font-size: 13px; outline: none; }
+.dt-preview-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px 8px; background: #222; }
+.dt-preview-title { margin-right: auto; overflow-wrap: anywhere; min-width: 0; }
+.dt-preview-gap { width: 8px; }
+.dt-preview-bar .btn { padding: 3px 9px; }
+.dt-preview-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none; }
+.dt-preview-dragging .dt-preview-stage { cursor: grabbing; }
+.dt-preview-frame { position: absolute; top: 0; left: 0; transform-origin: 0 0; line-height: 0; background: #111; }
+.dt-preview-frame canvas, .dt-preview-frame img { display: block; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges;
+    pointer-events: none; }
+.dt-preview-reading { position: absolute; z-index: 2; pointer-events: none; padding: 1px 5px; border-radius: 3px; white-space: nowrap;
+    background: rgba(0, 0, 0, 0.8); color: #fff; }
+.dt-preview-note { position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); text-align: center; padding: 8px; pointer-events: none; }
+.dt-preview [hidden] { display: none; }
 /* The photos that saw a spot (frames3d.js), on the 3D page and WebODM's map: each photo drawn in the browser, its
    reading and the surface's in a small table */
 .ta-pip-image canvas.dt-frames3d-canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; }
