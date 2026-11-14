@@ -40,7 +40,11 @@ The palette, colour scale, Image section and isotherm are the 2D Inspector's (se
 [Colours, legend and isotherms](quickstart-inspector.md#3-colours-legend-and-isotherms)), over the model's
 temperatures:
 
-- **Palette**: your palette, saved when you choose one here, so the 2D map opens in it too.
+- **Palette**: your palette, saved when you choose one here, so the 2D map opens in it too. **(Default)**, first in
+  the list, shows the model with its own textures and the point cloud in its own colours, as WebODM draws them, and
+  the photos that saw a spot as the camera saved them (where the task's workset has their pictures; else drawn from
+  their temperatures, and the window says so). It lasts until you choose a palette again and is never saved; the
+  tools still read temperatures meanwhile.
 - **Colour scale**: **Auto** is the model's 2nd to 98th percentile; **This model** gives its coldest and hottest
   temperatures.
 - **Image**: Brightness, Contrast, Gamma, Linear or Banded, and Sharpening change how the model is drawn, never its

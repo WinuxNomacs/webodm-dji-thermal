@@ -74,7 +74,7 @@
     // script (the worker's URL), indexScript (mesh_index.js's), Potree}
     function source(viewer, model, deps) {
         var WorkerType = deps.Worker || root.Worker, Potree = deps.Potree || root.Potree;
-        var index = null, worker = null, style = null, palette = null, nodes = [], pending = {}, seq = 0, detached = false;
+        var index = null, worker = null, style = null, palette = null, nodes = [], pending = {}, seq = 0, detached = false, plain = false;
 
         function cloud() { var pcs = viewer.scene.pointclouds || []; return pcs[0] || null; }
 
@@ -82,7 +82,7 @@
 
         // A node's points coloured with the style, once its lookups have come
         function paint(state) {
-            if (!style || !palette || !state.found) return;
+            if (plain || !style || !palette || !state.found) return;
             var attr = state.geometry.attributes.rgba;
             if (!attr) return;
             colourPoints(attr.array, state.original, state.found, value, style, palette);
@@ -132,6 +132,15 @@
                 style = s;
                 palette = Recolour.tonedPalette(s.colors, s.shares, false, s.steps);
                 nodes.forEach(paint);
+            },
+            // The points in ODX's own colours while on (the Inspector's "(Default)"); coloured again when off
+            plain: function (on) {
+                plain = !!on;
+                nodes.forEach(function (state) {
+                    var attr = state.geometry.attributes.rgba;
+                    if (!plain) return paint(state);
+                    if (attr) { attr.array.set(state.original); attr.needsUpdate = true; }
+                });
             },
             // The temperature where the pointer is ({x, y} in the view's pixels): the point Potree picks there, read on
             // the model's nearest surface; {point, reading, hit (that surface's, or null)}

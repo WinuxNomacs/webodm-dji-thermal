@@ -51,7 +51,7 @@ async function page(opts = {}) {
     const viewer = {renderArea: area, renderer: {domElement: canvas}, scene: {getActiveCamera: () => ({}), view: {lookAt: jest.fn()}, pointclouds: [pointcloud]}};
     const source = {ready: Promise.resolve(opts.description || DESCRIPTION), loaded: () => true, shown: jest.fn(() => opts.shown !== false),
                     meshes: () => Promise.resolve([{isMesh: true}]), values: () => Promise.resolve(), materialIndexOf: () => 0,
-                    restyle: jest.fn(), detach: jest.fn(),
+                    restyle: jest.fn(), plain: jest.fn(), detach: jest.fn(),
                     reading: (hit) => (hit.point.x >= 0 ? {valid: true, temperature: hit.point.x, reason: null} : {valid: false, temperature: null, reason: "nodata"})};
     jest.spyOn(Model3D, "source").mockReturnValue(source);
     const index = {tris: {origin: [0, 0, 0], list: []}, bounds: Float32Array.of(-1e3, -1e3, 0, 1e3, 1e3, 30)};
@@ -346,5 +346,25 @@ describe("the palette", () => {
         pub.inspector.toggle();
         pub.change("palette", "magma");
         expect(pub.saved).not.toHaveBeenCalled();
+    });
+
+    test("(Default), first in the list, shows the model as WebODM draws it and is never saved", async () => {
+        const p = await page();
+        p.inspector.toggle();
+        const select = () => p.panel().querySelector('[data-act="palette"]');
+        expect(select().options[0].textContent).toBe("(Default)");
+        expect(select().value).not.toBe("");
+        const before = p.inspector.state.palette;
+        p.change("palette", "");
+        expect(p.source.plain).toHaveBeenLastCalledWith(true);
+        expect(p.saved).not.toHaveBeenCalled();
+        expect(select().value).toBe("");
+        expect(p.panel().textContent).toContain("The model as WebODM draws it; the photos as the camera saved them.");
+        expect(p.inspector.state.palette).toBe(before);
+        p.change("palette", "magma");
+        expect(p.source.plain).toHaveBeenLastCalledWith(false);
+        expect(select().value).toBe("magma");
+        expect(p.panel().textContent).not.toContain("as WebODM draws it");
+        expect(p.saved).toHaveBeenCalledWith({palette: "magma"});
     });
 });

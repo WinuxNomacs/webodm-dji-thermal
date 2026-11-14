@@ -104,9 +104,16 @@ point cloud: the point Potree picks, then `MeshIndex.closest`), which gives the 
 coordinates (`uv`); the model source reads the texel there from that material's values (`valueAt`). Every colour and
 every temperature comes from those values, never from the GLB's grey.
 
-A **source** answers `ready`, `loaded()`, `shown()`, `restyle(style)`, `reading(hit)` and `detach()` (listed in
-`model3d.js`'s header). `inspector3d.js` restyles every source in `sources` when the palette, range, Image or isotherm
-changes, and reads the one shown.
+A **source** answers `ready`, `loaded()`, `shown()`, `restyle(style)`, `plain(on)`, `reading(hit)` and `detach()`
+(listed in `model3d.js`'s header). `inspector3d.js` restyles every source in `sources` when the palette, range, Image
+or isotherm changes, and reads the one shown.
+
+The Palette list's **(Default)** (`Inspector.PLAIN`, `state.plain` in both Inspectors; never saved) is the view without
+the plugin's colours: on the map each orthophoto's URL takes the colour map and range WebODM's layer panel holds
+(`plainLayer`; the look it had is kept on the layer and comes back with the next palette), in 3D every source is
+`plain(true)` (its own textures or colours back, nothing disposed), and the photos windows show the camera's own
+picture (`frames3d.js` `ownPicture`, `frames.js` `ownUrl`: the dataset's `thumbnail?own=1`), which only a task made
+from a workset the user can view has.
 
 ### How a request flows
 

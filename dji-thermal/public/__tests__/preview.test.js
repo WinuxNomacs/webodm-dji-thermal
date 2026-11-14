@@ -200,6 +200,56 @@ describe("Preview frame in the frames windows", () => {
         jest.restoreAllMocks();
     });
 
+    test("(Default) shows a photo as the camera saved it in the window and its preview, still reading the temperature under the pointer", async () => {
+        document.body.innerHTML = '<div id="box" hidden></div>';
+        const box = document.getElementById("box");
+        const context = {createImageData: (w, h) => ({data: new Uint8ClampedArray(w * h * 4)}), putImageData: jest.fn()};
+        jest.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context);
+        jest.spyOn(Recolour, "colour").mockImplementation(() => {});
+        const values = new Float32Array(40 * 30).fill(20);
+        values[5 * 40 + 8] = 31.5;
+        jest.spyOn(Recolour, "fetchValues").mockImplementation(() => Promise.resolve({values, width: 40, height: 30}));
+        const fetchFn = () => Promise.resolve({ok: true, json: () => Promise.resolve({
+            frames: [frame(1, "a.tiff", 20, {frame: "day 1/a.JPG"}), frame(2, "b.tiff", 21)], workset: {dataset: "d1", workset: "abc123abc123"}})});
+        let own = true;
+        const frames = Frames3D.create(box, {fetchFn, task: {id: "t1", project: 3}, style: () => ({palette: []}), corrected: (c) => c + 1,
+                                             format: (c) => c.toFixed(1) + " °C", own: () => own});
+        await frames.show({x: 0, y: 0, z: 0}, null, null);
+        await settled();
+        const picture = "/api/plugins/dji-thermal/datasets/d1/thumbnail?size=large&own=1&workset=abc123abc123&file=day%201%2Fa.JPG";
+        expect(box.querySelector("img.dt-frames3d-own").getAttribute("src")).toBe(picture);
+        expect(box.querySelector("canvas")).toBeNull();
+        expect(box.querySelector(".ta-pip-mark")).not.toBeNull();
+        expect(context.putImageData).not.toHaveBeenCalled();
+        box.querySelector('[data-pip="preview"]').click();
+        await settled();
+        const el = document.querySelector(".dt-preview");
+        expect(el.querySelector("img").getAttribute("src")).toBe(picture);
+        el.querySelector(".dt-preview-stage").dispatchEvent(new MouseEvent("pointermove", {clientX: 8.5 * 25.6, clientY: 5.5 * 25.6, bubbles: true}));
+        expect(el.querySelector(".dt-preview-reading").textContent).toBe("32.5 °C");
+        // A photo whose picture the server doesn't have (not a frame of the workset) is drawn from its temperatures, and says so
+        press(el, "next");
+        await settled();
+        expect(el.querySelector("img")).toBeNull();
+        expect(box.querySelector("canvas")).not.toBeNull();
+        expect(box.textContent).toContain("The camera's own picture of this photo isn't on the server: it's drawn from its temperatures.");
+        press(el, "close");
+        // A picture that can't be loaded says so in its place
+        box.querySelector('[data-pip="prev"]').click();
+        const img = box.querySelector("img.dt-frames3d-own");
+        img.dispatchEvent(new Event("error"));
+        expect(box.querySelector(".dt-frames3d-missing").textContent).toBe("The camera's own picture of this photo couldn't be loaded.");
+        expect(box.querySelector(".ta-pip-mark")).toBeNull();
+        // A palette chosen again: drawn from its temperatures, with no word of the picture
+        own = false;
+        frames.refresh();
+        await settled();
+        expect(box.querySelector("img")).toBeNull();
+        expect(box.querySelector("canvas")).not.toBeNull();
+        expect(box.textContent).not.toContain("camera's own picture");
+        jest.restoreAllMocks();
+    });
+
     test("a workset's frames window previews the pictures it shows, the point marked", () => {
         const pick = {at: 1, models: true, frames: [frame(4, "a.tiff"), frame(7, "b.tiff")]};
         expect(Frames.pipHtml(pick, "/x.png", "/api/w")).toContain('data-pip="preview"');

@@ -25,6 +25,12 @@
             "/frame?frame=" + encodeURIComponent(file) + (list ? "&list=" + encodeURIComponent(list) : "");
     }
 
+    // A frame's own picture, as the camera saved it, from the workset's API URL (base) and the frame's file: the
+    // Thermal Inspector's "(Default)"
+    function ownUrl(base, file) {
+        return base.replace(/\/conversions\/([0-9a-f]+)$/, "/thumbnail?size=large&own=1&workset=$1") + "&file=" + encodeURIComponent(file);
+    }
+
     // The frames as a WebODM orthophoto made from the workset's TIFFs shows them: ODM blended them, so none is the
     // pixel's own, and they come from the one that saw the point closest to straight down
     function orthophotoFrames(frames) {
@@ -140,7 +146,7 @@
     }
     var movedOnTop = 1000;      // Leaflet's corners are at 1000: the box grabbed last goes over them
 
-    var api = {movable: movable, framesUrl: framesUrl, frameUrl: frameUrl, framePageUrl: framePageUrl, orthophotoFrames: orthophotoFrames, pipHtml: pipHtml, preview: preview};
+    var api = {movable: movable, framesUrl: framesUrl, frameUrl: frameUrl, framePageUrl: framePageUrl, ownUrl: ownUrl, orthophotoFrames: orthophotoFrames, pipHtml: pipHtml, preview: preview};
     root.ThermalFrames = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : {});

@@ -54,6 +54,9 @@
     var MOSAIC_Z = 1000;                // above WebODM's layers (its z-indexes are below 100)
     var MOSAIC_TABS = {as_converted: "Mosaic", harmonized: "Harmonized", source_frame: "Source frame"};
     var DJI_PREFIX = "dji_";            // a DJI palette's key among a mosaic's palettes
+    // The Palette menu's "(Default)": orthophotos (and the 3D model) as WebODM draws them, the photos that saw a spot
+    // as the camera saved them; on this page only, never saved as the user's palette
+    var PLAIN = "";
     var REASONS = {excluded: "Outside the task's crop", outside_raster: "Outside the orthophoto", nodata: "No data here",
                    too_few_points: "A polygon needs three corners", self_intersecting: "The polygon's edges cross",
                    no_area: "The polygon has no area", line_too_short: "A line needs two points",
@@ -1073,7 +1076,8 @@
     function panelHtml(state) {
         var unit = userUnit();
         var options = paletteOptions(state.display);
-        var current = state.palette;
+        var current = state.plain ? PLAIN : state.palette;
+        if (options.length) options = [[PLAIN, "(Default)"]].concat(options);
         // One of WebODM's other colour maps, chosen in its layer panel
         if (current && options.length && !options.some(function (o) { return o[0] === current; })) options = options.concat([[current, current]]);
         // The top (the heading, modes, readout, palette and scale) stays in view while the rest scrolls under it, from the
@@ -1106,7 +1110,9 @@
             (options.length ? '<label class="dt-inspector-label">Palette <select class="form-control input-sm" data-act="palette">' +
                 options.map(function (o) {
                     return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === current ? " selected" : "") + ">" + escapeHtml(o[1]) + "</option>";
-                }).join("") + "</select></label>" : "") + scaleHtml(state.scale, state, unit) + "</div>" +
+                }).join("") + "</select></label>" : "") +
+            (state.plain ? '<div class="text-muted dt-inspector-hint">Orthophotos as WebODM draws them; the photos as the camera saved them.</div>' : "") +
+            scaleHtml(state.scale, state, unit) + "</div>" +
             correctionHtml(state.correction, unit, (state.onMap || []).map(function (k) { return state.sources[k]; }).filter(Boolean),
                            state.correctionNotice, state.correctionDefault) +
             imageHtml(state.scale) +
@@ -1147,7 +1153,7 @@
         var regions = loadPins(storage, rkey).filter(function (r) { return r && r.geometry && SHAPES[r.shape]; });
         var state = {open: false, mode: "hover", readout: null, pins: loadPins(storage, key), measurementsVisible: true,
                      regions: regions, shown: regions.length ? regions[regions.length - 1].id : null,
-                     notice: "", display: null, palette: "", isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
+                     notice: "", display: null, palette: "", plain: false, isotherm: loadIsotherm(storage, ikey), isothermNotice: "",
                      legendVisible: false, pointerTemperature: true, mosaics: null, laid: {}, orthos: null, orthoLaid: {}, overlaysOpen: {}, frames: false, pick: null,
                      correction: {on: false}, correctionNotice: "", sources: {}, onMap: [], savedVisible: true,
                      savedShown: null, form: null, savable: {}, scale: null, rangeError: "",
@@ -1471,7 +1477,8 @@
             if (t.mosaic) {
                 restyleMosaic(t.layer, {range: range.map(function (c) { return fromCelsius(c, t.mosaic.unit); }), adjust: adjust});
             } else {
-                var url = withPalette(withRange(t.layer._url, range), state.palette || paletteOf(t.layer._url), state.display, adjust);
+                var url = withPalette(withRange(t.layer._url, range), state.plain ? paletteOf(t.layer._url) : state.palette || paletteOf(t.layer._url),
+                                      state.display, adjust);
                 if (url !== t.layer._url) restyleOrthophoto(t.layer, url);
             }
             if (said) render();
@@ -2084,9 +2091,13 @@
             L.circleMarker(photosAt.latlng, {radius: 6, color: "#000", weight: 1, fillColor: "#fff", fillOpacity: 1, interactive: false}).addTo(pickLayer);
         }
 
+        // A workset's frame as its layer is drawn, or as the camera saved it ("(Default)")
+        function frameUrlOf(src, f) {
+            return state.plain ? Frames.ownUrl(src.base, f.file) : Frames.frameUrl(src.base, src.tab, f.index, src.query);
+        }
         function frameImageUrl(pick) {
             var src = framesSource(thermalLayer(pick.t.layer), state.mosaics, state.palette, state.display), f = pick.frames[pick.at];
-            return src && f ? Frames.frameUrl(src.base, src.tab, f.index, src.query) : "";
+            return src && f ? frameUrlOf(src, f) : "";
         }
 
         function drawPick() {
@@ -2159,7 +2170,7 @@
             if (action === "preview") {
                 e.preventDefault();
                 var src = framesSource(thermalLayer(pick.t.layer), state.mosaics, state.palette, state.display);
-                return src && Frames.preview(doc, pick, function (f) { return Frames.frameUrl(src.base, src.tab, f.index, src.query); },
+                return src && Frames.preview(doc, pick, function (f) { return frameUrlOf(src, f); },
                                              function (i) { if (state.pick === pick) { pick.at = i; drawPick(); } });
             }
             if (action === "close") return closeFrames();
@@ -2171,6 +2182,7 @@
         function applyPalette(t) {
             if (!state.palette) return;
             if (t.mosaic) return restyleMosaic(t.layer, {key: paletteKey(mosaicOf(t.mosaic), state.palette, state.display)});
+            if (state.plain) return;
             var url = withPalette(t.layer._url, state.palette, state.display, adjustOf(t.layer._url));
             if (url !== t.layer._url) restyleOrthophoto(t.layer, url);
         }
@@ -2200,7 +2212,7 @@
                     var range = paramOf(url, "rescale");
                     if (range && range === t.layer.__dtPanelRange && rangeOf(t.layer._url)) args[0] = withRange(args[0], rangeOf(t.layer._url));
                     else t.layer.__dtPanelRange = range;
-                    var name = state.palette || chosen || paletteOf(t.layer._url);
+                    var name = (!state.plain && state.palette) || chosen || paletteOf(t.layer._url);
                     if (name) args[0] = withPalette(args[0], name, state.display, adjustOf(t.layer._url));
                     // Coloured again from the values it has
                     args[1] = true;
@@ -2441,9 +2453,48 @@
             if (src && src.palette && src.palette !== state.palette && paletteNames(state.display).indexOf(src.palette) !== -1) showPalette(src.palette);
         }
 
+        // "(Default)": each orthophoto in the colour map and over the range WebODM's layer panel holds for it, with no
+        // Image adjustments (as WebODM draws it), the photos as the camera saved them; a mosaic, which only the plugin
+        // draws, keeps its palette. The look it had comes back with the next palette chosen, unless it was changed
+        // meanwhile
+        function plainLayer(t) {
+            if (t.mosaic) return;
+            var layer = t.layer, url = withPalette(layer._url, layer.__dtPanelMap || paletteOf(layer._url), state.display, Scale.defaultAdjust());
+            var range = rangeOf("?rescale=" + (layer.__dtPanelRange || ""));
+            if (range) url = withRange(url, range);
+            layer.__dtBefore = layer._url;
+            if (url !== layer._url) restyleOrthophoto(layer, url);
+            layer.__dtPlain = layer._url;
+        }
+        function framesAgain() {
+            if (photosAt) photos.refresh();
+            if (state.pick) drawPick();
+        }
+        function showPlain() {
+            if (state.plain) return;
+            state.plain = true;
+            paletteChosen = true;               // the task's palette no longer replaces it
+            thermalLayers(map, true).forEach(plainLayer);
+            framesAgain();
+            renderLegend();
+            render();
+        }
+        function leavePlain(except) {
+            state.plain = false;
+            thermalLayers(map, true).forEach(function (t) {
+                var layer = t.layer;
+                if (t.mosaic) return;
+                if (layer !== except && layer.__dtBefore && layer._url === layer.__dtPlain) restyleOrthophoto(layer, layer.__dtBefore);
+                layer.__dtBefore = layer.__dtPlain = null;
+            });
+        }
+
         function showPalette(name, except) {
+            var was = state.plain;
+            if (was) leavePlain(except);
             state.palette = name;
             thermalLayers(map).forEach(function (t) { if (t.layer !== except) applyPalette(t); });
+            if (was) framesAgain();
             render();
         }
 
@@ -2595,7 +2646,7 @@
 
         function onPanelChange(e) {
             var what = e.target.getAttribute("data-act") || "";
-            if (what === "palette") choosePalette(e.target.value);
+            if (what === "palette") { if (e.target.value === PLAIN) showPlain(); else choosePalette(e.target.value); }
             else if (what === "pointer-temperature") choosePointerTemperature(e.target.checked);
             else if (what.indexOf("isotherm-") === 0) isothermInput(what.slice("isotherm-".length), e.target.value);
             else if (what.indexOf("range-") === 0 || what.indexOf("image-") === 0) onScaleInput(what, e.target);
@@ -2652,6 +2703,7 @@
                     style: function () { return photosAt ? photoStyle(photosAt.t) : null; },
                     corrected: function (c) { return corrected(c, photosAt ? fixFor(photosAt.t) : null); },
                     format: function (c) { return formatTemp(c, userUnit()); },
+                    own: function () { return state.plain; },
                     changed: onPhotoShown
                 });
                 // A frame that cannot be drawn says so in its place
@@ -2816,7 +2868,7 @@
 
     var api = {userUnit: userUnit, formatTemp: formatTemp, thermalLayer: thermalLayer, thermalLayers: thermalLayers,
                thermalLayerAt: thermalLayerAt, pointUrl: pointUrl, withColorMap: withColorMap, colorMapOf: colorMapOf,
-               withPalette: withPalette, paletteOf: paletteOf, paletteOptions: paletteOptions, rangeOf: rangeOf,
+               PLAIN: PLAIN, withPalette: withPalette, paletteOf: paletteOf, paletteOptions: paletteOptions, rangeOf: rangeOf,
                isothermKey: isothermKey, validIsotherm: validIsotherm, loadIsotherm: loadIsotherm, defaultIsotherm: defaultIsotherm,
                isothermUrl: isothermUrl, describeIsotherm: describeIsotherm, legendHtml: legendHtml,
                pinsKey: pinsKey, regionsKey: regionsKey, loadPins: loadPins, savePins: savePins, measurementsOf: measurementsOf, measurementsCsv: measurementsCsv,

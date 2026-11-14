@@ -62,6 +62,13 @@ keeps them for the next time you open the same task; to share one, save it (sect
 
 - **Palette**: the thermal layer's colours, from the same list as the DJI Thermal Analyzer's. It's your palette
   everywhere: choosing one here also sets it in the Analyzer.
+- **(Default)**, first in that list, shows the map without the plugin's colours, on this page only (it's never saved
+  as your palette): each orthophoto as WebODM draws it (the colour map and range of WebODM's layer panel, without the
+  Image section's adjustments), and the photos that saw a spot as the camera saved them, in the frames window and in
+  Preview frame, where the temperature under the pointer is still read. A photo's own picture comes from the task's
+  workset; without one you can view, the photo stays drawn from its temperatures and the window says so. A workset
+  mosaic on the map keeps its palette (only the plugin draws it); its frames show as the camera saved them. Choose a
+  palette again and the colours come back, with the range and Image settings you had.
 - **The colour scale**, under Palette: the palette over the range the layer is drawn with, with that range in two
   boxes in your unit. Type a new minimum or maximum, or use the cross of buttons between them: **◀** and **▶**
   narrow or widen the range by a tenth of it, about its middle; **▲** and **▼** raise or lower it by a tenth of its

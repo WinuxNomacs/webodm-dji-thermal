@@ -37,6 +37,12 @@
         return Frames.framePageUrl(API + "datasets/" + workset.dataset + "/conversions/" + workset.workset, frame, "");
     }
 
+    // A photo's own picture, as the camera saved it, when the task came from a workset whose frame it is; "" otherwise
+    function ownPicture(workset, frame) {
+        if (!workset || !frame || !Frames) return "";
+        return Frames.ownUrl(API + "datasets/" + workset.dataset + "/conversions/" + workset.workset, frame);
+    }
+
     // The normal (unit length) of the triangle a hit of the mesh index is on, or null
     function surfaceNormal(index, hit) {
         if (!index || !hit || typeof hit.triangle !== "number") return null;
@@ -84,8 +90,9 @@
 
     // The window (pick: {frames, hidden, at, workset, model (the model's temperature there, °C, or null), normal, spread,
     // error, loading}); format(celsius): a temperature as shown (corrected, in the user's unit); words: what the spot
-    // is on, {surface: its row's name, hides: what hides it from a photo} (the model's when not given)
-    function windowHtml(pick, format, words) {
+    // is on, {surface: its row's name, hides: what hides it from a photo} (the model's when not given); own: the photos
+    // as the camera saved them ("(Default)"), where the server has their pictures, else drawn from their temperatures
+    function windowHtml(pick, format, words, own) {
         words = words || WORDS;
         var close = '<button type="button" class="btn btn-link btn-sm" data-pip="close" title="Close" aria-label="Close">' +
             '<i class="fa fa-times"></i></button>';
@@ -104,12 +111,14 @@
         var left = ((f.x + 0.5) / f.width * 100).toFixed(2), top = ((f.y + 0.5) / f.height * 100).toFixed(2);
         var angle = Number(f.view_angle).toFixed(0) + "° from " + (pick.normal ? "square on" : "straight down");
         var s = pick.spread, page = framePage(pick.workset, f.frame);
+        var picture = own && f.available !== false ? ownPicture(pick.workset, f.frame) : "";
         var rows = [["This photo", typeof f.temperature === "number" ? format(f.temperature) : f.available ? "No temperature here" : "Not on the server"],
                     [words.surface, typeof pick.model === "number" ? format(pick.model) : "No temperature here"]];
         return title("Photo " + (pick.at + 1) + " of " + n + " that saw this spot") +
             nav("prev", "chevron-left", "Previous photo", pick.at === 0) + nav("next", "chevron-right", "Next photo", pick.at === n - 1) + close + "</div>" +
-            '<div class="ta-pip-image" style="aspect-ratio: ' + f.width + " / " + f.height + ';"><canvas class="dt-frames3d-canvas" width="' + f.width +
-            '" height="' + f.height + '" aria-label="' + escapeHtml(f.file) + '"></canvas>' +
+            '<div class="ta-pip-image" style="aspect-ratio: ' + f.width + " / " + f.height + ';">' +
+            (picture ? '<img class="dt-frames3d-own" src="' + escapeHtml(picture) + '" alt="' + escapeHtml(f.file) + '">'
+                : '<canvas class="dt-frames3d-canvas" width="' + f.width + '" height="' + f.height + '" aria-label="' + escapeHtml(f.file) + '"></canvas>') +
             (f.available === false ? '<div class="dt-frames3d-missing">' + GONE + "</div>"
                 : '<span class="ta-pip-mark" style="left: ' + left + "%; top: " + top + '%;"></span>') + "</div>" +
             '<div class="ta-pip-foot">' + escapeHtml(f.file) +
@@ -119,6 +128,7 @@
             '<div class="ta-message">Seen ' + escapeHtml(angle) + ", " + Number(f.distance).toFixed(1) + " m away." +
             (s && s.count > 1 ? " The " + s.count + " photos read " + escapeHtml(format(s.low)) + " to " + escapeHtml(format(s.high)) +
                 " here (median " + escapeHtml(format(s.median)) + ")." : "") + "</div>" + hiddenNote +
+            (own && !picture && f.available !== false ? '<div class="ta-message">' + NO_OWN + "</div>" : "") +
             '<div class="ta-pip-links">' +
             (page ? '<a href="' + escapeHtml(page) + '" target="_blank" rel="noopener" data-pip="open" ' +
                 'title="The frame on its own page in the Analyzer: measure it, or measure it again with other parameters">' +
@@ -131,6 +141,9 @@
     // In place of a photo that can't be drawn: its file is gone (the server says so with the photos, or when asked for
     // its temperatures), or the request failed
     var GONE = "This photo isn't on the server any more.", FAILED = "This photo couldn't be loaded.";
+    // "(Default)" for a photo whose picture the server doesn't have (the task wasn't made from a workset the user can view)
+    var NO_OWN = "The camera's own picture of this photo isn't on the server: it's drawn from its temperatures.";
+    var OWN_FAILED = "The camera's own picture of this photo couldn't be loaded.";
     // How many photos' temperatures the window keeps (each about 1.3 MB), the ones shown longest ago dropped first
     var KEPT = 24;
 
@@ -138,13 +151,14 @@
     // (MeshIndex.raycast), index() (the mesh index, or null; not given: the server leaves the hidden photos out),
     // style() (the sources' style, or null), corrected(celsius) (Manual Corrections), format(celsius) (as shown, in the
     // user's unit), changed(shown, open) (the photo shown changed: {camera, point, frame} to mark, or null when there
-    // is none; open: the window is), and, when they aren't the 3D model's: framesUrl(point, normal),
-    // valuesUrl(index), words (windowHtml's)}
+    // is none; open: the window is), own() (whether the photos are shown as the camera saved them: "(Default)"), and,
+    // when they aren't the 3D model's: framesUrl(point, normal), valuesUrl(index), words (windowHtml's)}
     function create(box, deps) {
         var fetchFn = deps.fetchFn || root.fetch.bind(root), doc = box.ownerDocument;
         var pick = null, seq = 0, tiles = {}, order = [], asking = {};
         var framesAt = deps.framesUrl || function (point, normal) { return framesUrl(deps.task, point, normal); };
         var valuesOf = deps.valuesUrl || function (index) { return valuesUrl(deps.task, index); };
+        var own = function () { return !!(deps.own && deps.own()); };
 
         // A photo's values kept as the one used last, the ones used longest ago dropped past KEPT
         function kept(url) {
@@ -213,8 +227,11 @@
                 title: function (i) { return "Photo " + (i + 1) + " of " + n + " that saw this spot: " + frames[i].file; },
                 item: function (i) {
                     var f = frames[i], tile = null;
+                    var picture = own() && f.available !== false ? ownPicture(pick && pick.workset, f.frame) : "";
+                    // The camera's picture; its temperatures still asked for, for the one under the pointer
+                    if (picture) valuesFor(f).then(function (t) { tile = t; }, function () {});
                     return {
-                        name: f.file, width: f.width, height: f.height, mark: {x: f.x, y: f.y},
+                        name: f.file, width: f.width, height: f.height, mark: {x: f.x, y: f.y}, url: picture || undefined,
                         paint: function (canvas) {
                             var style = deps.style();
                             if (f.available === false || !style) return Promise.resolve(f.available === false ? GONE : FAILED);
@@ -252,7 +269,7 @@
         function render() {
             if (!pick) { box.hidden = true; box.innerHTML = ""; return; }
             box.hidden = false;
-            box.innerHTML = windowHtml(pick, function (c) { return deps.format(deps.corrected(c)); }, deps.words);
+            box.innerHTML = windowHtml(pick, function (c) { return deps.format(deps.corrected(c)); }, deps.words, own());
             draw();
         }
         function shownChanged() {
@@ -269,6 +286,15 @@
             render();
             shownChanged();
         });
+
+        // The camera's own picture that can't be loaded says so in its place (before the map's own handler for a
+        // workset's frames, on the same box)
+        box.addEventListener("error", function (e) {
+            if (!e.target.classList || !e.target.classList.contains("dt-frames3d-own")) return;
+            e.stopImmediatePropagation();
+            e.target.hidden = true;
+            missing(OWN_FAILED);
+        }, true);
 
         var api = {
             // The photos that saw a point ({x, y, z}) of the model, on a surface of that normal (or null); model: its
@@ -326,7 +352,7 @@
         return api;
     }
 
-    var api = {create: create, framesUrl: framesUrl, valuesUrl: valuesUrl, framePage: framePage, surfaceNormal: surfaceNormal,
+    var api = {create: create, framesUrl: framesUrl, valuesUrl: valuesUrl, framePage: framePage, ownPicture: ownPicture, surfaceNormal: surfaceNormal,
                hidden: hidden, inView: inView, spread: spread, windowHtml: windowHtml, OFF_SURFACE: OFF_SURFACE, KEPT: KEPT};
     root.ThermalFrames3D = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

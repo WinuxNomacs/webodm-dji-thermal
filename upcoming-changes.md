@@ -14,6 +14,26 @@
   the earlier "Folder conversion" item (below).
 
 **Done**
+- **R42. "(Default)" at the top of the Palette list** (`r42-default-palette`) — 2026-11-14. The user: "can we add
+  (Default) to the top of the list of thermal palettes that allows the user to switch the view to that of the
+  source/raw image?" Decided (the user, 2026-11-14): **where**: the Thermal Inspector's Palette menu on the map page
+  and on the 3D page, and it turns the plugin's colours off everywhere there (the orthophoto and the 3D model as
+  WebODM itself draws them, the photos as the camera's own picture); **shows**: the JPEG as the drone saved it (the
+  range, Banded, the isotherm and the corrections don't change the picture; the temperature under the pointer still
+  reads); **saved**: no, this page only, until a palette is chosen again or the page is left (the saved palette
+  stays). Built: `inspector.js` (`PLAIN`, `showPlain`, `leavePlain`, `plainLayer`: an orthophoto goes back to WebODM's
+  layer panel's colour map and range, the workset frames window and its preview ask for the camera's picture),
+  `inspector3d.js` (`setPlain`), the 3D sources' `plain(on)` (`model3d.js`, `pointcloud3d.js`), `frames3d.js`
+  (`ownPicture`, the `own` dep: the photos window and Preview frame show the picture, temperatures still read from
+  the values), `frames.js` (`ownUrl`), and the server's `thumbnail?size=large&own=1` (`analyzer_api.DatasetThumbnail`:
+  the embedded picture, never recoloured). The camera's picture is only on the server for a task made from a workset
+  the user can view: otherwise a photo stays drawn from its temperatures, with a note. A workset mosaic laid on the
+  map keeps its palette (only its frames change). WebODM's own look for a thermal orthophoto is magma over its
+  statistics, so with the magma palette the orthophoto looks the same. Tests: `__tests__/inspector.test.js`,
+  `inspector3d.test.js`, `model3d.test.js`, `pointcloud3d.test.js`, `preview.test.js`; `tests/test_analyzer.py`
+  (`own=1`). Docs: README, `quickstart-inspector.md`, `quickstart-3d.md`, `palettes.md`, `api.md`, `developing.md`.
+  Checked live, read only, on the map page at 1280 and 390 px and the 3D page: the menu, the picture in the window
+  and the preview, the pointer's temperature, back to a palette.
 - **R41. The map page's stylesheets at the scripts' version** (`r41-map-styles-versioned`) — 2026-11-14. The user:
   "Preview frame viewer is supposed to open full page size over the current view until they click close or press
   escape". The preview is laid over the whole window by `frames.css`; on WebODM's map page the stylesheets were
