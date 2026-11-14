@@ -109,7 +109,8 @@
             nav("prev", "chevron-left", "Previous photo", pick.at === 0) + nav("next", "chevron-right", "Next photo", pick.at === n - 1) + close + "</div>" +
             '<div class="ta-pip-image" style="aspect-ratio: ' + f.width + " / " + f.height + ';"><canvas class="dt-frames3d-canvas" width="' + f.width +
             '" height="' + f.height + '" aria-label="' + escapeHtml(f.file) + '"></canvas>' +
-            '<span class="ta-pip-mark" style="left: ' + left + "%; top: " + top + '%;"></span></div>' +
+            (f.available === false ? '<div class="dt-frames3d-missing">' + GONE + "</div>"
+                : '<span class="ta-pip-mark" style="left: ' + left + "%; top: " + top + '%;"></span>') + "</div>" +
             '<div class="ta-pip-foot">' + escapeHtml(f.file) +
             '<table class="table table-condensed dt-frames3d-figures"><tbody>' + rows.map(function (r) {
                 return "<tr><td>" + escapeHtml(r[0]) + '</td><td class="text-right">' + escapeHtml(r[1]) + "</td></tr>";
@@ -123,6 +124,9 @@
     }
 
     var WORDS = {surface: "The model", hides: "the model"};
+    // In place of a photo that can't be drawn: its file is gone (the server says so with the photos, or when asked for
+    // its temperatures), or the request failed
+    var GONE = "This photo isn't on the server any more.", FAILED = "This photo couldn't be loaded.";
     // How many photos' temperatures the window keeps (each about 1.3 MB), the ones shown longest ago dropped first
     var KEPT = 24;
 
@@ -140,7 +144,7 @@
 
         function draw() {
             var canvas = box.querySelector(".dt-frames3d-canvas"), f = pick && pick.frames && pick.frames[pick.at];
-            if (!canvas || !f) return;
+            if (!canvas || !f || f.available === false) return;
             var style = deps.style(), url = valuesOf(f.index), tile = tiles[url];
             if (!style) return;
             order = order.filter(function (u) { return u !== url; }).concat(url);
@@ -151,9 +155,15 @@
                     if (tiles[url] !== "loading") return;       // dropped meanwhile
                     tiles[url] = t || "none";
                     draw();
-                }, function () { if (tiles[url] === "loading") delete tiles[url]; });     // asked for again when shown again
+                }, function () {
+                    if (tiles[url] !== "loading") return;
+                    delete tiles[url];                          // asked for again when shown again
+                    var shown = pick && pick.frames && pick.frames[pick.at];
+                    if (shown && valuesOf(shown.index) === url) missing(FAILED);
+                });
                 return;
             }
+            if (tile === "none") return missing(GONE);
             if (typeof tile === "string") return;
             canvas.width = tile.width;
             canvas.height = tile.height;
@@ -161,6 +171,16 @@
             Recolour.colour(tile, style, image.data);
             if (style.isothermPaint) Recolour.paintIsotherm(tile.values, image.data, style.isothermPaint);
             ctx.putImageData(image, 0, 0);
+        }
+        // The words in place of the shown photo's picture, its mark gone with it
+        function missing(text) {
+            var image = box.querySelector(".ta-pip-image"), mark = image && image.querySelector(".ta-pip-mark");
+            if (!image || image.querySelector(".dt-frames3d-missing")) return;
+            var note = doc.createElement("div");
+            note.className = "dt-frames3d-missing";
+            note.textContent = text;
+            image.appendChild(note);
+            if (mark) image.removeChild(mark);
         }
         function render() {
             if (!pick) { box.hidden = true; box.innerHTML = ""; return; }

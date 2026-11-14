@@ -183,8 +183,8 @@ def frames_at(task, point, normal=None):
     The photos that saw a point (x, y, z, the model's coordinates): [{index (of shots), file, x, y (its pixel there,
     continuous, pixel centres at whole numbers), width, height, camera ([x, y, z]: where the photo was taken from),
     view_angle (from the surface's normal when it's given, else from straight down), distance (m), temperature (°C at
-    its nearest pixel, or None), available (its file is on the server)}], most squarely first, then nearest. A photo
-    that isn't of temperatures is left out.
+    its nearest pixel, or None), available (its file is on the server)}], those on the server first, most squarely
+    first, then nearest. A photo that isn't of temperatures is left out.
     :raises NoCameras: as shots
     """
     import numpy as np
@@ -211,7 +211,7 @@ def frames_at(task, point, normal=None):
                     'view_angle': view_angle(shot, point, normal),
                     'distance': math.sqrt(sum((c[k] - point[k]) ** 2 for k in range(3))),
                     'temperature': temperature, 'available': path is not None})
-    return sorted(out, key=lambda f: (round(f['view_angle'], 6), f['distance']))
+    return sorted(out, key=lambda f: (not f['available'], round(f['view_angle'], 6), f['distance']))
 
 
 def on_map(task):
@@ -259,7 +259,7 @@ def frames_on_map(task, lon, lat):
     """
     import numpy as np
     import rasterio
-    from rasterio.errors import RasterioError
+    from rasterio.errors import CRSError, RasterioError
     from rasterio.warp import transform
     from rasterio.windows import Window
 
@@ -277,8 +277,8 @@ def frames_on_map(task, lon, lat):
             heights = src.read(1, window=window).astype(np.float32)
             if src.nodata is not None:
                 heights[heights == src.nodata] = np.nan
-    except (OSError, RasterioError) as e:
-        raise NoCameras("This task has no surface model (DSM) to place the point with") from e
+    except (OSError, RasterioError, CRSError) as e:       # CRSError (no projection, or not one PROJ knows) isn't a RasterioError
+        raise NoCameras("This task's surface model (DSM) can't be read, so the point can't be placed in its photos") from e
     heights[~np.isfinite(heights)] = np.nan
     z = float(heights[row - origin[1], col - origin[0]])
     if not math.isfinite(z):

@@ -11,5 +11,8 @@
 /* The photos that saw a spot (frames3d.js), on the 3D page and WebODM's map: each photo drawn in the browser, its
    reading and the surface's in a small table */
 .ta-pip-image canvas.dt-frames3d-canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; }
+/* In place of a photo that can't be drawn */
+.ta-pip-image .dt-frames3d-missing { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center;
+    justify-content: center; padding: 8px; text-align: center; line-height: 1.4; color: #ddd; }
 .ta-pip-foot .dt-frames3d-figures { margin: 4px 0; }
 .ta-pip-foot .dt-frames3d-figures td { padding: 1px 4px; }
