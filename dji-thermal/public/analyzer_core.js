@@ -658,6 +658,7 @@
         "min-num-features": "Structure From Motion › Feature Extraction",
         "gps-accuracy": "Structure From Motion › Georeferencing",
         "skip-3dmodel": "Meshing",
+        "texturing-skip-global-seam-leveling": "Texturing",
         "dsm": "Digital Elevation Models › Outputs",
         "orthophoto-resolution": "Orthophoto",
         "fast-orthophoto": "Orthophoto"

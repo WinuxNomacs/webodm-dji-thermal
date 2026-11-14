@@ -69,7 +69,9 @@ converted images (see section 5).
 
 Below the measurement values is WebODM's usual task panel: the task's name, the processing node and the options.
 The options start as the WebODM plan's: **(Custom)**, with `radiometric-calibration` none, as the images already hold
-temperatures. Normalized or harmonized, a task whose options you leave so also gets the plan's orthophoto resolution
+temperatures, and `texturing-skip-global-seam-leveling` ticked: ODM's global seam levelling adjusts the photos' values
+to even them out, which shifts temperatures by tenths of a degree and can leave a few pixels far outside any
+temperature measured. Normalized or harmonized, a task whose options you leave so also gets the plan's orthophoto resolution
 (the frames' ground sample distance) and GPS accuracy (from the RTK positions), from the dataset's analysis, before it
 starts. Pick another preset to use your own. The thermal frames keep their size; they aren't resized. Press
 **Review**, then **Start Processing**.

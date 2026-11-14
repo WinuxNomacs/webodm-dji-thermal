@@ -123,7 +123,9 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
    gets every photo picked (the RGB ones too) as they are uploaded, so they are sent once, and is analyzed once the
    task is made. The message under the project then links to it.
 6. Below it, WebODM's own task panel: name, processing node, options and the photos on the map. The options start as
-   the WebODM plan's, "(Custom)" with `radiometric-calibration` none (the images already hold temperatures). Images
+   the WebODM plan's, "(Custom)" with `radiometric-calibration` none (the images already hold temperatures) and
+   `texturing-skip-global-seam-leveling` (ODM's levelling shifts temperatures and can leave a few pixels far outside
+   any measured). Images
    are not resized: the thermal frames keep their size. **Review**, then **Start Processing**.
 7. Each photo is converted as it is uploaded, a few at a time. A photo that fails is left out with its reason;
    the task then processes the others. A GCP file, `geo.txt` and `image_groups.txt` go in with the photos' names
