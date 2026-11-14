@@ -241,6 +241,9 @@ describe("the Thermal Inspector", () => {
         const {ins, plugins, panel} = start(map, {[POINT]: {valid: true, temperature: 30}});
         ins.open();
         const click = plugins.Map.onHandleClick.mock.calls[0][0];
+        // Before the task has said whether it has its photos, the click waits for it (and isn't WebODM's)
+        expect(click({latlng: {lat: 0.6, lng: 0.5}})).toBe(true);
+        await flush(); await flush();
         expect(click({latlng: {lat: 0.6, lng: 0.5}})).toBe(false);        // hovering: WebODM's click
         panel().querySelector('[data-mode="pin"]').click();
         expect(map.el.style.cursor).toBe("crosshair");
@@ -774,6 +777,10 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         panel().querySelector('[data-mode="rectangle"]').click();
         drawRectangle(map);
         await flush(); await flush();
+        map.fire("mousemove", {latlng: L.latLng(0.5, 0.5)});
+        await new Promise(r => setTimeout(r, 100));
+        await flush(); await flush();
+        expect(panel().querySelector(".dt-inspector-readout").textContent).toContain("30.00 °C");
 
         // Turned on: from what it was measured with, then another emissivity
         const on = panel().querySelector('[data-act="correction-on"]');
@@ -787,6 +794,8 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         expect(bodies[bodies.length - 1].correction).toEqual({emissivity: 0.8, reflected: 21});
         const want = model(30, 0.8, 21, 0.91, 21);
         expect(panel().querySelector("[data-pin]").textContent).toContain(want.toFixed(2) + " °C");
+        // Pointer Info follows, the pointer where it was
+        expect(panel().querySelector(".dt-inspector-readout").textContent).toContain(want.toFixed(2) + " °C");
         expect(Object.keys(window.localStorage).filter(k => k.indexOf("correction") >= 0)).toEqual([]);
         // The colour scale keeps the temperatures it shows, so the layer is drawn over others of its own values
         expect(panel().querySelector('[data-act="range-min"]').value).toBe("10");

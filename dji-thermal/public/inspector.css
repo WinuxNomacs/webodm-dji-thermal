@@ -92,6 +92,10 @@ body:not(.leaflet-dragging) .leaflet-container.dt-pointer-plain.leaflet-grab { c
     background: #fff; color: #333; border-radius: 4px; box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4); font-size: 12px; cursor: default;
 }
 .dt-inspector-frames[hidden] { display: none; }
+/* On a narrow map: the map's width from its top (set by inspector.js), over the panel and the map's other controls */
+.dt-inspector-frames.dt-inspector-frames-wide { right: auto; max-width: none; z-index: 1002; box-sizing: border-box; }
+.leaflet-top:has(.dt-inspector-frames-wide:not([hidden])) { z-index: 1001; }
+.leaflet-control:has(.dt-inspector-frames-wide:not([hidden])) { z-index: 2000; }
 .dt-inspector-frames .ta-message { color: #777; }
 
 /* The correction's parameters, the form saving a measurement, and a saved one's comment */

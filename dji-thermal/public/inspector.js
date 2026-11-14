@@ -1128,6 +1128,7 @@
     }
 
     var FIELDS = "a, button, input, select, textarea, label";      // a press on these is theirs, not a drag
+    var NARROW = 768;                                               // a map narrower than this (px): the frames window over the panel
     var FRAMES_WIDTH = 300, FRAMES_GAP = 8;                         // the source frames window beside the panel (px)
 
     // The control on a map: args as WebODM's willAddControls gives them ({map, tiles}); deps for tests ({fetch,
@@ -1157,6 +1158,8 @@
         var container, panel, frameBox, panelMove, legendMove, frameMove, framesMoved = false, cursor, pinLayer, regionLayer, savedLayer, pickLayer, legend, tool = null, timer = null, seq = 0, applying = false, drawnAt = 0;
         var profileMarker = null, profileAt = null;     // the point of the profile hovered, on the map
         var pickSeq = 0;                    // the frames asked for last
+        var showSeq = 0;                    // the frames window asked for last (a later click replaces one still waiting)
+        var hovered = null;                 // the reading under the pointer as read, and its layer: {t, r}
         var overlays = [], colors = {};     // the isotherm's layer over each thermal layer; each palette's colours
         var paletteChosen = false;          // a palette the user chose on this page, which the task's no longer replaces
         var sliding = false;                // while an Image slider moves (the frames window's picture waits)
@@ -1209,7 +1212,7 @@
                 var src = layerSource(t);
                 if (state.sources[src.key]) return;
                 state.sources[src.key] = assign(src, {loading: true, measurements: [], can_change: false, baseline: null, palette: "", photos: false});
-                fetchFn(src.url, {credentials: "same-origin"}).then(readJson).then(function (r) {
+                src.ready = fetchFn(src.url, {credentials: "same-origin"}).then(readJson).then(function (r) {
                     if (r.ok) {
                         assign(src, {measurements: r.data.measurements || [], can_change: !!r.data.can_change, baseline: r.data.baseline || null,
                                      palette: r.data.palette || "", photos: !!r.data.photos});
@@ -1256,6 +1259,7 @@
             drawIsotherms();
             renderLegend();
             drawPins();
+            if (hovered) readHovered();         // Pointer Info follows the correction without the pointer moving
             render();
         }
 
@@ -1950,6 +1954,7 @@
             if (timer) clearTimeout(timer);
             var mine = ++seq;
             if (!t) {
+                hovered = null;
                 state.readout = null;
                 cursor.style.display = "none";
                 return renderReadout();
@@ -1957,12 +1962,9 @@
             timer = setTimeout(function () {
                 query(t, e.latlng).then(function (r) {
                     if (mine !== seq || !state.open) return;
-                    var fix = fixFor(t);
-                    state.readout = fix && r && r.valid ? assign({}, r, {temperature: corrected(r.temperature, fix)}) : r;
+                    hovered = {t: t, r: r};
+                    var text = readHovered();
                     renderReadout();
-                    // The temperature the panel shows, corrected as it is
-                    var text = state.pointerTemperature && r && r.valid ? formatTemp(state.readout.temperature) : "";
-                    cursor.textContent = text;
                     cursor.style.display = text ? "" : "none";
                     if (text) {
                         var pt = map.latLngToContainerPoint(e.latlng);
@@ -1971,6 +1973,17 @@
                     }
                 });
             }, HOVER_MS);
+        }
+
+        // The reading under the pointer as the panel shows it, corrected as the corrections are now; the text beside
+        // the pointer follows (answered)
+        function readHovered() {
+            var r = hovered && hovered.r, fix = hovered && fixFor(hovered.t);
+            state.readout = fix && r && r.valid ? assign({}, r, {temperature: corrected(r.temperature, fix)}) : r || null;
+            var text = state.pointerTemperature && r && r.valid ? formatTemp(state.readout.temperature) : "";
+            cursor.textContent = text;
+            if (!text) cursor.style.display = "none";
+            return text;
         }
 
         function onOut() {
@@ -2006,6 +2019,12 @@
         // The frames that saw a point of a thermal layer, beside the panel; keep: the frame to show again if it saw the
         // point too. False (nothing shown) for a layer without source frames.
         function showFrames(t, latlng, keep) {
+            var asked = ++showSeq, known = t && !t.mosaic && state.sources[layerSource(t).key];
+            // An orthophoto whose task hasn't said yet whether it has its photos: the click waits for its answer
+            if (known && known.loading && known.ready) {
+                known.ready.then(function () { if (asked === showSeq && state.open) showFrames(t, latlng, keep); });
+                return true;
+            }
             var src = framesSource(t, state.mosaics, state.palette, state.display, hasPhotos(t));
             if (!src) return false;
             if (src.photos) return showPhotos(t, latlng);
@@ -2099,8 +2118,23 @@
         // once dragged on its own, it stays where it was dropped until it is closed
         function placeFrames(offset) {
             if (framesMoved) return;
-            frameMove.to(offset);
             var a = map.getContainer().getBoundingClientRect(), p = panel.getBoundingClientRect();
+            // A narrow page has no room beside the panel: the window takes the map's width from its top, over the panel
+            // and the map's controls (inspector.css raises it)
+            var narrow = a.width < NARROW && frameBox.offsetParent, s = frameBox.style;
+            frameBox.classList.toggle("dt-inspector-frames-wide", !!narrow);
+            if (narrow) {
+                frameMove.reset();
+                var o = narrow.getBoundingClientRect();
+                s.left = (a.left - o.left - narrow.clientLeft + FRAMES_GAP) + "px";
+                s.top = (a.top - o.top - narrow.clientTop + FRAMES_GAP) + "px";
+                s.width = (a.width - 2 * FRAMES_GAP) + "px";
+                s.maxHeight = (a.height - 2 * FRAMES_GAP) + "px";
+                frameBox.classList.remove("dt-inspector-frames-right");
+                return;
+            }
+            s.left = s.top = s.width = s.maxHeight = "";
+            frameMove.to(offset);
             var room = (frameBox.offsetWidth || FRAMES_WIDTH) + FRAMES_GAP;
             frameBox.classList.toggle("dt-inspector-frames-right", !!(offset.x || offset.y) && p.left - a.left < room && a.right - p.right >= room);
         }
@@ -2582,6 +2616,7 @@
             onProfileOut();
             setMode("hover");
             state.open = false;
+            hovered = null;
             state.readout = null;
             container.classList.remove("open");
             plainPointer();

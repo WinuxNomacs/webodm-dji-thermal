@@ -177,6 +177,8 @@ task, at the height of the task's surface model, so the circle is on the very pi
   left out, and the window says how many.
 - A photo whose file is no longer in the task comes after those that are, and the window says so in place of its
   picture.
+- On a page too narrow for the window beside the panel (under 768 pixels), it takes the map's width, over the panel:
+  close it to get back to the panel.
 - **Open this frame**, when the task was processed from a workset's TIFFs, opens the frame on its own page in the
   Analyzer, in a new tab, to measure it in its pixels or measure it again with other values: see
   [One frame at a time](quickstart-worksets.md#one-frame-at-a-time).
