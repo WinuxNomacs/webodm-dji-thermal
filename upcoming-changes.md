@@ -2409,7 +2409,7 @@
   installer runs Docker), and the native Windows installer, checked end to end there. Done.
 - **Thermal Inspector** (the user, 2026-10-30): the earlier Pixel Inspector ported as a control on WebODM's 2D map,
   for thermal orthophotos, with the palette and unit shared with the Analyzer; in five steps (details under
-  "Up next: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0. Steps 2–5
+  "Done: Thermal Inspector" below). Lands in 1.0.0 if that is not published first, else in 1.1.0. Steps 2–5
   and 3b done (the last, isotherms and the legend, 2026-10-31), and dji-thermal-cli 1.10.0 pinned with the fallback
   to its internal tables dropped (2026-10-31, `pin-cli-1.10.0`). Done.
 - **Release 1.1.0** — 2026-11-05, `release/1.1.0` (the user: "prepare the plugin for release"): WebODM 4.0.0
@@ -2425,7 +2425,7 @@
   WebODM-Plugins' `directory.json`.
 - **Release 1.0.0** — 2026-10-30, `release/1.0.0` (details below); redone 2026-11-02 and published (tag `v1.0.0`).
 - **Thermal Analyzer, part 1** — 2026-10-29, in four steps (`analyzer-datasets`, `analyzer-conversions`,
-  `analyzer-mosaics`, `analyzer-task`; details under "1. Thermal Analyzer, part 1" below).
+  `analyzer-mosaics`, `analyzer-task`; details under "Done: Thermal Analyzer, part 1" below).
 - **The DJI Thermal page under Administration** — 2026-10-29, `admin-page` (details below).
 - **DJI's own Thermal SDK** — 2026-10-29, `native-sdk` here and in dji-thermal-cli (details below).
 - **Thermal task flow** — 2026-10-29, `thermal-task-flow` (details below).
@@ -3617,7 +3617,7 @@ goes (the docs are written once, from it); 10 needs no dji-thermal-cli release, 
 
 All six steps done (2026-10-31). The Documentation phase is next; its screenshots show this UI.
 
-## Up next: Thermal Inspector
+## Done: Thermal Inspector
 
 **The request** (the user, 2026-10-30): "The thermal inspector is not showing on the 2d orthomosaics for any of the
 tasks for the First Project." Not a bug: the earlier plugin's Pixel Inspector (shown as "Thermal Inspector") was
@@ -3753,7 +3753,7 @@ read in place from a server folder (administrators only). Decided (the user, 202
 Analyzer part 1, as an Analyzer dataset whose photos are read in place (so they don't count toward a quota; its
 conversions and mosaics do, in its holder task).
 
-## Later: Thermal Analyzer and Pixel Inspector
+## Done: Thermal Analyzer and Pixel Inspector (the plan)
 
 **The request** (the user, 2026-10-29): add the earlier plugin's Thermal Analyzer to this plugin; recorded as phases
 after 1.0.0.
@@ -3787,9 +3787,9 @@ What has to change, all within the plugin rules (no change to WebODM):
 4. **Tests**: the Jest tests mostly carry over; the Python tests are rewritten against the data stores; live
    checks on the M4T flight. Its JavaScript is mostly plain (not JSX), which fits the plugin's build.
 
-Phases, in order: **part 1** (datasets in holder tasks, conversions, mosaics on the map; see "1. Thermal Analyzer, part 1"), **part 2**
+Phases, in order: **part 1** (datasets in holder tasks, conversions, mosaics on the map; see "Done: Thermal Analyzer, part 1"), **part 2**
 (measurements, comparisons, frame views), **Pixel Inspector** (the map control and its endpoints).
-The Pixel Inspector moved ahead, as the Thermal Inspector (2026-10-30, "Up next: Thermal Inspector" above).
+The Pixel Inspector moved ahead, as the Thermal Inspector (2026-10-30, "Done: Thermal Inspector" above).
 
 Decided (the user, 2026-10-29):
 - **The Analyzer's page is at the root of WebODM's menu** (`main_menu`, every user), as the plugin's primary UI;
@@ -3805,7 +3805,7 @@ Decided (the user, 2026-10-29):
 - ~~A dataset lives in the thermal task it leads to~~: replaced the same day, see Part 1 below (WebODM deletes
   a partial task after 72 hours, `CLEANUP_PARTIAL_TASKS`, and a dataset has several conversions).
 
-## 1. Thermal Analyzer, part 1
+## Done: Thermal Analyzer, part 1
 
 **The request** (the user, 2026-10-29): plan the Analyzer's first part; it ships before 1.0.0.
 
