@@ -10,8 +10,6 @@
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **Server-folder datasets** for administrators (photos read in place on the server), in the Analyzer; replaces
-  the earlier "Folder conversion" item (below).
 
 **Done**
 - **R43. ODM's global seam levelling off for thermal tasks** (`r43-seam-levelling`) — 2026-11-14. From a review of
@@ -3745,7 +3743,10 @@ converted TIFFs' Software tag, the reports and the SDK page. `Plugin.check_requi
 endpoints on the flight's orthophoto (`DT_FLIGHT_DIR`), the CLI's own tests for its function; live checks on
 First Project's three tasks (read only, thumbnails blocked).
 
-## Later: Server-folder datasets
+## Dropped: Server-folder datasets
+
+**Dropped** (the user, 2026-11-14: "drop it"): not planned any more; datasets come from uploads only. What was
+recorded before:
 
 The earlier plugin converts a folder on the server (overrides for the measurement parameters, the camera's own
 conversion kept in `raw/`, a CSV report, progress and Cancel in the worker), and the earlier Analyzer has datasets
@@ -3819,7 +3820,7 @@ Decided (the user, 2026-10-29):
   task or project is deleted. It shows in the project's task list as "Thermal dataset: <name>" with "Set a
   processing node" (a plugin can't hide a task); its folder's root holds no image, so a node set on it by hand
   only fails the task with no photos.
-- **Uploads only** in part 1; server-folder datasets later (above).
+- **Uploads only** in part 1; server-folder datasets later (above; dropped 2026-11-14).
 - **The Thermal Task button stays** as the quick path; it and the Analyzer share the converter, the SDK choice and
   the task creation.
 
