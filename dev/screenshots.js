@@ -298,9 +298,9 @@ const SHOTS = {
         const map = await p.locator(".leaflet-container").first().boundingBox();
         const at = (fx, fy) => [map.x + map.width * fx, map.y + map.height * fy];
         await p.click('.dt-inspector-modes [data-mode="delta"]');
-        await p.mouse.click(...at(0.38, 0.5));
+        await p.mouse.click(...at(0.36, 0.5));
         await p.waitForTimeout(300);
-        await p.mouse.click(...at(0.52, 0.44));
+        await p.mouse.click(...at(0.48, 0.44));     // each spot's label beside it, the second's clear of the panel
         await p.waitForSelector(".dt-inspector-delta-figures", {timeout: 30000});
         // The panel is drawn again as it reads: scrolled to the figures once they are there
         await p.waitForTimeout(500);

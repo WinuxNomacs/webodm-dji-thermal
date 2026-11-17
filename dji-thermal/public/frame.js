@@ -528,12 +528,17 @@
                     var o = {color: sh.color, weight: sh.shown ? 3 : 2, dashArray: sh.dash, fillOpacity: sh.shown ? 0.15 : 0.05, interactive: false};
                     var g = sh.g;
                     if (!g) return;
-                    // A ΔT: a thin dashed line between its spots, a dot at each (the first hollow)
+                    // A ΔT: a thin dashed line between its spots, a dot at each (the first hollow), each labelled with its
+                    // temperature and its own ΔT on its outer side
                     if (sh.shape === "delta") {
-                        var ends = g.coordinates.map(latLng);
+                        var ends = g.coordinates.map(latLng), res = sh.res || {}, firstLeft = ends[0][1] <= ends[1][1];
+                        var labels = Inspector.deltaLabels(sh.name, res.first, res.second, Inspector.userUnit());
                         L.polyline(ends, {color: sh.color, weight: sh.shown ? 2 : 1.5, dashArray: "4 3", interactive: false}).addTo(groups[i]);
                         ends.forEach(function (e, n) {
-                            L.circleMarker(e, {radius: 4, color: sh.color, weight: 2, fillColor: n ? sh.color : "#fff", fillOpacity: 1, interactive: false}).addTo(groups[i]);
+                            L.circleMarker(e, {radius: 4, color: sh.color, weight: 2, fillColor: n ? sh.color : "#fff", fillOpacity: 1, interactive: false})
+                                .bindTooltip(labels[n], {permanent: true, direction: (n === 0) === firstLeft ? "left" : "right",
+                                                         className: "dt-inspector-tip" + (sh.saved ? " dt-inspector-saved-tip" : "")})
+                                .addTo(groups[i]);
                         });
                         return;
                     }

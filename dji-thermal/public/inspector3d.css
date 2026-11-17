@@ -23,7 +23,6 @@
     background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 11px; line-height: 16px;
 }
 .dt-inspector3d-marker.dt-spot::before { background: #ff9800; }
-.dt-inspector3d-marker.dt-spot:not(.dt-spot-end) span { display: none; }
 .dt-inspector3d-marker.dt-saved::before { background: #2e7d32; border-style: dashed; }
 .dt-inspector3d-line { stroke: #fff; stroke-width: 2px; stroke-dasharray: 5 3; filter: drop-shadow(0 0 1px #000); }
 .dt-inspector3d-marker.dt-camera::before { background: #1e88e5; border-radius: 2px; }

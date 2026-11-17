@@ -333,7 +333,8 @@ its detail pane: the frame page of the newest workset that converted):
   **Temperature On Pointer** shows the temperature beside the pointer too, each
   pane its own;
 - **Measure**: the Thermal Inspector's tools in the frame's pixels: **ΔT** (two pixels clicked: each one's
-  temperature and the second's less the first's, with the distance between them in pixels), a pin (a pixel's temperature), a line (a strip 1
+  temperature and the second's less the first's, with the distance between them in pixels; each labelled on the
+  frame with its temperature and its own ΔT), a pin (a pixel's temperature), a line (a strip 1
   pixel either side of it, with its profile; hovering the profile marks its point), a rectangle, a circle or a
   polygon (the statistics, the surroundings, a ring 3 to 10 pixels wide, and ΔT, the isotherm's share and a
   histogram), labelled D1…, P1…, L1…, R1…, kept while the page is open and measured again when the isotherm or the
@@ -410,7 +411,8 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   orthophoto and where it has no data it says so.
 - **ΔT**, beside Hover: click a first spot, then a second, labelled D1, D2…. The panel gives each spot's temperature
   (its own pixel, as a pin reads it), **ΔT**, the second's less the first's (corrected with Manual Corrections), and
-  the distance between them; the map shows a thin line between the spots, labelled at the second with its ΔT. A ΔT
+  the distance between them; the map shows a thin line between the spots, each labelled with its temperature and its own ΔT, that spot's less
+  the other's ("D1: 22.10 °C, ΔT -2.10 °C" and "D1: 24.20 °C, ΔT +2.10 °C"). A ΔT
   is listed under Measurements, kept in your browser, saved like a region and exported in the CSV (with
   **first_spot** and **second_spot** columns). With an overlay swiped, a ΔT can span the divider: each spot is
   read from the layer showing where it was clicked, the list names both layers, each dot shows with its own layer
@@ -537,8 +539,8 @@ temperature TIFFs), the plugin colours the textured model in your palette from t
 as soon as the page opens (ODM's own model has them as grey). A thermometer button beside **Share** opens the 3D
 Thermal Inspector, with the 2D Inspector's tools that make sense on a model:
 
-- **Hover** (a tap on a phone), **ΔT** (two spots, and the distance between them) and **Pin**, read where the
-  pointer meets the model. Pins and ΔTs are listed under Measurements, kept in your browser for the task, with
+- **Hover** (a tap on a phone), **ΔT** (two spots, and the distance between them; each spot labelled with its
+  temperature and its own ΔT) and **Pin**, read where the pointer meets the model. Pins and ΔTs are listed under Measurements, kept in your browser for the task, with
   Hide/Show, CSV (x, y, z in the task's projection) and Remove all. A click measures; a drag still moves the view.
 - **Palette** (your palette, shared with the 2D map), **colour scale** (Auto: the model's 2nd to 98th percentile),
   **Image**, **Isotherm** (shared with the task's 2D map), **Legend** and **Manual Corrections**, as on the map.

@@ -642,7 +642,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         ticks.forEach(([at, label]) => expect(at).toBeCloseTo((inspector.uncorrected(label, half) - 10) / 30 * 100, 0));
     });
 
-    it("measures ΔT between two spots clicked after choosing ΔT beside Hover, the second's temperature less the first's", async () => {
+    it("measures ΔT between two spots clicked after choosing ΔT beside Hover, the second's temperature less the first's, each spot labelled with its own", async () => {
         const map = leafletMap();
         const DELTA = {valid: true, reason: null, first: 20, second: 26.5, delta_t: 6.5, reasons: [null, null], length: 2.31, measured: [20, 26.5], correction: null};
         const {ins, fetchFn, panel} = start(map, {[REGION]: DELTA}, {L});
@@ -672,13 +672,17 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         expect(shown.textContent).not.toContain("Mean");
         expect(panel().querySelector("[data-region]").textContent).toContain("+6.50 °C ΔT");
         const tips = [];
-        map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) tips.push([l.getTooltip()._content, l.getLatLng()]); });
-        expect(tips).toEqual([["D1: ΔT +6.50 °C", L.latLng(0.5, 0.50002)]]);     // at the second spot
+        map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) tips.push([l.getTooltip()._content, l.getLatLng(), l.getTooltip().options.direction]); });
+        // Each spot its temperature and its own ΔT (that spot's less the other's), on its side away from the other
+        expect(tips).toEqual([["D1: 20.00 °C, ΔT -6.50 °C", L.latLng(0.5, 0.5), "left"], ["D1: 26.50 °C, ΔT +6.50 °C", L.latLng(0.5, 0.50002), "right"]]);
         expect(regionsCsv(ins.state.regions, "F").split("\n")[1]).toBe("D1,delta,,,,,,2.310,,,,,,,,,11.700,,,,,,68.000,79.700");
 
-        // A spot with no temperature: no ΔT, and which one says why
+        // A spot with no temperature: no ΔT, and which one says why; on the map its name alone, the other its temperature
         const missing = Object.assign({}, DELTA, {valid: false, reason: "nodata", second: null, delta_t: null, reasons: [null, "nodata"]});
         expect(inspector.statisticsHtml(Object.assign({shape: "delta"}, missing), "C")).toContain("No data here");
+        expect(inspector.deltaLabels("D1", 20, null, "C")).toEqual(["D1: 20.00 °C", "D1"]);
+        expect(inspector.deltaLabels("D1", undefined, undefined, "C")).toEqual(["D1", "D1"]);
+        expect(inspector.deltaLabels("D1", 20, 26.5, "F")).toEqual(["D1: 68.00 °F, ΔT -11.70 °F", "D1: 79.70 °F, ΔT +11.70 °F"]);
         map.remove();
     });
 
@@ -712,7 +716,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         ["Vent", "ΔT", "First spot20.00 °C", "Second spot18.00 °C", "ΔT-2.00 °C"].forEach(t => expect(shown).toContain(t));
         const tips = [];
         map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) tips.push(l.getTooltip()._content); });
-        expect(tips).toContain("Vent: ΔT -2.00 °C");
+        expect(tips).toEqual(expect.arrayContaining(["Vent: 20.00 °C, ΔT +2.00 °C", "Vent: 18.00 °C, ΔT -2.00 °C"]));
         expect(inspector.savedCsv([{source: {name: "Roof survey"}, m: saved}], "C").split("\n")[1]).toMatch(
             /^Vent,,delta,Roof survey,,2026-11-11T10:00:00Z,ana,,,,,,3,,,,,,,,,-2,,,,,,,,20,18$/);
         map.remove();

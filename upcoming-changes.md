@@ -3,7 +3,16 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R46. ΔT: each spot's temperature and its own ΔT** (`r46-delta-labels`, after R45: the same labels) — the user,
+- **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
+  release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
+  macOS"); Apple Silicon was checked without a Mac.
+
+**Later**
+- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
+  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+
+**Done**
+- **R46. ΔT: each spot's temperature and its own ΔT** (`r46-delta-labels`) — 2026-11-17, built. The user,
   2026-11-17, in `new.md`: "For Delta T points, display each points temperature as well as the Delta T at both
   points. Better visual aid to what the values true meaning is." Today only the second spot is labelled ("D1: ΔT
   +2.1 °C"; the 3D page "D1a" and "D1 +2.1"); each spot's temperature is already kept (`first`, `second`, live and
@@ -18,15 +27,17 @@
      the frame page. A spot without a reading shows its name alone and no ΔT.
   Tests: Jest for the labels on each page (the sign at each spot, a spot without a reading); docs: the ΔT sections
   of `quickstart-inspector.md`, the 3D and frame pages', screenshots where a ΔT shows.
-- **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
-  release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
-  macOS"); Apple Silicon was checked without a Mac.
-
-**Later**
-- **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
-  webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-
-**Done**
+  **Built**: `inspector.js` `deltaLabels(name, first, second, unit)` (exported; the second's ΔT is the one listed),
+  used by `deltaLayers` (both dots labelled, each on its side away from the other) for new and saved ΔTs, across two
+  layers too; `inspector3d.js` (both spots' markers; `inspector3d.css` no longer hides the first's label);
+  `frame.js` `drawShapes` (both pixels labelled, new and saved). Tests: Jest `inspector.test.js` (the labels and
+  their sides, a saved ΔT's, `deltaLabels` without a reading and in °F), `inspector3d.test.js`, `frame.test.js` (new
+  and saved); each new check failed on the old code. Jest 418, ESLint, Ruff. Live on :8002 (read only; the
+  measuring POSTs let through): the map at 1280 px ("D1: 65.40 °F, ΔT -55.63 °F" / "D1: 121.03 °F, ΔT +55.63 °F",
+  listed +55.63) and 390 px, the 3D page and the frame page alike; no console errors. A label near the map's edge
+  runs past it, as any Leaflet label. Docs: README, `quickstart-inspector.md`, `quickstart-3d.md`,
+  `quickstart-worksets.md`; `inspector-delta.png` (spots moved so the second's label clears the panel) and
+  `inspector-3d.png` retaken and looked at.
 - **R45. Pins: no photos window from a Pin click; each pin's temperature beside it** (`r45-pin-labels`) — 2026-11-17, built. The user,
   2026-11-17, in `new.md`: "2 fixes needed for Thermal Inspector Pins. 1, don't open the source photos as that should
   only happen when hover is active. 2, show the pin's temperature by the pin point. Similar to how Delta T works."

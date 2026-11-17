@@ -457,7 +457,7 @@ describe("the frame page", () => {
         expect(pins(0)[0].tooltipOpts.className).toBe("dt-inspector-tip dt-inspector-saved-tip");
     });
 
-    it("measures ΔT between two pixels clicked with ΔT, first of the tools, and saves it like the others", async () => {
+    it("measures ΔT between two pixels clicked with ΔT, first of the tools, each spot labelled with its own, and saves it like the others", async () => {
         const {server, L} = await start();
         const tools = [...document.querySelectorAll("#ta-frame-measure [data-tool]")];
         expect(tools.map(b => b.getAttribute("data-tool"))).toEqual(["delta", "pin", "line", "rectangle", "circle", "polygon"]);
@@ -476,6 +476,9 @@ describe("the frame page", () => {
         const drawn = L.maps[0].layers.filter(l => l.clearLayers).pop().layers;
         expect(drawn.filter(l => l.line).length).toBe(1);
         expect(drawn.filter(l => l.marker).map(l => l.marker)).toEqual([[-0.5, 0.5], [-0.5, 5.5]]);
+        // Each spot labelled with its temperature and its own ΔT, on its side away from the other
+        expect(drawn.filter(l => l.marker).map(l => [l.tooltip, l.tooltipOpts.direction]))
+            .toEqual([["D1: 15.00 °C, ΔT -2.25 °C", "left"], ["D1: 17.25 °C, ΔT +2.25 °C", "right"]]);
         document.querySelector("[data-item] [data-act=save]").click();
         document.querySelector("[data-form=name]").value = "Joint";
         document.querySelector("[data-act=form-save]").click();
@@ -485,6 +488,9 @@ describe("the frame page", () => {
         expect($("ta-frame-saved").textContent).toContain("Joint");
         expect($("ta-frame-saved").textContent).toContain("+2.25 °C ΔT");
         expect($("ta-frame-saved").textContent).toContain("Second spot17.25 °C");
+        const savedDots = L.maps[0].layers.filter(l => l.clearLayers).pop().layers.filter(l => l.marker);
+        expect(savedDots.map(l => l.tooltip)).toEqual(["Joint: 15.00 °C, ΔT -2.25 °C", "Joint: 17.25 °C, ΔT +2.25 °C"]);
+        expect(savedDots[0].tooltipOpts.className).toBe("dt-inspector-tip dt-inspector-saved-tip");
     });
 
     it("measures the shapes again when the isotherm or the parameters change, the isotherm's limits in °C", async () => {

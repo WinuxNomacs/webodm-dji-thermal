@@ -25,7 +25,8 @@ The panel's buttons choose what a click on the model does:
   read a spot. Off the model, or where its texture holds no temperature, the panel says so.
 - **ΔT**: click a first spot, then a second (D1, D2…). The panel gives each spot's temperature, **ΔT** (the second's
   minus the first's) and the distance between them, in metres along a straight line through the air. The view shows a
-  dashed line between them. Esc forgets a first spot clicked by mistake.
+  dashed line between them, and each spot is labelled with its temperature and its own ΔT, that spot's less the
+  other's ("D1: 24.20 °C, ΔT +2.10 °C" at the second). Esc forgets a first spot clicked by mistake.
 - **Pin**: a click pins the point, with its temperature beside it ("P1: 22.30 °C"). It doesn't open the photos that
   saw it (section 6): Hover does.
 
