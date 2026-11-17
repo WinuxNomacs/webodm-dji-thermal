@@ -25,8 +25,9 @@ on the map does:
   and applies to the Analyzer's mosaic viewer and frame page too (where the label is off until you tick it).
 - **ΔT**: click a first spot, then a second (D1, D2…). The panel gives each spot's temperature, the temperature of
   its own pixel, and **ΔT**, the second's minus the first's: click the cold spot first and a warmer one second, and
-  ΔT is above zero. The map shows a thin line between them, labelled with the ΔT at the second spot. With Manual
-  Corrections on (section 8), both spots are corrected. Save it, rename it and delete it like a region.
+  ΔT is above zero. The map shows a thin line between them, and each spot is labelled with its temperature and its
+  own ΔT, that spot's less the other's: "D1: 22.10 °C, ΔT -2.10 °C" at the first, "D1: 24.20 °C, ΔT +2.10 °C" at the
+  second (the ΔT listed). With Manual Corrections on (section 8), both spots are corrected. Save it, rename it and delete it like a region.
 - **Pin**: a click pins the point, with its temperature beside it on the map ("P1: 22.30 °C"). The pins are listed
   in the panel; click one to go to it. A click in Pin doesn't open the frames that saw the point (section 6): Hover
   does.

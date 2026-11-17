@@ -104,6 +104,16 @@
         return (celsius > 0 ? "+" : "") + formatDelta(celsius, unit);
     }
     function numberOrNull(v) { return typeof v === "number" && isFinite(v) ? v : null; }
+    // A ΔT's labels at its two spots: each its temperature and its own ΔT, that spot's less the other's, so the second's
+    // is the ΔT listed and the first's its opposite ("D1: 22.10 °C, ΔT -2.10 °C", "D1: 24.20 °C, ΔT +2.10 °C"); a spot
+    // without a temperature its name alone, and the other no ΔT
+    function deltaLabels(name, first, second, unit) {
+        var both = typeof first === "number" && typeof second === "number";
+        return [[first, second], [second, first]].map(function (p) {
+            if (typeof p[0] !== "number") return name;
+            return name + ": " + formatTemp(p[0], unit) + (both ? ", ΔT " + formatSigned(p[0] - p[1], unit) : "");
+        });
+    }
     function formatLength(m, unit) {
         var imperial = (unit || userUnit()) === "F";
         return (imperial ? m * FT_PER_M : m).toFixed(m >= 100 ? 0 : 1) + (imperial ? " ft" : " m");
@@ -1667,7 +1677,7 @@
             state.regions.forEach(function (r) {
                 var style = r.id === state.shown ? Regions.STYLE : {color: Regions.STYLE.color, weight: 1, opacity: 0.8, fillOpacity: 0.05};
                 if (r.shape === "delta") {
-                    return deltaLayers(latLngs(r), style.color, r.label + (typeof r.delta_t === "number" ? ": ΔT " + formatSigned(r.delta_t) : ""), "dt-inspector-tip",
+                    return deltaLayers(latLngs(r), style.color, deltaLabels(r.label, r.first, r.second), "dt-inspector-tip",
                                        acrossLayers(r) ? r.sources : r.source).forEach(function (l) { regionLayer.addLayer(l); });
                 }
                 var shape = r.circle ? L.circle([r.circle.lat, r.circle.lng], inPane(r.source, assign({radius: r.circle.radius, interactive: false}, style))) :
@@ -1686,18 +1696,20 @@
             updateCrossLines();
         }
 
-        // A ΔT on the map: a thin line between its spots, a dot at each (the first hollow), the label at the second; in
-        // the pane of the layer it was read on (key). Across two layers (key: [first's, second's]), each dot in its own
+        // A ΔT on the map: a thin line between its spots, a dot at each (the first hollow), each with its label (labels:
+        // deltaLabels'), on its outer side, away from the other; in the pane of the layer it was read on (key). Across two layers (key: [first's, second's]), each dot in its own
         // layer's pane, and the line in one of its own, shown only while both dots show (updateCrossLines)
         var crossLines = [];
-        function deltaLayers(points, color, label, className, key) {
+        function deltaLayers(points, color, labels, className, key) {
             var keys = Array.isArray(key) ? key : [key, key], across = keys[0] !== keys[1];
             var dot = function (p, fill, k) { return L.circleMarker(p, inPane(k, {radius: 4, color: color, weight: 2, fillColor: fill, fillOpacity: 1, interactive: false})); };
-            var second = dot(points[1], color, keys[1]);
-            second.bindTooltip(label, inPane(keys[1], {permanent: true, direction: "right", className: className}));
+            var firstLeft = points[0][1] <= points[1][1];
+            var first = dot(points[0], "#fff", keys[0]), second = dot(points[1], color, keys[1]);
+            first.bindTooltip(labels[0], inPane(keys[0], {permanent: true, direction: firstLeft ? "left" : "right", className: className}));
+            second.bindTooltip(labels[1], inPane(keys[1], {permanent: true, direction: firstLeft ? "right" : "left", className: className}));
             var line = L.polyline(points, inPane(across ? ACROSS_PANE : keys[0], {color: color, weight: 1.5, opacity: 0.95, dashArray: "4 3", interactive: false}));
             if (across) crossLines.push({line: line, points: points, keys: keys});
-            return [line, dot(points[0], "#fff", keys[0]), second];
+            return [line, first, second];
         }
         // Each ΔT across two layers: its line shown only while both its spots are on screen, each where its own layer
         // shows (inside its pane's clip: WebODM's divider), so a line never leads to a spot that isn't there
@@ -1747,7 +1759,7 @@
                     if (typeof t === "number") label = m.name + ": " + formatTemp(t);
                 } else if (m.shape === "delta") {
                     var v = m.values || {};
-                    return deltaLayers(savedLatLngs(m), SAVED_STYLE.color, m.name + (typeof v.delta_t === "number" ? ": ΔT " + formatSigned(v.delta_t) : ""),
+                    return deltaLayers(savedLatLngs(m), SAVED_STYLE.color, deltaLabels(m.name, v.first, v.second),
                                        "dt-inspector-tip dt-inspector-saved-tip", key).forEach(function (l) { savedLayer.addLayer(l); });
                 } else if (m.circle) shape = L.circle([m.circle.lat, m.circle.lng], inPane(key, assign({radius: m.circle.radius, interactive: false}, style)));
                 else if (m.shape === "line") shape = L.polyline(savedLatLngs(m), inPane(key, assign({interactive: false}, style, {weight: style.weight + 1})));
@@ -2868,7 +2880,7 @@
         });
     }
 
-    var api = {userUnit: userUnit, formatTemp: formatTemp, thermalLayer: thermalLayer, thermalLayers: thermalLayers,
+    var api = {userUnit: userUnit, formatTemp: formatTemp, deltaLabels: deltaLabels, thermalLayer: thermalLayer, thermalLayers: thermalLayers,
                thermalLayerAt: thermalLayerAt, pointUrl: pointUrl, withColorMap: withColorMap, colorMapOf: colorMapOf,
                PLAIN: PLAIN, withPalette: withPalette, paletteOf: paletteOf, paletteOptions: paletteOptions, rangeOf: rangeOf,
                isothermKey: isothermKey, validIsotherm: validIsotherm, loadIsotherm: loadIsotherm, defaultIsotherm: defaultIsotherm,

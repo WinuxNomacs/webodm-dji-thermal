@@ -590,8 +590,8 @@
                 state.measurements.forEach(function (m) {
                     if (m.kind === "pin") html += marker("dt-pin", labelled(m.label, temp(m), unit));
                     else {
-                        var d = deltaOf(m, temp);
-                        html += marker("dt-spot", m.label + "a") + marker("dt-spot dt-spot-end", m.label + (d === null ? "" : " " + formatSigned(d, unit)));
+                        var labels = Inspector.deltaLabels(m.label, temp(m.first), temp(m.second), unit);
+                        html += marker("dt-spot", labels[0]) + marker("dt-spot dt-spot-end", labels[1]);
                         lines += '<line class="dt-inspector3d-line"></line>';
                     }
                 });

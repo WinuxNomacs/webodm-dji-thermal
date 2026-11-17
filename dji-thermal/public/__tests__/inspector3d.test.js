@@ -253,7 +253,7 @@ describe("pins and ΔTs", () => {
         expect(p.inspector.state.measurements).toHaveLength(0);
     });
 
-    test("ΔT is the second spot's temperature less the first's, with their distance in 3D; Esc cancels the first", async () => {
+    test("ΔT is the second spot's temperature less the first's, with their distance in 3D, each spot labelled with its own; Esc cancels the first", async () => {
         const p = await page();
         p.inspector.toggle();
         await flush();
@@ -270,6 +270,9 @@ describe("pins and ΔTs", () => {
         expect(Inspector3D.deltaOf(d, (r) => r.temperature)).toBeCloseTo(30, 9);
         expect(d.length).toBeCloseTo(Math.hypot(30, 40), 9);
         expect(p.panel().querySelector(".dt-inspector-delta-figures").textContent).toMatch(/\+30\.00 °C/);
+        // Each spot labelled with its temperature and its own ΔT, that spot's less the other's
+        expect([...p.area.querySelectorAll(".dt-inspector3d-marker.dt-spot")].map((m) => m.textContent))
+            .toEqual(["D1: 10.00 °C, ΔT -30.00 °C", "D1: 40.00 °C, ΔT +30.00 °C"]);
     });
 
     test("Manual Corrections change the temperatures shown, and the scale keeps the temperatures it shows", async () => {
