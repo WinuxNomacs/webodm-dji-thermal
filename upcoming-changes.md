@@ -18,6 +18,16 @@
   (R29, which places the photos at the DSM's height) never opened for them: WebODM's popup did, or a workset's older
   window. R29 had assumed `dsm` was the plan's. Decided (the user, 2026-11-17: "DSM should be provided by ODM task
   results ergo our changes should apply only to the plugin"): the plugin asks for it, dji-thermal-cli is not changed.
+  **Built:** `analysis.PLUGIN_OPTIONS` (`dsm`, with its reason) and `with_plugin_options`, which adds it to the stored
+  plan when it is read (recommended, and `--dsm` in `odm_arguments`; not when the plan names it already), so a
+  dataset analyzed before gets it with no Analyze again: in the dataset's page (`analyzer_api.detail`: the WebODM plan
+  tab, Save as a WebODM preset) and wherever a task takes the plan's options (`conversion_tasks.plan_of`: Create task
+  on a workset, Use for parent task, a converted DJI Thermal Task). DJI Thermal Task's panel starts with it
+  (`thermal/plan.js` `PANEL_OPTIONS`), and its note names it (`ThermalTaskPanel.jsx`). Tests: Django
+  `TestAnalysis.test_the_plan_asks_for_a_surface_model_even_for_a_dataset_analyzed_before`, the options lists in
+  `test_api.py` and `TestConversionTasks`; Jest `plan.test.js`. Docs: README, `quickstart-thermal-task.md` (its panel
+  screenshot retaken), `quickstart-analyzer.md`, `quickstart-inspector.md`, `developing.md`. Checked live, read only, on
+  :8002 at 1280 and 390 px: Roof Sample's plan tab lists `dsm` under "Digital Elevation Models › Outputs".
 - **R43. ODM's global seam levelling off for thermal tasks** (`r43-seam-levelling`) — 2026-11-14. From a review of
   two Mavic 3M multispectral tools (mavic3m-pansharpening, dedal-calibration: reflectance, nothing for thermal
   images): dedal-calibration processes its calibrated images with `texturing-skip-global-seam-leveling` so the mosaic

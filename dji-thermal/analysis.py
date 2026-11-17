@@ -13,6 +13,12 @@ from . import converter, datasets
 
 PROGRESS_INTERVAL = 1.0     # seconds between progress writes (each also checks the run is still wanted)
 FILES_SHARE = 0.8           # the analysis's progress the files' checks make, before its summary
+# The ODM options the plugin asks for itself, after dji-thermal-cli's plan's recommended ones: {name: (value, reason)}.
+# The DSM is the surface the Thermal Inspector places a task's photos on, on the map page (frames3d.on_map)
+PLUGIN_OPTIONS = {
+    'dsm': (True, ("the surface model: on the map page, the Thermal Inspector's \"Photos that saw this spot\" places "
+                   "the task's photos at its height (without it, that window doesn't open)")),
+}
 
 
 class Canceled(Exception):
@@ -99,6 +105,25 @@ def cameras(rows):
         found[key] = found.get(key, 0) + 1
     return [{'model': k[0], 'serial': k[1], 'width': k[2], 'height': k[3], 'frames': n}
             for k, n in sorted(found.items(), key=lambda kv: -kv[1])]
+
+
+def with_plugin_options(a):
+    """An analysis with the plugin's own ODM options (PLUGIN_OPTIONS) in its WebODM plan, recommended and in its
+    odm_arguments, but for those the plan has already: a copy when any is added (datasets.analysis' dict is shared, so
+    never changed). Added when read, so a dataset analyzed before gets them too."""
+    plan = a.get('webodm')
+    if not plan:
+        return a
+    named = set(plan.get('recommended') or {}) | set(plan.get('consider') or {})
+    missing = [(n, v) for n, v in PLUGIN_OPTIONS.items() if n not in named]
+    if not missing:
+        return a
+    recommended = dict(plan.get('recommended') or {})
+    arguments = list(plan.get('odm_arguments') or [])
+    for name, (value, reason) in missing:
+        recommended[name] = {'value': value, 'reason': reason}
+        arguments += ['--' + name] if value is True else ['--' + name, str(value)]
+    return dict(a, webodm=dict(plan, recommended=recommended, odm_arguments=arguments))
 
 
 def compact(result, root, version=""):

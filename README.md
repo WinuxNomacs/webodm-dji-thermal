@@ -125,7 +125,7 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
 6. Below it, WebODM's own task panel: name, processing node, options and the photos on the map. The options start as
    the WebODM plan's, "(Custom)" with `radiometric-calibration` none (the images already hold temperatures) and
    `texturing-skip-global-seam-leveling` (ODM's levelling shifts temperatures and can leave a few pixels far outside
-   any measured). Images
+   any measured), and `dsm` (the surface model the Thermal Inspector places the task's photos on, on the map). Images
    are not resized: the thermal frames keep their size. **Review**, then **Start Processing**.
 7. Each photo is converted as it is uploaded, a few at a time. A photo that fails is left out with its reason;
    the task then processes the others. A GCP file, `geo.txt` and `image_groups.txt` go in with the photos' names
@@ -521,7 +521,7 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   one closest to straight down; those the surface hides the point from are left out and counted; the photo shown is
   marked on the map by where it was taken from, with a line to the point; **Open this frame** (the frame page, in a
   new tab) when the task came from a workset, and **Preview frame** (the whole photo at its full size over the page,
-  zoomed and dragged, with the temperature under the pointer, stepping through the photos without leaving the map). A task without a surface model (`dsm` off) or ODM's cameras shows
+  zoomed and dragged, with the temperature under the pointer, stepping through the photos without leaving the map). A task without a surface model (`dsm` off: the plugin turns it on for the tasks it starts) or ODM's cameras shows
   instead, when it was processed from a workset whose mosaics are built, the workset's frames placed from their GPS
   and gimbal (the point can be a little off). On a mosaic, the window is the mosaic viewer's, the mosaic's own frame
   first, its outline on the map. Elsewhere a click in Hover is still WebODM's (its popup).

@@ -5,9 +5,11 @@ export const MAX_PITCH = -80;   // degrees: dji-thermal-cli's mosaic.DEFAULT_MAX
 
 // The options WebODM's panel starts from ("Custom"). Left so, a normalized or harmonized task gets the plan's
 // recommended ones once its dataset is analyzed (api.py TaskWorkset: plan_options).
-// Global seam levelling off: it shifts the temperatures and can leave a few pixels far outside any measured.
+// Global seam levelling off: it shifts the temperatures and can leave a few pixels far outside any measured. A surface
+// model (DSM): the map page's Thermal Inspector places the task's photos on it (analysis.py PLUGIN_OPTIONS).
 export const PANEL_OPTIONS = [{name: "radiometric-calibration", value: "none"},
-                              {name: "texturing-skip-global-seam-leveling", value: true}];
+                              {name: "texturing-skip-global-seam-leveling", value: true},
+                              {name: "dsm", value: true}];
 
 // A photo's gimbal pitch in degrees (DJI's XMP GimbalPitchDegree, as exifr reads it), or null
 export function gimbalPitch(exif){

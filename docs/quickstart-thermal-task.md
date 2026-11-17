@@ -71,7 +71,8 @@ Below the measurement values is WebODM's usual task panel: the task's name, the 
 The options start as the WebODM plan's: **(Custom)**, with `radiometric-calibration` none, as the images already hold
 temperatures, and `texturing-skip-global-seam-leveling` ticked: ODM's global seam levelling adjusts the photos' values
 to even them out, which shifts temperatures by tenths of a degree and can leave a few pixels far outside any
-temperature measured. Normalized or harmonized, a task whose options you leave so also gets the plan's orthophoto resolution
+temperature measured, and `dsm` ticked: the surface model the Thermal Inspector places the task's photos on, on the
+map page ([The photos that saw a point](quickstart-inspector.md#6-the-frames-that-saw-a-point)). Normalized or harmonized, a task whose options you leave so also gets the plan's orthophoto resolution
 (the frames' ground sample distance) and GPS accuracy (from the RTK positions), from the dataset's analysis, before it
 starts. Pick another preset to use your own. The thermal frames keep their size; they aren't resized. Press
 **Review**, then **Start Processing**.
