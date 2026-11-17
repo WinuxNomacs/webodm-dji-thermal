@@ -14,15 +14,22 @@ describe("what DJI Thermal Task's panel takes from the WebODM plan", () => {
         expect(byPitch(["a", "c"], pitches, null)).toEqual({kept: ["a", "c"], oblique: []});
     });
 
+    test("the panel starts from radiometric calibration none, no global seam levelling and a surface model", () => {
+        expect(PANEL_OPTIONS).toEqual([{name: "radiometric-calibration", value: "none"},
+                                       {name: "texturing-skip-global-seam-leveling", value: true},
+                                       {name: "dsm", value: true}]);
+    });
+
     test("options are the same whatever their order, and differ by any value", () => {
         const seams = "texturing-skip-global-seam-leveling";
-        expect(sameOptions([{name: seams, value: true}, {name: "radiometric-calibration", value: "none"}], PANEL_OPTIONS)).toBe(true);
-        expect(sameOptions([{name: seams, value: "true"}, {name: "radiometric-calibration", value: "none"}], PANEL_OPTIONS)).toBe(true);
-        expect(sameOptions([{name: seams, value: false}, {name: "radiometric-calibration", value: "none"}], PANEL_OPTIONS)).toBe(false);
+        const panel = (seamsValue, calibration) => [{name: "dsm", value: true}, {name: seams, value: seamsValue},
+                                                    {name: "radiometric-calibration", value: calibration || "none"}];
+        expect(sameOptions(panel(true), PANEL_OPTIONS)).toBe(true);
+        expect(sameOptions(panel("true"), PANEL_OPTIONS)).toBe(true);
+        expect(sameOptions(panel(false), PANEL_OPTIONS)).toBe(false);
+        expect(sameOptions(panel(true).slice(1), PANEL_OPTIONS)).toBe(false);
         expect(sameOptions([{name: "radiometric-calibration", value: "none"}], PANEL_OPTIONS)).toBe(false);
-        expect(sameOptions([{name: "dsm", value: true}, {name: "radiometric-calibration", value: "none"}],
-                           [{name: "radiometric-calibration", value: "none"}, {name: "dsm", value: true}])).toBe(true);
-        expect(sameOptions([{name: seams, value: true}, {name: "radiometric-calibration", value: "camera"}], PANEL_OPTIONS)).toBe(false);
+        expect(sameOptions(panel(true, "camera"), PANEL_OPTIONS)).toBe(false);
         expect(sameOptions([], PANEL_OPTIONS)).toBe(false);
     });
 });

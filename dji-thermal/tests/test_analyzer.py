@@ -439,6 +439,29 @@ class TestAnalysis(AnalyzerTestCase):
         self.assertEqual(unkept.status_code, status.HTTP_200_OK)
         self.assertEqual(os.listdir(datasets.data_path(task, "thumbnails", "arctic")), [])
 
+    def test_the_plan_asks_for_a_surface_model_even_for_a_dataset_analyzed_before(self):
+        task = self.create()
+        stored = datasets.data_path(task, datasets.ANALYSIS_FILE)
+        datasets.write_json(stored, {"webodm": {
+            "recommended": {"radiometric-calibration": {"value": "none", "reason": "already temperatures"}},
+            "consider": {}, "odm_arguments": ["--radiometric-calibration", "none"]}})
+        plan = self.client.get("{}/{}".format(API, task.id)).data["analysis"]["webodm"]
+        # After dji-thermal-cli's options, for the Thermal Inspector's photos on the map page, which need a DSM
+        self.assertEqual(list(plan["recommended"]), ["radiometric-calibration", "dsm"])
+        self.assertTrue(plan["recommended"]["dsm"]["value"])
+        self.assertIn("Photos that saw this spot", plan["recommended"]["dsm"]["reason"])
+        self.assertEqual(plan["odm_arguments"], ["--radiometric-calibration", "none", "--dsm"])
+        self.assertEqual([o["name"] for o in conversion_tasks.plan_options(task)], ["radiometric-calibration", "dsm"])
+        # Added when read: the analysis kept as dji-thermal-cli made it
+        self.assertNotIn("dsm", datasets.read_json(stored)["webodm"]["recommended"])
+
+        # A plan that already names it (to recommend or to consider) is left as it is; no plan, nothing added
+        datasets.write_json(stored, {"webodm": {"recommended": {}, "consider": {"dsm": {"value": False, "reason": "x"}},
+                                                "odm_arguments": []}})
+        self.assertEqual(conversion_tasks.plan_options(task), [{"name": "dsm", "value": False, "reason": "x", "recommended": False}])
+        datasets.write_json(stored, {"files": []})
+        self.assertNotIn("webodm", self.client.get("{}/{}".format(API, task.id)).data["analysis"])
+
 
 class TestDatasetFiles(AnalyzerTestCase):
     """The Files tab's detail pane: a file as uploaded, shown or downloaded, and several as a zip"""
@@ -1728,7 +1751,7 @@ class TestConversionTasks(AnalyzerTestCase):
         info = self.client.get(self.url(task, cid)).data
         self.assertEqual((info["problems"], info["warnings"], info["frames"]), ([], [], 3))
         self.assertEqual([o["name"] for o in info["options"]],
-                         ["radiometric-calibration", "orthophoto-resolution", "fast-orthophoto"])
+                         ["radiometric-calibration", "orthophoto-resolution", "dsm", "fast-orthophoto"])
         self.assertEqual((info["name"], info["can_create"]), ("Roof - Nadir", True))
 
         res = self.client.post(self.url(task, cid), {"name": "Roof thermal", "options": [
@@ -1868,9 +1891,10 @@ class TestConversionTasks(AnalyzerTestCase):
         self.assertEqual(sorted(task.scan_images()), ["DJI_0002_T_temp_c.tiff", "a_DJI_0001_T_temp_c.tiff",
                                                       "b_DJI_0001_T_temp_c.tiff"])
         self.assertEqual((task.images_count, task.processing_node, task.auto_processing_node), (3, None, False))
-        # A task without options gets the plan's recommended ones; it waits for a node, and is still the dataset
+        # A task without options gets the plan's recommended ones, and the plugin's own (a DSM); it waits for a node,
+        # and is still the dataset
         self.assertEqual(task.options, [{"name": "radiometric-calibration", "value": "none"},
-                                        {"name": "orthophoto-resolution", "value": 6.2}])
+                                        {"name": "orthophoto-resolution", "value": 6.2}, {"name": "dsm", "value": True}])
         self.assertNotIn(task, get_pending_tasks())
         d = self.client.get("{}/{}".format(API, task.id)).data
         self.assertEqual((d["name"], d["parent"]["conversion"], len(d["conversions"])), ("Roof", cid, 1))

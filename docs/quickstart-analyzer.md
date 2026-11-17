@@ -91,8 +91,10 @@ reason for each. Above each option's name is the section it's in, in WebODM's ta
 **Edit**), where options are listed by the same names. Among the recommended ones are `radiometric-calibration`
 none (the images already hold temperatures) and `texturing-skip-global-seam-leveling`: ODM's global seam levelling
 adjusts the photos' values to even them out, which shifts temperatures by tenths of a degree and can leave a few
-pixels far outside any temperature measured. A dataset analyzed before the plan had an option keeps its plan as it
-was: **Analyze again** brings it up to date.
+pixels far outside any temperature measured. The plugin adds `dsm`, the surface model: on the map page, the Thermal
+Inspector places the task's photos at its height ("Photos that saw this spot"); every dataset's plan has it, analyzed
+before or not. A dataset analyzed before dji-thermal-cli's plan had an option keeps its plan as it was: **Analyze
+again** brings it up to date.
 
 ![The WebODM plan tab](images/dataset-plan.png)
 

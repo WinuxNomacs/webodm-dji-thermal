@@ -42,7 +42,7 @@ from app.security import path_traversal_check
 from nodeodm import status_codes
 from pyodx.exceptions import GenericError
 
-from . import conversions, datasets, measurements
+from . import analysis, conversions, datasets, measurements
 
 TASKS_FILE = 'tasks.json'
 PARENT_FILE = 'parent.json'
@@ -79,7 +79,7 @@ def set_task_palette(task, palette):
 
 
 def plan_of(task):
-    return datasets.analysis(task).get('webodm') or {}
+    return analysis.with_plugin_options(datasets.analysis(task)).get('webodm') or {}
 
 
 def plan_settings(process_args):

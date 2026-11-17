@@ -24,7 +24,7 @@ Everything the plugin ships is in `dji-thermal/` (the plugin's id, and the relea
 | `analyzer_api.py` | The DJI Thermal Analyzer's API: datasets, uploads, the analysis, worksets (`conversions` in the code), downloads, the mosaic viewer's tiles and values, preferences. Holds `DatasetView` and `get_dataset` / `get_conversion`, which check WebODM's project permissions. |
 | `analyzer_pages.py` | The Analyzer's pages: each renders a template from `templates/` with `common()` (the script version, the API's URL, the user's display preferences). |
 | `datasets.py` | A dataset: a holder task of its project, with everything in the task's `thermal/` folder. JSON records written atomically (`write_json`) under a lock the web app and the worker share (`locked`). Background jobs: `start_job` and `run_job`. |
-| `analysis.py` | The analysis job: dji-thermal-cli's check and WebODM plan over a dataset's photos. |
+| `analysis.py` | The analysis job: dji-thermal-cli's check and WebODM plan over a dataset's photos; the ODM options the plugin adds to that plan when it reads it (`PLUGIN_OPTIONS`, `with_plugin_options`: `dsm`, for the map's photos window). |
 | `conversions.py` | Worksets: their settings (checked in `parse_settings`), the conversion job (`convert`), the outputs' names, the palettes (`palettes()`, `COLORMAPS`), and each user's saved defaults and display preferences. |
 | `mosaics.py` | A workset's mosaics: the build job (`make`), and what the mosaic viewer reads (tiles, values, palettes). |
 | `intensify.py` | Each pixel's difference from its surroundings (the median over about 2 m): the mosaic viewer's Intensify tab. |

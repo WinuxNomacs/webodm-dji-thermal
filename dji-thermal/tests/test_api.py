@@ -385,9 +385,10 @@ class TestTaskWorkset(ApiTestCase):
             self.assertTrue(self.client.get(self.url).data["committed"])
         process.delay.assert_called_once_with(self.task.id)
         self.task.refresh_from_db()
-        # The plan's recommended options over the panel's, the others kept; not those it only suggests considering
-        self.assertEqual(self.task.options, [{"name": "dsm", "value": True}, {"name": "radiometric-calibration", "value": "none"},
-                                             {"name": "orthophoto-resolution", "value": 2.2}])
+        # The plan's recommended options over the panel's, the plugin's own (a DSM) after them; not those it only
+        # suggests considering
+        self.assertEqual(self.task.options, [{"name": "radiometric-calibration", "value": "none"},
+                                             {"name": "orthophoto-resolution", "value": 2.2}, {"name": "dsm", "value": True}])
 
     def test_the_workset_s_progress_says_how_far_it_is_and_starts_a_converted_worksets_task(self):
         self.assertEqual(self.client.get(self.url).status_code, status.HTTP_404_NOT_FOUND)

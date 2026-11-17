@@ -135,7 +135,7 @@ def detail(task, user, known_analysis=None):
     if known_analysis and known_analysis == out['analysis_stamp']:
         out['analysis_unchanged'] = True
     else:
-        out['analysis'] = datasets.analysis(task)
+        out['analysis'] = analysis.with_plugin_options(datasets.analysis(task))
     # Newest first
     out['conversions'] = [conversion_summary(task, cid) for cid in reversed(conversions.ids(task))]
     # What the conversions' settings are compared against, to list what each one changed

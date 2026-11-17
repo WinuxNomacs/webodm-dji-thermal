@@ -197,7 +197,8 @@ task, at the height of the task's surface model, so the circle is on the very pi
 
 ![A photo previewed over the map, the point circled](images/inspector-preview.png)
 
-A task processed without a surface model (ODM's `dsm` option off) or without ODM's cameras can't place its photos so:
+A task processed without a surface model (ODM's `dsm` option off; the tasks the plugin starts have it on) or without
+ODM's cameras can't place its photos so:
 if it was processed from a workset whose mosaics are built, the window shows the workset's frames instead, placed
 from their GPS and gimbal (the point can be a little off, and the window says so); otherwise the click is WebODM's.
 
