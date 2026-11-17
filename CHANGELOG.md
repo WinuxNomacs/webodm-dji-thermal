@@ -1,5 +1,59 @@
 # Changelog
 
+## 1.4.0 (2026-11-17)
+
+For WebODM 3.3.2 and 4.0.0, in Docker (Linux, Windows, macOS) or from its native Windows installer.
+
+**New**
+
+- **Thermal 3D**: on WebODM's 3D page, a thermal task's textured model and point cloud are drawn in the plugin's
+  palettes from the temperatures the model's textures hold (the point cloud from the model's nearest surface), with
+  the **Thermal Inspector in 3D**: Hover, ΔT, Pin and Measurements, the palette, scale and Image section, the
+  isotherm, the legend, Manual Corrections, and the pins saved on the map shown on the model.
+- **Photos that saw this spot**, on the 3D page and on the map page: a click on the model, or in Hover or Pin on a
+  thermal orthophoto, shows the task's own photos that saw the point, placed with ODM's refined cameras (on the map
+  at the surface model's height), each with its temperature there beside the orthophoto's or the model's, and the
+  spread, the one closest to straight down first. Photos the surface hides are left out and counted; on the map the
+  photo shown is marked by its camera and a line to the point. It works for every thermal task with its photos and
+  a surface model (DSM), not only one made from a workset (the tasks the plugin starts now have one, below); a
+  workset's task without a DSM keeps the earlier window.
+- **Preview frame**, beside "Open this frame" in both frames windows (the photos that saw a spot, and a workset's
+  frames on the map and the mosaic viewer): the frame at full size over the page, zoomed by the wheel, a pinch or the
+  keys, dragged, stepped through the frames that saw the spot with the arrows, closed with Esc. In the photos window
+  it reads the temperature under the pointer.
+- **(Default)** at the top of the Thermal Inspector's Palette list, on the map and 3D pages: the orthophoto and the
+  model as WebODM draws them and the photos as the camera saved them, for this page only (the saved palette stays);
+  the temperature under the pointer still reads.
+- **The Workset Creation Settings show the range each value accepts** for the dataset's cameras, and refuse a value
+  outside it before converting, where every frame of that camera used to fail.
+
+**Changed**
+
+- **ODM's global seam levelling is off for thermal tasks**: DJI Thermal Task starts WebODM's options with
+  `texturing-skip-global-seam-leveling`, and the Analyzer's WebODM plan recommends it. On a test flight the levelling
+  brought the orthophoto no closer to the photos, but left a few pixels near -390 °C. A dataset analyzed before
+  shows it in its plan once analyzed again.
+- **The tasks the plugin starts ask ODM for a surface model** (`dsm`): DJI Thermal Task starts with it, and the
+  Analyzer's WebODM plan recommends it (every dataset's, analyzed before or not), so the map's photos window opens on
+  them.
+- **The 3D model's palette loads faster** (about 2 s instead of 7 on the test model): each material's temperatures
+  are kept on the server until the task is processed again.
+- dji-thermal-cli 1.14.0 (was 1.12.0).
+- The docs explain how the distance, the ambient temperature and the humidity work together, after a report that
+  temperatures read lower with the rangefinder's distance: that is DJI's air correction, as set.
+
+**Fixed and made sturdier**
+
+- A photo that can't be shown says so ("isn't on the server any more", "couldn't be loaded"), and a surface model that
+  can't be read is said in words.
+- A click on an orthophoto before the map's layers have answered waits for them, instead of opening the wrong window.
+- Pointer Info follows a Manual Correction at once, without moving the pointer.
+- On a map under 768 px wide the frames window takes the map's full width, over the panel.
+- The map page's stylesheets are fetched at the scripts' version, so after an update the browser doesn't keep the old
+  ones (Preview frame over the whole window).
+- A task whose photos WebODM's Compact removed no longer claims the photos window; the window keeps only its last
+  24 photos' values, asks again for one that failed, and its links read on the 3D page.
+
 ## 1.3.0 (2026-11-12)
 
 For WebODM 3.3.2 and 4.0.0, in Docker (Linux, Windows, macOS) or from its native Windows installer.

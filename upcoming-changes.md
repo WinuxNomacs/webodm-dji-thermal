@@ -12,6 +12,24 @@
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
 
 **Done**
+- **Release 1.4.0** — 2026-11-17, `release/1.4.0` (the user: "prepare for release"): everything since 1.3.0 (Thermal 3D,
+  R27 to R44: the map's photos window placed with ODM's cameras, Preview frame, "(Default)" in the Palette list, the
+  workset ranges, the 3D palette's speed, ODM's global seam levelling off, a DSM for the tasks the plugin starts,
+  dji-thermal-cli 1.14.0); manifest 1.4.0, `CHANGELOG.md` (README has no version). Tests: Ruff, ESLint, Jest 418,
+  Django 273 with `app.tests.test_plugins` on 4.0.0 and 3.3.2 (`skipped=1`). Zip: `dist/dji-thermal-1.4.0.zip`
+  (`public/build` built against 4.0.0), sha256 `0c5e93999fd599139a90e4eafc31fdeb284517d458f90b051611e680e8145a8d`.
+  Release check on Docker 3.3.2 (:8003, recreated without the mount, then restored and stopped; :8002 left alone),
+  installed through Administration > Plugins (pip: dji-thermal-cli 1.14.0, numpy 1.26.2, Pillow 11.3.0; no webpack),
+  the M4T flight's 40 thermal frames and 3 RGB photos. First zip: a DJI Thermal Task processed (209 s; the layer
+  10.2 to 31.6 °C), its 3D page (the model in the palette, 2.9 to 36.9 °C, the pointer's temperature, 21 photos that
+  saw a spot, Preview frame); a dataset analyzed, a harmonized workset with mosaics (40 converted, 3 not thermal), the
+  viewer (a point's 19 frames, Preview frame), a task from the workset processed (293 s, 5.7 to 32.2 °C) whose map
+  showed the workset's frames window. It found R44: the DJI Thermal Task had no DSM, so its map opened WebODM's popup.
+  With R44's zip: the DJI Thermal Task's Review lists `dsm:true`, it processed with a DSM (201 s), and its map's
+  photos window opened at 1280 px (22 photos, 22.08 °C against the orthophoto's 22.25 °C, 4 hidden by the surface,
+  Preview frame) and 390 px (no overflow); the workset's Create task recommends `dsm` without analyzing again. No
+  console errors. The check's project deleted (its tasks removed first), the plugin removed. Not run: native Windows
+  (its WebODM wasn't running).
 - **R44. A surface model (DSM) for every task the plugin starts** (`r44-dsm`) — 2026-11-17. Found in release 1.4.0's
   check: a DJI Thermal Task, or a task made from a workset, had no DSM (neither the panel's starting options nor
   dji-thermal-cli's plan asked ODM for `dsm`), so on the map page the Thermal Inspector's "Photos that saw this spot"
