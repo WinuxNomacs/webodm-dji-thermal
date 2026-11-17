@@ -12,6 +12,12 @@
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
 
 **Done**
+- **R44. A surface model (DSM) for every task the plugin starts** (`r44-dsm`) — 2026-11-17. Found in release 1.4.0's
+  check: a DJI Thermal Task, or a task made from a workset, had no DSM (neither the panel's starting options nor
+  dji-thermal-cli's plan asked ODM for `dsm`), so on the map page the Thermal Inspector's "Photos that saw this spot"
+  (R29, which places the photos at the DSM's height) never opened for them: WebODM's popup did, or a workset's older
+  window. R29 had assumed `dsm` was the plan's. Decided (the user, 2026-11-17: "DSM should be provided by ODM task
+  results ergo our changes should apply only to the plugin"): the plugin asks for it, dji-thermal-cli is not changed.
 - **R43. ODM's global seam levelling off for thermal tasks** (`r43-seam-levelling`) — 2026-11-14. From a review of
   two Mavic 3M multispectral tools (mavic3m-pansharpening, dedal-calibration: reflectance, nothing for thermal
   images): dedal-calibration processes its calibrated images with `texturing-skip-global-seam-leveling` so the mosaic
