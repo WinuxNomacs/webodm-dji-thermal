@@ -15,7 +15,8 @@ For WebODM 3.3.2 and 4.0.0, in Docker (Linux, Windows, macOS) or from its native
   at the surface model's height), each with its temperature there beside the orthophoto's or the model's, and the
   spread, the one closest to straight down first. Photos the surface hides are left out and counted; on the map the
   photo shown is marked by its camera and a line to the point. It works for every thermal task with its photos and
-  a surface model (DSM), not only one made from a workset; a workset's task without a DSM keeps the earlier window.
+  a surface model (DSM), not only one made from a workset (the tasks the plugin starts now have one, below); a
+  workset's task without a DSM keeps the earlier window.
 - **Preview frame**, beside "Open this frame" in both frames windows (the photos that saw a spot, and a workset's
   frames on the map and the mosaic viewer): the frame at full size over the page, zoomed by the wheel, a pinch or the
   keys, dragged, stepped through the frames that saw the spot with the arrows, closed with Esc. In the photos window
@@ -32,6 +33,9 @@ For WebODM 3.3.2 and 4.0.0, in Docker (Linux, Windows, macOS) or from its native
   `texturing-skip-global-seam-leveling`, and the Analyzer's WebODM plan recommends it. On a test flight the levelling
   brought the orthophoto no closer to the photos, but left a few pixels near -390 °C. A dataset analyzed before
   shows it in its plan once analyzed again.
+- **The tasks the plugin starts ask ODM for a surface model** (`dsm`): DJI Thermal Task starts with it, and the
+  Analyzer's WebODM plan recommends it (every dataset's, analyzed before or not), so the map's photos window opens on
+  them.
 - **The 3D model's palette loads faster** (about 2 s instead of 7 on the test model): each material's temperatures
   are kept on the server until the task is processed again.
 - dji-thermal-cli 1.14.0 (was 1.12.0).
