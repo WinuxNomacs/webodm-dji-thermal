@@ -3,6 +3,38 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **R45. Pins: no photos window from a Pin click; each pin's temperature beside it** (`r45-pin-labels`) — the user,
+  2026-11-17, in `new.md`: "2 fixes needed for Thermal Inspector Pins. 1, don't open the source photos as that should
+  only happen when hover is active. 2, show the pin's temperature by the pin point. Similar to how Delta T works."
+  Today (checked in the code): a click in Pin drops the pin and opens the photos window, on the map page
+  (`inspector.js` `onClick`) and the 3D page (`inspector3d.js`, the pin tool's `click`); a pin's name in the
+  Measurements list pans to it and opens the window too. The map page's new pins are labelled "P1: 22.3 °C" already,
+  but a saved pin shows only its name; a 3D pin's marker reads "P1" (its temperature only in the hover title); the
+  frame page draws its pins on the image unlabelled.
+  **Decided** (the user, 2026-11-17):
+  1. A click in Pin no longer opens the photos window, on the map page and the 3D page: only Hover does. Clicking a
+     pin's name in the Measurements list still opens it ("Keep it").
+  2. Every pin shows its temperature beside it, "P1: 22.3 °C" (corrected and in the unit as the list shows it), on
+     the map page (saved pins too: name and temperature), the 3D page and the frame page (new and saved). A pin
+     without a reading keeps its name alone.
+  Builds on R10/R12 (pins, ΔT), R18 (one Measurements list), Thermal 3D's markers, R29 (the map's photos window).
+  Tests: Jest (`inspector.test.js`, `inspector3d.test.js`, frame page's) for the click and the labels; docs:
+  `quickstart-inspector.md` (Pin), the 3D and frame pages' sections, screenshots retaken where a pin shows.
+- **R46. ΔT: each spot's temperature and its own ΔT** (`r46-delta-labels`, after R45: the same labels) — the user,
+  2026-11-17, in `new.md`: "For Delta T points, display each points temperature as well as the Delta T at both
+  points. Better visual aid to what the values true meaning is." Today only the second spot is labelled ("D1: ΔT
+  +2.1 °C"; the 3D page "D1a" and "D1 +2.1"); each spot's temperature is already kept (`first`, `second`, live and
+  saved), so nothing new is measured or stored.
+  **Decided** (the user, 2026-11-17: "Temps, Delta T at both. However the Delta T should show the difference applied
+  both ways. So that A to B shows a delta of C and B to A show a delta of D. They should not both be the same as it
+  must increase or decrease depending on the direction. Both Delta T values are useful."):
+  1. Each spot's label is its temperature and its own ΔT, that spot less the other: first "D1: 22.1 °C, ΔT
+     −2.1 °C", second "D1: 24.2 °C, ΔT +2.1 °C". The second's is today's ΔT (second less first), so the list, the
+     CSV and the GeoJSON keep theirs; only the labels change.
+  2. On the map page (new and saved, across two orthophotos too: each label in its own layer's pane), the 3D page and
+     the frame page. A spot without a reading shows its name alone and no ΔT.
+  Tests: Jest for the labels on each page (the sign at each spot, a spot without a reading); docs: the ΔT sections
+  of `quickstart-inspector.md`, the 3D and frame pages', screenshots where a ΔT shows.
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
