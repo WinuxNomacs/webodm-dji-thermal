@@ -220,7 +220,7 @@ describe("reading the model", () => {
 });
 
 describe("pins and ΔTs", () => {
-    test("Pin keeps a clicked point and its temperature, numbered, in the browser for the task", async () => {
+    test("Pin keeps a clicked point and its temperature beside it, numbered, in the browser for the task, without the photos window", async () => {
         const p = await page();
         p.inspector.toggle();
         await flush();
@@ -235,7 +235,10 @@ describe("pins and ΔTs", () => {
         expect(list[1].temperature).toBeCloseTo(20, 9);
         expect(list[0].point).toEqual({x: 50, y: 50, z: 0});
         expect(JSON.parse(p.storage.items["dji-thermal-inspector3d:measurements:" + TASK.id])).toHaveLength(2);
-        expect(p.area.querySelectorAll(".dt-inspector3d-marker.dt-pin")).toHaveLength(2);
+        const pins = [...p.area.querySelectorAll(".dt-inspector3d-marker.dt-pin")];
+        expect(pins.map((m) => m.textContent)).toEqual(["P1: 50.00 °C", "P2: 20.00 °C"]);
+        // Only Hover opens the photos that saw a spot
+        expect(p.fetchFn.mock.calls.some((c) => c[0].indexOf("/inspector/model/frames?") !== -1)).toBe(false);
     });
 
     test("a drag of the view isn't a click", async () => {
@@ -318,7 +321,7 @@ describe("the isotherm", () => {
 });
 
 describe("the saved 2D pins", () => {
-    test("are placed on the model's top surface, and say when they aren't on it", async () => {
+    test("are placed on the model's top surface, labelled with their temperature, and say when they aren't on it", async () => {
         const p = await page({saved: [{id: "a1", name: "Vent", x: 20, y: 30, values: {temperature: 21.5}},
                                       {id: "b2", name: "Far", x: 500, y: 500, values: {temperature: 9}}]});
         p.inspector.toggle();
@@ -331,7 +334,7 @@ describe("the saved 2D pins", () => {
         const rows = p.panel().querySelectorAll("[data-saved]");
         expect(rows[0].textContent).toMatch(/Vent.*21\.50 °C/);
         expect(rows[1].textContent).toMatch(/not on the model/);
-        expect(p.area.querySelectorAll(".dt-inspector3d-marker.dt-saved")).toHaveLength(1);
+        expect([...p.area.querySelectorAll(".dt-inspector3d-marker.dt-saved")].map((m) => m.textContent)).toEqual(["Vent: 21.50 °C"]);
     });
 });
 

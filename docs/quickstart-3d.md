@@ -26,7 +26,8 @@ The panel's buttons choose what a click on the model does:
 - **ΔT**: click a first spot, then a second (D1, D2…). The panel gives each spot's temperature, **ΔT** (the second's
   minus the first's) and the distance between them, in metres along a straight line through the air. The view shows a
   dashed line between them. Esc forgets a first spot clicked by mistake.
-- **Pin**: a click pins the point with its temperature (P1, P2…).
+- **Pin**: a click pins the point, with its temperature beside it ("P1: 22.30 °C"). It doesn't open the photos that
+  saw it (section 6): Hover does.
 
 Pins and ΔTs are listed under **Measurements**, with Hide/Show, **CSV** (a row each: its position in the model's
 coordinates, x, y and z in the task's projection, and its temperature, or the two spots and the ΔT) and Remove all.
@@ -75,14 +76,15 @@ Hover, ΔT and Pin read the point under the pointer the same way.
 ## 5. Measurements saved on the map
 
 The pins saved on the task's 2D map ([Saving measurements](quickstart-inspector.md#7-saving-measurements)) are shown
-on the model, dashed in green, with their values as saved, under **Saved measurements**. They are read only here:
+on the model, dashed in green, each with its name and temperature as saved, and listed under **Saved
+measurements**. They are read only here:
 save, rename and delete them on the map. A pin that falls off the model is listed as "not on the model". Regions,
 lines and saved ΔTs aren't shown in 3D.
 
 ## 6. The photos that saw a spot
 
 A click in **Hover** on the model or the point cloud opens the task's photos that saw that spot, beside the panel.
-Dropping a pin, or clicking a pin's name under **Measurements**, opens them too.
+Clicking a pin's name under **Measurements** opens them too (dropping a pin doesn't).
 
 ![The photos that saw a spot of the roof: the first, most squarely facing it, beside the panel](images/inspector-3d-frames.png)
 

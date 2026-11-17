@@ -34,7 +34,7 @@
                 click: function (inspector, spot) { inspector.deltaSpot(spot); }},
         pin: {icon: Regions.TOOLS.pin.icon, name: "Pin", title: "Pin: click the model to keep a point and its temperature",
               hint: "Click the model to pin a point and its temperature.",
-              click: function (inspector, spot) { inspector.addPin(spot); inspector.showFrames(spot); }}
+              click: function (inspector, spot) { inspector.addPin(spot); }}
     };
     var TOOL_ORDER = ["hover", "delta", "pin"];
 
@@ -577,6 +577,8 @@
             var w = area.clientWidth, h = area.clientHeight;
             return {x: (v.x + 1) / 2 * w, y: (1 - v.y) / 2 * h};
         }
+        // A pin's label: its name and temperature, "P1: 22.30 °C" (its name alone without one)
+        function labelled(name, celsius, unit) { return name + (typeof celsius === "number" ? ": " + Inspector.formatTemp(celsius, unit) : ""); }
         function marker(cls, label, title) {
             return '<div class="dt-inspector3d-marker ' + cls + '" title="' + escapeHtml(title || label) + '"><span>' + escapeHtml(label) + "</span></div>";
         }
@@ -586,7 +588,7 @@
             var unit = Inspector.userUnit(), html = "", lines = "";
             if (state.measurementsVisible) {
                 state.measurements.forEach(function (m) {
-                    if (m.kind === "pin") html += marker("dt-pin", m.label, m.label + (typeof temp(m) === "number" ? ": " + Inspector.formatTemp(temp(m), unit) : ""));
+                    if (m.kind === "pin") html += marker("dt-pin", labelled(m.label, temp(m), unit));
                     else {
                         var d = deltaOf(m, temp);
                         html += marker("dt-spot", m.label + "a") + marker("dt-spot dt-spot-end", m.label + (d === null ? "" : " " + formatSigned(d, unit)));
@@ -595,7 +597,7 @@
                 });
             }
             if (state.pending) html += marker("dt-spot", "…");
-            if (state.savedVisible) state.saved.forEach(function (s) { if (s.point) html += marker("dt-saved", s.name); });
+            if (state.savedVisible) state.saved.forEach(function (s) { if (s.point) html += marker("dt-saved", labelled(s.name, (s.values || {}).temperature, unit)); });
             if (state.camera) {
                 html += marker("dt-camera", "Photo", "Where the photo shown was taken from");
                 lines += '<line class="dt-inspector3d-line dt-inspector3d-camera-line"></line>';

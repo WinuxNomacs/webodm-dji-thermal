@@ -917,7 +917,7 @@
             '<button type="button" class="btn btn-default btn-xs" data-act="clear-measurements"><i class="fa fa-trash"></i> Remove all</button></div>';
     }
 
-    // frames: a click shows the frames that saw a point of a layer shown
+    // frames: a click shows the frames that saw a point of a layer shown (only in Hover)
     function readoutHtml(r, unit, frames) {
         if (!r) return '<span class="text-muted">Move the cursor over a thermal layer.' + (frames ? " Click it to see the frames that saw the point." : "") + "</span>";
         if (r.error) return '<span class="text-danger">' + escapeHtml(r.error) + "</span>";
@@ -1106,7 +1106,7 @@
             '<div class="dt-inspector-pointer"><strong>Pointer Info</strong>' +
             '<label class="dt-inspector-check"><input type="checkbox" data-act="pointer-temperature"' + (state.pointerTemperature ? " checked" : "") +
             "> Temperature On Pointer</label></div>" +
-            '<div class="dt-inspector-readout">' + readoutHtml(state.readout, unit, state.frames) + "</div>" +
+            '<div class="dt-inspector-readout">' + readoutHtml(state.readout, unit, state.frames && state.mode === "hover") + "</div>" +
             (options.length ? '<label class="dt-inspector-label">Palette <select class="form-control input-sm" data-act="palette">' +
                 options.map(function (o) {
                     return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === current ? " selected" : "") + ">" + escapeHtml(o[1]) + "</option>";
@@ -1584,7 +1584,7 @@
         // A reading changes only the readout, so the panel's buttons stay as they are while used
         function renderReadout() {
             var el = state.open && panel.querySelector(".dt-inspector-readout");
-            if (el) el.innerHTML = readoutHtml(state.readout, userUnit(), state.frames);
+            if (el) el.innerHTML = readoutHtml(state.readout, userUnit(), state.frames && state.mode === "hover");
         }
 
         // -- measurements drawn where their layer shows -----------------------------------------------------------
@@ -1739,10 +1739,12 @@
             savedLayer.clearLayers();
             if (!state.savedVisible) return;
             savedItems(assign({}, state, {onMap: sourcesOnMap()})).forEach(function (i) {
-                var m = i.m, style = i.key === state.savedShown ? assign({}, SAVED_STYLE, {weight: 3}) : SAVED_STYLE, shape, key = i.source.key;
+                var m = i.m, style = i.key === state.savedShown ? assign({}, SAVED_STYLE, {weight: 3}) : SAVED_STYLE, shape, key = i.source.key, label = m.name;
                 if (m.shape === "pin") {
                     var c = m.geometry.coordinates;
                     shape = L.circleMarker([c[1], c[0]], inPane(key, {radius: 5, color: "#fff", weight: 2, fillColor: SAVED_STYLE.color, fillOpacity: 1, interactive: false}));
+                    var t = (m.values || {}).temperature;
+                    if (typeof t === "number") label = m.name + ": " + formatTemp(t);
                 } else if (m.shape === "delta") {
                     var v = m.values || {};
                     return deltaLayers(savedLatLngs(m), SAVED_STYLE.color, m.name + (typeof v.delta_t === "number" ? ": ΔT " + formatSigned(v.delta_t) : ""),
@@ -1750,7 +1752,7 @@
                 } else if (m.circle) shape = L.circle([m.circle.lat, m.circle.lng], inPane(key, assign({radius: m.circle.radius, interactive: false}, style)));
                 else if (m.shape === "line") shape = L.polyline(savedLatLngs(m), inPane(key, assign({interactive: false}, style, {weight: style.weight + 1})));
                 else shape = L.polygon(savedLatLngs(m), inPane(key, assign({interactive: false}, style)));
-                shape.bindTooltip(m.name, inPane(key, {permanent: true, direction: m.shape === "pin" ? "right" : "center", className: "dt-inspector-tip dt-inspector-saved-tip"}));
+                shape.bindTooltip(label, inPane(key, {permanent: true, direction: m.shape === "pin" ? "right" : "center", className: "dt-inspector-tip dt-inspector-saved-tip"}));
                 savedLayer.addLayer(shape);
             });
         }
@@ -2000,7 +2002,8 @@
         }
 
         // A click while pinning pins the point and is not WebODM's (no popup), nor is one while drawing
-        // In Hover, one on a layer with source frames shows them (else it is WebODM's); a pin shows them too
+        // In Hover, one on a layer with source frames shows them (else it is WebODM's); only Hover does (a pin's name in
+        // the list shows them too)
         function onClick(e) {
             if (Date.now() - drawnAt < DRAWN_CLICK_MS) return true;
             if (!state.open) return false;
@@ -2008,7 +2011,6 @@
             if (state.mode === "hover") return showFrames(t, e.latlng);
             if (state.mode !== "pin") return true;
             if (!t) return true;
-            showFrames(t, e.latlng);
             var n = state.pins.reduce(function (m, p) { return Math.max(m, Number(String(p.label).replace(/\D/g, "")) || 0); }, 0) + 1;
             var pin = {id: String(Date.now()) + n, label: "P" + n, lat: e.latlng.lat, lng: e.latlng.lng, temperature: null, reason: null, source: layerSource(t).key};
             query(t, e.latlng).then(function (r) {

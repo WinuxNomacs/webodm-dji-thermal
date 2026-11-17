@@ -776,7 +776,7 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         map.remove();
     });
 
-    it("shows who can only view the project the saved measurements, with no Save, rename or delete", async () => {
+    it("shows who can only view the project the saved measurements, with no Save, rename or delete, a saved pin labelled with its temperature", async () => {
         const map = leafletMap();
         const m = {id: "0123456789ab", name: "Vent", comment: "", shape: "pin", geometry: {type: "Point", coordinates: [0.5, 0.5]},
                    values: {valid: true, temperature: 41.5, measured: 41.5}, isotherm: null, correction: null, created_by: "ana"};
@@ -790,6 +790,9 @@ describe("the Thermal Inspector's saved measurements and correction", () => {
         expect(panel().querySelector("[data-saved]").textContent).toContain("41.50 °C");
         expect(panel().querySelector('[data-saved] [data-act="edit"]')).toBe(null);
         expect(panel().querySelector('[data-saved] [data-act="delete"]')).toBe(null);
+        const tips = [];
+        map.eachLayer(l => { if (l.getTooltip && l.getTooltip()) tips.push(l.getTooltip()._content); });
+        expect(tips).toContain("Vent: 41.50 °C");
         map.remove();
     });
 
@@ -1776,6 +1779,10 @@ describe("the Thermal Inspector's workset mosaics", () => {
         openOverlays(panel());
         change(panel().querySelector('[data-act="mosaic-on"]'), true);
         expect(panel().querySelector(".dt-inspector-readout").textContent).toContain("Click it to see the frames that saw the point");
+        // Only Hover's click shows them, so only Hover says so
+        ins.setMode("pin");
+        expect(panel().querySelector(".dt-inspector-readout").textContent).not.toContain("Click it to see the frames");
+        ins.setMode("hover");
 
         // A click in Hover is the Inspector's, not WebODM's popup
         expect(ins.click({latlng: L.latLng(0.5, 0.5)})).toBe(true);
@@ -1864,7 +1871,7 @@ describe("the Thermal Inspector's workset mosaics", () => {
         map.remove();
     });
 
-    it("shows the frames of the workset an orthophoto was processed from, by view angle, in the orthophoto's palette and range", async () => {
+    it("shows the frames of the workset an orthophoto was processed from, by view angle, in the orthophoto's palette and range, not from a Pin click", async () => {
         const map = leafletMap(THERMAL_TASK);
         const tiles = [{type: "orthophoto", meta: {task: Object.assign({project: 2}, THERMAL_TASK)}}];
         const frames = jest.fn(() => jsonResponse(FRAMES));
@@ -1881,12 +1888,18 @@ describe("the Thermal Inspector's workset mosaics", () => {
         expect(frameBox(map).textContent).not.toContain("comes from this frame");
         expect(frameBox(map).textContent).toContain("not ODM's cameras");
 
-        // A pin shows them too
+        // A click in Pin pins the point but doesn't show them: only Hover does; the pin's name in the list does too
+        pip(map, "close");
         ins.setMode("pin");
-        ins.click({latlng: L.latLng(0.5005, 0.4995)});
+        expect(ins.click({latlng: L.latLng(0.5005, 0.4995)})).toBe(true);
+        await flush(); await flush();
+        expect(ins.state.pins.length).toBe(1);
+        expect(frames).toHaveBeenCalledTimes(1);
+        expect(frameBox(map).hidden).toBe(true);
+        document.querySelector('[data-pin] [data-act="goto"]').click();
         await flush(); await flush();
         expect(frames.mock.calls[1][0]).toContain("lat=0.5005");
-        expect(ins.state.pins.length).toBe(1);
+        expect(frameBox(map).hidden).toBe(false);
         map.remove();
     });
 
