@@ -6,6 +6,9 @@
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
+- **Loose ends** (open since 1.4.0, 2026-11-17): the check on native Windows WebODM (`C:\WebODM`, 4.0.0) of what
+  changed since its last run; the docs screenshots `dataset-plan.png` and `create-task.png`, which show an older
+  page: retake them (`docs` skill).
 
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
