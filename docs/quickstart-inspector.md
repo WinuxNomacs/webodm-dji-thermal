@@ -27,8 +27,9 @@ on the map does:
   its own pixel, and **ΔT**, the second's minus the first's: click the cold spot first and a warmer one second, and
   ΔT is above zero. The map shows a thin line between them, labelled with the ΔT at the second spot. With Manual
   Corrections on (section 8), both spots are corrected. Save it, rename it and delete it like a region.
-- **Pin**: a click pins the point with its temperature (P1, P2…). The pins are listed in the panel; click one to go
-  to it.
+- **Pin**: a click pins the point, with its temperature beside it on the map ("P1: 22.30 °C"). The pins are listed
+  in the panel; click one to go to it. A click in Pin doesn't open the frames that saw the point (section 6): Hover
+  does.
 - **Rectangle**, **circle** and **polygon**: draw a region (R1, R2…). For a rectangle or circle, press and drag. For
   a polygon, click its corners, then double-click or press Enter to finish (Backspace removes the last corner, Esc
   cancels).
@@ -167,7 +168,7 @@ has no thermal orthophoto but another in the project does, the Inspector's butto
 ## 6. The frames that saw a point
 
 On a thermal orthophoto or a workset mosaic, a click in **Hover** opens the photos that saw that point, beside the
-panel. Dropping a pin, or clicking a pin's name in the panel, opens them too.
+panel. Clicking a pin's name in the panel opens them too (dropping a pin doesn't).
 
 ![The photos that saw a point clicked on a thermal orthophoto](images/inspector-frames.png)
 
@@ -218,7 +219,8 @@ On other layers a click in Hover is WebODM's own: its popup with the task's down
 ## 7. Saving measurements
 
 If you can change the project, each pin, region and line in the panel has a save button (the floppy disk). It opens
-a small form: give the measurement a name (it starts as P1, R1 or L1) and, if you like, a comment, then **Save**.
+a small form: give the measurement a name (it starts as P1, R1 or L1) and, if you like, a comment, then **Save**. A
+saved pin shows its name and temperature beside it.
 
 ![A region measured with the correction on, its Save form filled in](images/inspector-saved.png)
 

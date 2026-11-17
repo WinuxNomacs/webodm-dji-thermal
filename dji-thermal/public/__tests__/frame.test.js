@@ -96,7 +96,8 @@ describe("the frame page", () => {
     // A Leaflet stand-in: the panes' maps and the canvas each shows
     function fakeLeaflet() {
         const L = {maps: [], CRS: {Simple: {}}, DomUtil: {addClass() {}}, Util: {falseFn() {}}, latLngBounds: b => b};
-        const layer = extra => Object.assign({addTo(m) { (m.layers = m.layers || []).push(this); return this; }}, extra);
+        const layer = extra => Object.assign({addTo(m) { (m.layers = m.layers || []).push(this); return this; },
+                                              bindTooltip(text, opts) { this.tooltip = text; this.tooltipOpts = opts; return this; }}, extra);
         L.layerGroup = () => layer({layers: [], clearLayers() { this.layers = []; }});
         L.circleMarker = (at, opts) => layer({marker: at, opts});
         L.circle = (at, opts) => layer({circle: at, opts});
@@ -428,7 +429,7 @@ describe("the frame page", () => {
         expect(puts.length).toBeGreaterThan(drawn);
     });
 
-    it("pins a pixel, measured on the server in the frame's pixels, and saves it for everyone with a name", async () => {
+    it("pins a pixel, measured on the server in the frame's pixels, labelled with its temperature, and saves it for everyone with a name", async () => {
         const {server, L} = await start();
         document.querySelector("[data-tool=pin]").click();
         L.maps[0].fire("click", {latlng: {lat: -0.5, lng: 0.25}});
@@ -437,6 +438,10 @@ describe("the frame page", () => {
         expect(JSON.parse(region[1].body)).toEqual({frame: "a_T.JPG", changes: {}, geometry: {type: "Point", coordinates: [0.25, 0.5]}, isotherm: null});
         expect($("ta-frame-measure").textContent).toContain("P1");
         expect($("ta-frame-measure").textContent).toContain("15.00 °C");
+        // Its temperature beside it, once measured
+        const pins = i => L.maps[i].layers.filter(l => l.clearLayers).pop().layers.filter(l => l.marker);
+        expect(pins(0).map(l => l.tooltip)).toEqual(["P1: 15.00 °C"]);
+        expect(pins(0)[0].tooltipOpts).toEqual(expect.objectContaining({permanent: true, className: "dt-inspector-tip"}));
         document.querySelector("[data-item] [data-act=save]").click();
         document.querySelector("[data-form=name]").value = "Hot spot";
         document.querySelector("[data-act=form-save]").click();
@@ -447,6 +452,9 @@ describe("the frame page", () => {
         expect(document.querySelector("#ta-frame-measure [data-item]")).toBeNull();
         expect($("ta-frame-saved").textContent).toContain("Hot spot");
         expect($("ta-frame-saved").textContent).toContain("As converted. Saved by admin");
+        // A saved pin: its name and temperature, in the saved ones' colours
+        expect(pins(0).map(l => l.tooltip)).toEqual(["Hot spot: 15.00 °C"]);
+        expect(pins(0)[0].tooltipOpts.className).toBe("dt-inspector-tip dt-inspector-saved-tip");
     });
 
     it("measures ΔT between two pixels clicked with ΔT, first of the tools, and saves it like the others", async () => {

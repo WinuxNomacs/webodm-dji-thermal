@@ -3,23 +3,6 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **R45. Pins: no photos window from a Pin click; each pin's temperature beside it** (`r45-pin-labels`) — the user,
-  2026-11-17, in `new.md`: "2 fixes needed for Thermal Inspector Pins. 1, don't open the source photos as that should
-  only happen when hover is active. 2, show the pin's temperature by the pin point. Similar to how Delta T works."
-  Today (checked in the code): a click in Pin drops the pin and opens the photos window, on the map page
-  (`inspector.js` `onClick`) and the 3D page (`inspector3d.js`, the pin tool's `click`); a pin's name in the
-  Measurements list pans to it and opens the window too. The map page's new pins are labelled "P1: 22.3 °C" already,
-  but a saved pin shows only its name; a 3D pin's marker reads "P1" (its temperature only in the hover title); the
-  frame page draws its pins on the image unlabelled.
-  **Decided** (the user, 2026-11-17):
-  1. A click in Pin no longer opens the photos window, on the map page and the 3D page: only Hover does. Clicking a
-     pin's name in the Measurements list still opens it ("Keep it").
-  2. Every pin shows its temperature beside it, "P1: 22.3 °C" (corrected and in the unit as the list shows it), on
-     the map page (saved pins too: name and temperature), the 3D page and the frame page (new and saved). A pin
-     without a reading keeps its name alone.
-  Builds on R10/R12 (pins, ΔT), R18 (one Measurements list), Thermal 3D's markers, R29 (the map's photos window).
-  Tests: Jest (`inspector.test.js`, `inspector3d.test.js`, frame page's) for the click and the labels; docs:
-  `quickstart-inspector.md` (Pin), the 3D and frame pages' sections, screenshots retaken where a pin shows.
 - **R46. ΔT: each spot's temperature and its own ΔT** (`r46-delta-labels`, after R45: the same labels) — the user,
   2026-11-17, in `new.md`: "For Delta T points, display each points temperature as well as the Delta T at both
   points. Better visual aid to what the values true meaning is." Today only the second spot is labelled ("D1: ΔT
@@ -44,6 +27,34 @@
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
 
 **Done**
+- **R45. Pins: no photos window from a Pin click; each pin's temperature beside it** (`r45-pin-labels`) — 2026-11-17, built. The user,
+  2026-11-17, in `new.md`: "2 fixes needed for Thermal Inspector Pins. 1, don't open the source photos as that should
+  only happen when hover is active. 2, show the pin's temperature by the pin point. Similar to how Delta T works."
+  Today (checked in the code): a click in Pin drops the pin and opens the photos window, on the map page
+  (`inspector.js` `onClick`) and the 3D page (`inspector3d.js`, the pin tool's `click`); a pin's name in the
+  Measurements list pans to it and opens the window too. The map page's new pins are labelled "P1: 22.3 °C" already,
+  but a saved pin shows only its name; a 3D pin's marker reads "P1" (its temperature only in the hover title); the
+  frame page draws its pins on the image unlabelled.
+  **Decided** (the user, 2026-11-17):
+  1. A click in Pin no longer opens the photos window, on the map page and the 3D page: only Hover does. Clicking a
+     pin's name in the Measurements list still opens it ("Keep it").
+  2. Every pin shows its temperature beside it, "P1: 22.3 °C" (corrected and in the unit as the list shows it), on
+     the map page (saved pins too: name and temperature), the 3D page and the frame page (new and saved). A pin
+     without a reading keeps its name alone.
+  Builds on R10/R12 (pins, ΔT), R18 (one Measurements list), Thermal 3D's markers, R29 (the map's photos window).
+  Tests: Jest (`inspector.test.js`, `inspector3d.test.js`, frame page's) for the click and the labels; docs:
+  `quickstart-inspector.md` (Pin), the 3D and frame pages' sections, screenshots retaken where a pin shows.
+  **Built**: `inspector.js` (`onClick`: Pin no longer calls `showFrames`; Pointer Info's "Click it to see the frames
+  that saw the point" only in Hover, which the live check found still showing in Pin; `drawSaved`: a saved pin's
+  label is its name and temperature as saved), `inspector3d.js` (the pin tool's `click` only adds the pin; `labelled`
+  for pins and saved 2D pins), `frame.js` (`pinLabel`; `drawShapes` labels pins, new and saved, and is called again
+  once a pin is measured). Tests: Jest `inspector.test.js` (a Pin click asks for no photos, the pin's name does; Pin
+  hides the hint; a saved pin's label), `inspector3d.test.js` (pins' labels, no photos asked; saved pins' labels),
+  `frame.test.js` (a pin's label, then its saved label); each new check failed on the old code. Jest 418, ESLint,
+  Ruff. Live on :8002 (HomerunObliqueII, read only): the map at 1280 and 390 px (a Pin click: no window, nothing
+  asked, "P1: 64.13 °F"; the pin's name opened the window), the 3D page ("P1: 111.74 °F", no photos asked), the frame
+  page ("P1: 56.78 °F", as its list); no console errors. Docs: README, `quickstart-inspector.md`, `quickstart-3d.md`,
+  `quickstart-worksets.md`; `inspector-3d.png` retaken (looked at: no place, coordinates or serial).
 - **Release 1.4.0** — 2026-11-17, `release/1.4.0` (the user: "prepare for release"): everything since 1.3.0 (Thermal 3D,
   R27 to R44: the map's photos window placed with ODM's cameras, Preview frame, "(Default)" in the Palette list, the
   workset ranges, the 3D palette's speed, ODM's global seam levelling off, a DSM for the tasks the plugin starts,

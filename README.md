@@ -415,8 +415,8 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   **first_spot** and **second_spot** columns). With an overlay swiped, a ΔT can span the divider: each spot is
   read from the layer showing where it was clicked, the list names both layers, each dot shows with its own layer
   and the line only while both dots show. Such a ΔT isn't saved; it stays in the panel until the page is left.
-- **Pin**: a click pins the point with its temperature, labelled P1, P2…, shown on the map instead of WebODM's
-  popup. Pins are listed under Measurements (click one to go to it), with their latitude, longitude and temperature
+- **Pin**: a click pins the point, labelled with its temperature beside it ("P1: 22.30 °C", saved ones under their
+  name), instead of WebODM's popup; it doesn't open the source frames (Hover does). Pins are listed under Measurements (click one to go to it), with their latitude, longitude and temperature
   in the CSV.
 - **Regions and lines**: draw a rectangle or a circle (press and drag) or a polygon (click its corners; double-click
   or Enter finishes, Backspace removes the last corner, Esc cancels), labelled R1, R2…, or a line (click its points,
@@ -513,7 +513,7 @@ orthophotos only, but for one the Analyzer's **Open on WebODM's map** opened, wi
   and a horizontal divider alike); a ΔT across the divider compares the two layers.
   A map without temperatures shows the
   Inspector's button when the project has another task's thermal orthophoto to lay.
-- **Source frames**: a click in Hover (or a pin dropped, or a pin's name clicked in the panel) on a thermal
+- **Source frames**: a click in Hover (or a pin's name clicked in the panel) on a thermal
   orthophoto or a workset mosaic opens the window of the photos that saw that point beside the panel, one at a time
   with a crosshair on the point. On a thermal orthophoto they are the task's own photos, placed with the cameras ODM
   refined at the height of the task's surface model (so on the very pixel), as on the 3D view: each drawn in the
@@ -547,7 +547,8 @@ Thermal Inspector, with the 2D Inspector's tools that make sense on a model:
   It's coloured in your browser, in a background thread, as Potree loads its parts.
 - **Saved measurements**: the pins saved on the task's 2D map, shown on the model with their values as saved, read
   only.
-- **The photos that saw a spot**: a click in Hover (or a pin dropped, or a pin's name clicked) opens the task's
+- **Pins** show their temperature beside them ("P1: 22.30 °C"), saved ones too.
+- **The photos that saw a spot**: a click in Hover (or a pin's name clicked) opens the task's
   photos that saw that spot beside the panel, placed with the cameras ODM refined, so the spot is on the right pixel,
   walls included. Photos the model hides the spot from are left out; the rest come most squarely facing the surface
   first, one at a time in your palette with a crosshair on the spot, with that photo's temperature there, the model's,

@@ -297,6 +297,12 @@
         return s.count === 1 && !res.profile ? esc(core.formatTemp(s.mean, "C", 2)) : esc(core.formatTemp(s.mean, "C", 2)) + ' <span class="text-muted">mean</span>';
     }
 
+    // A pin's label on the frame: its name and temperature as the list shows it, "P1: 22.30 °C" (its name alone without one)
+    function pinLabel(name, res) {
+        var s = res && res.statistics;
+        return name + (s && s.count === 1 && typeof s.mean === "number" ? ": " + core.formatTemp(s.mean, "C", 2) : "");
+    }
+
     // What a measurement found, in full: the Inspector's statistics (sizes in pixels); a pin's own temperature
     function detailHtml(res, Inspector) {
         if (!res) return "";
@@ -508,11 +514,12 @@
             $("ta-frame-saved").innerHTML = savedHtml({saved: saved, savedShown: savedShown, form: form, canChange: meta.can_change, unit: unit()}, Inspector);
         }
 
-        // The shapes on both panes: those drawn (the one shown bolder) and those saved (dashed, green)
+        // The shapes on both panes: those drawn (the one shown bolder) and those saved (dashed, green); each pin labelled
         function drawShapes() {
             if (!L) return;
-            var shapes = items().map(function (i) { return {g: i.geometry, circle: i.circle, shape: i.shape, shown: i.id === shownItem, color: "#ff9800"}; })
-                .concat(saved.map(function (m) { return {g: m.geometry, circle: m.circle, shape: m.shape, shown: m.id === savedShown, color: "#2e7d32", dash: "5 4"}; }));
+            var shapes = items().map(function (i) { return {g: i.geometry, circle: i.circle, shape: i.shape, shown: i.id === shownItem, color: "#ff9800", name: i.label, res: i.res}; })
+                .concat(saved.map(function (m) { return {g: m.geometry, circle: m.circle, shape: m.shape, shown: m.id === savedShown, color: "#2e7d32", dash: "5 4",
+                                                         name: m.name, res: m.values, saved: true}; }));
             [0, 1].forEach(function (i) {
                 if (!maps[i]) return;
                 if (!groups[i]) groups[i] = L.layerGroup().addTo(maps[i]);
@@ -533,6 +540,10 @@
                     var layer = g.type === "Point" ? L.circleMarker(latLng(g.coordinates), {radius: 5, color: "#000", weight: 1, fillColor: sh.color, fillOpacity: 1, interactive: false}) :
                         sh.circle ? L.circle([sh.circle.lat, sh.circle.lng], Object.assign({radius: sh.circle.radius}, o)) :
                         g.type === "LineString" ? L.polyline(g.coordinates.map(latLng), o) : L.polygon(g.coordinates[0].map(latLng), o);
+                    if (g.type === "Point") {
+                        layer.bindTooltip(pinLabel(sh.name, sh.res), {permanent: true, direction: "right",
+                                                                      className: "dt-inspector-tip" + (sh.saved ? " dt-inspector-saved-tip" : "")});
+                    }
                     layer.addTo(groups[i]);
                 });
             });
@@ -550,7 +561,7 @@
                     if (mine !== item.asked) return;
                     item.loading = false;
                     item.res = r.ok ? r.data : {error: core.errorText(r.data, "Could not measure it.")};
-                    if (rel === frame) showMeasure();
+                    if (rel === frame) { showMeasure(); drawShapes(); }
                 }, function () {
                     if (mine !== item.asked) return;
                     item.loading = false;
