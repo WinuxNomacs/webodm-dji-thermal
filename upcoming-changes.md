@@ -2617,6 +2617,15 @@ user's call): whether the default `lrf` should stay, since at mapping heights it
 The advice given: 5 m (the camera's own setting, backed by the references), ambient as the
 measured air temperature, and a two-point calibration of the 5 m output against melting ice (0 C) and the station.
 
+**What the camera stores** (the M4T confirmed by the user on the aircraft, 2026-11-25): the M4T thermal camera's
+default measurement settings are a distance of 5 m (16 ft) and humidity 50 %, and it doesn't take the distance from
+the laser rangefinder; the M4T flight's 217 photos carry exactly that (5 m, 50 %) beside readings of 8.9-30.4 m.
+The embedded distance is the pilot's setting, used for the camera's live readout and stored with the photo; it
+doesn't change the raw data, so any distance can be applied later. DJI's documents give no default distance (the
+Thermal Analysis Tool guide v1.2: "The camera's default calibration distance is generally fixed during production",
+humidity default 70 %); the H30T FAQ says DJI Pilot 2 can read the rangefinder automatically, and the H30T sample
+stores 13 m (its thermal focusing and test distance), so other models' defaults and laser use are not confirmed.
+
 **Known gaps**: at mapping heights the 25 m cameras' rangefinder readings are clamped to 25 m, yet counted as
 "laser rangefinder" (not planned yet); frames without a reading get 5 m; oblique frames get the centre's distance
 everywhere.
