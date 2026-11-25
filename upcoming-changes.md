@@ -2595,6 +2595,21 @@ mosaic uses it so: the median hit altitude as the ground plane, each hit as a he
 most hits land on becoming the "ground". The datum of the absolute altitudes varies by aircraft and RTK set-up
 (not checked); only differences on one scale are used.
 
+**Distance pivots on ambient** (a user's glacier report, 2026-11-25: at 120 m the ice read 14 C off with ambient
+18 C and the station right; with ambient 0 C the reverse, the same size; the embedded 5 m was close on both). Long
+distance stretches each pixel's difference from the ambient entered: at ambient 18 C, 5 m to 120 m, about 1.9x on
+the M4T flight (iirp; p98 29.19 to 39.49 C) and the M4T hirp sample (p2 -7.60 to -30.00 C), 1.7x on the M3TD hirp
+sample, 1.4x on the H30T iirp sample; a pixel at ambient doesn't move. So with a scene spanning 0-18 C no single
+ambient puts both right (0.8 x 18 = 14 C, the user's error). The model is driven by distance, humidity only a small
+adjustment: on the M4T flight frame (header `hum_on` 1), p2 at 120 m is 12.97 / 12.79 / 12.64 C at humidity 10 / 50
+/ 95 %, at 5 m 20.07 / 19.98 / 19.91 C, against -7.2 C from 5 m to 120 m: humidity works, it is not bugged. 5 m is
+close to no distance correction, not exactly none (1 m against 5 m: 0.6 C in the cold pixels), and emissivity,
+reflected and ambient still apply (ambient 18 against 0 C moves the 5 m readings about 2.6 C). Since the 5 m
+readings matched both references, the real air over 120 m changed the signal little, while DJI's model corrects as
+if it let through about half: DJI's correction likely over-corrects at drone heights (a hypothesis, not checked
+against a radiative model). The advice given: 5 m (no air correction, backed by the references), ambient as the
+measured air temperature, and a two-point calibration of the 5 m output against melting ice (0 C) and the station.
+
 **Known gaps**: at mapping heights the 25 m cameras' rangefinder readings are clamped to 25 m, yet counted as
 "laser rangefinder" (not planned yet); frames without a reading get 5 m; oblique frames get the centre's distance
 everywhere.
