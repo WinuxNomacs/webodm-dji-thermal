@@ -13,13 +13,17 @@
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **D1. The Inspector's correction note** (the user, 2026-11-25): `correction.py`'s docstring says the
-  atmosphere's transmission is taken as 1 "as at mapping distances"; measured, it isn't (see "Object distance").
 - **D2. Distance estimate from the photo's pose** (the user, 2026-11-25): a new Distance to the target choice,
   "Laser rangefinder, else estimate, else as recorded"; dji-thermal-cli first. See "Object distance".
 - **D3. Distance estimate from the task's DSM** (the user, 2026-11-25), after D2. See "Object distance".
 
 **Done**
+- **D1. The Inspector's correction note** (main) — 2026-11-25, built. The user, 2026-11-25: "do D1, fix the
+  correction.py note". `correction.py`'s docstring said the atmosphere's transmission is taken as 1 "as at mapping
+  distances"; measured, distance matters there (see "Object distance"). **Built**: the docstring now says the model
+  is of the radiance leaving the surface, and the air is left out because the temperatures are already corrected
+  for it and a new emissivity or reflected temperature doesn't change that radiance (so they must be measured with
+  the distance wanted); the README's Manual Corrections paragraph alike. No code changed; Ruff.
 - **R46. ΔT: each spot's temperature and its own ΔT** (`r46-delta-labels`) — 2026-11-17, built. The user,
   2026-11-17, in `new.md`: "For Delta T points, display each points temperature as well as the Delta T at both
   points. Better visual aid to what the values true meaning is." Today only the second spot is labelled ("D1: ΔT
@@ -2584,9 +2588,10 @@ from ambient; the cold tail moves most. The flight's rangefinder: 8.9 / 23.9 / 3
 "laser rangefinder" (not planned yet); frames without a reading get 5 m; oblique frames get the centre's distance
 everywhere.
 
-**D1. The Inspector's correction note**: reword `correction.py`'s docstring: tau is left out (the temperatures it
-starts from are already corrected for it, so the error is second order), not "taken as 1, as at mapping distances"
-(wrong at 25-100 m, above). Comment only.
+**D1. The Inspector's correction note** (done, 2026-11-25): `correction.py`'s docstring no longer says tau is
+"taken as 1, as at mapping distances" (wrong at 25-100 m, above). Tau needs no place in the model: the temperatures
+it starts from are already corrected for the air, and the radiance leaving the surface doesn't change with the
+emissivity or reflected temperature asked for.
 
 **D2. Distance estimate from the pose** (decided, the user, 2026-11-25: a new choice, the default stays `lrf`; the
 pose first, the DSM later). dji-thermal-cli first (shared with the dji-thermal-ui session: ask there), released and

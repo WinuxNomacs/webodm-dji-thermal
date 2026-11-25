@@ -1,13 +1,19 @@
 """
 The Thermal Inspector's correction of temperatures for another emissivity and reflected temperature than they were
 measured with, as dji-thermal-ui corrects its mosaics. It is approximate: a broadband model (radiance as the fourth
-power of the temperature in kelvin, the atmosphere's transmission taken as 1, as at mapping distances)
+power of the temperature in kelvin) of the radiance leaving the surface
 
     W = eps * T_obj^4 + (1 - eps) * T_refl^4
 
-finds the radiance the camera saw from a temperature and the parameters it was measured with (the baseline), then the
+finds the radiance that left the surface from a temperature and the parameters it was measured with (the baseline), then the
 object's temperature again from that radiance with the parameters wanted. The camera's own model is spectral, so this
 is for comparing surfaces, not for calibrated values.
+
+The air between camera and surface is left out on purpose, not taken as transparent: the temperatures were already
+corrected for it when they were measured (object distance, humidity), and a change of emissivity or reflected
+temperature doesn't change what leaves the surface. At mapping distances that correction is not small (on an M4T
+frame, 25 m against 5 m moves the coldest pixels by 1.5 °C), so these temperatures must have been measured with the
+distance wanted.
 
 A layer's baseline is what its temperatures were measured with: an orthophoto's, the median of what its task's TIFFs
 record in their XMP (dji-thermal-cli's Emissivity and ReflectedTemperatureC); a workset mosaic's, the workset's
