@@ -2578,7 +2578,8 @@ defaults to `lrf`; the Frames viewer's changes take metres only.
 m with the newer tau table (H30T, M4T), tau from a (target temperature, distance) table; hirp 0-1000 m (libMicroTA
 transmission); girp and dirp (H20T, XT S) 1-25 m in whole metres, H20T and XT S starting from 5 m whatever the file
 says. XT S refuses to measure at 1-4 m (its own check needs 5 m or more; not compared with native). 5 m is DJI's
-reference: girp's and XT S's distance terms vanish there; cameras write it unless the pilot sets one.
+reference for girp and XT S (their distance terms vanish there), not for iirp (below); cameras write it unless the
+pilot sets one.
 
 **Effect** (M4T flight, iirp, a middle frame, ambient 26.8 C): p1 / median / p99 at 5 m 19.58 / 23.87 / 28.24 C,
 25 m 18.05 / 23.30 / 28.49, 100 m 13.24 / 21.66 / 29.19, 300 m 11.92 / 20.91 / 29.60. Distance pushes values away
@@ -2602,12 +2603,18 @@ the M4T flight (iirp; p98 29.19 to 39.49 C) and the M4T hirp sample (p2 -7.60 to
 sample, 1.4x on the H30T iirp sample; a pixel at ambient doesn't move. So with a scene spanning 0-18 C no single
 ambient puts both right (0.8 x 18 = 14 C, the user's error). The model is driven by distance, humidity only a small
 adjustment: on the M4T flight frame (header `hum_on` 1), p2 at 120 m is 12.97 / 12.79 / 12.64 C at humidity 10 / 50
-/ 95 %, at 5 m 20.07 / 19.98 / 19.91 C, against -7.2 C from 5 m to 120 m: humidity works, it is not bugged. 5 m is
-close to no distance correction, not exactly none (1 m against 5 m: 0.6 C in the cold pixels), and emissivity,
+/ 95 %, at 5 m 20.07 / 19.98 / 19.91 C, against -7.2 C from 5 m to 120 m: humidity works, it is not bugged. 5 m is not
+"no correction" on iirp: DJI's tau table (read at 20 C) gives 1.000 only at 0.25 m, then on the M4T flight 0.945 at
+1 m, 0.858 at 5 m, 0.716 at 25 m, 0.433 at 120 m (H30T 0.902 / 0.822 / 0.689 / 0.610, M3T and M3TD 0.911 / 0.805 /
+0.684 / 0.638), and the SDK refuses below 1 m; hirp accepts 0 (its transmission there not read). Its effect on the
+temperatures stays small near ambient (1 m against 5 m: 0.6 C in the cold pixels). Emissivity,
 reflected and ambient still apply (ambient 18 against 0 C moves the 5 m readings about 2.6 C). Since the 5 m
 readings matched both references, the real air over 120 m changed the signal little, while DJI's model corrects as
-if it let through about half: DJI's correction likely over-corrects at drone heights (a hypothesis, not checked
-against a radiative model). The advice given: 5 m (no air correction, backed by the references), ambient as the
+if it let through about half (0.433 at 120 m against 0.858 at 5 m: the 1.9x): DJI's correction likely over-corrects at drone heights (a hypothesis, not checked
+against a radiative model). Not an input error: the plugin and the CLI pass metres straight to the SDK, and the port matches the native SDK
+at random distances over each camera's whole range (`tests/oracle_cases.py`, `test_tsdk_vs_native`). Open (the
+user's call): whether the default `lrf` should stay, since at mapping heights it applies this over-correction.
+The advice given: 5 m (the camera's own setting, backed by the references), ambient as the
 measured air temperature, and a two-point calibration of the 5 m output against melting ice (0 C) and the station.
 
 **Known gaps**: at mapping heights the 25 m cameras' rangefinder readings are clamped to 25 m, yet counted as
