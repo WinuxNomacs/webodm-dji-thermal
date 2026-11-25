@@ -3,6 +3,9 @@
 ## Phases (current and upcoming)
 
 **Up next**
+- **D4. Distance: as recorded by default** (the user, 2026-11-25: "We shouldn't use the laser as default. We should
+  actually use whatever the camera was configured for during its flight and not the height of the drone or the lrf
+  distance"; the rule in `CLAUDE.md`: accurate temperatures first, the sensor data never modified). See "D4" below.
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
@@ -2644,6 +2647,27 @@ without `RelativeAltitude`, terrain away from take-off height.
 
 **D3. Distance estimate from the task's DSM** (plugin, after D2): the ground height under each photo from the
 task's DSM, modelled on the CLI's DSM offset (`mosaic._dsm_surface`).
+
+D2 and D3 are doubtful since D4: an estimate adds DJI's distance correction, which over-corrects at drone heights.
+
+**D4. Distance: as recorded by default** (decided, the user, 2026-11-25). Why: the M4T's own settings (5 m, 50 %,
+no rangefinder) are what the camera and DJI's tools measure with; the distance setting doesn't change the raw data
+(iirp: on every sample the raw values are the uncorrected reading and DJI corrects on top; hirp not tested), so
+using it is a choice of correction, and the rangefinder's distance brings DJI's over-correction at survey heights.
+Keeping the uploaded originals in the thermal task flow was considered and not wanted (the user: they stay with
+the user, a new task converts them again; each TIFF records its parameters).
+- The plugin's default becomes `'embedded'`, "As recorded", listed first: `conversions.DEFAULTS` (convert and
+  workset settings, "Reset to defaults"), `converter.settings` (a blank distance), the thermal task flow's
+  Distance to the target (`ThermalTaskPanel.jsx`, `MeasurementSettings.jsx`, `measurement.js`), the conversions
+  page's menu (`conversions.js`); `frame.js`'s distance field default checked. "Laser rangefinder, else as
+  recorded" stays a choice. dji-thermal-cli is not changed: the plugin always passes its distance.
+- Saved settings keep their `'lrf'` (they can't tell a chosen one from the old default); only new ones and "Reset to
+  defaults" change.
+- The check findings that name `--distance lrf (the default)` (`rangefinder_distance`, `rangefinder_invalid`, the
+  emissivity/distance spread) are reworded in `dataset.js` to say what the workset's own setting does.
+- Tests: Django (`test_api`, `test_converter`: the default, a blank distance), Jest (`measurement`, `upload`,
+  `conversions`, `analyzer` defaults; the reworded findings). Docs: README, `docs/measurement.md`,
+  `docs/converted-images.md`, screenshots showing the menu (`docs` skill). Live check of a conversion's default.
 
 ## Done: Thermal 3D
 
