@@ -13,6 +13,11 @@
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
+- **D1. The Inspector's correction note** (the user, 2026-11-25): `correction.py`'s docstring says the
+  atmosphere's transmission is taken as 1 "as at mapping distances"; measured, it isn't (see "Object distance").
+- **D2. Distance estimate from the photo's pose** (the user, 2026-11-25): a new Distance to the target choice,
+  "Laser rangefinder, else estimate, else as recorded"; dji-thermal-cli first. See "Object distance".
+- **D3. Distance estimate from the task's DSM** (the user, 2026-11-25), after D2. See "Object distance".
 
 **Done**
 - **R46. ΔT: each spot's temperature and its own ΔT** (`r46-delta-labels`) — 2026-11-17, built. The user,
@@ -2555,6 +2560,43 @@
   `Registered [coreplugins.dji-thermal.plugin]`. `ignored/WebODM` is at `v3.3.2`, `ignored/WebODM-Docs` and
   `ignored/WebODM-Plugins` on their upstream `main`. Ruff passes; Jest and ESLint have nothing to check until
   `dji-thermal/public/` exists.
+
+## Object distance (research, 2026-11-25)
+
+The user asked how distance is used (embedded, laser rangefinder). Research only; nothing built.
+
+**Today** (dji-thermal-cli 1.14.0, `core._rangefinder_distance`): `--distance METRES` > the rangefinder (DJI XMP
+`LRFStatus=Normal`, `LRFTargetDistance` > 0) > the embedded distance; the rangefinder's is clamped to the camera's
+range, with a note. One distance per frame. The mosaic uses only `LRFTargetAbsAlt`, for geometry. The plugin
+defaults to `lrf`; the Frames viewer's changes take metres only.
+
+**Per SDK family** (port of SDK 1.8, ranges read on the samples): iirp 1-25 m (H20N, M2EA, M30T, M3T, M3TD), 1-300
+m with the newer tau table (H30T, M4T), tau from a (target temperature, distance) table; hirp 0-1000 m (libMicroTA
+transmission); girp and dirp (H20T, XT S) 1-25 m in whole metres, H20T and XT S starting from 5 m whatever the file
+says. XT S refuses to measure at 1-4 m (its own check needs 5 m or more; not compared with native). 5 m is DJI's
+reference: girp's and XT S's distance terms vanish there; cameras write it unless the pilot sets one.
+
+**Effect** (M4T flight, iirp, a middle frame, ambient 26.8 C): p1 / median / p99 at 5 m 19.58 / 23.87 / 28.24 C,
+25 m 18.05 / 23.30 / 28.49, 100 m 13.24 / 21.66 / 29.19, 300 m 11.92 / 20.91 / 29.60. Distance pushes values away
+from ambient; the cold tail moves most. The flight's rangefinder: 8.9 / 23.9 / 30.4 m (min / median / max).
+
+**Known gaps**: at mapping heights the 25 m cameras' rangefinder readings are clamped to 25 m, yet counted as
+"laser rangefinder" (not planned yet); frames without a reading get 5 m; oblique frames get the centre's distance
+everywhere.
+
+**D1. The Inspector's correction note**: reword `correction.py`'s docstring: tau is left out (the temperatures it
+starts from are already corrected for it, so the error is second order), not "taken as 1, as at mapping distances"
+(wrong at 25-100 m, above). Comment only.
+
+**D2. Distance estimate from the pose** (decided, the user, 2026-11-25: a new choice, the default stays `lrf`; the
+pose first, the DSM later). dji-thermal-cli first (shared with the dji-thermal-ui session: ask there), released and
+pinned, then the plugin's choice "Laser rangefinder, else estimate, else as recorded". Slant range =
+`RelativeAltitude / cos(90 deg + gimbal pitch)`, clamped like the rangefinder's; a new `distance_source`
+"estimate" in the summary and the plugin's labels. Open: the value's name, the obliquest pitch estimated, frames
+without `RelativeAltitude`, terrain away from take-off height.
+
+**D3. Distance estimate from the task's DSM** (plugin, after D2): the ground height under each photo from the
+task's DSM, modelled on the CLI's DSM offset (`mosaic._dsm_surface`).
 
 ## Done: Thermal 3D
 
