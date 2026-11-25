@@ -510,9 +510,12 @@ def flight_frames(count):
 
 
 class TestConversionSettings(AnalyzerTestCase):
-    def test_settings_left_out_are_dji_thermal_clis_defaults(self):
+    def test_settings_left_out_are_the_defaults_the_distance_as_the_camera_recorded_it(self):
         self.assertEqual(conversions.parse_settings({}), (conversions.DEFAULTS, {}))
         self.assertEqual(conversions.parse_settings(None), (conversions.DEFAULTS, {}))
+        self.assertEqual(conversions.DEFAULTS['distance'], 'embedded')
+        self.assertEqual(conversions.parse_settings({'distance': ''})[0]['distance'], 'embedded')
+        self.assertEqual(conversions.parse_settings({'distance': 'lrf'})[0]['distance'], 'lrf')
 
     def test_settings_are_checked_field_by_field(self):
         settings, errors = conversions.parse_settings({

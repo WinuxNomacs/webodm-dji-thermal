@@ -345,7 +345,7 @@
         [/--ambient-temp and --reflected-temp/g, "an Ambient and a Reflected temperature"],
         [/--ambient-temp\b/g, "Ambient temperature"], [/--reflected-temp\b/g, "Reflected temperature"],
         [/--emissivity\b/g, "Emissivity"], [/--humidity\b/g, "Relative humidity"],
-        [/--distance lrf \(the default\)/g, "Distance to the target, Laser rangefinder (the default),"],
+        [/--distance lrf \(the default\)/g, "Distance to the target, Laser rangefinder,"],
         [/--distance embedded/g, "Distance to the target, As recorded,"], [/--distance METRES/g, "a Distance to the target in metres"],
         [/--distance\b/g, "Distance to the target"],
         [/--replace-above\/--replace-above-value \(or --replace-below\/\.\.\.\)/g, "Replace temperatures above (or below), in the settings' Adjustments,"],
@@ -368,12 +368,15 @@
             set: {max_pitch: -80}, label: "Only frames at or below \u221280\u00b0"},
         {code: /^temperature_(max|min)_outlier$/, text: "Hot or cold spots such as sun glint: Replace temperatures above (or below), " +
             "in the settings' Adjustments, blanks or replaces them; a Colour range gives a fixed colour scale."},
-        {code: /^rangefinder_distance$/, text: "The workset measures with the rangefinder's distance (the default). To use the " +
-            "distance recorded in each photo instead, choose As recorded in Distance to the target."},
-        {code: /^rangefinder_invalid$/, text: "Their recorded distance is used instead. If that's wrong, give a Distance to the " +
-            "target in metres."},
-        {code: /^rangefinder_outlier$/, text: "The laser hit something nearer or farther (a roof, a tree, the horizon). To use one " +
-            "distance for every photo, give a Distance to the target in metres."}
+        {code: /^rangefinder_distance$/, text: "A workset measures with the recorded distance (As recorded, the default): " +
+            "the distance the drone's thermal camera was set to for the flight, as DJI intends. Laser rangefinder in Distance " +
+            "to the target measures with the rangefinder's instead, where DJI's correction for the air grows large."},
+        {code: /^rangefinder_invalid$/, text: "Only matters with Laser rangefinder in Distance to the target: these photos are " +
+            "measured with their recorded distance instead."},
+        {code: /^rangefinder_outlier$/, text: "Only matters with Laser rangefinder in Distance to the target: the laser hit " +
+            "something nearer or farther (a roof, a tree, the horizon). As recorded, the default, isn't affected."},
+        {code: /^distance_differs$/, text: "The camera was set to different distances during the flight; As recorded, the " +
+            "default, measures each photo with its own. To use one distance for every photo, give a Distance to the target in metres."}
     ];
     function findingFix(f) {
         return FINDING_FIXES.filter(function (x) { return x.code.test(f.code); })[0] || null;

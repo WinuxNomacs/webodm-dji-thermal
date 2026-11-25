@@ -69,6 +69,13 @@ describe("the frame page's helpers", () => {
         expect(frame.changesTyped({reflected_temp: 30, emissivity: 0.8}, "C")).toEqual({reflected_temp: "86", emissivity: "0.8"});
     });
 
+    it("shows the distance the camera was set to as recorded, not the rangefinder's it was measured with", () => {
+        document.body.innerHTML = frame.paramsHtml(INFO, {}, {}, null, "");
+        const cells = Array.from(document.querySelectorAll("tbody tr")[0].querySelectorAll("td")).map(td => td.textContent);
+        expect(cells.slice(0, 3)).toEqual(["Distance (m)", "5.0", "18.1"]);
+        expect(document.body.textContent).toContain("The distance is the rangefinder's.");
+    });
+
     it("asks for a frame measured with the changes, and opens the Worksets form filled in with them", () => {
         expect(frame.frameApiUrl(BASE, "frame/values", "sub/b T.JPG", {emissivity: 0.8}))
             .toBe(BASE + "/frame/values?frame=sub%2Fb%20T.JPG&emissivity=0.8");

@@ -107,13 +107,14 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
      when imperial, else °C). The task's images are always in degrees Celsius.
    - **Emissivity**, **reflected temperature**, **ambient temperature** (the H20T and XT S do not use it, and the
      form says so) and **relative humidity**.
-   - **Distance to the target**: by default each photo's laser rangefinder distance where it has a valid one
-     (each photo of the M4T flight checked has one; DJI's sample images have none), else the distance the camera
-     recorded (usually 5 m, whatever the flight height). Or the recorded distance, or one distance for all photos.
-     The distance sets how much DJI's SDK corrects for the air, from the ambient temperature and humidity. The
-     camera's recorded ambient temperature is its own estimate, not the air's. Over tens of metres, a wrong ambient
-     temperature moves every temperature by several degrees. So with a real distance, type the air temperature and
-     humidity measured at the flight; without them, choose the recorded distance, as DJI's own apps use
+   - **Distance to the target**: by default **As recorded**, the distance the drone's thermal camera was set to for
+     the flight and recorded in each photo (on the M4T 5 m unless changed in DJI Pilot 2). The intent of the setting
+     is to match the drone's thermal camera, as DJI designed it: DJI calibrates the camera at a fixed distance, and
+     its own tools measure each photo with the distance it records. The setting doesn't change the photo's raw data;
+     it only sets how much DJI's SDK corrects for the air. Or **Laser rangefinder, else as recorded** (each photo's
+     rangefinder distance where it has a valid one), or one distance for all photos: at flight heights DJI's
+     correction is large and pushes temperatures away from the ambient temperature, so check a longer distance
+     against something of known temperature
      ([Measurement settings](docs/measurement.md#distance-ambient-temperature-and-humidity-together)).
 4. **Palette**, under Measurement (the Workset Creation Settings' order: Frames, Measurement, Colours): the DJI
    palette the task's thermal map (and the Thermal Inspector) opens in, starting on the one the photos were shot in,

@@ -138,11 +138,11 @@ class TestWhatIsConverted(ConverterTestCase):
 
 
 class TestMeasurementSettings(ConverterTestCase):
-    def test_by_default_the_rangefinder_s_distance_and_the_recorded_parameters_are_used(self):
+    def test_by_default_the_parameters_the_camera_recorded_are_used_its_distance_included(self):
         for values in (None, {}, {"distance": "", "emissivity": "", "humidity": None}):
             with self.subTest(values=values):
                 s = converter.settings(values)
-                self.assertEqual(s.distance, "lrf")
+                self.assertEqual(s.distance, "embedded")
                 self.assertEqual(s.unit, "C")
                 for name in converter.MEASUREMENT_FIELDS:
                     self.assertIsNone(getattr(s, name), name)
@@ -153,8 +153,8 @@ class TestMeasurementSettings(ConverterTestCase):
         self.assertEqual((s.distance, s.emissivity, s.reflected_temp, s.ambient_temp, s.humidity),
                          (12.5, 0.95, -3.0, 21.0, 70.0))
 
-    def test_the_recorded_distance_can_be_chosen_instead_of_the_rangefinder_s(self):
-        self.assertEqual(converter.settings({"distance": "embedded"}).distance, "embedded")
+    def test_the_rangefinder_s_distance_can_be_chosen_instead_of_the_recorded_one(self):
+        self.assertEqual(converter.settings({"distance": "lrf"}).distance, "lrf")
 
     def test_temperatures_in_fahrenheit_are_measured_in_celsius(self):
         s = converter.settings({"unit": "f", "reflected_temp": "50", "ambient_temp": "32"})
@@ -272,7 +272,7 @@ class TestRealFlight(ConvertedImagesTestCase):
 
     def test_a_flight_s_thermal_frames_convert_keeping_the_metadata_odm_reads(self):
         # All those ODM and OpenSfM read for a photo's position and orientation, and DJI's others (ImageSource, the
-        # rangefinder's)
+        # rangefinder's); measured with the distance the camera recorded, by default
         tags = ["GPSLatitude", "GPSLongitude", "GPSAltitude", "DateTimeOriginal", "Make", "Model", "FocalLength"] + [
             "XMP-drone-dji:" + t for t in ODM_DJI_TAGS + ("ImageSource", "LRFStatus", "LRFTargetDistance")]
         thermal = [f for f in jpegs_in("DJI_THERMAL_FLIGHT_DIR") if converter.is_thermal_rjpeg(f)]
@@ -281,7 +281,7 @@ class TestRealFlight(ConvertedImagesTestCase):
                 dest, _ = self.assertConverts(source)
                 before, after = read_tags(source, *tags), read_tags(dest, *tags + ["XMP-Camera:BandName"])
                 self.assertEqual(after.pop("BandName"), "LWIR")
-                self.assertEqual(read_tags(dest, "XMP-dtc:DistanceSource")["DistanceSource"], "rangefinder")
+                self.assertEqual(read_tags(dest, "XMP-dtc:DistanceSource")["DistanceSource"], "embedded")
                 before.pop("SourceFile"), after.pop("SourceFile")
                 self.assertIn("GimbalPitchDegree", before)
                 self.assertEqual(sorted(after), sorted(before))
