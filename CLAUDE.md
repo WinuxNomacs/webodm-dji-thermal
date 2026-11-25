@@ -6,6 +6,10 @@ and may be public: nothing private, nothing true only on one machine. Keep it sh
 
 ## Rules for this repository
 
+- **Accurate temperatures come first, and the sensor data is never modified** (the user, 2026-11-25): processing
+  changes only how the data is measured, shown and reviewed, never the photos' raw data, so the source stays
+  accurate. Measuring follows how the camera was set up for the flight unless the user chooses otherwise, and
+  every output records the parameters it was measured with.
 - **The plugin is `dji-thermal/`** (its id): the released zip has that folder as its single root. Dev tools
   (`dev/`, `package.json`, `eslint.config.mjs`, `ruff.toml`, `requirements-dev.txt`) stay outside it.
 - **Official plugin rules only** (https://docs.webodm.org/plugin-development-guide): no Django models or
