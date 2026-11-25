@@ -41,13 +41,24 @@ flight (here 26.6 to 27.8 °C) in steps of 1/16 °C. It's the camera's own estim
 
 ## Distance to the target
 
-How far the surface is from the camera, for the same air correction. Three choices:
+How far the surface is from the camera, for the same air correction.
 
-- **Laser rangefinder, else as recorded** (the default): each photo's laser rangefinder distance where it has a
-  valid one, else the distance its camera recorded. Of the photos checked, every M4T photo has one; DJI's sample
-  images have none.
-- **As recorded**: the distance the camera recorded. It's usually a fixed 5 m whatever the flight height. DJI's own
-  apps use it, so choose this to match their temperatures exactly.
+**The intent of this setting is to match the drone's thermal camera, as DJI designed it.** The pilot sets the
+distance in DJI Pilot 2's temperature measurement settings; on the M4T it is 5 m (16 ft), with 50 % humidity,
+unless changed there, and the camera doesn't take the laser rangefinder's distance. The camera writes the setting
+into each photo, and DJI's own tools measure each photo with it. DJI's Thermal Analysis Tool guide says "The
+camera's default calibration distance is generally fixed during production. This is the distance at which
+temperature measurements are the most accurate." So the plugin measures with it too, by default.
+
+The setting doesn't change what the camera captures: the photo's raw data is the same whatever it is, and the
+distance is applied afterwards, when temperatures are computed (checked on the iirp photos, the M4T's on older
+firmware: their raw values are the camera's uncorrected reading, and DJI corrects on top). Three choices:
+
+- **As recorded** (the default): the distance the drone's thermal camera was set to for the flight, as recorded in
+  each photo. It's usually 5 m whatever the flight height. The temperatures match DJI's own tools.
+- **Laser rangefinder, else as recorded**: each photo's laser rangefinder distance where it has a valid one, else
+  the distance its camera recorded. Of the photos checked, every M4T photo has one; DJI's sample images have none.
+  DJI's correction for the air grows quickly with distance and is large at flight heights (below).
 - **Set for all photos**: one distance you type.
 
 ## Distance, ambient temperature and humidity together
@@ -71,12 +82,21 @@ Measured on one frame of the M4T flight, with the recorded ambient temperature (
 At 100 m, an ambient temperature of 20 °C instead of 27.6 °C turns that frame's mean shift from −4.0 °C into
 +4.6 °C. The humidity matters far less: 20 % or 80 % moves the mean by under 0.3 °C.
 
+At long distances DJI's correction pivots on the ambient temperature: a surface at that temperature doesn't move,
+and every other is pushed away from it, roughly twice as far at 120 m as at 5 m on the M4T photos checked. So with
+a scene spanning several degrees (ice at 0 °C and a sunlit object at 18 °C, say), no single ambient temperature puts
+them all right: setting it to one surface's temperature leaves that one right and moves the other. DJI's correction
+treats 120 m of air as letting through about half the radiation that 5 m does; whether the air absorbed that much on
+the day can only be checked against a known temperature.
+
 So:
 
-- **To correct for the air**, use the rangefinder's distance (or your flight height), and type the ambient
-  temperature and humidity measured at the time of the flight, from a weather station or a thermometer at the site.
-- **Without a measured air temperature**, choose **As recorded**. The short 5 m path keeps the correction small, and
-  the temperatures match DJI's apps.
+- **Keep As recorded** unless you have a reason not to: it measures as the drone's thermal camera was set, as DJI
+  intends, and the temperatures match DJI's tools. Type the ambient temperature and humidity measured at the time of
+  the flight if you have them; the ambient temperature matters even at 5 m.
+- **To use a longer distance** (the rangefinder's, or one you type), check the result against something of known
+  temperature in the scene (melting ice is 0 °C; water, or an object you measured), at several distances with the
+  frame page's **Measure again**.
 
 To see what a value changes before converting a whole flight, use the frame page's **Measure again** (below).
 

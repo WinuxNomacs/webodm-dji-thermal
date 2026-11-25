@@ -94,8 +94,9 @@ describe("the values checked before the upload", () => {
 });
 
 describe("what is sent with each photo", () => {
-    test("only the values changed, with the unit and the rangefinder's distance by default", () => {
-        expect(requestData({emissivity: "0.90", humidity: ""}, "F")).toEqual({unit: "F", emissivity: "0.9", distance: "lrf"});
+    test("only the values changed, with the unit and the recorded distance by default", () => {
+        expect(requestData({emissivity: "0.90", humidity: ""}, "F")).toEqual({unit: "F", emissivity: "0.9", distance: "embedded"});
+        expect(requestData({distanceMode: "lrf"}, "C")).toEqual({unit: "C", distance: "lrf"});
     });
 
     test("the distance is the recorded one, or the one set for all photos", () => {

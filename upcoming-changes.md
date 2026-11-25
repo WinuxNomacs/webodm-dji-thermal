@@ -3,9 +3,6 @@
 ## Phases (current and upcoming)
 
 **Up next**
-- **D4. Distance: as recorded by default** (the user, 2026-11-25: "We shouldn't use the laser as default. We should
-  actually use whatever the camera was configured for during its flight and not the height of the drone or the lrf
-  distance"; the rule in `CLAUDE.md`: accurate temperatures first, the sensor data never modified). See "D4" below.
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
@@ -21,6 +18,10 @@
 - **D3. Distance estimate from the task's DSM** (the user, 2026-11-25), after D2. See "Object distance".
 
 **Done**
+- **D4. Distance: as recorded by default** (`d4-distance-embedded`) — 2026-11-25, built. The user, 2026-11-25: "We
+  shouldn't use the laser as default. We should actually use whatever the camera was configured for during its
+  flight", and: "be sure to point out in the description and documentation that the intent of the distance setting
+  is to match that of the drone thermal camera per DJI". See "D4" in "Object distance".
 - **D1. The Inspector's correction note** (main) — 2026-11-25, built. The user, 2026-11-25: "do D1, fix the
   correction.py note". `correction.py`'s docstring said the atmosphere's transmission is taken as 1 "as at mapping
   distances"; measured, distance matters there (see "Object distance"). **Built**: the docstring now says the model
@@ -2668,6 +2669,22 @@ the user, a new task converts them again; each TIFF records its parameters).
 - Tests: Django (`test_api`, `test_converter`: the default, a blank distance), Jest (`measurement`, `upload`,
   `conversions`, `analyzer` defaults; the reworded findings). Docs: README, `docs/measurement.md`,
   `docs/converted-images.md`, screenshots showing the menu (`docs` skill). Live check of a conversion's default.
+
+**Built** (`d4-distance-embedded`): `conversions.DEFAULTS['distance']` and a blank distance (`parse_settings`,
+`converter.settings`) are `'embedded'`; the thermal task flow (`ThermalTaskPanel.jsx`, `MeasurementSettings.jsx`,
+`measurement.js`) and the Workset Creation Settings (`conversions.js`) list As recorded first and start on it, their
+help saying it is the distance the drone's thermal camera was set to for the flight, as DJI intends (the task
+panel: 5 m on the M4T unless changed in DJI Pilot 2); Laser rangefinder's help says DJI's correction grows large at
+flight heights. The frame page's Recorded column shows the camera's distance, not the rangefinder's (`frame.js`).
+`dataset.js` rewords the rangefinder findings (only matter with Laser rangefinder; As recorded, the default) and
+adds one for `distance_differs`. Docs: `docs/measurement.md` (the intent per DJI, quoting the Thermal Analysis Tool
+guide; the setting doesn't change the raw data; how long distances pivot on the ambient temperature; checking a
+longer distance against a known temperature), README's Distance to the target. Screenshots retaken:
+`thermal-task-panel`, `workset-settings`, `dataset-problems`, `frame-measure-again`. `converted-images.md` needed
+no change. Tests: Django `test_converter` (the default, Laser rangefinder chosen, a flight's TIFFs record
+`DistanceSource` embedded), `test_analyzer` (the defaults, a blank distance); Jest `measurement`, `frame` (Recorded
+column), `analyzer` (the menu's order and default, the help, the reworded findings), the four failing on the old
+code. Jest 420, ESLint, Ruff.
 
 ## Done: Thermal 3D
 

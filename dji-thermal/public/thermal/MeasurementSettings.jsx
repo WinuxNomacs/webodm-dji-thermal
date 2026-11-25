@@ -59,7 +59,7 @@ export default class MeasurementSettings extends React.Component {
 
     render(){
         const { combined, values, unit, errors, disabled } = this.props;
-        const distanceMode = values.distanceMode || "lrf";
+        const distanceMode = values.distanceMode || "embedded";
         const unusedByAll = FIELDS.filter(f => !combined.ranges[f.name] && combined.unusedBy[f.name]);
 
         return (
@@ -93,8 +93,8 @@ export default class MeasurementSettings extends React.Component {
                     <div className="col-sm-10">
                         <select id="dji-thermal-distance-mode" className="form-control dji-thermal-input" value={distanceMode}
                                 disabled={disabled} onChange={this.setValue("distanceMode")}>
-                            <option value="lrf">{_("Laser rangefinder, else as recorded")}</option>
                             <option value="embedded">{_("As recorded")}</option>
+                            <option value="lrf">{_("Laser rangefinder, else as recorded")}</option>
                             <option value="value">{_("Set for all photos")}</option>
                         </select>
                         {distanceMode === "value" ?
@@ -106,7 +106,9 @@ export default class MeasurementSettings extends React.Component {
                         : ""}
                         {this.renderError("distance")}
                         <span className="help-block">{distanceMode === "lrf" ?
-                            _("Each photo's laser rangefinder distance where it has a valid one, else the distance its camera recorded.") + " " : ""}
+                            _("Each photo's laser rangefinder distance where it has a valid one, else the distance its camera recorded. DJI's correction for the air grows with distance and is large at flight heights.") + " " :
+                            distanceMode === "embedded" ?
+                            _("The distance the drone's thermal camera was set to for the flight (5 m on the M4T unless changed in DJI Pilot 2), as DJI intends and as DJI's own tools measure.") + " " : ""}
                             {interpolate(_("Range: %(range)s"), {range: rangeText("distance", combined, unit)})}</span>
                     </div>
                 </div>

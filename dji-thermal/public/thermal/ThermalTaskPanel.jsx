@@ -43,7 +43,7 @@ export default class ThermalTaskPanel extends React.Component {
             photos: [],
             unsupported: [], // [{name, reason}]
             combined: null,
-            values: {distanceMode: "lrf"},
+            values: {distanceMode: "embedded"},
             unit: defaultUnit(unitSystem()),
             errors: {},
             keepPhotos: false,

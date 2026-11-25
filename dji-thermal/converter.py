@@ -165,8 +165,9 @@ def is_thermal_rjpeg(path):
 
 def settings(values=None):
     """
-    dji-thermal-cli's Settings from an upload's measurement values (a dict): 'distance' ('lrf', the laser
-    rangefinder's distance where valid, else the recorded one; 'embedded', the recorded one; or metres), 'unit'
+    dji-thermal-cli's Settings from an upload's measurement values (a dict): 'distance' ('embedded', the default:
+    the distance the drone's thermal camera was set to and recorded, as DJI intends it to be measured; 'lrf', the
+    laser rangefinder's distance where valid, else the recorded one; or metres), 'unit'
     ('C', 'F' or 'K', of the temperatures) and the MEASUREMENT_FIELDS. A field left out, None or '' keeps each photo's
     recorded value. Measured with the SDK in use (sdk.current()).
     :raises ValueError: a value that is not a number, or that the library refuses, naming the field; the SDK
@@ -191,7 +192,7 @@ def settings(values=None):
     if unit not in UNITS:
         raise ValueError("unit must be C, F or K, not {!r}".format(values.get('unit')))
     distance = values.get('distance')
-    distance = 'lrf' if distance is None or distance == '' else distance
+    distance = 'embedded' if distance is None or distance == '' else distance
     if distance not in DISTANCES:
         distance = number('distance')
     folder = sdk.current()      # first: dji-thermal-cli that can't be loaded is an SdkError, with the reason
@@ -203,8 +204,8 @@ def measure(path, measurement_settings=None):
     """
     An R-JPEG measured with dji-thermal-cli: its .temperature in degrees Celsius (a float32 array of shape
     (height, width)), the .params used (Celsius) and the .distance_source ('rangefinder', 'embedded' or 'option').
-    :param measurement_settings: from settings(); by default each photo's rangefinder distance where valid and
-        the other parameters the camera recorded
+    :param measurement_settings: from settings(); by default the parameters the camera recorded, its distance
+        included
     :raises: the library's errors, for a file it cannot measure or a value outside the camera's range
     """
     return library().measure(path, measurement_settings or settings(), unit='C')

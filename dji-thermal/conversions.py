@@ -41,9 +41,9 @@ DISPLAY_KEY = 'display'
 UNITS = ('C', 'F', 'K')
 COMPRESSIONS = ('deflate', 'none')
 
-# dji-thermal-cli's own defaults (Settings(), process()), what "Reset to defaults" goes back to
+# dji-thermal-cli's own defaults (Settings(), process()), but the distance, what "Reset to defaults" goes back to
 DEFAULTS = {
-    'distance': 'lrf',
+    'distance': 'embedded',     # as the drone's thermal camera was set for the flight, as DJI intends; dji-thermal-cli's is 'lrf'
     'humidity': None,
     'emissivity': None,
     'reflected_temp': None,
@@ -147,12 +147,12 @@ def parse_settings(raw):
     if distance in ('lrf', 'embedded'):
         out['distance'] = distance
     elif blank(distance):
-        out['distance'] = 'lrf'
+        out['distance'] = DEFAULTS['distance']
     else:
         try:
             out['distance'] = number(distance)
         except (TypeError, ValueError):
-            errors['distance'] = "The distance is the rangefinder's, the embedded one, or a number of metres"
+            errors['distance'] = "The distance is the one recorded, the rangefinder's, or a number of metres"
 
     unit = str(get('unit') or 'C').upper()
     if unit in UNITS:

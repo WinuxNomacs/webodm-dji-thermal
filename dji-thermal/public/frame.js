@@ -16,7 +16,7 @@
     // The parameters a frame can be measured again with: [field, label, step, a temperature, what the SDK says it
     // measured with (info.params, °C), what the camera recorded (info.recorded)]
     var CHANGES = [
-        ["distance", "Distance (m)", "0.1", false, "distance", "lrf"],
+        ["distance", "Distance (m)", "0.1", false, "distance", "distance"],
         ["humidity", "Humidity (%)", "1", false, "humidity", "humidity"],
         ["emissivity", "Emissivity", "0.01", false, "emissivity", "emissivity"],
         ["reflected_temp", "Reflected temperature", "0.1", true, "reflection", "reflection"],
@@ -156,7 +156,7 @@
         var params = (info && info.params) || {}, rec = (info && info.recorded) || {}, starts = changeStarts(info);
         var any = Object.keys(changes || {}).length > 0, symbol = core.unitSymbol(core.userUnit());
         var rows = CHANGES.map(function (c) {
-            var recorded = c[0] === "distance" && (rec.lrf === null || rec.lrf === undefined) ? rec.distance : rec[c[5]];
+            var recorded = rec[c[5]];
             var value = typed[c[0]] !== undefined ? typed[c[0]] : starts[c[0]];
             return "<tr" + (error && error.field === c[0] ? ' class="has-error"' : "") + "><td>" + esc(c[1] + (c[3] ? " (" + symbol + ")" : "")) +
                 "</td><td>" + esc(paramText(c[0], c[3], recorded)) + "</td><td>" + esc(paramText(c[0], c[3], params[c[4]])) + "</td>" +
@@ -165,7 +165,7 @@
         var source = info && info.distance_source ? '<p class="ta-message">The distance is ' + esc(DISTANCE_SOURCES[info.distance_source] ||
             info.distance_source) + ".</p>" : "";
         return '<table class="table table-condensed ta-viewer-values ta-params"><thead><tr><th></th>' +
-            '<th title="As the camera recorded them (the distance: the rangefinder\'s)">Recorded</th><th>Measured with</th><th>Change to</th></tr></thead>' +
+            '<th title="As the drone\'s thermal camera was set for the flight">Recorded</th><th>Measured with</th><th>Change to</th></tr></thead>' +
             "<tbody>" + rows + "</tbody></table>" + source +
             '<div class="text-danger" id="ta-frame-change-error">' + esc((error && error.error) || "") + "</div>" +
             '<div class="ta-frame-download"><button type="button" class="btn btn-primary btn-sm" id="ta-frame-apply"><i class="fa fa-refresh"></i> Measure again</button>' +

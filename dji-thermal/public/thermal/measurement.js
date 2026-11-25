@@ -104,7 +104,7 @@ export function recordedText(name, combined, unit){
     return formatNumber(field && field.temperature ? fromCelsius(value, unit) : value);
 }
 
-// values: {emissivity: "0.95", ..., distanceMode: "lrf", distance: "12"} as typed. The problem of each field that
+// values: {emissivity: "0.95", ..., distanceMode: "embedded", distance: "12"} as typed. The problem of each field that
 // has one ({name: message}); empty when the values can be used.
 export function validate(values, combined, unit){
     const errors = {};
@@ -139,6 +139,6 @@ export function requestData(values, unit){
         const n = parse(values[f.name]);
         if (n !== null) data[f.name] = String(n);
     });
-    data.distance = values.distanceMode === "value" ? String(parse(values.distance)) : (values.distanceMode || "lrf");
+    data.distance = values.distanceMode === "value" ? String(parse(values.distance)) : (values.distanceMode || "embedded");
     return data;
 }

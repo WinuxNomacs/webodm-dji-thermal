@@ -84,7 +84,7 @@ const ANALYSIS = {
 };
 
 const DEFAULTS = {
-    distance: "lrf", humidity: null, emissivity: null, reflected_temp: null, ambient_temp: null, unit: "C", range_min: null,
+    distance: "embedded", humidity: null, emissivity: null, reflected_temp: null, ambient_temp: null, unit: "C", range_min: null,
     range_max: null, palette: null, gimbal_yaw: null, gimbal_pitch: null, gimbal_roll: null, replace_above: null,
     replace_above_value: null, replace_below: null, replace_below_value: null, strip_location: false, normalize: false, harmonize: false,
     max_pitch: null, outputs: ["temp_c:tiff", "pseudo:png"], compression: "deflate", mosaics: true
@@ -909,6 +909,23 @@ describe("a dataset's page", () => {
         expect(dataset.sortRows(rows, "v", true).map(r => r.v)).toEqual([2, 1, null]);
     });
 
+    it("says the rangefinder's findings only matter with Laser rangefinder, As recorded being the default", () => {
+        const html = dataset.problemsHtml({findings: [
+            {severity: "info", code: "rangefinder_distance", files: [], suggestion: "--distance embedded keeps the embedded distance instead",
+             message: "the embedded object distance is 5 m but the rangefinder reads 23.9 m (median); --distance lrf (the default) measures with the rangefinder's"},
+            {severity: "info", code: "rangefinder_outlier", files: [], suggestion: "", message: "2 file(s) with an unusual rangefinder distance"},
+            {severity: "warning", code: "distance_differs", files: [], message: "embedded distance differs between files: 3 at 5, 1 at 10",
+             suggestion: "--distance lrf (the default) uses each file's rangefinder reading; or set one with --distance METRES"}]});
+        document.body.innerHTML = html;
+        const text = document.body.textContent;
+        expect(text).toContain("each photo records an object distance of 5 m, but its rangefinder read 23.9 m (median)");
+        expect(text).toContain("A workset measures with the recorded distance (As recorded, the default)");
+        expect(text).toContain("as DJI intends");
+        expect(text).toContain("As recorded, the default, isn't affected");
+        expect(text).toContain("As recorded, the default, measures each photo with its own");
+        expect(text).not.toMatch(/Laser rangefinder \(the default\)|--distance/);
+    });
+
     it("shows the problems with what addresses them, and the WebODM plan", () => {
         const problems = dataset.problemsHtml(ANALYSIS);
         expect(problems).toContain("alert-warning");
@@ -1441,6 +1458,11 @@ describe("a dataset's conversions", () => {
         document.body.innerHTML = '<div id="f">' + conversions.formHtml(Object.assign({}, DEFAULTS, {unit: "K"}), PREFERENCES, rec) + "</div>";
         const html = document.getElementById("f").innerHTML;
         expect(html).toContain("Recorded: 5.0 m; laser rangefinder: 20.7 m");
+        // As recorded first and chosen by default, said to be the camera's setting as DJI intends
+        const modes = Array.from(document.querySelectorAll('[name="distance_mode"] option'));
+        expect(modes.map(o => o.textContent)).toEqual(["As recorded", "Laser rangefinder, else as recorded", "Set for all photos"]);
+        expect(modes.filter(o => o.selected).map(o => o.value)).toEqual(["embedded"]);
+        expect(html).toContain("As recorded measures with the distance the drone's thermal camera was set to for the flight, as DJI intends");
         expect(html).toContain("Reflected temperature (°F)");
         expect(html).toContain("Recorded: 68.0 °F");      // 20 °C
         expect(html).toContain("Recorded: 0.91");
