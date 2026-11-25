@@ -2584,6 +2584,17 @@ reference: girp's and XT S's distance terms vanish there; cameras write it unles
 25 m 18.05 / 23.30 / 28.49, 100 m 13.24 / 21.66 / 29.19, 300 m 11.92 / 20.91 / 29.60. Distance pushes values away
 from ambient; the cold tail moves most. The flight's rangefinder: 8.9 / 23.9 / 30.4 m (min / median / max).
 
+**The rangefinder's two values**: `LRFTargetDistance` is the beam's length, camera to the point hit (the object
+distance the SDK takes). `LRFTargetAbsAlt` is that point's altitude, on `AbsoluteAltitude`'s scale, with
+`LRFTargetLat`/`Lon` placing it in 3D; it is computed, not measured: `AbsoluteAltitude - LRFTargetDistance *
+sin(-GimbalPitchDegree)`, within 0.06 m (median) on all 217 frames of the M4T flight (-90 deg: 21.40 m beam,
+21.31 m drop; -45 deg: 29.86 m beam, 21.05 m drop). So it is only as good as the drone's altitude (barometer or
+GPS, centimetres with RTK), and it is the altitude of whatever surface was hit (roof, canopy, ground), not an
+object's height: that needs the ground's altitude there too (a hit on open ground, a terrain model or DSM). The
+mosaic uses it so: the median hit altitude as the ground plane, each hit as a height anchor (`mosaic.py`), a roof
+most hits land on becoming the "ground". The datum of the absolute altitudes varies by aircraft and RTK set-up
+(not checked); only differences on one scale are used.
+
 **Known gaps**: at mapping heights the 25 m cameras' rangefinder readings are clamped to 25 m, yet counted as
 "laser rangefinder" (not planned yet); frames without a reading get 5 m; oblique frames get the centre's distance
 everywhere.
