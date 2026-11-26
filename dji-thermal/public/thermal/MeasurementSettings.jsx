@@ -108,7 +108,7 @@ export default class MeasurementSettings extends React.Component {
                         <span className="help-block">{distanceMode === "lrf" ?
                             _("Experimental: each photo's laser rangefinder distance where it has a valid one, else the distance its camera recorded, given to DJI's automatic correction for the air. That correction grows with distance: at flight heights it can make temperatures differ greatly from the photo as its camera recorded them.") + " " :
                             distanceMode === "embedded" ?
-                            _("The distance the drone's thermal camera was set to for the flight (5 m on the M4T unless changed in DJI Pilot 2), as DJI intends and as DJI's own tools measure.") + " " : ""}
+                            _("The distance the drone's thermal camera was set to for the flight, as DJI intends and as DJI's own tools measure. It may be a setting of the thermal camera's own, apart from the laser rangefinder and the flight height: verify it on your drone.") + " " : ""}
                             {interpolate(_("Range: %(range)s"), {range: rangeText("distance", combined, unit)})}</span>
                     </div>
                 </div>

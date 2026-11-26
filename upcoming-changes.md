@@ -29,6 +29,10 @@
   the distances a photo holds, one distance per photo, each camera's range and the clamp, what the distance does,
   why the rangefinder is experimental, what outputs record), linked from `docs/index.md`, `docs/measurement.md` and
   the README. Screenshot retaken: `workset-settings`. Jest (the menu's names, the help), ESLint.
+  Then (the user, 2026-11-26): "Instead of saying \"5 m on the M4T unless changed in DJI Pilot 2\" we should inform
+  the user that the distance for the thermal camera may be a separate configuration option and they should verify
+  the setting on their drone." The task panel's As recorded help, the README, `measurement.md` and `distance.md` now
+  say so (`distance-verify-setting`); `thermal-task-panel` retaken.
 - **D4. Distance: as recorded by default** (`d4-distance-embedded`) — 2026-11-25, built. The user, 2026-11-25: "We
   shouldn't use the laser as default. We should actually use whatever the camera was configured for during its
   flight", and: "be sure to point out in the description and documentation that the intent of the distance setting

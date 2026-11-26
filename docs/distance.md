@@ -26,7 +26,7 @@ checked this way.
 
 | Value in the photo | What it is | Used for temperatures? |
 |---|---|---|
-| The thermal camera's distance, in DJI's thermal data | The distance the pilot set in DJI Pilot 2's temperature measurement settings. On the M4T it is 5 m (16 ft) unless changed, with 50 % humidity. | Yes, by DJI's apps and tools, and by the plugin by default (**As recorded**). |
+| The thermal camera's distance, in DJI's thermal data | The distance the thermal camera was set to for the flight. It may be a setting of the thermal camera's own, apart from the laser rangefinder and the flight height: verify it on your drone. | Yes, by DJI's apps and tools, and by the plugin by default (**As recorded**). |
 | `LRFTargetDistance` | The laser rangefinder's beam length, from the camera to the point the laser hit. | Only if you choose **Laser rangefinder** (experimental). |
 | `LRFTargetAbsAlt`, `LRFTargetLat`, `LRFTargetLon` | Where the laser hit, as a position and altitude. | No. |
 | `RelativeAltitude`, `AbsoluteAltitude` | The drone's height above take-off, and its altitude. | No. |
@@ -34,7 +34,9 @@ checked this way.
 **The camera doesn't take the rangefinder's distance on the M4T.** With its default settings, the M4T writes 5 m into
 every photo, whatever the drone's height. On the M4T flight checked, all 217 photos record 5 m, while the rangefinder
 read from 8.9 m to 30.4 m (23.9 m median). Other models may differ: DJI's H30T documentation says DJI Pilot 2 can read
-the rangefinder automatically, and DJI's H30T sample image records 13 m. This hasn't been checked on an H30T flight.
+the rangefinder automatically, and DJI's H30T sample image records 13 m. This hasn't been checked on an H30T flight. So
+verify the thermal camera's distance setting on your drone (on the M4T, in DJI Pilot 2's temperature measurement
+settings), and whether it follows the rangefinder.
 
 **DJI calibrates the camera at a fixed distance.** DJI's Thermal Analysis Tool guide (v1.2) says: "The camera's
 default calibration distance is generally fixed during production. This is the distance at which temperature

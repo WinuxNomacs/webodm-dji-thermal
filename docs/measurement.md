@@ -43,10 +43,10 @@ flight (here 26.6 to 27.8 °C) in steps of 1/16 °C. It's the camera's own estim
 
 How far the surface is from the camera, for the same air correction.
 
-**The intent of this setting is to match the drone's thermal camera, as DJI designed it.** The pilot sets the
-distance in DJI Pilot 2's temperature measurement settings; on the M4T it is 5 m (16 ft), with 50 % humidity,
-unless changed there, and the camera doesn't take the laser rangefinder's distance. The camera writes the setting
-into each photo, and DJI's own tools measure each photo with it. DJI's Thermal Analysis Tool guide says "The
+**The intent of this setting is to match the drone's thermal camera, as DJI designed it.** The distance
+may be a setting of the thermal camera's own, apart from the laser rangefinder and the flight height (on the M4T,
+in DJI Pilot 2's temperature measurement settings), so verify it on your drone before a flight. The camera writes
+the setting into each photo, and DJI's own tools measure each photo with it. DJI's Thermal Analysis Tool guide says "The
 camera's default calibration distance is generally fixed during production. This is the distance at which
 temperature measurements are the most accurate." So the plugin measures with it too, by default.
 
