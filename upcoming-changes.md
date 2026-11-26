@@ -18,6 +18,17 @@
 - **D3. Distance estimate from the task's DSM** (the user, 2026-11-25), after D2. See "Object distance".
 
 **Done**
+- **D5. Laser rangefinder experimental, and a distance page** (`distance-lrf-experimental`) — 2026-11-26, built. The
+  user, 2026-11-26: "Add "(Experimental)" to the name of the laser rangefinder distance option. Make it clear in its
+  description that it uses DJI's thermal auto correction that can cause temperature values to differ greatly from
+  their source image. We should also add the distance research as a page in the documentation". **Built**: the
+  choice reads "Laser rangefinder, else as recorded (Experimental)" in the thermal task panel
+  (`MeasurementSettings.jsx`) and the Workset Creation Settings (`conversions.js`), its help saying it gives the
+  rangefinder's distance to DJI's automatic correction for the air, which at flight heights can make temperatures
+  differ greatly from the photo as its camera recorded them. New page `docs/distance.md` (How DJI uses distance:
+  the distances a photo holds, one distance per photo, each camera's range and the clamp, what the distance does,
+  why the rangefinder is experimental, what outputs record), linked from `docs/index.md`, `docs/measurement.md` and
+  the README. Screenshot retaken: `workset-settings`. Jest (the menu's names, the help), ESLint.
 - **D4. Distance: as recorded by default** (`d4-distance-embedded`) — 2026-11-25, built. The user, 2026-11-25: "We
   shouldn't use the laser as default. We should actually use whatever the camera was configured for during its
   flight", and: "be sure to point out in the description and documentation that the intent of the distance setting

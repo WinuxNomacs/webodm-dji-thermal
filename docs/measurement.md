@@ -56,10 +56,14 @@ firmware: their raw values are the camera's uncorrected reading, and DJI correct
 
 - **As recorded** (the default): the distance the drone's thermal camera was set to for the flight, as recorded in
   each photo. It's usually 5 m whatever the flight height. The temperatures match DJI's own tools.
-- **Laser rangefinder, else as recorded**: each photo's laser rangefinder distance where it has a valid one, else
-  the distance its camera recorded. Of the photos checked, every M4T photo has one; DJI's sample images have none.
-  DJI's correction for the air grows quickly with distance and is large at flight heights (below).
+- **Laser rangefinder, else as recorded (Experimental)**: each photo's laser rangefinder distance where it has a
+  valid one, else the distance its camera recorded, given to DJI's automatic correction for the air. Of the photos
+  checked, every M4T photo has one; DJI's sample images have none. The correction grows quickly with distance: at
+  flight heights it can make temperatures differ greatly from the photo as its camera recorded them (below).
 - **Set for all photos**: one distance you type.
+
+[How DJI uses distance](distance.md) explains each distance a photo holds (the camera's, the rangefinder's, the
+drone's altitude), what DJI's correction does with it, and why Laser rangefinder is experimental.
 
 ## Distance, ambient temperature and humidity together
 

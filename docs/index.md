@@ -72,6 +72,8 @@ Each one walks through a task from start to finish.
 - [Installing](installing.md): WebODM in Docker (Linux, Windows, macOS) or WebODM's native Windows installer.
 - [Measurement settings](measurement.md): emissivity, distance, reflected and ambient temperature, humidity, and
   what each one changes.
+- [How DJI uses distance](distance.md): the thermal camera's distance, the laser rangefinder and the drone's
+  altitude, what DJI's correction for the air does with the distance, and why Laser rangefinder is experimental.
 - [Palettes and units](palettes.md): how temperatures are coloured and in which unit they're shown.
 - [DJI's own Thermal SDK](dji-sdk.md): having DJI's library compute the temperatures instead.
 

@@ -111,11 +111,12 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
      the flight and recorded in each photo (on the M4T 5 m unless changed in DJI Pilot 2). The intent of the setting
      is to match the drone's thermal camera, as DJI designed it: DJI calibrates the camera at a fixed distance, and
      its own tools measure each photo with the distance it records. The setting doesn't change the photo's raw data;
-     it only sets how much DJI's SDK corrects for the air. Or **Laser rangefinder, else as recorded** (each photo's
-     rangefinder distance where it has a valid one), or one distance for all photos: at flight heights DJI's
-     correction is large and pushes temperatures away from the ambient temperature, so check a longer distance
-     against something of known temperature
-     ([Measurement settings](docs/measurement.md#distance-ambient-temperature-and-humidity-together)).
+     it only sets how much DJI's SDK corrects for the air. Or **Laser rangefinder, else as recorded (Experimental)**
+     (each photo's rangefinder distance where it has a valid one, given to DJI's automatic correction for the air),
+     or one distance for all photos: at flight heights DJI's correction is large and can make temperatures differ
+     greatly from the photo as its camera recorded them, so check a longer distance against something of known
+     temperature. [How DJI uses distance](docs/distance.md) explains the distances a photo holds and why the
+     rangefinder is experimental.
 4. **Palette**, under Measurement (the Workset Creation Settings' order: Frames, Measurement, Colours): the DJI
    palette the task's thermal map (and the Thermal Inspector) opens in, starting on the one the photos were shot in,
    unless you've chosen a palette in the Analyzer's preferences; the task's images hold temperatures, so the map can
