@@ -13,9 +13,6 @@
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
-- **D2. Distance estimate from the photo's pose** (the user, 2026-11-25): a new Distance to the target choice,
-  "Laser rangefinder, else estimate, else as recorded"; dji-thermal-cli first. See "Object distance".
-- **D3. Distance estimate from the task's DSM** (the user, 2026-11-25), after D2. See "Object distance".
 
 **Done**
 - **D5. Laser rangefinder experimental, and a distance page** (`distance-lrf-experimental`) — 2026-11-26, built. The
@@ -2664,7 +2661,8 @@ without `RelativeAltitude`, terrain away from take-off height.
 **D3. Distance estimate from the task's DSM** (plugin, after D2): the ground height under each photo from the
 task's DSM, modelled on the CLI's DSM offset (`mosaic._dsm_surface`).
 
-D2 and D3 are doubtful since D4: an estimate adds DJI's distance correction, which over-corrects at drone heights.
+D2 and D3 are dropped (the user, 2026-11-26): an estimate would put a longer distance through DJI's correction for
+the air, which over-corrects at drone heights, the reason Laser rangefinder is experimental (D5).
 
 **D4. Distance: as recorded by default** (decided, the user, 2026-11-25). Why: the M4T's own settings (5 m, 50 %,
 no rangefinder) are what the camera and DJI's tools measure with; the distance setting doesn't change the raw data
