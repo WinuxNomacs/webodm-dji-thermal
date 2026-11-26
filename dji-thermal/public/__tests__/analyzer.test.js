@@ -1460,9 +1460,13 @@ describe("a dataset's conversions", () => {
         expect(html).toContain("Recorded: 5.0 m; laser rangefinder: 20.7 m");
         // As recorded first and chosen by default, said to be the camera's setting as DJI intends
         const modes = Array.from(document.querySelectorAll('[name="distance_mode"] option'));
-        expect(modes.map(o => o.textContent)).toEqual(["As recorded", "Laser rangefinder, else as recorded", "Set for all photos"]);
+        expect(modes.map(o => o.textContent)).toEqual(["As recorded", "Laser rangefinder, else as recorded (Experimental)", "Set for all photos"]);
         expect(modes.filter(o => o.selected).map(o => o.value)).toEqual(["embedded"]);
         expect(html).toContain("As recorded measures with the distance the drone's thermal camera was set to for the flight, as DJI intends");
+        // The rangefinder is experimental: DJI's automatic correction can take temperatures far from the photo's
+        expect(document.getElementById("f").textContent).toContain("Laser rangefinder (Experimental) gives each photo's rangefinder " +
+            "distance to DJI's automatic correction for the air, which at flight heights can make temperatures differ greatly " +
+            "from the photo as its camera recorded them");
         expect(html).toContain("Reflected temperature (°F)");
         expect(html).toContain("Recorded: 68.0 °F");      // 20 °C
         expect(html).toContain("Recorded: 0.91");

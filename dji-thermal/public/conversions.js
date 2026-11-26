@@ -7,7 +7,7 @@
 
     var STATUS_LABELS = {converting: "Converting", ready: "Converted", failed: "Failed", canceled: "Canceled"};
     // As the DJI Thermal Task panel names them (thermal/MeasurementSettings.jsx), in its order
-    var DISTANCE_MODES = [["embedded", "As recorded"], ["lrf", "Laser rangefinder, else as recorded"], ["fixed", "Set for all photos"]];
+    var DISTANCE_MODES = [["embedded", "As recorded"], ["lrf", "Laser rangefinder, else as recorded (Experimental)"], ["fixed", "Set for all photos"]];
     var UNIT_LABELS = {C: "°C", F: "°F", K: "K"};
     // The measurement parameters with the analysis' column of each image's recorded value (Celsius for temperatures)
     var MEASUREMENTS = [
@@ -125,7 +125,9 @@
                 return '<option value="' + m[0] + '"' + (sel ? " selected" : "") + ">" + esc(m[1]) + "</option>";
             }).join("") + "</select>" + numberInput("distance", fixed ? s.distance : "", ' step="0.1" min="0.1" placeholder="m"' + (fixed ? "" : " hidden")) +
             "</div>", esc(withRange(distanceHelp, "distance") + ". As recorded measures with the distance the drone's thermal " +
-                "camera was set to for the flight, as DJI intends"));
+                "camera was set to for the flight, as DJI intends. Laser rangefinder (Experimental) gives each photo's rangefinder " +
+                "distance to DJI's automatic correction for the air, which at flight heights can make temperatures differ greatly " +
+                "from the photo as its camera recorded them"));
         var measurement = MEASUREMENTS.map(function (m) {
                 var hint = m.temperature ? core.convertTemp(rec[m.hint], "C") : rec[m.hint];
                 var label = m.label + (m.temperature ? " (" + u + ")" : m.unit ? " (" + m.unit + ")" : "");
