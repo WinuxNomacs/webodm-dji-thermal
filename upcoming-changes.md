@@ -11,6 +11,10 @@
   page: retake them (`docs` skill).
 
 **Later**
+- **Pin the next dji-thermal-cli** (its distance default is now `embedded`, `lrf` experimental: merged into its main
+  2026-11-26, not released). When pinned: `conversions.py`'s DEFAULTS comment ("dji-thermal-cli's is 'lrf'") and
+  `dataset.js`'s SETTING_NAMES rule for "--distance lrf (the default)" go; the check messages it rewords by code
+  read again against the new texts. Nothing changes in what the plugin measures: it always passes its distance.
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
 
