@@ -108,7 +108,8 @@ viewer's base layers are WebODM's own, loaded by your browser as on WebODM's oth
    - **Emissivity**, **reflected temperature**, **ambient temperature** (the H20T and XT S do not use it, and the
      form says so) and **relative humidity**.
    - **Distance to the target**: by default **As recorded**, the distance the drone's thermal camera was set to for
-     the flight and recorded in each photo (on the M4T 5 m unless changed in DJI Pilot 2). The intent of the setting
+     the flight and recorded in each photo. It may be a setting of the thermal camera's own, apart from the laser
+     rangefinder and the flight height: verify it on your drone. The intent of the setting
      is to match the drone's thermal camera, as DJI designed it: DJI calibrates the camera at a fixed distance, and
      its own tools measure each photo with the distance it records. The setting doesn't change the photo's raw data;
      it only sets how much DJI's SDK corrects for the air. Or **Laser rangefinder, else as recorded (Experimental)**
