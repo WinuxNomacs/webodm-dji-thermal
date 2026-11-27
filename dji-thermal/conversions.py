@@ -41,9 +41,9 @@ DISPLAY_KEY = 'display'
 UNITS = ('C', 'F', 'K')
 COMPRESSIONS = ('deflate', 'none')
 
-# dji-thermal-cli's own defaults (Settings(), process()), but the distance, what "Reset to defaults" goes back to
+# dji-thermal-cli's own defaults (Settings(), process()), what "Reset to defaults" goes back to
 DEFAULTS = {
-    'distance': 'embedded',     # as the drone's thermal camera was set for the flight, as DJI intends; dji-thermal-cli's is 'lrf'
+    'distance': 'embedded',     # as the drone's thermal camera was set for the flight, as DJI intends
     'humidity': None,
     'emissivity': None,
     'reflected_temp': None,
