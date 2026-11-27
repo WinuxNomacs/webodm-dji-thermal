@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.5.0 (2026-11-27)
+
+For WebODM 3.3.2 and 4.0.0, in Docker (Linux, Windows, macOS) or from its native Windows installer.
+
+**Changed**
+
+- **Temperatures are measured with the distance the drone's thermal camera recorded, by default** (**As recorded**,
+  in Distance to the target), as DJI intends and as DJI's own tools measure, in the DJI Thermal Task panel, the
+  Workset Creation Settings and "Reset to defaults". It may be a setting of the thermal camera's own, apart from the
+  laser rangefinder and the flight height: verify it on your drone. Worksets made before keep the distance they were
+  converted with.
+- **Laser rangefinder is marked Experimental** ("Laser rangefinder, else as recorded (Experimental)"): it gives each
+  photo's rangefinder distance to DJI's automatic correction for the air, which at flight heights can make
+  temperatures differ greatly from the photo as its camera recorded them.
+- **A new docs page, How DJI uses distance**: the distances a photo holds (the thermal camera's, the rangefinder's, the
+  drone's altitude), what DJI's correction does with them, what each camera accepts, and why Laser rangefinder is
+  experimental.
+- **Every pin shows its temperature beside it** ("P1: 22.30 °C"), on the map, the frame page and the 3D page, saved
+  pins included; a click with Pin no longer opens the photos window (Hover does, and so does a pin's name in the list).
+- **Each ΔT spot is labelled with its temperature and its own ΔT** ("D1: 22.10 °C, ΔT -2.10 °C" at one spot, "+2.10 °C"
+  at the other), on the map, the frame page and the 3D page.
+- The dataset's problems name dji-thermal-cli's distance choices as the settings do.
+- dji-thermal-cli 1.15.0 (was 1.14.0): its own distance default is now the recorded one too.
+
 ## 1.4.0 (2026-11-17)
 
 For WebODM 3.3.2 and 4.0.0, in Docker (Linux, Windows, macOS) or from its native Windows installer.
