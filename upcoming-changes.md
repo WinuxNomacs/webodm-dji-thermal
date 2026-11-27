@@ -11,14 +11,17 @@
   page: retake them (`docs` skill).
 
 **Later**
-- **Pin the next dji-thermal-cli** (its distance default is now `embedded`, `lrf` experimental: merged into its main
-  2026-11-26, not released). When pinned: `conversions.py`'s DEFAULTS comment ("dji-thermal-cli's is 'lrf'") and
-  `dataset.js`'s SETTING_NAMES rule for "--distance lrf (the default)" go; the check messages it rewords by code
-  read again against the new texts. Nothing changes in what the plugin measures: it always passes its distance.
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
 
 **Done**
+- **dji-thermal-cli 1.15.0 pinned** (`pin-cli-1.15.0`) — 2026-11-27, built. The user: "pin 1.15.0 in the plugin".
+  1.15.0 makes `embedded` its distance default and calls `lrf` experimental; the plugin always passes its own
+  distance, so what it measures is unchanged. `requirements.txt` pins it; `conversions.py`'s DEFAULTS comment no
+  longer says the CLI's default is `lrf`; `dataset.js`'s SETTING_NAMES names the CLI's new "--distance lrf
+  (experimental)" and "--distance embedded (the default)" (without a stray comma before punctuation); the four
+  distance findings' own texts (`FINDING_FIXES`) still replace the CLI's suggestions, read again against 1.15.0's.
+  Tests: `analyzer.test.js` (1.15.0's finding texts, the new names); Django suites on 4.0.0 and 3.3.2.
 - **D5. Laser rangefinder experimental, and a distance page** (`distance-lrf-experimental`) — 2026-11-26, built. The
   user, 2026-11-26: "Add "(Experimental)" to the name of the laser rangefinder distance option. Make it clear in its
   description that it uses DJI's thermal auto correction that can cause temperature values to differ greatly from

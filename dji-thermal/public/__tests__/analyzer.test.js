@@ -911,11 +911,11 @@ describe("a dataset's page", () => {
 
     it("says the rangefinder's findings only matter with Laser rangefinder, As recorded being the default", () => {
         const html = dataset.problemsHtml({findings: [
-            {severity: "info", code: "rangefinder_distance", files: [], suggestion: "--distance embedded keeps the embedded distance instead",
-             message: "the embedded object distance is 5 m but the rangefinder reads 23.9 m (median); --distance lrf (the default) measures with the rangefinder's"},
+            {severity: "info", code: "rangefinder_distance", files: [], suggestion: "--distance lrf (experimental) measures with the rangefinder's, through DJI's correction for the air, which at flight heights can take temperatures far from the file's own",
+             message: "the embedded object distance is 5 m but the rangefinder reads 23.9 m (median); --distance embedded (the default) measures with the embedded one"},
             {severity: "info", code: "rangefinder_outlier", files: [], suggestion: "", message: "2 file(s) with an unusual rangefinder distance"},
             {severity: "warning", code: "distance_differs", files: [], message: "embedded distance differs between files: 3 at 5, 1 at 10",
-             suggestion: "--distance lrf (the default) uses each file's rangefinder reading; or set one with --distance METRES"}]});
+             suggestion: "--distance embedded (the default) measures each file with its own; or set one with --distance METRES"}]});
         document.body.innerHTML = html;
         const text = document.body.textContent;
         expect(text).toContain("each photo records an object distance of 5 m, but its rangefinder read 23.9 m (median)");
@@ -924,6 +924,13 @@ describe("a dataset's page", () => {
         expect(text).toContain("As recorded, the default, isn't affected");
         expect(text).toContain("As recorded, the default, measures each photo with its own");
         expect(text).not.toMatch(/Laser rangefinder \(the default\)|--distance/);
+    });
+
+    it("names dji-thermal-cli's distance choices as the Workset Creation Settings do", () => {
+        expect(dataset.settingsWords("only matters with --distance lrf (experimental): their embedded distance is used instead"))
+            .toBe("only matters with Distance to the target, Laser rangefinder (Experimental): their embedded distance is used instead");
+        expect(dataset.settingsWords("--distance embedded (the default) measures each file with its own; or set one with --distance METRES"))
+            .toBe("Distance to the target, As recorded (the default), measures each file with its own; or set one with a Distance to the target in metres");
     });
 
     it("shows the problems with what addresses them, and the WebODM plan", () => {
