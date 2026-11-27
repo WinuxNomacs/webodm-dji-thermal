@@ -12,6 +12,25 @@
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
 
 **Done**
+- **Release 1.5.0** — 2026-11-27, `release/1.5.0` (the user: "push main and prepare the 1.5.0 release"): everything
+  since 1.4.0 (D1, D4, D5 and the "verify it on your drone" wording, R45, R46, dji-thermal-cli 1.15.0); manifest
+  1.5.0, `CHANGELOG.md` (README has no version). Reviewed first: nothing to fix (the ΔT labels' `first` and `second`
+  are in every ΔT result, saved ones from 1.4.0 included). Tests: Ruff, ESLint, Jest 421, Django 273 with
+  `app.tests.test_plugins` on 4.0.0 and 3.3.2 (`skipped=1`). Zip: `dist/dji-thermal-1.5.0.zip` (`public/build` built
+  against 4.0.0), sha256 `83fbd184dc5135874085887178f1bd21d1d6fb4820ec761c45ec64c9d9089086`. Release check on Docker
+  3.3.2 (:8003, recreated without the mount, then restored; :8002 left alone), with the upgrade rehearsed from the
+  published 1.4.0 zip (sha256 checked): under 1.4.0, a DJI Thermal Task (the rangefinder's distance by default)
+  processed, a saved pin on its map ("P1" alone; a Pin click opened the photos window), a dataset and a harmonized
+  workset (`distance: lrf`, dji-thermal-cli 1.14.0). 1.4.0 removed and the 1.5.0 zip installed through Administration >
+  Plugins (pip: dji-thermal-cli 1.15.0, numpy 1.26.2, Pillow 11.3.0; no webpack; the upload's page answered with a
+  connection reset as the dev server reloaded, the install itself done). After: the old workset keeps `lrf` and its
+  viewer (3.9 to 32.5 °C); the saved pin reads "P1: 23.53 °C". With 1.5.0: the DJI
+  Thermal Task panel opens on As recorded with the Experimental choice and "verify it on your drone", the task
+  processed (the layer 11.3 to 30.8 °C; Hover's photos window, 18 photos, Preview frame; a Pin click opened no photos
+  window, the pin labelled "P1: 19.46 °C"); a new harmonized workset (`distance: embedded`, 5 m, made with
+  dji-thermal-cli 1.15.0 without restarting the worker; the viewer 7.0 to 31.8 °C, as on native Windows), a task from
+  it processed (490 s, 8.5 to 31.5 °C; the workset's frames window, 24 photos, Preview frame). No console errors. Native
+  Windows: checked the same day on `main` (the loose ends, below). The check's project deleted, the plugin removed.
 - **Loose ends of 1.4.0** — 2026-11-27, done. **Screenshots**: the docs dataset analyzed again (the user agreed: its
   plan predated `texturing-skip-global-seam-leveling`), then `dataset-plan.png`, `create-task.png` and
   `dataset-preset.png` retaken (looked at: no place, coordinates or serial). **Native Windows 4.0.0** (`C:\WebODM`,
