@@ -6,15 +6,25 @@
 - **No macOS testing before the release** (the user, 2026-11-08): "we'll forego any macOS testing needed prior to
   release." WebODM's macOS installer runs it in Docker, so the Linux runs cover it ("Done: Linux, Windows and
   macOS"); Apple Silicon was checked without a Mac.
-- **Loose ends** (open since 1.4.0, 2026-11-17): the check on native Windows WebODM (`C:\WebODM`, 4.0.0) of what
-  changed since its last run; the docs screenshots `dataset-plan.png` and `create-task.png`, which show an older
-  page: retake them (`docs` skill).
 
 **Later**
 - **Kelvin on screen** (the user, 2026-11-07: dropped from the header unit, "we may decide to add it back later if
   webodm adds more traditional Kelvin support"): only once WebODM's units offer it.
 
 **Done**
+- **Loose ends of 1.4.0** — 2026-11-27, done. **Screenshots**: the docs dataset analyzed again (the user agreed: its
+  plan predated `texturing-skip-global-seam-leveling`), then `dataset-plan.png`, `create-task.png` and
+  `dataset-preset.png` retaken (looked at: no place, coordinates or serial). **Native Windows 4.0.0** (`C:\WebODM`,
+  started by the user, through the reverse tunnel): a zip of `main` installed through Administration > Plugins (pip:
+  dji-thermal-cli 1.15.0, numpy 2.5.4, Pillow 13.0.0; no webpack), the M4T flight's 40 thermal frames and 3 RGB
+  photos. A DJI Thermal Task processed (438 s, with `texturing-skip-global-seam-leveling` and `dsm`; the layer 11.3 to
+  30.2 °C), its map's photos window (22 photos, 26.21 °C against the orthophoto's 26.25 °C, 4 hidden, Preview frame),
+  its 3D page (1.6 to 36.4 °C, 20 photos that saw a spot); a dataset analyzed (40 thermal, 3 not), a harmonized
+  workset with mosaics (`distance: embedded`; the viewer 7.0 to 31.8 °C), a task from it processed (414 s, 8.4 to
+  31.4 °C) whose map showed the workset's frames window (23 photos, Open this frame, Preview frame). No console errors
+  of the plugin's: one intermittent page error on the dashboard comes from the SplatMe plugin
+  (`splatme/build/Dashboard.js`, a MutationObserver). The check's dataset, tasks and project deleted, the plugin
+  removed, the tunnel stopped.
 - **dji-thermal-cli 1.15.0 pinned** (`pin-cli-1.15.0`) — 2026-11-27, built. The user: "pin 1.15.0 in the plugin".
   1.15.0 makes `embedded` its distance default and calls `lrf` experimental; the plugin always passes its own
   distance, so what it measures is unchanged. `requirements.txt` pins it; `conversions.py`'s DEFAULTS comment no
